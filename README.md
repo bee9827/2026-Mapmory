@@ -14,6 +14,17 @@
 
 각 플랫폼 저장소는 독립적으로 빌드·배포합니다. Compose Multiplatform 공통 코드를 도입할 경우 Android/iOS 저장소 중 한 곳에 복사하지 않고, 별도의 shared 모듈 저장소 또는 패키지 배포 전략을 먼저 결정합니다.
 
+## 현재 클라이언트 구조
+
+```text
+client/
+├── androidApp/  # Android 진입점
+├── iosApp/      # Xcode 앱 진입점
+└── shared/      # Compose Multiplatform 공통 코드
+```
+
+클라이언트 환경 구성은 [`docs/client-environment.md`](docs/client-environment.md)에 기록합니다.
+
 ## 팀 운영 원칙
 
 - 버전과 실행 명령은 각 저장소 README에 기록합니다.

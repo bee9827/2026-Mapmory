@@ -1,0 +1,13 @@
+[versions]
+agp = "9.1.0"
+kotlin = "2.4.10"
+composeMultiplatform = "1.11.1"
+compileSdk = "36"
+minSdk = "28"
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
