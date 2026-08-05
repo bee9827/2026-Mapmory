@@ -1,6 +1,6 @@
 # Mapmory
 
-여행을 지도에 남기는 서비스 Mapmory의 통합 저장소입니다.
+사진과 지구본으로 여행의 장소와 기억을 기록하는 여행 아카이브 서비스 Mapmory의 통합 저장소입니다.
 
 이 저장소 하나에서 Android, iOS, Compose Multiplatform 공통 코드, Backend를 관리합니다. 저장소는 하나지만 각 영역의 소스·빌드·의존성·배포 경계는 분리합니다.
 
