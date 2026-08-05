@@ -7,7 +7,7 @@
 | Kotlin | 2.4.10 |
 | Compose Multiplatform | 1.11.1 |
 | Android Gradle Plugin | 9.1.0 |
-| Gradle | 9.5.0 (Wrapper로 고정 예정) |
+| Gradle | 9.5.0 (Wrapper로 고정) |
 | JDK | 21 |
 | Android compileSdk | 36 |
 | Android targetSdk | 36 |
@@ -27,7 +27,8 @@ Kotlin 2.4.10의 공식 KMP 호환 범위에 맞추기 위해 AGP 9.1.0을 사�
 ## 현재 검증 상태
 
 - JDK 21: 로컬 확인 완료
-- Gradle Wrapper: 아직 추가하지 않음
-- Android SDK 36: 로컬 확인 필요
+- Gradle Wrapper: `./gradlew --version`으로 9.5.0 확인
+- Android SDK 36: `/Users/chohs4164/Library/Android/sdk/platforms/android-36` 확인
 - Xcode 전체 설치: 현재 Command Line Tools만 활성화되어 있음
-- Android/iOS 실제 빌드: 환경 설치 후 수행
+- Android Debug 빌드: `./gradlew :androidApp:assembleDebug` 성공
+- iOS 실제 빌드: Xcode 전체 설치 후 수행
