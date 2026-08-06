@@ -94,6 +94,7 @@ fun TravelRecordListScreen(
                 } else {
                     TravelRecordList(
                         records = uiState.records,
+                        locations = locations,
                         onRecordClick = onRecordClick,
                         modifier = Modifier.weight(1f),
                     )
@@ -126,6 +127,7 @@ fun TravelRecordListScreen(
 @Composable
 private fun TravelRecordList(
     records: List<TravelRecord>,
+    locations: List<Location>,
     onRecordClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -140,6 +142,9 @@ private fun TravelRecordList(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(record.title, style = MaterialTheme.typography.titleMedium)
+                    locations.firstOrNull { it.id == record.locationId }?.let { location ->
+                        Text(location.name, style = MaterialTheme.typography.bodySmall)
+                    }
                     Text(record.content, style = MaterialTheme.typography.bodyMedium)
                     record.startDate?.let { startDate ->
                         Text(

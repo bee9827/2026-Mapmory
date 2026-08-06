@@ -16,10 +16,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.mapmory.shared.domain.model.Location
 
 @Composable
 fun TravelRecordDetailScreen(
     uiState: TravelRecordDetailUiState,
+    locations: List<Location>,
     onBackClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
@@ -51,6 +53,9 @@ fun TravelRecordDetailScreen(
             is TravelRecordDetailUiState.Success -> {
                 val record = uiState.record
                 Text(record.title, style = MaterialTheme.typography.headlineMedium)
+                locations.firstOrNull { it.id == record.locationId }?.let { location ->
+                    Text(location.name, style = MaterialTheme.typography.titleMedium)
+                }
                 Text(record.content, style = MaterialTheme.typography.bodyLarge)
                 record.startDate?.let { startDate ->
                     Text(if (record.endDate == null) startDate else "$startDate ~ ${record.endDate}")

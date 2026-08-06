@@ -103,6 +103,7 @@ fun MapmoryApp() {
 
         AppScreen.DETAIL -> TravelRecordDetailScreen(
             uiState = detailViewModel.uiState,
+            locations = locations,
             onBackClick = { screen = AppScreen.LIST },
             onEditClick = {
                 val record = (detailViewModel.uiState as? TravelRecordDetailUiState.Success)?.record
