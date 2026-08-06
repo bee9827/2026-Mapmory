@@ -32,6 +32,8 @@ fun TravelRecordListScreen(
     onKeywordChanged: (String) -> Unit,
     onLocationChanged: (Long?) -> Unit,
     onSearchClick: () -> Unit,
+    onPreviousPageClick: () -> Unit,
+    onNextPageClick: () -> Unit,
     onCreateClick: () -> Unit,
     onRecordClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -92,7 +94,28 @@ fun TravelRecordListScreen(
                     TravelRecordList(
                         records = uiState.records,
                         onRecordClick = onRecordClick,
+                        modifier = Modifier.weight(1f),
                     )
+                }
+                if (uiState.totalPages > 1) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Button(
+                            onClick = onPreviousPageClick,
+                            enabled = uiState.page > 0,
+                        ) {
+                            Text("이전")
+                        }
+                        Text("${uiState.page + 1} / ${uiState.totalPages}")
+                        Button(
+                            onClick = onNextPageClick,
+                            enabled = uiState.page + 1 < uiState.totalPages,
+                        ) {
+                            Text("다음")
+                        }
+                    }
                 }
             }
         }
@@ -103,8 +126,12 @@ fun TravelRecordListScreen(
 private fun TravelRecordList(
     records: List<TravelRecord>,
     onRecordClick: (Long) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         items(records, key = TravelRecord::id) { record ->
             Card(
                 onClick = { onRecordClick(record.id) },

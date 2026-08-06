@@ -41,6 +41,15 @@ class TravelRecordListViewModel(
             },
         )
     }
+
+    suspend fun previousPage() {
+        if (query.page > 0) load(query.copy(page = query.page - 1))
+    }
+
+    suspend fun nextPage() {
+        val state = uiState as? TravelRecordListUiState.Success ?: return
+        if (query.page + 1 < state.totalPages) load(query.copy(page = query.page + 1))
+    }
 }
 
 sealed interface TravelRecordListUiState {

@@ -70,6 +70,8 @@ fun MapmoryApp() {
             onKeywordChanged = listViewModel::updateKeyword,
             onLocationChanged = listViewModel::filterByLocation,
             onSearchClick = { scope.launch { listViewModel.load() } },
+            onPreviousPageClick = { scope.launch { listViewModel.previousPage() } },
+            onNextPageClick = { scope.launch { listViewModel.nextPage() } },
             onCreateClick = {
                 editorViewModel.reset()
                 screen = AppScreen.EDITOR
