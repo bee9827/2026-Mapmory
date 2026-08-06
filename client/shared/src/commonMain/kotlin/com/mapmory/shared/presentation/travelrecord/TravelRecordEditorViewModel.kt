@@ -57,6 +57,17 @@ class TravelRecordEditorViewModel(
         uiState = uiState.copy(endDate = endDate, errorMessage = null)
     }
 
+    fun addMediaObjectKey(objectKey: String) {
+        val trimmedObjectKey = objectKey.trim()
+        if (trimmedObjectKey.isBlank() || trimmedObjectKey in uiState.mediaObjectKeys) return
+
+        uiState = uiState.copy(mediaObjectKeys = uiState.mediaObjectKeys + trimmedObjectKey)
+    }
+
+    fun removeMediaObjectKey(objectKey: String) {
+        uiState = uiState.copy(mediaObjectKeys = uiState.mediaObjectKeys - objectKey)
+    }
+
     suspend fun save(): Boolean {
         val state = uiState
         val location = state.selectedLocation ?: return fail("장소를 선택해 주세요.")

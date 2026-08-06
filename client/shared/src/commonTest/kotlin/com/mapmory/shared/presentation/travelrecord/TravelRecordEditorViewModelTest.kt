@@ -75,4 +75,22 @@ class TravelRecordEditorViewModelTest {
             assertEquals("올바른 시작일을 입력해 주세요.", viewModel.uiState.errorMessage)
         }
     }
+
+    @Test
+    fun mediaObjectKeysCanBeAddedAndRemoved() {
+        val viewModel = TravelRecordEditorViewModel(
+            createTravelRecord = CreateTravelRecordUseCase(FakeTravelRecordRepository(10) { "2026-08-07T00:00:00Z" }),
+            updateTravelRecord = UpdateTravelRecordUseCase(FakeTravelRecordRepository(10) { "2026-08-07T00:00:00Z" }),
+        )
+
+        viewModel.addMediaObjectKey(" records/1/photo.jpg ")
+        viewModel.addMediaObjectKey("records/1/photo.jpg")
+        viewModel.addMediaObjectKey(" ")
+
+        assertEquals(listOf("records/1/photo.jpg"), viewModel.uiState.mediaObjectKeys)
+
+        viewModel.removeMediaObjectKey("records/1/photo.jpg")
+
+        assertTrue(viewModel.uiState.mediaObjectKeys.isEmpty())
+    }
 }
