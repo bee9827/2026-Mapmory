@@ -2,9 +2,7 @@ package com.mapmory.shared.data.repository
 
 import com.mapmory.shared.domain.model.TravelRecordDraft
 import com.mapmory.shared.domain.model.TravelRecordQuery
-import kotlin.coroutines.Continuation
-import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.coroutines.startCoroutine
+import com.mapmory.shared.runSuspend
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -48,18 +46,4 @@ class FakeTravelRecordRepositoryTest {
         assertTrue(repository.deleteTravelRecord(created.id).isSuccess)
         assertTrue(repository.getTravelRecord(created.id).isFailure)
     }
-}
-
-private fun <T> runSuspend(block: suspend () -> T): T {
-    var outcome: Result<T>? = null
-    block.startCoroutine(
-        object : Continuation<T> {
-            override val context = EmptyCoroutineContext
-
-            override fun resumeWith(result: Result<T>) {
-                outcome = result
-            }
-        },
-    )
-    return checkNotNull(outcome).getOrThrow()
 }
