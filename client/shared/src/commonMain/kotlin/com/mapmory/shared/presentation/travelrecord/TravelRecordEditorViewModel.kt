@@ -36,6 +36,10 @@ class TravelRecordEditorViewModel(
         uiState = uiState.copy(selectedLocation = location, errorMessage = null)
     }
 
+    fun clearLocation() {
+        uiState = uiState.copy(selectedLocation = null, errorMessage = null)
+    }
+
     fun updateTitle(title: String) {
         uiState = uiState.copy(title = title, errorMessage = null)
     }

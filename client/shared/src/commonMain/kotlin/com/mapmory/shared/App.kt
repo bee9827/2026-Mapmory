@@ -52,8 +52,10 @@ fun MapmoryApp() {
     // ponytail: 임시 지역 목록이며, 장소 조회 API를 연결하면 Repository 결과로 교체한다.
     val locations = remember {
         listOf(
+            Location(1, 1, null, "KR-11", "서울특별시", LocationType.PROVINCE),
+            Location(2, 1, null, "KR-26", "부산광역시", LocationType.PROVINCE),
             Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT),
-            Location(102, 1, 1, "KR-26-26290", "해운대구", LocationType.DISTRICT),
+            Location(102, 1, 2, "KR-26-26290", "해운대구", LocationType.DISTRICT),
         )
     }
 
@@ -85,6 +87,7 @@ fun MapmoryApp() {
         AppScreen.EDITOR -> TravelRecordEditorScreen(
             uiState = editorViewModel.uiState,
             locations = locations,
+            onProvinceChanged = editorViewModel::clearLocation,
             onLocationSelected = editorViewModel::selectLocation,
             onTitleChanged = editorViewModel::updateTitle,
             onContentChanged = editorViewModel::updateContent,

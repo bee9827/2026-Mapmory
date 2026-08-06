@@ -12,14 +12,20 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.LocationType
 
 @Composable
 fun TravelRecordEditorScreen(
     uiState: TravelRecordEditorUiState,
     locations: List<Location>,
+    onProvinceChanged: () -> Unit,
     onLocationSelected: (Location) -> Unit,
     onTitleChanged: (String) -> Unit,
     onContentChanged: (String) -> Unit,
@@ -29,6 +35,11 @@ fun TravelRecordEditorScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val provinces = locations.filter { it.type == LocationType.PROVINCE }
+    var selectedProvinceId by remember {
+        mutableStateOf(uiState.selectedLocation?.parentId)
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -42,16 +53,38 @@ fun TravelRecordEditorScreen(
             text = if (uiState.recordId == null) "여행 기록 작성" else "여행 기록 수정",
             style = MaterialTheme.typography.headlineMedium,
         )
-        Text("장소 선택", style = MaterialTheme.typography.titleMedium)
-        locations.forEach { location ->
+        Text("시·도 선택", style = MaterialTheme.typography.titleMedium)
+        provinces.forEach { province ->
             OutlinedButton(
-                onClick = { onLocationSelected(location) },
+                onClick = {
+                    if (selectedProvinceId != province.id) onProvinceChanged()
+                    selectedProvinceId = province.id
+                },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    if (uiState.selectedLocation?.id == location.id) "✓ ${location.name}" else location.name,
+                    if (selectedProvinceId == province.id) "✓ ${province.name}" else province.name,
                 )
             }
+        }
+        selectedProvinceId?.let { provinceId ->
+            Text("시·군·구 선택", style = MaterialTheme.typography.titleMedium)
+            locations
+                .filter { it.type == LocationType.DISTRICT && it.parentId == provinceId }
+                .forEach { district ->
+                    OutlinedButton(
+                        onClick = { onLocationSelected(district) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            if (uiState.selectedLocation?.id == district.id) {
+                                "✓ ${district.name}"
+                            } else {
+                                district.name
+                            },
+                        )
+                    }
+                }
         }
         OutlinedTextField(
             value = uiState.title,

@@ -10,6 +10,7 @@ import com.mapmory.shared.domain.usecase.UpdateTravelRecordUseCase
 import com.mapmory.shared.runSuspend
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TravelRecordEditorViewModelTest {
@@ -37,6 +38,9 @@ class TravelRecordEditorViewModelTest {
                 record = record,
                 location = Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT),
             )
+            viewModel.clearLocation()
+            assertNull(viewModel.uiState.selectedLocation)
+            viewModel.selectLocation(Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT))
             viewModel.updateTitle("서울 여름 여행")
 
             assertTrue(viewModel.save())

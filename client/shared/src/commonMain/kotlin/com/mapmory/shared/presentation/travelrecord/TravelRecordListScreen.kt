@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TravelRecord
 import com.mapmory.shared.domain.model.TravelRecordQuery
 
@@ -64,7 +65,7 @@ fun TravelRecordListScreen(
             OutlinedButton(onClick = { onLocationChanged(null) }) {
                 Text(if (query.locationId == null) "✓ 전체" else "전체")
             }
-            locations.forEach { location ->
+            locations.filter { it.type == LocationType.DISTRICT }.forEach { location ->
                 OutlinedButton(onClick = { onLocationChanged(location.id) }) {
                     Text(if (query.locationId == location.id) "✓ ${location.name}" else location.name)
                 }
