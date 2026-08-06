@@ -1,4 +1,5 @@
 .gradle/
+client/gradle/gradle-daemon-jvm.properties
 build/
 local.properties
 .idea/
