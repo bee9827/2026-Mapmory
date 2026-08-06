@@ -22,15 +22,15 @@ android {
         targetSdk = libs.versions.compileSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField(
-            "String",
-            "MAPBOX_ACCESS_TOKEN",
-            "\"${localProperties.getProperty("MAPBOX_ACCESS_TOKEN").orEmpty()}\"",
+        resValue(
+            type = "string",
+            name = "mapbox_access_token",
+            value = localProperties.getProperty("MAPBOX_ACCESS_TOKEN").orEmpty(),
         )
     }
 
     buildFeatures {
-        buildConfig = true
+        resValues = true
     }
 
     buildTypes {

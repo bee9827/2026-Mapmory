@@ -32,7 +32,16 @@ Kotlin 2.4.10의 공식 KMP 호환 범위에 맞추기 위해 AGP 9.1.0을 사�
 MAPBOX_ACCESS_TOKEN=발급받은_공개_액세스_토큰
 ```
 
-Android 앱에서는 `BuildConfig.MAPBOX_ACCESS_TOKEN`으로 읽는다. 실제 Mapbox SDK 의존성과 지도 화면 연결은 다음 단계에서 추가한다.
+Mapbox SDK는 생성된 `mapbox_access_token` 문자열 리소스를 자동으로 읽는다. 실제 SDK 의존성과 지도 화면 연결은 다음 단계에서 추가한다.
+
+Mapbox Maven 저장소에서 SDK를 내려받으려면 별도의 비밀 토큰도 필요하다. `Downloads:Read` 권한이 있는 토큰을 사용자 Gradle 설정에만 추가한다.
+
+```properties
+# ~/.gradle/gradle.properties
+MAPBOX_DOWNLOADS_TOKEN=발급받은_비밀_다운로드_토큰
+```
+
+비밀 다운로드 토큰은 앱에 포함하거나 저장소에 커밋하지 않는다.
 
 ## 현재 검증 상태
 
