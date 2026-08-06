@@ -35,6 +35,13 @@ GET /travel-statistics
 - 단건·목록 응답의 필드명, 날짜·시각 형식, 페이지 응답 구조
 - 공통 오류 응답 형식과 오류 코드
 
+### 사진 업로드
+
+- Presigned URL 발급 API의 HTTP method·경로와 요청 필드(파일명, MIME type, 크기)
+- 발급 응답의 `objectKey`, 업로드 URL, 필수 헤더, 만료 시각 형식
+- 여행 기록 생성·수정 전에 업로드한 파일의 취소·실패 시 정리 정책
+- 첨부 가능한 사진 수, 파일 크기, MIME type 제한
+
 ### 장소 선택
 
 - 국가와 행정구역을 조회하는 API 경로와 응답 구조
@@ -49,6 +56,8 @@ GET /travel-statistics
 ## 확정된 데이터 정책
 
 - 사진은 만료되는 URL이 아닌 `objectKey`를 영구 저장한다. 조회 응답에서만 서버가 `url`을 생성한다.
+- 사진 첨부 흐름은 `Presigned URL 발급 → 클라이언트 직접 업로드 → travel record에 objectKey 전달`이다.
 - 날짜를 입력하지 않으면 `startDate`, `endDate` 모두 `null`이다.
 - 시작일만 입력하면 서버가 `endDate`를 시작일과 같은 날짜로 저장한다.
+- 종료일만 입력하는 기록은 허용하지 않는다.
 - 종료일이 시작일보다 빠른 기록은 허용하지 않는다.
