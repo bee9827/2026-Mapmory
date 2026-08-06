@@ -11,7 +11,10 @@ import com.mapmory.shared.data.repository.FakeTravelRecordRepository
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.usecase.CreateTravelRecordUseCase
+import com.mapmory.shared.domain.usecase.GetTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTravelRecordsUseCase
+import com.mapmory.shared.presentation.travelrecord.TravelRecordDetailScreen
+import com.mapmory.shared.presentation.travelrecord.TravelRecordDetailViewModel
 import com.mapmory.shared.presentation.travelrecord.TravelRecordEditorScreen
 import com.mapmory.shared.presentation.travelrecord.TravelRecordEditorViewModel
 import com.mapmory.shared.presentation.travelrecord.TravelRecordListScreen
@@ -27,9 +30,11 @@ fun MapmoryApp() {
         )
     }
     val listViewModel = remember { TravelRecordListViewModel(GetTravelRecordsUseCase(repository)) }
+    val detailViewModel = remember { TravelRecordDetailViewModel(GetTravelRecordUseCase(repository)) }
     val editorViewModel = remember { TravelRecordEditorViewModel(CreateTravelRecordUseCase(repository)) }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(AppScreen.LIST) }
+    var selectedRecordId by remember { mutableStateOf<Long?>(null) }
 
     // ponytail: 임시 지역 목록이며, 장소 조회 API를 연결하면 Repository 결과로 교체한다.
     val locations = remember {
@@ -41,6 +46,7 @@ fun MapmoryApp() {
 
     LaunchedEffect(screen) {
         if (screen == AppScreen.LIST) listViewModel.load()
+        if (screen == AppScreen.DETAIL) selectedRecordId?.let { detailViewModel.load(it) }
     }
 
     when (screen) {
@@ -49,6 +55,10 @@ fun MapmoryApp() {
             onCreateClick = {
                 editorViewModel.reset()
                 screen = AppScreen.EDITOR
+            },
+            onRecordClick = { recordId ->
+                selectedRecordId = recordId
+                screen = AppScreen.DETAIL
             },
         )
 
@@ -67,10 +77,16 @@ fun MapmoryApp() {
             },
             onBackClick = { screen = AppScreen.LIST },
         )
+
+        AppScreen.DETAIL -> TravelRecordDetailScreen(
+            uiState = detailViewModel.uiState,
+            onBackClick = { screen = AppScreen.LIST },
+        )
     }
 }
 
 private enum class AppScreen {
     LIST,
     EDITOR,
+    DETAIL,
 }

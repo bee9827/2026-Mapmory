@@ -21,6 +21,7 @@ import com.mapmory.shared.domain.model.TravelRecord
 fun TravelRecordListScreen(
     uiState: TravelRecordListUiState,
     onCreateClick: () -> Unit,
+    onRecordClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -48,7 +49,10 @@ fun TravelRecordListScreen(
                 if (uiState.records.isEmpty()) {
                     Text("아직 작성한 여행 기록이 없어요.")
                 } else {
-                    TravelRecordList(records = uiState.records)
+                    TravelRecordList(
+                        records = uiState.records,
+                        onRecordClick = onRecordClick,
+                    )
                 }
             }
         }
@@ -56,10 +60,16 @@ fun TravelRecordListScreen(
 }
 
 @Composable
-private fun TravelRecordList(records: List<TravelRecord>) {
+private fun TravelRecordList(
+    records: List<TravelRecord>,
+    onRecordClick: (Long) -> Unit,
+) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(records, key = TravelRecord::id) { record ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                onClick = { onRecordClick(record.id) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(record.title, style = MaterialTheme.typography.titleMedium)
                     Text(record.content, style = MaterialTheme.typography.bodyMedium)
