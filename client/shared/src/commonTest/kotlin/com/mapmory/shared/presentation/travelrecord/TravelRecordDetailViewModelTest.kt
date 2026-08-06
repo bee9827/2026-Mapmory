@@ -2,6 +2,7 @@ package com.mapmory.shared.presentation.travelrecord
 
 import com.mapmory.shared.data.repository.FakeTravelRecordRepository
 import com.mapmory.shared.domain.model.TravelRecordDraft
+import com.mapmory.shared.domain.usecase.DeleteTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTravelRecordUseCase
 import com.mapmory.shared.runSuspend
 import kotlin.test.Test
@@ -23,14 +24,18 @@ class TravelRecordDetailViewModelTest {
                     mediaObjectKeys = emptyList(),
                 ),
             ).getOrThrow()
-            val viewModel = TravelRecordDetailViewModel(GetTravelRecordUseCase(repository))
+            val viewModel = TravelRecordDetailViewModel(
+                getTravelRecord = GetTravelRecordUseCase(repository),
+                deleteTravelRecord = DeleteTravelRecordUseCase(repository),
+            )
 
             viewModel.load(record.id)
 
             val success = assertIs<TravelRecordDetailUiState.Success>(viewModel.uiState)
             assertEquals("서울 여행", success.record.title)
 
-            viewModel.load(Long.MAX_VALUE)
+            assertEquals(true, viewModel.delete())
+            viewModel.load(record.id)
 
             assertIs<TravelRecordDetailUiState.Error>(viewModel.uiState)
         }

@@ -11,6 +11,7 @@ import com.mapmory.shared.data.repository.FakeTravelRecordRepository
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.usecase.CreateTravelRecordUseCase
+import com.mapmory.shared.domain.usecase.DeleteTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTravelRecordsUseCase
 import com.mapmory.shared.presentation.travelrecord.TravelRecordDetailScreen
@@ -30,7 +31,12 @@ fun MapmoryApp() {
         )
     }
     val listViewModel = remember { TravelRecordListViewModel(GetTravelRecordsUseCase(repository)) }
-    val detailViewModel = remember { TravelRecordDetailViewModel(GetTravelRecordUseCase(repository)) }
+    val detailViewModel = remember {
+        TravelRecordDetailViewModel(
+            getTravelRecord = GetTravelRecordUseCase(repository),
+            deleteTravelRecord = DeleteTravelRecordUseCase(repository),
+        )
+    }
     val editorViewModel = remember { TravelRecordEditorViewModel(CreateTravelRecordUseCase(repository)) }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(AppScreen.LIST) }
@@ -81,6 +87,14 @@ fun MapmoryApp() {
         AppScreen.DETAIL -> TravelRecordDetailScreen(
             uiState = detailViewModel.uiState,
             onBackClick = { screen = AppScreen.LIST },
+            onDeleteClick = {
+                scope.launch {
+                    if (detailViewModel.delete()) {
+                        selectedRecordId = null
+                        screen = AppScreen.LIST
+                    }
+                }
+            },
         )
     }
 }

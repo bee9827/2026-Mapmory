@@ -4,11 +4,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
@@ -16,8 +21,11 @@ import androidx.compose.ui.unit.dp
 fun TravelRecordDetailScreen(
     uiState: TravelRecordDetailUiState,
     onBackClick: () -> Unit,
+    onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -31,6 +39,7 @@ fun TravelRecordDetailScreen(
         when (uiState) {
             TravelRecordDetailUiState.Idle,
             TravelRecordDetailUiState.Loading,
+            TravelRecordDetailUiState.Deleting,
             -> CircularProgressIndicator()
 
             is TravelRecordDetailUiState.Error -> Text(
@@ -50,7 +59,33 @@ fun TravelRecordDetailScreen(
                 }
                 Text("작성일: ${record.createdAt}", style = MaterialTheme.typography.bodySmall)
                 Text("수정일: ${record.updatedAt}", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { showDeleteDialog = true }) {
+                    Text("삭제", color = MaterialTheme.colorScheme.error)
+                }
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("여행 기록 삭제") },
+            text = { Text("삭제한 기록은 복구할 수 없습니다.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDeleteClick()
+                    },
+                ) {
+                    Text("삭제", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("취소")
+                }
+            },
+        )
     }
 }
