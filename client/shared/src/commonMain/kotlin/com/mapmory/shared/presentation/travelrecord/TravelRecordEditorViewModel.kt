@@ -4,17 +4,32 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.TravelRecord
 import com.mapmory.shared.domain.model.TravelRecordDraft
 import com.mapmory.shared.domain.usecase.CreateTravelRecordUseCase
+import com.mapmory.shared.domain.usecase.UpdateTravelRecordUseCase
 
 class TravelRecordEditorViewModel(
     private val createTravelRecord: CreateTravelRecordUseCase,
+    private val updateTravelRecord: UpdateTravelRecordUseCase,
 ) {
     var uiState by mutableStateOf(TravelRecordEditorUiState())
         private set
 
     fun reset() {
         uiState = TravelRecordEditorUiState()
+    }
+
+    fun startEditing(record: TravelRecord, location: Location) {
+        uiState = TravelRecordEditorUiState(
+            recordId = record.id,
+            selectedLocation = location,
+            title = record.title,
+            content = record.content,
+            startDate = record.startDate.orEmpty(),
+            endDate = record.endDate.orEmpty(),
+            mediaObjectKeys = record.media.map { it.objectKey },
+        )
     }
 
     fun selectLocation(location: Location) {
@@ -43,16 +58,18 @@ class TravelRecordEditorViewModel(
         if (state.title.isBlank()) return fail("제목을 입력해 주세요.")
 
         uiState = state.copy(isSaving = true, errorMessage = null)
-        return createTravelRecord(
-            TravelRecordDraft(
-                locationId = location.id,
-                title = state.title.trim(),
-                content = state.content.trim(),
-                startDate = state.startDate.ifBlank { null },
-                endDate = state.endDate.ifBlank { null },
-                mediaObjectKeys = emptyList(),
-            ),
-        ).fold(
+        val draft = TravelRecordDraft(
+            locationId = location.id,
+            title = state.title.trim(),
+            content = state.content.trim(),
+            startDate = state.startDate.ifBlank { null },
+            endDate = state.endDate.ifBlank { null },
+            mediaObjectKeys = state.mediaObjectKeys,
+        )
+        val result = state.recordId?.let { updateTravelRecord(it, draft) }
+            ?: createTravelRecord(draft)
+
+        return result.fold(
             onSuccess = {
                 uiState = uiState.copy(isSaving = false)
                 true
@@ -74,11 +91,13 @@ class TravelRecordEditorViewModel(
 }
 
 data class TravelRecordEditorUiState(
+    val recordId: Long? = null,
     val selectedLocation: Location? = null,
     val title: String = "",
     val content: String = "",
     val startDate: String = "",
     val endDate: String = "",
+    val mediaObjectKeys: List<String> = emptyList(),
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
 )

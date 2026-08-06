@@ -38,7 +38,10 @@ fun TravelRecordEditorScreen(
         TextButton(onClick = onBackClick) {
             Text("목록으로")
         }
-        Text("여행 기록 작성", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            text = if (uiState.recordId == null) "여행 기록 작성" else "여행 기록 수정",
+            style = MaterialTheme.typography.headlineMedium,
+        )
         Text("장소 선택", style = MaterialTheme.typography.titleMedium)
         locations.forEach { location ->
             OutlinedButton(
@@ -82,7 +85,13 @@ fun TravelRecordEditorScreen(
             enabled = !uiState.isSaving,
             modifier = Modifier.fillMaxWidth(),
         ) {
-            Text(if (uiState.isSaving) "저장 중..." else "저장")
+            Text(
+                when {
+                    uiState.isSaving -> "저장 중..."
+                    uiState.recordId == null -> "저장"
+                    else -> "수정"
+                },
+            )
         }
     }
 }

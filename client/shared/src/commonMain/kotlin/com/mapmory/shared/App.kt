@@ -14,7 +14,9 @@ import com.mapmory.shared.domain.usecase.CreateTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.DeleteTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTravelRecordsUseCase
+import com.mapmory.shared.domain.usecase.UpdateTravelRecordUseCase
 import com.mapmory.shared.presentation.travelrecord.TravelRecordDetailScreen
+import com.mapmory.shared.presentation.travelrecord.TravelRecordDetailUiState
 import com.mapmory.shared.presentation.travelrecord.TravelRecordDetailViewModel
 import com.mapmory.shared.presentation.travelrecord.TravelRecordEditorScreen
 import com.mapmory.shared.presentation.travelrecord.TravelRecordEditorViewModel
@@ -37,7 +39,12 @@ fun MapmoryApp() {
             deleteTravelRecord = DeleteTravelRecordUseCase(repository),
         )
     }
-    val editorViewModel = remember { TravelRecordEditorViewModel(CreateTravelRecordUseCase(repository)) }
+    val editorViewModel = remember {
+        TravelRecordEditorViewModel(
+            createTravelRecord = CreateTravelRecordUseCase(repository),
+            updateTravelRecord = UpdateTravelRecordUseCase(repository),
+        )
+    }
     val scope = rememberCoroutineScope()
     var screen by remember { mutableStateOf(AppScreen.LIST) }
     var selectedRecordId by remember { mutableStateOf<Long?>(null) }
@@ -87,6 +94,14 @@ fun MapmoryApp() {
         AppScreen.DETAIL -> TravelRecordDetailScreen(
             uiState = detailViewModel.uiState,
             onBackClick = { screen = AppScreen.LIST },
+            onEditClick = {
+                val record = (detailViewModel.uiState as? TravelRecordDetailUiState.Success)?.record
+                val location = locations.firstOrNull { it.id == record?.locationId }
+                if (record != null && location != null) {
+                    editorViewModel.startEditing(record, location)
+                    screen = AppScreen.EDITOR
+                }
+            },
             onDeleteClick = {
                 scope.launch {
                     if (detailViewModel.delete()) {

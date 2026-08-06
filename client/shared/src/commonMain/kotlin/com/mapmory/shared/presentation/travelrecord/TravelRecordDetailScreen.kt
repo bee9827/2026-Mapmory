@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 fun TravelRecordDetailScreen(
     uiState: TravelRecordDetailUiState,
     onBackClick: () -> Unit,
+    onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -59,6 +60,9 @@ fun TravelRecordDetailScreen(
                 }
                 Text("작성일: ${record.createdAt}", style = MaterialTheme.typography.bodySmall)
                 Text("수정일: ${record.updatedAt}", style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = onEditClick) {
+                    Text("수정")
+                }
                 TextButton(onClick = { showDeleteDialog = true }) {
                     Text("삭제", color = MaterialTheme.colorScheme.error)
                 }
