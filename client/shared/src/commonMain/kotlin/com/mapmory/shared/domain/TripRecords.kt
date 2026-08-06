@@ -1,5 +1,7 @@
 package com.mapmory.shared.domain
 
+import kotlin.uuid.Uuid
+
 class TripRecords(
     tripRecords: List<TripRecord> = emptyList(),
 ) {
@@ -20,6 +22,18 @@ class TripRecords(
             tripRecordDescription = tripRecordDescription,
             location = tripLocation
         )
-        return TripRecords(_tripRecords + newRecord)
+        return TripRecords(records + newRecord)
     }
+
+    fun removeTripRecord(
+        deletingRecord: TripRecord
+    ): TripRecords {
+        val record = records.find { it.id == deletingRecord.id }
+        if(record == null) return this
+
+        return TripRecords(records.minus(record))
+    }
+
+    private fun findTripRecordId(id: Uuid): Uuid? = records.find { it.id == id }?.id
+
 }
