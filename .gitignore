@@ -12,3 +12,18 @@ keystore.properties
 .env
 .env.*
 !.env.example
+
+
+.kotlin/
+**/.kotlin/
+**/build/
+
+# Android build outputs
+*.apk
+*.aab
+*.apks
+
+# Signing materials
+*.jks
+*.keystore
+key.properties
