@@ -63,7 +63,7 @@ class TravelRecordEditorViewModelTest {
             viewModel.updateEndDate("2026-08-01")
 
             assertFalse(viewModel.save())
-            assertEquals("종료일만 입력할 수 없어요.", viewModel.uiState.errorMessage)
+            assertEquals("종료일만 입력할 수 없습니다.", viewModel.uiState.errorMessage)
 
             viewModel.updateStartDate("2026-08-02")
             assertFalse(viewModel.save())
