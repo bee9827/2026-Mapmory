@@ -5,6 +5,7 @@ import com.mapmory.shared.domain.model.TravelRecordQuery
 import com.mapmory.shared.runSuspend
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class FakeTravelRecordRepositoryTest {
@@ -45,5 +46,23 @@ class FakeTravelRecordRepositoryTest {
         assertEquals("서울 여름 여행", updated.title)
         assertTrue(repository.deleteTravelRecord(created.id).isSuccess)
         assertTrue(repository.getTravelRecord(created.id).isFailure)
+    }
+
+    @Test
+    fun createRejectsInvalidDateRange() = runSuspend {
+        val repository = FakeTravelRecordRepository(10) { "2026-08-07T00:00:00Z" }
+
+        val result = repository.createTravelRecord(
+            TravelRecordDraft(
+                locationId = 101,
+                title = "서울 여행",
+                content = "한강을 걸었다.",
+                startDate = "2026-08-02",
+                endDate = "2026-08-01",
+                mediaObjectKeys = emptyList(),
+            ),
+        )
+
+        assertFalse(result.isSuccess)
     }
 }

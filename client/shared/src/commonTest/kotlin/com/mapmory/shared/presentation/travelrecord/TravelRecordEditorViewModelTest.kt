@@ -10,6 +10,7 @@ import com.mapmory.shared.domain.usecase.UpdateTravelRecordUseCase
 import com.mapmory.shared.runSuspend
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -45,6 +46,28 @@ class TravelRecordEditorViewModelTest {
 
             assertTrue(viewModel.save())
             assertEquals("서울 여름 여행", repository.getTravelRecord(record.id).getOrThrow().title)
+        }
+    }
+
+    @Test
+    fun saveRejectsInvalidDateRange() {
+        runSuspend {
+            val repository = FakeTravelRecordRepository(10) { "2026-08-07T00:00:00Z" }
+            val viewModel = TravelRecordEditorViewModel(
+                createTravelRecord = CreateTravelRecordUseCase(repository),
+                updateTravelRecord = UpdateTravelRecordUseCase(repository),
+            )
+
+            viewModel.selectLocation(Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT))
+            viewModel.updateTitle("서울 여행")
+            viewModel.updateEndDate("2026-08-01")
+
+            assertFalse(viewModel.save())
+            assertEquals("종료일만 입력할 수 없어요.", viewModel.uiState.errorMessage)
+
+            viewModel.updateStartDate("2026-08-02")
+            assertFalse(viewModel.save())
+            assertEquals("종료일은 시작일보다 빠를 수 없어요.", viewModel.uiState.errorMessage)
         }
     }
 }

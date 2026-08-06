@@ -60,6 +60,12 @@ class TravelRecordEditorViewModel(
         val state = uiState
         val location = state.selectedLocation ?: return fail("장소를 선택해 주세요.")
         if (state.title.isBlank()) return fail("제목을 입력해 주세요.")
+        if (state.endDate.isNotBlank() && state.startDate.isBlank()) {
+            return fail("종료일만 입력할 수 없어요.")
+        }
+        if (state.startDate.isNotBlank() && state.endDate.isNotBlank() && state.endDate < state.startDate) {
+            return fail("종료일은 시작일보다 빠를 수 없어요.")
+        }
 
         uiState = state.copy(isSaving = true, errorMessage = null)
         val draft = TravelRecordDraft(

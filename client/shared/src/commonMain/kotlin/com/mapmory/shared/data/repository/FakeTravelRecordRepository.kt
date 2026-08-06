@@ -46,6 +46,7 @@ class FakeTravelRecordRepository(
             ?: Result.failure(NoSuchElementException("여행 기록을 찾을 수 없습니다."))
 
     override suspend fun createTravelRecord(draft: TravelRecordDraft): Result<TravelRecord> {
+        validateDates(draft)?.let { return Result.failure(IllegalArgumentException(it)) }
         val timestamp = now()
         val record = TravelRecord(
             id = nextRecordId++,
@@ -66,6 +67,7 @@ class FakeTravelRecordRepository(
     override suspend fun updateTravelRecord(id: Long, draft: TravelRecordDraft): Result<TravelRecord> {
         val index = records.indexOfFirst { it.id == id }
         if (index == -1) return Result.failure(NoSuchElementException("여행 기록을 찾을 수 없습니다."))
+        validateDates(draft)?.let { return Result.failure(IllegalArgumentException(it)) }
 
         val updatedRecord = records[index].copy(
             locationId = draft.locationId,
@@ -96,4 +98,12 @@ class FakeTravelRecordRepository(
                 url = null,
             )
         }
+
+    private fun validateDates(draft: TravelRecordDraft): String? = when {
+        draft.endDate != null && draft.startDate == null -> "종료일만 입력할 수 없습니다."
+        draft.startDate != null && draft.endDate != null && draft.endDate < draft.startDate -> {
+            "종료일은 시작일보다 빠를 수 없습니다."
+        }
+        else -> null
+    }
 }
