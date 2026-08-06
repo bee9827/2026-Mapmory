@@ -34,6 +34,12 @@ class TravelRecordListViewModelTest {
             val success = assertIs<TravelRecordListUiState.Success>(viewModel.uiState)
             assertEquals("서울 여행", success.records.single().title)
 
+            viewModel.updateKeyword("없는 기록")
+            viewModel.load()
+
+            val empty = assertIs<TravelRecordListUiState.Success>(viewModel.uiState)
+            assertEquals(0, empty.records.size)
+
             viewModel.load(TravelRecordQuery(size = 0))
 
             assertIs<TravelRecordListUiState.Error>(viewModel.uiState)

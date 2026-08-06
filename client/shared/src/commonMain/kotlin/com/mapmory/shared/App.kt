@@ -65,6 +65,11 @@ fun MapmoryApp() {
     when (screen) {
         AppScreen.LIST -> TravelRecordListScreen(
             uiState = listViewModel.uiState,
+            query = listViewModel.query,
+            locations = locations,
+            onKeywordChanged = listViewModel::updateKeyword,
+            onLocationChanged = listViewModel::filterByLocation,
+            onSearchClick = { scope.launch { listViewModel.load() } },
             onCreateClick = {
                 editorViewModel.reset()
                 screen = AppScreen.EDITOR

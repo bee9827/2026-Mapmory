@@ -14,7 +14,19 @@ class TravelRecordListViewModel(
     var uiState by mutableStateOf<TravelRecordListUiState>(TravelRecordListUiState.Idle)
         private set
 
-    suspend fun load(query: TravelRecordQuery = TravelRecordQuery()) {
+    var query by mutableStateOf(TravelRecordQuery())
+        private set
+
+    fun updateKeyword(keyword: String) {
+        query = query.copy(keyword = keyword.ifBlank { null }, page = 0)
+    }
+
+    fun filterByLocation(locationId: Long?) {
+        query = query.copy(locationId = locationId, page = 0)
+    }
+
+    suspend fun load(query: TravelRecordQuery = this.query) {
+        this.query = query
         uiState = TravelRecordListUiState.Loading
         uiState = getTravelRecords(query).fold(
             onSuccess = { page ->
