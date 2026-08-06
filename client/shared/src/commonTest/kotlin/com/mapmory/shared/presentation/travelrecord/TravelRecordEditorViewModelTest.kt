@@ -67,7 +67,12 @@ class TravelRecordEditorViewModelTest {
 
             viewModel.updateStartDate("2026-08-02")
             assertFalse(viewModel.save())
-            assertEquals("종료일은 시작일보다 빠를 수 없어요.", viewModel.uiState.errorMessage)
+            assertEquals("종료일은 시작일보다 빠를 수 없습니다.", viewModel.uiState.errorMessage)
+
+            viewModel.updateStartDate("2026-02-29")
+            viewModel.updateEndDate("")
+            assertFalse(viewModel.save())
+            assertEquals("올바른 시작일을 입력해 주세요.", viewModel.uiState.errorMessage)
         }
     }
 }

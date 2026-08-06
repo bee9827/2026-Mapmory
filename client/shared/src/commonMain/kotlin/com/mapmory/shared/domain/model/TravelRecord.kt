@@ -24,6 +24,29 @@ data class TravelRecordDraft(
     val mediaObjectKeys: List<String>, // 첨부할 이미지 저장소 경로 목록
 )
 
+fun TravelRecordDraft.dateValidationError(): String? = when {
+    endDate != null && startDate == null -> "종료일만 입력할 수 없습니다."
+    startDate != null && !startDate.isValidIsoDate() -> "올바른 시작일을 입력해 주세요."
+    endDate != null && !endDate.isValidIsoDate() -> "올바른 종료일을 입력해 주세요."
+    endDate != null && endDate < startDate!! -> "종료일은 시작일보다 빠를 수 없습니다."
+    else -> null
+}
+
+private fun String.isValidIsoDate(): Boolean {
+    if (!matches(Regex("\\d{4}-\\d{2}-\\d{2}"))) return false
+
+    val year = substring(0, 4).toInt()
+    val month = substring(5, 7).toInt()
+    val day = substring(8, 10).toInt()
+    val daysInMonth = when (month) {
+        1, 3, 5, 7, 8, 10, 12 -> 31
+        4, 6, 9, 11 -> 30
+        2 -> if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) 29 else 28
+        else -> return false
+    }
+    return day in 1..daysInMonth
+}
+
 // 여행 기록 목록을 조회할 때 사용하는 조건
 data class TravelRecordQuery(
     val locationId: Long? = null, // 특정 지역으로 필터링할 때 사용하는 지역 ID

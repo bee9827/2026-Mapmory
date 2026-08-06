@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.TravelRecord
 import com.mapmory.shared.domain.model.TravelRecordDraft
+import com.mapmory.shared.domain.model.dateValidationError
 import com.mapmory.shared.domain.usecase.CreateTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.UpdateTravelRecordUseCase
 
@@ -60,14 +61,7 @@ class TravelRecordEditorViewModel(
         val state = uiState
         val location = state.selectedLocation ?: return fail("장소를 선택해 주세요.")
         if (state.title.isBlank()) return fail("제목을 입력해 주세요.")
-        if (state.endDate.isNotBlank() && state.startDate.isBlank()) {
-            return fail("종료일만 입력할 수 없어요.")
-        }
-        if (state.startDate.isNotBlank() && state.endDate.isNotBlank() && state.endDate < state.startDate) {
-            return fail("종료일은 시작일보다 빠를 수 없어요.")
-        }
 
-        uiState = state.copy(isSaving = true, errorMessage = null)
         val draft = TravelRecordDraft(
             locationId = location.id,
             title = state.title.trim(),
@@ -76,6 +70,9 @@ class TravelRecordEditorViewModel(
             endDate = state.endDate.ifBlank { null },
             mediaObjectKeys = state.mediaObjectKeys,
         )
+        draft.dateValidationError()?.let { return fail(it) }
+
+        uiState = state.copy(isSaving = true, errorMessage = null)
         val result = state.recordId?.let { updateTravelRecord(it, draft) }
             ?: createTravelRecord(draft)
 
