@@ -24,6 +24,16 @@ Kotlin 2.4.10의 공식 KMP 호환 범위에 맞추기 위해 AGP 9.1.0을 사�
 - `shared`는 Android와 iOS에서 함께 사용하는 코드만 관리합니다.
 - Backend 소스와 의존성은 클라이언트 Gradle 프로젝트에 포함하지 않습니다.
 
+## Mapbox 공개 액세스 토큰
+
+지도 SDK를 연결하기 전에 `client/local.properties`에 아래 값을 추가한다. 이 파일은 Git에서 제외된다.
+
+```properties
+MAPBOX_ACCESS_TOKEN=발급받은_공개_액세스_토큰
+```
+
+Android 앱에서는 `BuildConfig.MAPBOX_ACCESS_TOKEN`으로 읽는다. 실제 Mapbox SDK 의존성과 지도 화면 연결은 다음 단계에서 추가한다.
+
 ## 현재 검증 상태
 
 - JDK 21: 로컬 확인 완료
