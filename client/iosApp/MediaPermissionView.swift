@@ -14,19 +14,19 @@ final class MediaPermissionViewModel: ObservableObject {
     }
 
     func requestCamera() async {
-        guard cameraStatus == .notDetermined else { return }
+        guard cameraStatus == .notDetermined, !isRequestingCamera else { return }
 
         isRequestingCamera = true
+        defer { isRequestingCamera = false }
         cameraStatus = await MediaPermissionManager.requestCameraAccess()
-        isRequestingCamera = false
     }
 
     func requestPhotoLibrary() async {
-        guard photoLibraryStatus == .notDetermined else { return }
+        guard photoLibraryStatus == .notDetermined, !isRequestingPhotoLibrary else { return }
 
         isRequestingPhotoLibrary = true
+        defer { isRequestingPhotoLibrary = false }
         photoLibraryStatus = await MediaPermissionManager.requestPhotoLibraryAccess()
-        isRequestingPhotoLibrary = false
     }
 }
 
