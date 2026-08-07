@@ -24,17 +24,10 @@ Kotlin 2.4.10의 공식 KMP 호환 범위에 맞추기 위해 AGP 9.1.0을 사�
 - `shared`는 Android와 iOS에서 함께 사용하는 코드만 관리합니다.
 - Backend 소스와 의존성은 클라이언트 Gradle 프로젝트에 포함하지 않습니다.
 
-## 지도 SDK
+## 지도
 
-Android 지도는 MapLibre Native를 사용한다. 개발 단계에서는 MapLibre 데모 스타일을
-사용하므로 Mapbox 계정이나 액세스 토큰이 필요하지 않다.
-
-```text
-https://demotiles.maplibre.org/style.json
-```
-
-데모 타일은 운영 서비스용으로 보장되지 않으므로, 배포 전에는 별도의 타일·스타일
-제공처와 사용량 정책을 결정한다.
+현재는 외부 지도 SDK를 사용하지 않는다. 지도 기능은 행정구역 GeoJSON과
+`Location.regionCode` 매핑 규칙, 지도 데이터 제공 방식을 확정한 뒤 별도 검토한다.
 
 ## Mapmory API Base URL
 
