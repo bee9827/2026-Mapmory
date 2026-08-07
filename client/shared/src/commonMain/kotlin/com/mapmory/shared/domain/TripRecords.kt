@@ -1,7 +1,6 @@
 package com.mapmory.shared.domain
 
 import kotlinx.datetime.LocalDate
-import kotlin.uuid.Uuid
 
 class TripRecords(
     tripRecords: List<TripRecord> = emptyList(),
@@ -62,6 +61,6 @@ class TripRecords(
         )
     }
 
-    private fun findTripRecordId(id: Uuid): TripRecord? = records.find { it.id == id }
+    private fun findTripRecordId(id: Long): TripRecord? = records.find { it.id == id }
 
 }
