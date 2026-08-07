@@ -7,6 +7,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.material3.Text
 import com.mapmory.shared.data.repository.FakeTravelRecordRepository
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
@@ -22,10 +23,13 @@ import com.mapmory.shared.presentation.travelrecord.TravelRecordEditorScreen
 import com.mapmory.shared.presentation.travelrecord.TravelRecordEditorViewModel
 import com.mapmory.shared.presentation.travelrecord.TravelRecordListScreen
 import com.mapmory.shared.presentation.travelrecord.TravelRecordListViewModel
+import com.mapmory.shared.presentation.travelrecord.TravelMapScreen
 import kotlinx.coroutines.launch
 
 @Composable
-fun MapmoryApp() {
+fun MapmoryApp(
+    mapContent: @Composable () -> Unit = { Text("지도 SDK를 준비 중입니다.") },
+) {
     val repository = remember {
         FakeTravelRecordRepository(
             memberId = 10,
@@ -78,10 +82,16 @@ fun MapmoryApp() {
                 editorViewModel.reset()
                 screen = AppScreen.EDITOR
             },
+            onMapClick = { screen = AppScreen.MAP },
             onRecordClick = { recordId ->
                 selectedRecordId = recordId
                 screen = AppScreen.DETAIL
             },
+        )
+
+        AppScreen.MAP -> TravelMapScreen(
+            mapContent = mapContent,
+            onBackClick = { screen = AppScreen.LIST },
         )
 
         AppScreen.EDITOR -> TravelRecordEditorScreen(
@@ -127,6 +137,7 @@ fun MapmoryApp() {
 
 private enum class AppScreen {
     LIST,
+    MAP,
     EDITOR,
     DETAIL,
 }

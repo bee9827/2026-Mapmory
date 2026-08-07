@@ -5,6 +5,7 @@ composeMultiplatform = "1.11.1"
 compileSdk = "36"
 minSdk = "28"
 ktor = "3.5.1"
+mapbox = "11.27.1"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -21,3 +22,5 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+mapbox-maps-android = { module = "com.mapbox.maps:android-ndk27", version.ref = "mapbox" }
+mapbox-maps-compose = { module = "com.mapbox.extension:maps-compose-ndk27", version.ref = "mapbox" }

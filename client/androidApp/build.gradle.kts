@@ -30,6 +30,7 @@ android {
     }
 
     buildFeatures {
+        compose = true
         resValues = true
     }
 
@@ -43,4 +44,6 @@ android {
 dependencies {
     implementation(project(":shared"))
     implementation("androidx.activity:activity-compose:1.11.0")
+    implementation(libs.mapbox.maps.android)
+    implementation(libs.mapbox.maps.compose)
 }

@@ -36,6 +36,7 @@ fun TravelRecordListScreen(
     onPreviousPageClick: () -> Unit,
     onNextPageClick: () -> Unit,
     onCreateClick: () -> Unit,
+    onMapClick: () -> Unit,
     onRecordClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -51,6 +52,9 @@ fun TravelRecordListScreen(
         )
         Button(onClick = onCreateClick) {
             Text("기록 작성")
+        }
+        OutlinedButton(onClick = onMapClick) {
+            Text("지도 보기")
         }
         OutlinedTextField(
             value = query.keyword.orEmpty(),
