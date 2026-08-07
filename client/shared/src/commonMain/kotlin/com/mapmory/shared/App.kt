@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import com.mapmory.shared.data.repository.FakeTravelRecordRepository
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.domain.repository.TravelRecordRepository
 import com.mapmory.shared.domain.usecase.CreateTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.DeleteTravelRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTravelRecordUseCase
@@ -28,10 +29,11 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun MapmoryApp(
+    travelRecordRepository: TravelRecordRepository? = null,
     mapContent: @Composable () -> Unit = { Text("지도 SDK를 준비 중입니다.") },
 ) {
-    val repository = remember {
-        FakeTravelRecordRepository(
+    val repository = remember(travelRecordRepository) {
+        travelRecordRepository ?: FakeTravelRecordRepository(
             memberId = 10,
             now = { "2026-08-07T00:00:00Z" },
         )

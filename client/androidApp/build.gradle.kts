@@ -27,6 +27,11 @@ android {
             name = "mapbox_access_token",
             value = localProperties.getProperty("MAPBOX_ACCESS_TOKEN").orEmpty(),
         )
+        resValue(
+            type = "string",
+            name = "mapmory_api_base_url",
+            value = localProperties.getProperty("MAPMORY_API_BASE_URL").orEmpty(),
+        )
     }
 
     buildFeatures {
@@ -44,6 +49,7 @@ android {
 dependencies {
     implementation(project(":shared"))
     implementation("androidx.activity:activity-compose:1.11.0")
+    implementation(libs.ktor.client.core)
     implementation(libs.mapbox.maps.android)
     implementation(libs.mapbox.maps.compose)
 }

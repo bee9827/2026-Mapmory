@@ -34,6 +34,18 @@ MAPBOX_ACCESS_TOKEN=발급받은_공개_액세스_토큰
 
 Mapbox SDK는 생성된 `mapbox_access_token` 문자열 리소스를 자동으로 읽는다. SDK 의존성과 기본 지도 화면 연결은 완료했으며, 토큰 등록 후 Android 빌드와 실제 지도 표시를 검증한다.
 
+## Mapmory API Base URL
+
+Backend를 연결할 때만 `client/local.properties`에 API 주소를 추가한다.
+
+```properties
+MAPMORY_API_BASE_URL=http://10.0.2.2:8080/api/v1
+```
+
+값이 비어 있으면 Android 앱은 기존 Fake Repository로 실행한다. 값이 있으면
+`TravelRecordRemoteRepository`를 사용하며, Android 에뮬레이터에서 호스트 PC의
+`localhost`는 `10.0.2.2`로 접근한다.
+
 Mapbox Maven 저장소에서 SDK를 내려받으려면 별도의 비밀 토큰도 필요하다. `Downloads:Read` 권한이 있는 토큰을 사용자 Gradle 설정에만 추가한다.
 
 ```properties
