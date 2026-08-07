@@ -42,6 +42,8 @@ class TripRecords(
         editingImage: String?,
         editingTitle: String?,
         editingDescription: String?,
+        editingStartTripDate: LocalDate?,
+        editingEndTripDate: LocalDate?,
         editingLocation: String?,
     ): TripRecords {
         val record = findTripRecordId(editingRecord.id)
@@ -51,6 +53,8 @@ class TripRecords(
             imageUrl = editingImage ?: record.imageUrl,
             tripRecordTitle = editingTitle ?: record.tripRecordTitle,
             tripRecordDescription = editingDescription ?: record.tripRecordDescription,
+            startTripDate = editingStartTripDate ?: record.startTripDate,
+            endTripDate = editingEndTripDate ?: record.endTripDate,
             location = editingLocation ?: record.location,
         )
 

@@ -92,6 +92,8 @@ class TripRecordsTest {
             editingImage = null,
             editingTitle = "수정된 제목",
             editingDescription = null,
+            editingStartTripDate = null,
+            editingEndTripDate = null,
             editingLocation = "부산",
         )
 
@@ -117,6 +119,8 @@ class TripRecordsTest {
             editingImage = null,
             editingTitle = "수정된 첫 번째",
             editingDescription = null,
+            editingStartTripDate = null,
+            editingEndTripDate = null,
             editingLocation = null,
         )
 
@@ -134,10 +138,93 @@ class TripRecordsTest {
             editingImage = null,
             editingTitle = null,
             editingDescription = null,
+            editingStartTripDate = null,
+            editingEndTripDate = null,
             editingLocation = null,
         )
 
         assertEquals(record, result.tripRecords.single())
+        assertEquals(record, tripRecords.tripRecords.single())
+    }
+
+    @Test
+    fun `여행 시작일과 종료일을 함께 수정한다`() {
+        val record = createTripRecord()
+        val tripRecords = TripRecords(listOf(record))
+        val editingStartTripDate = LocalDate(2026, 9, 1)
+        val editingEndTripDate = LocalDate(2026, 9, 5)
+
+        val result = tripRecords.editTripRecord(
+            editingRecord = record,
+            editingImage = null,
+            editingTitle = null,
+            editingDescription = null,
+            editingStartTripDate = editingStartTripDate,
+            editingEndTripDate = editingEndTripDate,
+            editingLocation = null,
+        )
+
+        val editedRecord = result.tripRecords.single()
+        assertEquals(editingStartTripDate, editedRecord.startTripDate)
+        assertEquals(editingEndTripDate, editedRecord.endTripDate)
+    }
+
+    @Test
+    fun `시작일만 수정하면 기존 종료일을 유지한다`() {
+        val record = createTripRecord()
+        val tripRecords = TripRecords(listOf(record))
+        val editingStartTripDate = LocalDate(2026, 8, 2)
+
+        val result = tripRecords.editTripRecord(
+            editingRecord = record,
+            editingImage = null,
+            editingTitle = null,
+            editingDescription = null,
+            editingStartTripDate = editingStartTripDate,
+            editingEndTripDate = null,
+            editingLocation = null,
+        )
+
+        val editedRecord = result.tripRecords.single()
+        assertEquals(editingStartTripDate, editedRecord.startTripDate)
+        assertEquals(record.endTripDate, editedRecord.endTripDate)
+    }
+
+    @Test
+    fun `수정한 시작일이 종료일보다 늦으면 예외가 발생한다`() {
+        val record = createTripRecord()
+        val tripRecords = TripRecords(listOf(record))
+
+        assertFailsWith<IllegalArgumentException> {
+            tripRecords.editTripRecord(
+                editingRecord = record,
+                editingImage = null,
+                editingTitle = null,
+                editingDescription = null,
+                editingStartTripDate = LocalDate(2026, 8, 4),
+                editingEndTripDate = null,
+                editingLocation = null,
+            )
+        }
+        assertEquals(record, tripRecords.tripRecords.single())
+    }
+
+    @Test
+    fun `수정한 종료일이 시작일보다 빠르면 예외가 발생한다`() {
+        val record = createTripRecord()
+        val tripRecords = TripRecords(listOf(record))
+
+        assertFailsWith<IllegalArgumentException> {
+            tripRecords.editTripRecord(
+                editingRecord = record,
+                editingImage = null,
+                editingTitle = null,
+                editingDescription = null,
+                editingStartTripDate = null,
+                editingEndTripDate = LocalDate(2026, 7, 31),
+                editingLocation = null,
+            )
+        }
         assertEquals(record, tripRecords.tripRecords.single())
     }
 
@@ -151,6 +238,8 @@ class TripRecordsTest {
                 editingImage = null,
                 editingTitle = "수정된 제목",
                 editingDescription = null,
+                editingStartTripDate = null,
+                editingEndTripDate = null,
                 editingLocation = null,
             )
         }
