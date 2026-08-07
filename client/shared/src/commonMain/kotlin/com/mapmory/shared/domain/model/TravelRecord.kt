@@ -12,6 +12,7 @@ data class TravelRecord(
     val media: List<RecordMedia>, // 기록에 첨부된 사진 목록
     val createdAt: String, // 기록 생성 시각
     val updatedAt: String, // 기록 최종 수정 시각
+    val thumbnailUrl: String? = null, // 목록에서 사용하는 대표 이미지 조회 URL
 )
 
 // 여행 기록을 새로 만들거나 수정할 때 입력하는 값
