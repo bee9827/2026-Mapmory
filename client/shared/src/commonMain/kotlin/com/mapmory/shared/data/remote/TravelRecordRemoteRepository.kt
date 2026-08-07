@@ -89,7 +89,7 @@ class TravelRecordRemoteRepository(
     }
 }
 
-private suspend fun HttpResponse.requireSuccess(): HttpResponse {
+internal suspend fun HttpResponse.requireSuccess(): HttpResponse {
     if (status.value in 200..299) return this
 
     val error = runCatching { body<ApiErrorDto>() }.getOrNull()
