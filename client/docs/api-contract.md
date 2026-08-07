@@ -16,6 +16,16 @@ X-Member-Id: 10
 
 GET /travel-records/map
 
+지도 SDK의 역할은 지도 타일·스타일·지도 피처를 표시하는 것이다. Mapbox가
+Mapmory의 `Location.regionCode`를 제공한다고 가정하지 않는다.
+
+- 방문 지역 데이터는 Mapmory 서버가 제공한다.
+- 지도 색칠은 서버의 `regionCode`와 클라이언트가 사용하는 행정구역 GeoJSON의
+  속성을 매칭해서 처리한다.
+- Mapbox SDK에서 제공하는 지도 피처 속성이나 내부 ID를 Mapmory 지역 코드로
+  직접 저장하지 않는다.
+- 위치 권한을 사용하지 않는 한 사용자 GPS를 방문 지역 판정에 사용하지 않는다.
+
 ## 여행 기록 목록
 
 GET /travel-records?locationId={id}&keyword={keyword}&page={page}&size={size}
@@ -52,6 +62,14 @@ GET /travel-statistics
 
 - `GET /travel-records/map` 응답이 방문한 `locationId` 목록인지, `regionCode` 목록인지
 - `GET /travel-statistics`가 제공할 국가·지역별 방문 수와 기록 수의 응답 구조
+
+## 클라이언트 구현 순서
+
+1. API 응답 필드와 오류 형식 확정
+2. DTO와 도메인 모델 변환 규칙 작성
+3. HTTP Repository 구현 및 테스트
+4. 지도 방문 지역 응답과 GeoJSON 속성 매핑 확정
+5. Mapbox 지도에 방문 지역 색칠 연결
 
 ## 확정된 데이터 정책
 
