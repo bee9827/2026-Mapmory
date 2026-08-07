@@ -3,10 +3,10 @@ package com.mapmory.shared.data.remote.model
 import com.mapmory.shared.domain.model.Country
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.domain.model.RecordMedia
-import com.mapmory.shared.domain.model.TravelRecord
-import com.mapmory.shared.domain.model.TravelRecordDraft
-import com.mapmory.shared.domain.model.TravelRecordPage
+import com.mapmory.shared.domain.model.TripRecordMedia
+import com.mapmory.shared.domain.model.TripRecordData
+import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.model.TripRecordPage
 
 fun CountryDto.toDomain(): Country = Country(
     id = id,
@@ -23,14 +23,14 @@ fun LocationDto.toDomain(): Location = Location(
     type = LocationType.valueOf(locationType),
 )
 
-fun RecordMediaDto.toDomain(): RecordMedia = RecordMedia(
+fun TripRecordMediaDto.toDomain(): TripRecordMedia = TripRecordMedia(
     id = id,
     objectKey = objectKey,
     sortOrder = sortOrder,
     url = viewUrl,
 )
 
-fun TravelRecordListItemDto.toDomain(): TravelRecord = TravelRecord(
+fun TripRecordListItemDto.toDomain(): TripRecordData = TripRecordData(
     id = id,
     memberId = member.id,
     locationId = location.id,
@@ -44,7 +44,7 @@ fun TravelRecordListItemDto.toDomain(): TravelRecord = TravelRecord(
     thumbnailUrl = thumbnailUrl,
 )
 
-fun TravelRecordDetailDto.toDomain(): TravelRecord = TravelRecord(
+fun TripRecordDetailDto.toDomain(): TripRecordData = TripRecordData(
     id = id,
     memberId = member.id,
     locationId = location.id,
@@ -52,12 +52,12 @@ fun TravelRecordDetailDto.toDomain(): TravelRecord = TravelRecord(
     content = content,
     startDate = startDate,
     endDate = endDate,
-    media = media.map(RecordMediaDto::toDomain),
+    media = media.map(TripRecordMediaDto::toDomain),
     createdAt = createdAt,
     updatedAt = updatedAt,
 )
 
-fun TravelRecordRequestDto.toDraft(): TravelRecordDraft = TravelRecordDraft(
+fun TripRecordRequestDto.toDraft(): TripRecordDraft = TripRecordDraft(
     locationId = locationId,
     title = title,
     content = content,
@@ -66,7 +66,7 @@ fun TravelRecordRequestDto.toDraft(): TravelRecordDraft = TravelRecordDraft(
     mediaObjectKeys = objectKeys,
 )
 
-fun TravelRecordDraft.toRequestDto(): TravelRecordRequestDto = TravelRecordRequestDto(
+fun TripRecordDraft.toRequestDto(): TripRecordRequestDto = TripRecordRequestDto(
     locationId = locationId,
     title = title,
     content = content,
@@ -75,8 +75,8 @@ fun TravelRecordDraft.toRequestDto(): TravelRecordRequestDto = TravelRecordReque
     objectKeys = mediaObjectKeys,
 )
 
-fun PageDto<TravelRecordListItemDto>.toDomain(): TravelRecordPage = TravelRecordPage(
-    records = items.map(TravelRecordListItemDto::toDomain),
+fun PageDto<TripRecordListItemDto>.toDomain(): TripRecordPage = TripRecordPage(
+    records = items.map(TripRecordListItemDto::toDomain),
     page = page,
     size = size,
     totalElements = totalElements,

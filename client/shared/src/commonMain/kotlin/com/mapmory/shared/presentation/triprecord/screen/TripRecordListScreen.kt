@@ -1,4 +1,4 @@
-package com.mapmory.shared.presentation.travelrecord
+package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,13 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.domain.model.TravelRecord
-import com.mapmory.shared.domain.model.TravelRecordQuery
+import com.mapmory.shared.domain.model.TripRecordData
+import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
 
 @Composable
-fun TravelRecordListScreen(
-    uiState: TravelRecordListUiState,
-    query: TravelRecordQuery,
+fun TripRecordListScreen(
+    uiState: TripRecordListUiState,
+    query: TripRecordQuery,
     locations: List<Location>,
     onKeywordChanged: (String) -> Unit,
     onLocationChanged: (Long?) -> Unit,
@@ -80,13 +81,13 @@ fun TravelRecordListScreen(
         }
 
         when (uiState) {
-            TravelRecordListUiState.Idle,
-            TravelRecordListUiState.Loading,
+            TripRecordListUiState.Idle,
+            TripRecordListUiState.Loading,
             -> CircularProgressIndicator()
 
-            is TravelRecordListUiState.Error -> Text(uiState.message)
+            is TripRecordListUiState.Error -> Text(uiState.message)
 
-            is TravelRecordListUiState.Success -> {
+            is TripRecordListUiState.Success -> {
                 if (uiState.records.isEmpty()) {
                     Text(
                         if (query.keyword == null && query.locationId == null) {
@@ -96,7 +97,7 @@ fun TravelRecordListScreen(
                         },
                     )
                 } else {
-                    TravelRecordList(
+                    TripRecordList(
                         records = uiState.records,
                         locations = locations,
                         onRecordClick = onRecordClick,
@@ -129,8 +130,8 @@ fun TravelRecordListScreen(
 }
 
 @Composable
-private fun TravelRecordList(
-    records: List<TravelRecord>,
+private fun TripRecordList(
+    records: List<TripRecordData>,
     locations: List<Location>,
     onRecordClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
@@ -139,7 +140,7 @@ private fun TravelRecordList(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(records, key = TravelRecord::id) { record ->
+        items(records, key = TripRecordData::id) { record ->
             Card(
                 onClick = { onRecordClick(record.id) },
                 modifier = Modifier.fillMaxWidth(),

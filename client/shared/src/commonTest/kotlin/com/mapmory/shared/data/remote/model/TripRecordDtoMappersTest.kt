@@ -5,8 +5,8 @@ import kotlin.test.assertEquals
 
 class ApiDtoMappersTest {
     @Test
-    fun travelRecordDetailMapsMediaAndDates() {
-        val result = TravelRecordDetailDto(
+    fun tripRecordDetailMapsMediaAndDates() {
+        val result = TripRecordDetailDto(
             id = 101,
             member = MemberSummaryDto(10, "맵모리"),
             location = LocationSummaryDto(1, "KR", "11110", "서울특별시 종로구"),
@@ -14,7 +14,7 @@ class ApiDtoMappersTest {
             content = "골목을 걸었다.",
             startDate = "2026-07-10",
             endDate = "2026-07-12",
-            media = listOf(RecordMediaDto(1001, "travel-records/10/a.jpg", "https://example.com/a", 300, 0)),
+            media = listOf(TripRecordMediaDto(1001, "travel-records/10/a.jpg", "https://example.com/a", 300, 0)),
             createdAt = "2026-07-13T09:30:00+09:00",
             updatedAt = "2026-07-13T10:15:00+09:00",
         ).toDomain()
@@ -27,7 +27,7 @@ class ApiDtoMappersTest {
 
     @Test
     fun draftMapsToRequestWithObjectKeys() {
-        val result = TravelRecordRequestDto(
+        val result = TripRecordRequestDto(
             locationId = 1,
             title = "제목",
             content = "본문",

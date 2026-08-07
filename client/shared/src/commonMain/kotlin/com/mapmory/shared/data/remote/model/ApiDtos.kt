@@ -62,7 +62,7 @@ data class LocationSummaryDto(
 )
 
 @Serializable
-data class RecordMediaDto(
+data class TripRecordMediaDto(
     val id: Long,
     val objectKey: String,
     val viewUrl: String? = null,
@@ -71,7 +71,7 @@ data class RecordMediaDto(
 )
 
 @Serializable
-data class TravelRecordListItemDto(
+data class TripRecordListItemDto(
     val id: Long,
     val member: MemberSummaryDto,
     val location: LocationSummaryDto,
@@ -85,7 +85,7 @@ data class TravelRecordListItemDto(
 )
 
 @Serializable
-data class TravelRecordDetailDto(
+data class TripRecordDetailDto(
     val id: Long,
     val member: MemberSummaryDto,
     val location: LocationSummaryDto,
@@ -93,13 +93,13 @@ data class TravelRecordDetailDto(
     val content: String,
     val startDate: String?,
     val endDate: String?,
-    val media: List<RecordMediaDto> = emptyList(),
+    val media: List<TripRecordMediaDto> = emptyList(),
     val createdAt: String,
     val updatedAt: String,
 )
 
 @Serializable
-data class TravelRecordRequestDto(
+data class TripRecordRequestDto(
     val locationId: Long,
     val title: String,
     val content: String,

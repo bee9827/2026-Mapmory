@@ -1,4 +1,4 @@
-package com.mapmory.shared.presentation.travelrecord
+package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun TravelMapScreen(
+fun TripMapScreen(
     mapContent: @Composable () -> Unit,
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,

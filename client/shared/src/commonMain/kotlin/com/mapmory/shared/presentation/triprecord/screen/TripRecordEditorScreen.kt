@@ -1,4 +1,4 @@
-package com.mapmory.shared.presentation.travelrecord
+package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,10 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 
 @Composable
-fun TravelRecordEditorScreen(
-    uiState: TravelRecordEditorUiState,
+fun TripRecordEditorScreen(
+    uiState: TripRecordEditorUiState,
     locations: List<Location>,
     onProvinceChanged: () -> Unit,
     onLocationSelected: (Location) -> Unit,

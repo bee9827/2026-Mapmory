@@ -1,24 +1,25 @@
-package com.mapmory.shared.presentation.travelrecord
+package com.mapmory.shared.presentation.triprecord.viewmodel
 
 import com.mapmory.shared.runSuspend
-import com.mapmory.shared.data.repository.FakeTravelRecordRepository
-import com.mapmory.shared.domain.model.TravelRecordDraft
-import com.mapmory.shared.domain.model.TravelRecordQuery
-import com.mapmory.shared.domain.usecase.GetTravelRecordsUseCase
+import com.mapmory.shared.data.repository.FakeTripRecordRepository
+import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
+import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
-class TravelRecordListViewModelTest {
+class TripRecordListViewModelTest {
     @Test
     fun loadChangesStateForSuccessAndFailure() {
         runSuspend {
-            val repository = FakeTravelRecordRepository(
+            val repository = FakeTripRecordRepository(
                 memberId = 10,
                 now = { "2026-08-07T00:00:00Z" },
             )
-            repository.createTravelRecord(
-                TravelRecordDraft(
+            repository.createTripRecord(
+                TripRecordDraft(
                     locationId = 101,
                     title = "서울 여행",
                     content = "한강을 걸었다.",
@@ -27,8 +28,8 @@ class TravelRecordListViewModelTest {
                     mediaObjectKeys = emptyList(),
                 ),
             )
-            repository.createTravelRecord(
-                TravelRecordDraft(
+            repository.createTripRecord(
+                TripRecordDraft(
                     locationId = 102,
                     title = "부산 여행",
                     content = "바다를 보았다.",
@@ -37,30 +38,30 @@ class TravelRecordListViewModelTest {
                     mediaObjectKeys = emptyList(),
                 ),
             )
-            val viewModel = TravelRecordListViewModel(GetTravelRecordsUseCase(repository))
+            val viewModel = TripRecordListViewModel(GetTripRecordsUseCase(repository))
 
-            viewModel.load(TravelRecordQuery(size = 1))
+            viewModel.load(TripRecordQuery(size = 1))
 
-            val success = assertIs<TravelRecordListUiState.Success>(viewModel.uiState)
+            val success = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
             assertEquals("서울 여행", success.records.single().title)
 
             viewModel.nextPage()
-            val nextPage = assertIs<TravelRecordListUiState.Success>(viewModel.uiState)
+            val nextPage = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
             assertEquals("부산 여행", nextPage.records.single().title)
 
             viewModel.previousPage()
-            val previousPage = assertIs<TravelRecordListUiState.Success>(viewModel.uiState)
+            val previousPage = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
             assertEquals("서울 여행", previousPage.records.single().title)
 
             viewModel.updateKeyword("없는 기록")
             viewModel.load()
 
-            val empty = assertIs<TravelRecordListUiState.Success>(viewModel.uiState)
+            val empty = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
             assertEquals(0, empty.records.size)
 
-            viewModel.load(TravelRecordQuery(size = 0))
+            viewModel.load(TripRecordQuery(size = 0))
 
-            assertIs<TravelRecordListUiState.Error>(viewModel.uiState)
+            assertIs<TripRecordListUiState.Error>(viewModel.uiState)
         }
     }
 }

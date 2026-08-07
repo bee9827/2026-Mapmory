@@ -1,6 +1,6 @@
 package com.mapmory.shared.data.remote
 
-import com.mapmory.shared.domain.model.TravelRecordQuery
+import com.mapmory.shared.domain.model.TripRecordQuery
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -13,7 +13,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class TravelRecordRemoteRepositoryTest {
+class TripRecordRemoteRepositoryTest {
     @Test
     fun getRecordsSendsContractQueryAndMemberHeader() = runBlocking {
         val client = HttpClient(MockEngine) {
@@ -34,8 +34,8 @@ class TravelRecordRemoteRepositoryTest {
             }
         }
 
-        val result = TravelRecordRemoteRepository(client, "https://api.example.com/api/v1", 10)
-            .getTravelRecords(TravelRecordQuery(locationId = 1))
+        val result = TripRecordRemoteRepository(client, "https://api.example.com/api/v1", 10)
+            .getTripRecords(TripRecordQuery(locationId = 1))
 
         assertEquals(0, result.getOrThrow().records.size)
         client.close()

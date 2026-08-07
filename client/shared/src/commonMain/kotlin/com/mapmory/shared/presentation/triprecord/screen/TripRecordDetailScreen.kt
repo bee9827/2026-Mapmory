@@ -1,4 +1,4 @@
-package com.mapmory.shared.presentation.travelrecord
+package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,10 +17,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
 
 @Composable
-fun TravelRecordDetailScreen(
-    uiState: TravelRecordDetailUiState,
+fun TripRecordDetailScreen(
+    uiState: TripRecordDetailUiState,
     locations: List<Location>,
     onBackClick: () -> Unit,
     onEditClick: () -> Unit,
@@ -40,17 +41,17 @@ fun TravelRecordDetailScreen(
         }
 
         when (uiState) {
-            TravelRecordDetailUiState.Idle,
-            TravelRecordDetailUiState.Loading,
-            TravelRecordDetailUiState.Deleting,
+            TripRecordDetailUiState.Idle,
+            TripRecordDetailUiState.Loading,
+            TripRecordDetailUiState.Deleting,
             -> CircularProgressIndicator()
 
-            is TravelRecordDetailUiState.Error -> Text(
+            is TripRecordDetailUiState.Error -> Text(
                 text = uiState.message,
                 color = MaterialTheme.colorScheme.error,
             )
 
-            is TravelRecordDetailUiState.Success -> {
+            is TripRecordDetailUiState.Success -> {
                 val record = uiState.record
                 Text(record.title, style = MaterialTheme.typography.headlineMedium)
                 locations.firstOrNull { it.id == record.locationId }?.let { location ->

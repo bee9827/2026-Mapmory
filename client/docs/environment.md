@@ -37,9 +37,8 @@ Backend를 연결할 때만 `client/local.properties`에 API 주소를 추가한
 MAPMORY_API_BASE_URL=http://10.0.2.2:8080/api/v1
 ```
 
-값이 비어 있으면 Android 앱은 기존 Fake Repository로 실행한다. 값이 있으면
-`TravelRecordRemoteRepository`를 사용하며, Android 에뮬레이터에서 호스트 PC의
-`localhost`는 `10.0.2.2`로 접근한다.
+Android 여행 기록 API 연결은 백엔드·클라이언트 도메인 매핑을 합의한 뒤 추가한다.
+Android 에뮬레이터에서 호스트 PC의 `localhost`는 `10.0.2.2`로 접근한다.
 
 ## 현재 검증 상태
 

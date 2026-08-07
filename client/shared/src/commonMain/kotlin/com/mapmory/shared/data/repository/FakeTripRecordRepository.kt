@@ -1,23 +1,23 @@
 package com.mapmory.shared.data.repository
 
-import com.mapmory.shared.domain.model.RecordMedia
-import com.mapmory.shared.domain.model.TravelRecord
-import com.mapmory.shared.domain.model.TravelRecordDraft
-import com.mapmory.shared.domain.model.TravelRecordPage
-import com.mapmory.shared.domain.model.TravelRecordQuery
+import com.mapmory.shared.domain.model.TripRecordMedia
+import com.mapmory.shared.domain.model.TripRecordData
+import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.model.TripRecordPage
+import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.model.dateValidationError
-import com.mapmory.shared.domain.repository.TravelRecordRepository
+import com.mapmory.shared.domain.repository.TripRecordRepository
 
 /** 서버 API를 연결하기 전 기록 흐름을 확인하는 메모리 기반 구현이다. */
-class FakeTravelRecordRepository(
+class FakeTripRecordRepository(
     private val memberId: Long,
     private val now: () -> String,
-) : TravelRecordRepository {
-    private val records = mutableListOf<TravelRecord>()
+) : TripRecordRepository {
+    private val records = mutableListOf<TripRecordData>()
     private var nextRecordId = 1L
     private var nextMediaId = 1L
 
-    override suspend fun getTravelRecords(query: TravelRecordQuery): Result<TravelRecordPage> {
+    override suspend fun getTripRecords(query: TripRecordQuery): Result<TripRecordPage> {
         if (query.page < 0 || query.size <= 0) {
             return Result.failure(IllegalArgumentException("페이지 번호와 크기를 확인해 주세요."))
         }
@@ -32,7 +32,7 @@ class FakeTravelRecordRepository(
         val pageRecords = filteredRecords.drop(query.page * query.size).take(query.size)
 
         return Result.success(
-            TravelRecordPage(
+            TripRecordPage(
                 records = pageRecords,
                 page = query.page,
                 size = query.size,
@@ -42,14 +42,14 @@ class FakeTravelRecordRepository(
         )
     }
 
-    override suspend fun getTravelRecord(id: Long): Result<TravelRecord> =
+    override suspend fun getTripRecord(id: Long): Result<TripRecordData> =
         records.find { it.id == id }?.let(Result.Companion::success)
             ?: Result.failure(NoSuchElementException("여행 기록을 찾을 수 없습니다."))
 
-    override suspend fun createTravelRecord(draft: TravelRecordDraft): Result<TravelRecord> {
+    override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> {
         draft.dateValidationError()?.let { return Result.failure(IllegalArgumentException(it)) }
         val timestamp = now()
-        val record = TravelRecord(
+        val record = TripRecordData(
             id = nextRecordId++,
             memberId = memberId,
             locationId = draft.locationId,
@@ -65,7 +65,7 @@ class FakeTravelRecordRepository(
         return Result.success(record)
     }
 
-    override suspend fun updateTravelRecord(id: Long, draft: TravelRecordDraft): Result<TravelRecord> {
+    override suspend fun updateTripRecord(id: Long, draft: TripRecordDraft): Result<TripRecordData> {
         val index = records.indexOfFirst { it.id == id }
         if (index == -1) return Result.failure(NoSuchElementException("여행 기록을 찾을 수 없습니다."))
         draft.dateValidationError()?.let { return Result.failure(IllegalArgumentException(it)) }
@@ -83,16 +83,16 @@ class FakeTravelRecordRepository(
         return Result.success(updatedRecord)
     }
 
-    override suspend fun deleteTravelRecord(id: Long): Result<Unit> {
+    override suspend fun deleteTripRecord(id: Long): Result<Unit> {
         if (!records.removeAll { it.id == id }) {
             return Result.failure(NoSuchElementException("여행 기록을 찾을 수 없습니다."))
         }
         return Result.success(Unit)
     }
 
-    private fun createMedia(objectKeys: List<String>): List<RecordMedia> =
+    private fun createMedia(objectKeys: List<String>): List<TripRecordMedia> =
         objectKeys.mapIndexed { index, objectKey ->
-            RecordMedia(
+            TripRecordMedia(
                 id = nextMediaId++,
                 objectKey = objectKey,
                 sortOrder = index,

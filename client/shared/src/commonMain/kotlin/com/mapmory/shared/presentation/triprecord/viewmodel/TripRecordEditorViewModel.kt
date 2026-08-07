@@ -1,28 +1,29 @@
-package com.mapmory.shared.presentation.travelrecord
+package com.mapmory.shared.presentation.triprecord.viewmodel
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.mapmory.shared.domain.model.Location
-import com.mapmory.shared.domain.model.TravelRecord
-import com.mapmory.shared.domain.model.TravelRecordDraft
+import com.mapmory.shared.domain.model.TripRecordData
+import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.dateValidationError
-import com.mapmory.shared.domain.usecase.CreateTravelRecordUseCase
-import com.mapmory.shared.domain.usecase.UpdateTravelRecordUseCase
+import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
+import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
+import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 
-class TravelRecordEditorViewModel(
-    private val createTravelRecord: CreateTravelRecordUseCase,
-    private val updateTravelRecord: UpdateTravelRecordUseCase,
+class TripRecordEditorViewModel(
+    private val createTripRecord: CreateTripRecordUseCase,
+    private val updateTripRecord: UpdateTripRecordUseCase,
 ) {
-    var uiState by mutableStateOf(TravelRecordEditorUiState())
+    var uiState by mutableStateOf(TripRecordEditorUiState())
         private set
 
     fun reset() {
-        uiState = TravelRecordEditorUiState()
+        uiState = TripRecordEditorUiState()
     }
 
-    fun startEditing(record: TravelRecord, location: Location) {
-        uiState = TravelRecordEditorUiState(
+    fun startEditing(record: TripRecordData, location: Location) {
+        uiState = TripRecordEditorUiState(
             recordId = record.id,
             selectedLocation = location,
             title = record.title,
@@ -73,7 +74,7 @@ class TravelRecordEditorViewModel(
         val location = state.selectedLocation ?: return fail("장소를 선택해 주세요.")
         if (state.title.isBlank()) return fail("제목을 입력해 주세요.")
 
-        val draft = TravelRecordDraft(
+        val draft = TripRecordDraft(
             locationId = location.id,
             title = state.title.trim(),
             content = state.content.trim(),
@@ -84,8 +85,8 @@ class TravelRecordEditorViewModel(
         draft.dateValidationError()?.let { return fail(it) }
 
         uiState = state.copy(isSaving = true, errorMessage = null)
-        val result = state.recordId?.let { updateTravelRecord(it, draft) }
-            ?: createTravelRecord(draft)
+        val result = state.recordId?.let { updateTripRecord(it, draft) }
+            ?: createTripRecord(draft)
 
         return result.fold(
             onSuccess = {
@@ -107,15 +108,3 @@ class TravelRecordEditorViewModel(
         return false
     }
 }
-
-data class TravelRecordEditorUiState(
-    val recordId: Long? = null,
-    val selectedLocation: Location? = null,
-    val title: String = "",
-    val content: String = "",
-    val startDate: String = "",
-    val endDate: String = "",
-    val mediaObjectKeys: List<String> = emptyList(),
-    val isSaving: Boolean = false,
-    val errorMessage: String? = null,
-)

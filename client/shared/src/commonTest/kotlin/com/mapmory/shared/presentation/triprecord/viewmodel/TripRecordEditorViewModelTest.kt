@@ -1,12 +1,12 @@
-package com.mapmory.shared.presentation.travelrecord
+package com.mapmory.shared.presentation.triprecord.viewmodel
 
-import com.mapmory.shared.data.repository.FakeTravelRecordRepository
+import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.domain.model.TravelRecordQuery
-import com.mapmory.shared.domain.usecase.CreateTravelRecordUseCase
-import com.mapmory.shared.domain.usecase.GetTravelRecordsUseCase
-import com.mapmory.shared.domain.usecase.UpdateTravelRecordUseCase
+import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
+import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
+import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
 import com.mapmory.shared.runSuspend
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,14 +14,14 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class TravelRecordEditorViewModelTest {
+class TripRecordEditorViewModelTest {
     @Test
-    fun saveCreatesAndUpdatesTravelRecord() {
+    fun saveCreatesAndUpdatesTripRecord() {
         runSuspend {
-            val repository = FakeTravelRecordRepository(10) { "2026-08-07T00:00:00Z" }
-            val viewModel = TravelRecordEditorViewModel(
-                createTravelRecord = CreateTravelRecordUseCase(repository),
-                updateTravelRecord = UpdateTravelRecordUseCase(repository),
+            val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+            val viewModel = TripRecordEditorViewModel(
+                createTripRecord = CreateTripRecordUseCase(repository),
+                updateTripRecord = UpdateTripRecordUseCase(repository),
             )
 
             viewModel.selectLocation(Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT))
@@ -31,10 +31,10 @@ class TravelRecordEditorViewModelTest {
             assertTrue(viewModel.save())
             assertEquals(
                 "서울 여행",
-                GetTravelRecordsUseCase(repository)(TravelRecordQuery()).getOrThrow().records.single().title,
+                GetTripRecordsUseCase(repository)(TripRecordQuery()).getOrThrow().records.single().title,
             )
 
-            val record = repository.getTravelRecords(TravelRecordQuery()).getOrThrow().records.single()
+            val record = repository.getTripRecords(TripRecordQuery()).getOrThrow().records.single()
             viewModel.startEditing(
                 record = record,
                 location = Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT),
@@ -45,17 +45,17 @@ class TravelRecordEditorViewModelTest {
             viewModel.updateTitle("서울 여름 여행")
 
             assertTrue(viewModel.save())
-            assertEquals("서울 여름 여행", repository.getTravelRecord(record.id).getOrThrow().title)
+            assertEquals("서울 여름 여행", repository.getTripRecord(record.id).getOrThrow().title)
         }
     }
 
     @Test
     fun saveRejectsInvalidDateRange() {
         runSuspend {
-            val repository = FakeTravelRecordRepository(10) { "2026-08-07T00:00:00Z" }
-            val viewModel = TravelRecordEditorViewModel(
-                createTravelRecord = CreateTravelRecordUseCase(repository),
-                updateTravelRecord = UpdateTravelRecordUseCase(repository),
+            val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+            val viewModel = TripRecordEditorViewModel(
+                createTripRecord = CreateTripRecordUseCase(repository),
+                updateTripRecord = UpdateTripRecordUseCase(repository),
             )
 
             viewModel.selectLocation(Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT))
@@ -78,9 +78,9 @@ class TravelRecordEditorViewModelTest {
 
     @Test
     fun mediaObjectKeysCanBeAddedAndRemoved() {
-        val viewModel = TravelRecordEditorViewModel(
-            createTravelRecord = CreateTravelRecordUseCase(FakeTravelRecordRepository(10) { "2026-08-07T00:00:00Z" }),
-            updateTravelRecord = UpdateTravelRecordUseCase(FakeTravelRecordRepository(10) { "2026-08-07T00:00:00Z" }),
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }),
+            updateTripRecord = UpdateTripRecordUseCase(FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }),
         )
 
         viewModel.addMediaObjectKey(" records/1/photo.jpg ")
