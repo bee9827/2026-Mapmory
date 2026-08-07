@@ -11,4 +11,10 @@ data class TripRecord(
     val startTripDate: LocalDate,
     val endTripDate: LocalDate,
     val location: String,
-)
+) {
+    init {
+        require(startTripDate <= endTripDate) {
+            "여행 시작일은 종료일보다 늦을 수 없습니다"
+        }
+    }
+}
