@@ -10,6 +10,8 @@ kotlin {
         namespace = "com.mapmory.shared"
         compileSdk = libs.versions.compileSdk.get().toInt()
         minSdk = libs.versions.minSdk.get().toInt()
+
+        withHostTest {}
     }
     iosArm64()
     iosSimulatorArm64()
@@ -21,6 +23,10 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0") // Use the latest version
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
         }
     }
 }
