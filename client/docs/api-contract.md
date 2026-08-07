@@ -1,81 +1,272 @@
 # Mapmory Client API Contract
 
-## Base URL
+## 기본 정보
 
-/api/v1
+| 항목 | 값 |
+| --- | --- |
+| Base URL | `/api/v1` |
+| 데이터 형식 | `application/json` |
+| 문자 인코딩 | UTF-8 |
+| 임시 사용자 식별 | `X-Member-Id` 요청 헤더 |
+| 인증 | 추후 Access Token으로 교체 |
 
-## 임시 사용자 식별
+인증 도입 전에는 사용자 전용 요청에 `X-Member-Id`를 사용한다. 인증 도입 후에는
+헤더를 제거하고 Access Token에서 회원 ID를 조회한다. 여행 기록은 작성자 본인만
+접근할 수 있으며, 다른 회원의 기록 ID로 접근해도 `404 TRAVEL_RECORD_NOT_FOUND`를
+반환한다.
 
-모든 사용자 전용 API는 다음 헤더를 사용한다.
+## 공통 응답
 
-X-Member-Id: 10
+성공 응답은 `data`로 감싼다.
 
-실제 로그인 도입 뒤에는 `Authorization: Bearer <token>`으로 교체한다.
+```json
+{ "data": {} }
+```
 
-## 지도 방문 지역
+오류 응답은 다음 형식을 사용한다.
 
-GET /travel-records/map
+```json
+{
+  "code": "TRAVEL_RECORD_NOT_FOUND",
+  "message": "여행 기록을 찾을 수 없습니다.",
+  "fieldErrors": []
+}
+```
 
-지도 SDK의 역할은 지도 타일·스타일·지도 피처를 표시하는 것이다. Mapbox가
+유효성 오류의 `fieldErrors`는 다음 형식이다.
+
+```json
+[
+  { "field": "title", "reason": "제목은 필수입니다." }
+]
+```
+
+주요 상태 코드는 `200`, `201`, `204`, `400`, `401`, `403`, `404`, `409`, `500`이다.
+
+목록 API는 0부터 시작하는 페이지 번호를 사용한다. `page` 기본값은 `0`,
+`size` 기본값은 `20`, 최대값은 `100`이다.
+
+```json
+{
+  "data": {
+    "items": [],
+    "page": 0,
+    "size": 20,
+    "totalElements": 0,
+    "totalPages": 0,
+    "hasNext": false
+  }
+}
+```
+
+## 국가 및 지역 API
+
+### 국가 목록
+
+`GET /api/v1/countries`
+
+```json
+{
+  "data": [
+    { "id": 1, "code": "KR", "name": "대한민국" }
+  ]
+}
+```
+
+### 지역 목록
+
+`GET /api/v1/locations`
+
+| Query | 필수 | 설명 |
+| --- | --- | --- |
+| `countryId` | 조건부 | 국가의 시·도 조회 시 필요 |
+| `parentId` | 아니요 | 상위 지역의 직속 하위 지역 조회 |
+| `keyword` | 아니요 | 지역명 또는 지역 코드 검색 |
+
+`countryId`만 전달하면 시·도를 반환하고, `parentId`를 전달하면 해당 시·도의
+시·군·구를 반환한다.
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "countryId": 1,
+      "parentId": null,
+      "regionCode": "11",
+      "name": "서울특별시",
+      "locationType": "PROVINCE"
+    }
+  ]
+}
+```
+
+### 지역 상세
+
+`GET /api/v1/locations/{locationId}`
+
+응답은 지역 객체를 `data`로 감싸며, 없으면 `404 LOCATION_NOT_FOUND`를 반환한다.
+
+## 이미지 업로드 API
+
+### Presigned URL 발급
+
+`POST /api/v1/uploads/presigned-urls`
+
+헤더: `X-Member-Id` 필수
+
+```json
+{
+  "files": [
+    {
+      "fileName": "seoul-trip.jpg",
+      "contentType": "image/jpeg",
+      "fileSize": 3145728
+    }
+  ]
+}
+```
+
+서버는 UUID 기반의 `objectKey`를 생성한다. 클라이언트 파일명을 Object Key로
+직접 사용하지 않는다.
+
+```text
+travel-records/{memberId}/{uuid}.{extension}
+```
+
+```json
+{
+  "data": {
+    "uploads": [
+      {
+        "objectKey": "travel-records/10/550e8400-e29b-41d4-a716-446655440000.jpg",
+        "presignedUrl": "https://...",
+        "method": "PUT",
+        "contentType": "image/jpeg",
+        "expiresIn": 300
+      }
+    ]
+  }
+}
+```
+
+클라이언트는 발급받은 URL로 S3에 직접 `PUT`하고, 여행 기록 요청에는
+업로드가 완료된 `objectKeys`만 전달한다. Presigned URL은 DB에 저장하지 않는다.
+
+오류 코드는 `INVALID_FILE_TYPE`, `FILE_SIZE_EXCEEDED`, `TOO_MANY_FILES`,
+`MEMBER_NOT_FOUND`를 사용한다.
+
+## 여행 기록 API
+
+여행 기록의 `locationId`는 최종 선택 단계인 `DISTRICT` 지역 ID여야 한다.
+날짜를 입력하지 않으면 두 값 모두 `null`이다. 시작일만 입력하면 서버가 종료일을
+시작일과 같게 저장한다. 종료일만 입력하거나 종료일이 시작일보다 빠르면
+`INVALID_TRAVEL_DATE_RANGE`를 반환한다.
+
+`title`과 `content`는 요청에 포함되어야 하지만 빈 문자열과 공백 문자열을 허용한다.
+
+### 생성
+
+`POST /api/v1/travel-records`
+
+헤더: `X-Member-Id` 필수
+
+```json
+{
+  "locationId": 1,
+  "title": "비 오는 날의 종로",
+  "content": "골목을 걸으며 오래된 가게들을 기록했다.",
+  "startDate": null,
+  "endDate": null,
+  "objectKeys": ["travel-records/10/example.jpg"]
+}
+```
+
+응답은 `201 Created`이며 `Location` 헤더와 함께 다음을 반환한다.
+
+```json
+{ "data": { "id": 101 } }
+```
+
+### 목록
+
+`GET /api/v1/travel-records?locationId={id}&keyword={keyword}&page={page}&size={size}`
+
+헤더: `X-Member-Id` 필수. 현재 회원의 기록만 반환하고 기본 정렬은 `id DESC`다.
+
+목록 항목은 `id`, `member(id, name)`, `location(id, countryCode, regionCode, name)`,
+`title`, `startDate`, `endDate`, `thumbnailUrl`, `thumbnailUrlExpiresIn`,
+`createdAt`, `updatedAt`을 포함한다.
+
+### 상세
+
+`GET /api/v1/travel-records/{travelRecordId}`
+
+헤더: `X-Member-Id` 필수. 상세 항목은 목록 항목에 `content`와 `media`를 추가한다.
+
+미디어 항목은 `id`, `objectKey`, `viewUrl`, `viewUrlExpiresIn`, `sortOrder`를 포함한다.
+조회용 URL은 서버가 Presigned GET URL로 생성한다.
+
+### 수정
+
+`PUT /api/v1/travel-records/{travelRecordId}`
+
+생성과 같은 본문을 사용한다. `objectKeys`는 전체 교체 방식이며 배열 순서를
+`sortOrder`로 저장한다. 성공 응답은 `200 OK`와 `{ "data": { "id": 101 } }`다.
+
+### 삭제
+
+`DELETE /api/v1/travel-records/{travelRecordId}`
+
+헤더: `X-Member-Id` 필수. 성공 시 `204 No Content`를 반환한다.
+
+## 오류 코드
+
+클라이언트에서 우선 처리할 오류 코드는 다음과 같다.
+
+- `VALIDATION_ERROR`
+- `INVALID_TRAVEL_DATE_RANGE`
+- `TRAVEL_RECORD_NOT_FOUND`
+- `LOCATION_NOT_FOUND`
+- `INVALID_LOCATION_TYPE`
+- `INVALID_OBJECT_KEY`
+- `OBJECT_NOT_UPLOADED`
+- `MEMBER_NOT_FOUND`
+
+## API 요약
+
+| Method | Endpoint | 설명 |
+| --- | --- | --- |
+| GET | `/api/v1/countries` | 국가 목록 |
+| GET | `/api/v1/locations` | 지역 목록 |
+| GET | `/api/v1/locations/{locationId}` | 지역 상세 |
+| POST | `/api/v1/uploads/presigned-urls` | 이미지 업로드 URL 발급 |
+| POST | `/api/v1/travel-records` | 여행 기록 생성 |
+| GET | `/api/v1/travel-records` | 내 여행 기록 목록 |
+| GET | `/api/v1/travel-records/{travelRecordId}` | 내 여행 기록 상세 |
+| PUT | `/api/v1/travel-records/{travelRecordId}` | 여행 기록 전체 수정 |
+| DELETE | `/api/v1/travel-records/{travelRecordId}` | 여행 기록 삭제 |
+
+## 아직 결정할 운영 정책
+
+1. 허용 이미지 MIME 타입, 파일당 최대 크기, 기록당 최대 개수
+2. 기록 수정·삭제 시 제거된 S3 객체의 삭제 시점
+3. 대한민국 행정구역 코드 및 GeoJSON 출처와 갱신 방식
+
+## 아직 명세에 없는 기능
+
+아래 기능은 현재 제공된 최신 API 문서에 정의되어 있지 않으므로 클라이언트에서
+임의로 구현하지 않는다.
+
+- 지도 방문 지역 전용 API: `GET /travel-records/map` 추가 여부와 응답 형식
+- 여행 통계 API: `GET /travel-statistics` 추가 여부와 응답 형식
+
+## 지도 데이터 경계
+
+Mapbox는 지도 타일·스타일·지도 피처를 표시하는 역할만 담당한다. Mapbox가
 Mapmory의 `Location.regionCode`를 제공한다고 가정하지 않는다.
 
 - 방문 지역 데이터는 Mapmory 서버가 제공한다.
-- 지도 색칠은 서버의 `regionCode`와 클라이언트가 사용하는 행정구역 GeoJSON의
-  속성을 매칭해서 처리한다.
-- Mapbox SDK에서 제공하는 지도 피처 속성이나 내부 ID를 Mapmory 지역 코드로
-  직접 저장하지 않는다.
-- 위치 권한을 사용하지 않는 한 사용자 GPS를 방문 지역 판정에 사용하지 않는다.
-
-## 여행 기록 목록
-
-GET /travel-records?locationId={id}&keyword={keyword}&page={page}&size={size}
-
-## 통계
-
-GET /travel-statistics
-
-## 클라이언트 구현 전 확정할 항목
-
-아래 항목은 아직 DTO나 HTTP Repository에 임의로 반영하지 않는다.
-
-### 여행 기록 CRUD
-
-- 상세 조회, 생성, 수정, 삭제의 HTTP method와 경로
-- 생성·수정 요청 본문의 필드명과 `mediaObjectKeys` 전달 형식
-- 단건·목록 응답의 필드명, 날짜·시각 형식, 페이지 응답 구조
-- 공통 오류 응답 형식과 오류 코드
-
-### 사진 업로드
-
-- Presigned URL 발급 API의 HTTP method·경로와 요청 필드(파일명, MIME type, 크기)
-- 발급 응답의 `objectKey`, 업로드 URL, 필수 헤더, 만료 시각 형식
-- 여행 기록 생성·수정 전에 업로드한 파일의 취소·실패 시 정리 정책
-- 첨부 가능한 사진 수, 파일 크기, MIME type 제한
-
-### 장소 선택
-
-- 국가와 행정구역을 조회하는 API 경로와 응답 구조
-- `travelRecord.locationId`가 항상 최종 행정구역인 `DISTRICT`를 가리키는지
-- 지도 GeoJSON 속성과 `Location.regionCode`의 정확한 매핑 규칙
-
-### 지도와 통계
-
-- `GET /travel-records/map` 응답이 방문한 `locationId` 목록인지, `regionCode` 목록인지
-- `GET /travel-statistics`가 제공할 국가·지역별 방문 수와 기록 수의 응답 구조
-
-## 클라이언트 구현 순서
-
-1. API 응답 필드와 오류 형식 확정
-2. DTO와 도메인 모델 변환 규칙 작성
-3. HTTP Repository 구현 및 테스트
-4. 지도 방문 지역 응답과 GeoJSON 속성 매핑 확정
-5. Mapbox 지도에 방문 지역 색칠 연결
-
-## 확정된 데이터 정책
-
-- 사진은 만료되는 URL이 아닌 `objectKey`를 영구 저장한다. 조회 응답에서만 서버가 `url`을 생성한다.
-- 사진 첨부 흐름은 `Presigned URL 발급 → 클라이언트 직접 업로드 → travel record에 objectKey 전달`이다.
-- 날짜를 입력하지 않으면 `startDate`, `endDate` 모두 `null`이다.
-- 시작일만 입력하면 서버가 `endDate`를 시작일과 같은 날짜로 저장한다.
-- 종료일만 입력하는 기록은 허용하지 않는다.
-- 종료일이 시작일보다 빠른 기록은 허용하지 않는다.
+- 지도 색칠은 서버의 `regionCode`와 클라이언트 행정구역 GeoJSON 속성을 매칭한다.
+- Mapbox 내부 ID나 지도 피처 속성을 Mapmory 지역 코드로 저장하지 않는다.
+- Mapbox 검색 장소나 정확한 좌표를 여행 기록에 저장하지 않는다.
