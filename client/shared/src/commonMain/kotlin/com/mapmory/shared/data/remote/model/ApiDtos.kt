@@ -3,6 +3,19 @@ package com.mapmory.shared.data.remote.model
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class ApiErrorDto(
+    val code: String,
+    val message: String,
+    val fieldErrors: List<FieldErrorDto> = emptyList(),
+)
+
+@Serializable
+data class FieldErrorDto(
+    val field: String,
+    val reason: String,
+)
+
+@Serializable
 data class ApiResponseDto<T>(
     val data: T,
 )
