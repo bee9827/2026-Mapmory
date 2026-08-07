@@ -24,15 +24,17 @@ Kotlin 2.4.10의 공식 KMP 호환 범위에 맞추기 위해 AGP 9.1.0을 사�
 - `shared`는 Android와 iOS에서 함께 사용하는 코드만 관리합니다.
 - Backend 소스와 의존성은 클라이언트 Gradle 프로젝트에 포함하지 않습니다.
 
-## Mapbox 공개 액세스 토큰
+## 지도 SDK
 
-지도 SDK를 연결하기 전에 `client/local.properties`에 아래 값을 추가한다. 이 파일은 Git에서 제외된다.
+Android 지도는 MapLibre Native를 사용한다. 개발 단계에서는 MapLibre 데모 스타일을
+사용하므로 Mapbox 계정이나 액세스 토큰이 필요하지 않다.
 
-```properties
-MAPBOX_ACCESS_TOKEN=발급받은_공개_액세스_토큰
+```text
+https://demotiles.maplibre.org/style.json
 ```
 
-Mapbox SDK는 생성된 `mapbox_access_token` 문자열 리소스를 자동으로 읽는다. SDK 의존성과 기본 지도 화면 연결은 완료했으며, 토큰 등록 후 Android 빌드와 실제 지도 표시를 검증한다.
+데모 타일은 운영 서비스용으로 보장되지 않으므로, 배포 전에는 별도의 타일·스타일
+제공처와 사용량 정책을 결정한다.
 
 ## Mapmory API Base URL
 
@@ -45,22 +47,6 @@ MAPMORY_API_BASE_URL=http://10.0.2.2:8080/api/v1
 값이 비어 있으면 Android 앱은 기존 Fake Repository로 실행한다. 값이 있으면
 `TravelRecordRemoteRepository`를 사용하며, Android 에뮬레이터에서 호스트 PC의
 `localhost`는 `10.0.2.2`로 접근한다.
-
-Mapbox Maven 저장소에서 SDK를 내려받으려면 별도의 비밀 토큰도 필요하다. `Downloads:Read` 권한이 있는 토큰을 사용자 Gradle 설정에만 추가한다.
-
-```properties
-# ~/.gradle/gradle.properties
-MAPBOX_DOWNLOADS_TOKEN=발급받은_비밀_다운로드_토큰
-```
-
-비밀 다운로드 토큰은 앱에 포함하거나 저장소에 커밋하지 않는다.
-
-팀 토큰 운영 기준:
-
-- 각 개발자는 본인 계정으로 비밀 다운로드 토큰을 따로 발급한다.
-- CI는 개발자 토큰과 분리된 CI 전용 토큰을 사용한다.
-- 공개 토큰은 개발 환경용 하나를 공유할 수 있지만, 운영 환경은 별도 토큰을 사용한다.
-- 토큰에는 필요한 최소 권한만 부여하고, 유출·퇴사 시 해당 토큰만 폐기한다.
 
 ## 현재 검증 상태
 

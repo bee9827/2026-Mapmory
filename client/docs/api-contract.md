@@ -263,10 +263,10 @@ travel-records/{memberId}/{uuid}.{extension}
 
 ## 지도 데이터 경계
 
-Mapbox는 지도 타일·스타일·지도 피처를 표시하는 역할만 담당한다. Mapbox가
+지도 SDK는 지도 타일·스타일·지도 피처를 표시하는 역할만 담당한다. 지도 SDK가
 Mapmory의 `Location.regionCode`를 제공한다고 가정하지 않는다.
 
 - 방문 지역 데이터는 Mapmory 서버가 제공한다.
 - 지도 색칠은 서버의 `regionCode`와 클라이언트 행정구역 GeoJSON 속성을 매칭한다.
-- Mapbox 내부 ID나 지도 피처 속성을 Mapmory 지역 코드로 저장하지 않는다.
-- Mapbox 검색 장소나 정확한 좌표를 여행 기록에 저장하지 않는다.
+- 지도 SDK 내부 ID나 지도 피처 속성을 Mapmory 지역 코드로 저장하지 않는다.
+- 지도 SDK 검색 장소나 정확한 좌표를 여행 기록에 저장하지 않는다.
