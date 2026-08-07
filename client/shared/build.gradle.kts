@@ -20,6 +20,7 @@ kotlin {
             implementation(compose.foundation)
             implementation(compose.material3)
             implementation(compose.ui)
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0") // Use the latest version
         }
     }
 }
