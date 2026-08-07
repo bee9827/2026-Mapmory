@@ -1,145 +1,61 @@
 package com.mapmory.shared
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import com.mapmory.shared.data.repository.FakeTravelRecordRepository
-import com.mapmory.shared.domain.model.Location
-import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.domain.repository.TravelRecordRepository
-import com.mapmory.shared.domain.usecase.CreateTravelRecordUseCase
-import com.mapmory.shared.domain.usecase.DeleteTravelRecordUseCase
-import com.mapmory.shared.domain.usecase.GetTravelRecordUseCase
-import com.mapmory.shared.domain.usecase.GetTravelRecordsUseCase
-import com.mapmory.shared.domain.usecase.UpdateTravelRecordUseCase
-import com.mapmory.shared.presentation.travelrecord.TravelRecordDetailScreen
-import com.mapmory.shared.presentation.travelrecord.TravelRecordDetailUiState
-import com.mapmory.shared.presentation.travelrecord.TravelRecordDetailViewModel
-import com.mapmory.shared.presentation.travelrecord.TravelRecordEditorScreen
-import com.mapmory.shared.presentation.travelrecord.TravelRecordEditorViewModel
-import com.mapmory.shared.presentation.travelrecord.TravelRecordListScreen
-import com.mapmory.shared.presentation.travelrecord.TravelRecordListViewModel
-import com.mapmory.shared.presentation.travelrecord.TravelMapScreen
-import kotlinx.coroutines.launch
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 @Composable
 fun MapmoryApp(
-    travelRecordRepository: TravelRecordRepository? = null,
-    mapContent: @Composable () -> Unit = { Text("지도 SDK를 준비 중입니다.") },
+    isCameraPermissionGranted: Boolean? = null,
+    galleryPermissionState: GalleryPermissionState? = null,
+    onRequestCameraPermission: (() -> Unit)? = null,
+    onRequestGalleryPermission: (() -> Unit)? = null,
 ) {
-    val repository = remember(travelRecordRepository) {
-        travelRecordRepository ?: FakeTravelRecordRepository(
-            memberId = 10,
-            now = { "2026-08-07T00:00:00Z" },
-        )
-    }
-    val listViewModel = remember { TravelRecordListViewModel(GetTravelRecordsUseCase(repository)) }
-    val detailViewModel = remember {
-        TravelRecordDetailViewModel(
-            getTravelRecord = GetTravelRecordUseCase(repository),
-            deleteTravelRecord = DeleteTravelRecordUseCase(repository),
-        )
-    }
-    val editorViewModel = remember {
-        TravelRecordEditorViewModel(
-            createTravelRecord = CreateTravelRecordUseCase(repository),
-            updateTravelRecord = UpdateTravelRecordUseCase(repository),
-        )
-    }
-    val scope = rememberCoroutineScope()
-    var screen by remember { mutableStateOf(AppScreen.LIST) }
-    var selectedRecordId by remember { mutableStateOf<Long?>(null) }
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Text("Mapmory")
 
-    // ponytail: 임시 지역 목록이며, 장소 조회 API를 연결하면 Repository 결과로 교체한다.
-    val locations = remember {
-        listOf(
-            Location(1, 1, null, "KR-11", "서울특별시", LocationType.PROVINCE),
-            Location(2, 1, null, "KR-26", "부산광역시", LocationType.PROVINCE),
-            Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT),
-            Location(102, 1, 2, "KR-26-26290", "해운대구", LocationType.DISTRICT),
-        )
-    }
+        if (onRequestCameraPermission != null) {
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = onRequestCameraPermission,
+                enabled = isCameraPermissionGranted != true,
+            ) {
+                Text(if (isCameraPermissionGranted == true) "카메라 허용됨" else "카메라 권한 요청")
+            }
+        }
 
-    LaunchedEffect(screen) {
-        if (screen == AppScreen.LIST) listViewModel.load()
-        if (screen == AppScreen.DETAIL) selectedRecordId?.let { detailViewModel.load(it) }
-    }
-
-    when (screen) {
-        AppScreen.LIST -> TravelRecordListScreen(
-            uiState = listViewModel.uiState,
-            query = listViewModel.query,
-            locations = locations,
-            onKeywordChanged = listViewModel::updateKeyword,
-            onLocationChanged = listViewModel::filterByLocation,
-            onSearchClick = { scope.launch { listViewModel.load() } },
-            onPreviousPageClick = { scope.launch { listViewModel.previousPage() } },
-            onNextPageClick = { scope.launch { listViewModel.nextPage() } },
-            onCreateClick = {
-                editorViewModel.reset()
-                screen = AppScreen.EDITOR
-            },
-            onMapClick = { screen = AppScreen.MAP },
-            onRecordClick = { recordId ->
-                selectedRecordId = recordId
-                screen = AppScreen.DETAIL
-            },
-        )
-
-        AppScreen.MAP -> TravelMapScreen(
-            mapContent = mapContent,
-            onBackClick = { screen = AppScreen.LIST },
-        )
-
-        AppScreen.EDITOR -> TravelRecordEditorScreen(
-            uiState = editorViewModel.uiState,
-            locations = locations,
-            onProvinceChanged = editorViewModel::clearLocation,
-            onLocationSelected = editorViewModel::selectLocation,
-            onTitleChanged = editorViewModel::updateTitle,
-            onContentChanged = editorViewModel::updateContent,
-            onStartDateChanged = editorViewModel::updateStartDate,
-            onEndDateChanged = editorViewModel::updateEndDate,
-            onSaveClick = {
-                scope.launch {
-                    if (editorViewModel.save()) screen = AppScreen.LIST
-                }
-            },
-            onBackClick = { screen = AppScreen.LIST },
-        )
-
-        AppScreen.DETAIL -> TravelRecordDetailScreen(
-            uiState = detailViewModel.uiState,
-            locations = locations,
-            onBackClick = { screen = AppScreen.LIST },
-            onEditClick = {
-                val record = (detailViewModel.uiState as? TravelRecordDetailUiState.Success)?.record
-                val location = locations.firstOrNull { it.id == record?.locationId }
-                if (record != null && location != null) {
-                    editorViewModel.startEditing(record, location)
-                    screen = AppScreen.EDITOR
-                }
-            },
-            onDeleteClick = {
-                scope.launch {
-                    if (detailViewModel.delete()) {
-                        selectedRecordId = null
-                        screen = AppScreen.LIST
-                    }
-                }
-            },
-        )
+        if (onRequestGalleryPermission != null) {
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = onRequestGalleryPermission,
+                enabled = galleryPermissionState != GalleryPermissionState.FULL,
+            ) {
+                Text(galleryPermissionState.galleryButtonText())
+            }
+        }
     }
 }
 
-private enum class AppScreen {
-    LIST,
-    MAP,
-    EDITOR,
-    DETAIL,
+enum class GalleryPermissionState {
+    FULL,
+    PARTIAL,
+    DENIED,
+}
+
+private fun GalleryPermissionState?.galleryButtonText(): String = when (this) {
+    GalleryPermissionState.FULL -> "갤러리 허용됨"
+    GalleryPermissionState.PARTIAL -> "사진 추가 선택"
+    GalleryPermissionState.DENIED, null -> "갤러리 권한 요청"
 }
