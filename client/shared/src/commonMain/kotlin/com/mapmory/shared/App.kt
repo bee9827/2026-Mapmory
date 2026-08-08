@@ -9,7 +9,8 @@ import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordQuery
-import com.mapmory.shared.presentation.triprecord.screen.TripMapArtwork
+import com.mapmory.shared.presentation.map.domain.MapScope
+import com.mapmory.shared.presentation.map.ui.MapArtwork
 import com.mapmory.shared.presentation.triprecord.screen.TripMapScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripProfileScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordDetailScreen
@@ -30,6 +31,7 @@ private enum class AppDestination {
 @Composable
 fun MapmoryApp() {
     var destination by remember { mutableStateOf(AppDestination.MAP) }
+    var mapScope by remember { mutableStateOf(MapScope.WORLD) }
     var editorReturnDestination by remember { mutableStateOf(AppDestination.MAP) }
     var selectedRecordId by remember { mutableStateOf<Long?>(null) }
     var records by remember { mutableStateOf(emptyList<TripRecordData>()) }
@@ -111,7 +113,12 @@ fun MapmoryApp() {
 
     when (destination) {
         AppDestination.MAP -> TripMapScreen(
-            mapContent = { TripMapArtwork() },
+            mapScope = mapScope,
+            onMapScopeChange = { mapScope = it },
+            mapContent = {
+                // Temporary sample state until saved records are mapped to country codes.
+                MapArtwork(scope = mapScope, visitedCountryCodes = setOf("KOR"), visitedRegionCodes = setOf("KR-46"))
+            },
             onBackClick = {},
             onRecordClick = { destination = AppDestination.RECORDS },
             onCreateClick = { openCreateScreen(AppDestination.MAP) },
