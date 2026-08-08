@@ -5,13 +5,8 @@ import SwiftUI
 struct MapmoryApp: App {
     var body: some Scene {
         WindowGroup {
-            ZStack(alignment: .bottom) {
-                ComposeView()
-                    .ignoresSafeArea()
-
-                MediaPermissionView()
-                    .padding()
-            }
+            ComposeView()
+                .ignoresSafeArea()
         }
     }
 }

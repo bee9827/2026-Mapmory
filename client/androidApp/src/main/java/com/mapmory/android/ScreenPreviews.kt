@@ -1,0 +1,217 @@
+package com.mapmory.android
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.tooling.preview.Preview
+import com.mapmory.shared.MapmoryApp
+import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.domain.model.TripRecordData
+import com.mapmory.shared.domain.model.TripRecordMedia
+import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.presentation.triprecord.screen.TripMapScreen
+import com.mapmory.shared.presentation.triprecord.screen.TripRecordDetailScreen
+import com.mapmory.shared.presentation.triprecord.screen.TripRecordEditorScreen
+import com.mapmory.shared.presentation.triprecord.screen.TripRecordListScreen
+import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
+import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
+import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
+
+@Preview(
+    name = "Mapmory 랜딩",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun MapmoryAppPreview() {
+    MapmoryApp(
+        globePainter = { painterResource(R.drawable.globe_hero) },
+    )
+}
+
+@Preview(
+    name = "여행 기록 목록",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun TripRecordListScreenPreview() {
+    PreviewTheme {
+        TripRecordListScreen(
+            uiState = TripRecordListUiState.Success(
+                records = previewRecords,
+                page = 0,
+                totalPages = 3,
+            ),
+            query = TripRecordQuery(),
+            locations = previewLocations,
+            onKeywordChanged = {},
+            onLocationChanged = {},
+            onSearchClick = {},
+            onPreviousPageClick = {},
+            onNextPageClick = {},
+            onCreateClick = {},
+            onMapClick = {},
+            onRecordClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 상세",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 760,
+)
+@Composable
+fun TripRecordDetailScreenPreview() {
+    PreviewTheme {
+        TripRecordDetailScreen(
+            uiState = TripRecordDetailUiState.Success(previewRecords.first()),
+            locations = previewLocations,
+            onBackClick = {},
+            onEditClick = {},
+            onDeleteClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 작성",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun TripRecordEditorScreenPreview() {
+    PreviewTheme {
+        TripRecordEditorScreen(
+            uiState = TripRecordEditorUiState(
+                selectedLocation = previewLocations[1],
+                title = "봄날의 서울",
+                content = "천천히 걸으며 발견한 서울의 새로운 모습",
+                startDate = "2026-04-12",
+                endDate = "2026-04-14",
+            ),
+            locations = previewLocations,
+            onProvinceChanged = {},
+            onLocationSelected = {},
+            onTitleChanged = {},
+            onContentChanged = {},
+            onStartDateChanged = {},
+            onEndDateChanged = {},
+            onSaveClick = {},
+            onBackClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "지도",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 760,
+)
+@Composable
+fun TripMapScreenPreview() {
+    PreviewTheme {
+        TripMapScreen(
+            mapContent = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFE6F0E3)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("지도 SDK 영역")
+                }
+            },
+            onBackClick = {},
+        )
+    }
+}
+
+@Composable
+private fun PreviewTheme(content: @Composable () -> Unit) {
+    MaterialTheme {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            content = content,
+        )
+    }
+}
+
+private val previewLocations = listOf(
+    Location(
+        id = 1L,
+        countryId = 1L,
+        parentId = null,
+        regionCode = "11",
+        name = "서울특별시",
+        type = LocationType.PROVINCE,
+    ),
+    Location(
+        id = 2L,
+        countryId = 1L,
+        parentId = 1L,
+        regionCode = "11680",
+        name = "강남구",
+        type = LocationType.DISTRICT,
+    ),
+    Location(
+        id = 3L,
+        countryId = 1L,
+        parentId = 1L,
+        regionCode = "11650",
+        name = "서초구",
+        type = LocationType.DISTRICT,
+    ),
+)
+
+private val previewRecords = listOf(
+    TripRecordData(
+        id = 101L,
+        memberId = 7L,
+        locationId = 2L,
+        title = "봄날의 서울",
+        content = "천천히 걸으며 발견한 서울의 새로운 모습",
+        startDate = "2026-04-12",
+        endDate = "2026-04-14",
+        media = listOf(
+            TripRecordMedia(
+                id = 1001L,
+                objectKey = "preview/seoul.jpg",
+                sortOrder = 0,
+                url = null,
+            ),
+        ),
+        createdAt = "2026-04-15 10:30",
+        updatedAt = "2026-04-15 10:30",
+        thumbnailUrl = null,
+    ),
+    TripRecordData(
+        id = 102L,
+        memberId = 7L,
+        locationId = 3L,
+        title = "비 오는 서초 산책",
+        content = "빗소리와 따뜻한 커피가 좋았던 오후",
+        startDate = "2026-05-03",
+        endDate = null,
+        media = emptyList(),
+        createdAt = "2026-05-03 18:20",
+        updatedAt = "2026-05-03 18:20",
+        thumbnailUrl = null,
+    ),
+)
