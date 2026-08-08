@@ -5,6 +5,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
@@ -19,21 +23,29 @@ import com.mapmory.shared.presentation.triprecord.screen.TripRecordListScreen
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
+import kotlinx.serialization.Serializable
 
-private enum class AppDestination {
-    MAP,
-    RECORDS,
-    CREATE,
-    PROFILE,
-    DETAIL,
-}
+@Serializable
+private data object MapRoute
+
+@Serializable
+private data object RecordsRoute
+
+@Serializable
+private data object CreateRoute
+
+@Serializable
+private data object ProfileRoute
+
+@Serializable
+private data class DetailRoute(
+    val recordId: Long,
+)
 
 @Composable
 fun MapmoryApp() {
-    var destination by remember { mutableStateOf(AppDestination.MAP) }
+    val navController = rememberNavController()
     var mapScope by remember { mutableStateOf(MapScope.WORLD) }
-    var editorReturnDestination by remember { mutableStateOf(AppDestination.MAP) }
-    var selectedRecordId by remember { mutableStateOf<Long?>(null) }
     var records by remember { mutableStateOf(emptyList<TripRecordData>()) }
     var query by remember { mutableStateOf(TripRecordQuery()) }
     var editorState by remember {
@@ -44,18 +56,26 @@ fun MapmoryApp() {
         )
     }
 
-    fun openCreateScreen(returnTo: AppDestination) {
-        editorReturnDestination = returnTo
+    fun navigateToTab(route: Any) {
+        navController.navigate(route) {
+            popUpTo(navController.graph.startDestinationId) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    fun openCreateScreen() {
         editorState = TripRecordEditorUiState(
             selectedLocation = appLocations.firstOrNull { it.type == LocationType.DISTRICT },
         )
-        destination = AppDestination.CREATE
+        navController.navigate(CreateRoute)
     }
 
     fun openEditScreen(record: TripRecordData) {
         val location = appLocations.firstOrNull { it.id == record.locationId }
             ?: appLocations.firstOrNull { it.type == LocationType.DISTRICT }
-        editorReturnDestination = AppDestination.DETAIL
         editorState = TripRecordEditorUiState(
             recordId = record.id,
             selectedLocation = location,
@@ -64,7 +84,7 @@ fun MapmoryApp() {
             startDate = record.startDate.orEmpty(),
             endDate = record.endDate.orEmpty(),
         )
-        destination = AppDestination.CREATE
+        navController.navigate(CreateRoute)
     }
 
     fun saveEditor() {
@@ -92,12 +112,9 @@ fun MapmoryApp() {
                 } else {
                     records.map { if (it.id == record.id) record else it }
                 }
-                selectedRecordId = record.id
                 query = TripRecordQuery()
-                destination = if (state.recordId == null) {
-                    AppDestination.RECORDS
-                } else {
-                    AppDestination.DETAIL
+                if (!navController.popBackStack()) {
+                    navigateToTab(RecordsRoute)
                 }
             }
         }
@@ -109,98 +126,113 @@ fun MapmoryApp() {
                 record.title.contains(query.keyword.orEmpty(), ignoreCase = true) ||
                 record.content.contains(query.keyword.orEmpty(), ignoreCase = true))
     }
-    val selectedRecord = records.firstOrNull { it.id == selectedRecordId }
 
-    when (destination) {
-        AppDestination.MAP -> TripMapScreen(
-            mapScope = mapScope,
-            onMapScopeChange = { mapScope = it },
-            mapContent = {
-                // Temporary sample state until saved records are mapped to country codes.
-                MapArtwork(scope = mapScope, visitedCountryCodes = setOf("KOR"), visitedRegionCodes = setOf("KR-46"))
-            },
-            onBackClick = {},
-            onRecordClick = { destination = AppDestination.RECORDS },
-            onCreateClick = { openCreateScreen(AppDestination.MAP) },
-            onProfileClick = { destination = AppDestination.PROFILE },
-        )
+    NavHost(
+        navController = navController,
+        startDestination = MapRoute,
+    ) {
+        composable<MapRoute> {
+            TripMapScreen(
+                mapScope = mapScope,
+                onMapScopeChange = { mapScope = it },
+                mapContent = {
+                    // Temporary sample state until saved records are mapped to country codes.
+                    MapArtwork(
+                        scope = mapScope,
+                        visitedCountryCodes = setOf("KOR"),
+                        visitedRegionCodes = setOf("KR-46"),
+                    )
+                },
+                onBackClick = {},
+                onRecordClick = { navigateToTab(RecordsRoute) },
+                onCreateClick = { openCreateScreen() },
+                onProfileClick = { navigateToTab(ProfileRoute) },
+            )
+        }
 
-        AppDestination.RECORDS -> TripRecordListScreen(
-            uiState = TripRecordListUiState.Success(
-                records = visibleRecords,
-                page = 0,
-                totalPages = 1,
-            ),
-            query = query,
-            locations = appLocations,
-            onKeywordChanged = { keyword ->
-                query = query.copy(keyword = keyword.ifBlank { null }, page = 0)
-            },
-            onLocationChanged = { locationId ->
-                query = query.copy(locationId = locationId, page = 0)
-            },
-            onSearchClick = {},
-            onPreviousPageClick = {},
-            onNextPageClick = {},
-            onCreateClick = { openCreateScreen(AppDestination.RECORDS) },
-            onMapClick = { destination = AppDestination.MAP },
-            onRecordClick = { recordId ->
-                selectedRecordId = recordId
-                destination = AppDestination.DETAIL
-            },
-            onProfileClick = { destination = AppDestination.PROFILE },
-        )
+        composable<RecordsRoute> {
+            TripRecordListScreen(
+                uiState = TripRecordListUiState.Success(
+                    records = visibleRecords,
+                    page = 0,
+                    totalPages = 1,
+                ),
+                query = query,
+                locations = appLocations,
+                onKeywordChanged = { keyword ->
+                    query = query.copy(keyword = keyword.ifBlank { null }, page = 0)
+                },
+                onLocationChanged = { locationId ->
+                    query = query.copy(locationId = locationId, page = 0)
+                },
+                onSearchClick = {},
+                onPreviousPageClick = {},
+                onNextPageClick = {},
+                onCreateClick = { openCreateScreen() },
+                onMapClick = { navigateToTab(MapRoute) },
+                onRecordClick = { recordId ->
+                    navController.navigate(DetailRoute(recordId))
+                },
+                onProfileClick = { navigateToTab(ProfileRoute) },
+            )
+        }
 
-        AppDestination.CREATE -> TripRecordEditorScreen(
-            uiState = editorState,
-            locations = appLocations,
-            onProvinceChanged = {},
-            onLocationSelected = { location ->
-                editorState = editorState.copy(selectedLocation = location, errorMessage = null)
-            },
-            onTitleChanged = { title ->
-                editorState = editorState.copy(title = title, errorMessage = null)
-            },
-            onContentChanged = { content ->
-                editorState = editorState.copy(content = content, errorMessage = null)
-            },
-            onStartDateChanged = { date ->
-                editorState = editorState.copy(startDate = date, errorMessage = null)
-            },
-            onEndDateChanged = { date ->
-                editorState = editorState.copy(endDate = date, errorMessage = null)
-            },
-            onSaveClick = ::saveEditor,
-            onBackClick = { destination = editorReturnDestination },
-            onMapClick = { destination = AppDestination.MAP },
-            onRecordClick = { destination = AppDestination.RECORDS },
-            onProfileClick = { destination = AppDestination.PROFILE },
-        )
+        composable<CreateRoute> {
+            TripRecordEditorScreen(
+                uiState = editorState,
+                locations = appLocations,
+                onProvinceChanged = {},
+                onLocationSelected = { location ->
+                    editorState = editorState.copy(selectedLocation = location, errorMessage = null)
+                },
+                onTitleChanged = { title ->
+                    editorState = editorState.copy(title = title, errorMessage = null)
+                },
+                onContentChanged = { content ->
+                    editorState = editorState.copy(content = content, errorMessage = null)
+                },
+                onStartDateChanged = { date ->
+                    editorState = editorState.copy(startDate = date, errorMessage = null)
+                },
+                onEndDateChanged = { date ->
+                    editorState = editorState.copy(endDate = date, errorMessage = null)
+                },
+                onSaveClick = ::saveEditor,
+                onBackClick = { navController.popBackStack() },
+                onMapClick = { navigateToTab(MapRoute) },
+                onRecordClick = { navigateToTab(RecordsRoute) },
+                onProfileClick = { navigateToTab(ProfileRoute) },
+            )
+        }
 
-        AppDestination.PROFILE -> TripProfileScreen(
-            onMapClick = { destination = AppDestination.MAP },
-            onRecordClick = { destination = AppDestination.RECORDS },
-            onCreateClick = { openCreateScreen(AppDestination.PROFILE) },
-            onProfileClick = { destination = AppDestination.PROFILE },
-        )
+        composable<ProfileRoute> {
+            TripProfileScreen(
+                onMapClick = { navigateToTab(MapRoute) },
+                onRecordClick = { navigateToTab(RecordsRoute) },
+                onCreateClick = { openCreateScreen() },
+                onProfileClick = { navigateToTab(ProfileRoute) },
+            )
+        }
 
-        AppDestination.DETAIL -> TripRecordDetailScreen(
-            uiState = selectedRecord?.let(TripRecordDetailUiState::Success)
-                ?: TripRecordDetailUiState.Error("여행 기록을 찾을 수 없습니다."),
-            locations = appLocations,
-            onBackClick = { destination = AppDestination.RECORDS },
-            onEditClick = { selectedRecord?.let(::openEditScreen) },
-            onDeleteClick = {
-                selectedRecordId?.let { recordId ->
-                    records = records.filterNot { it.id == recordId }
-                }
-                destination = AppDestination.RECORDS
-            },
-            onMapClick = { destination = AppDestination.MAP },
-            onRecordClick = { destination = AppDestination.RECORDS },
-            onCreateClick = { openCreateScreen(AppDestination.DETAIL) },
-            onProfileClick = { destination = AppDestination.PROFILE },
-        )
+        composable<DetailRoute> { backStackEntry ->
+            val detailRoute = backStackEntry.toRoute<DetailRoute>()
+            val selectedRecord = records.firstOrNull { it.id == detailRoute.recordId }
+            TripRecordDetailScreen(
+                uiState = selectedRecord?.let(TripRecordDetailUiState::Success)
+                    ?: TripRecordDetailUiState.Error("여행 기록을 찾을 수 없습니다."),
+                locations = appLocations,
+                onBackClick = { navController.popBackStack() },
+                onEditClick = { selectedRecord?.let(::openEditScreen) },
+                onDeleteClick = {
+                    records = records.filterNot { it.id == detailRoute.recordId }
+                    navController.popBackStack()
+                },
+                onMapClick = { navigateToTab(MapRoute) },
+                onRecordClick = { navigateToTab(RecordsRoute) },
+                onCreateClick = { openCreateScreen() },
+                onProfileClick = { navigateToTab(ProfileRoute) },
+            )
+        }
     }
 }
 
