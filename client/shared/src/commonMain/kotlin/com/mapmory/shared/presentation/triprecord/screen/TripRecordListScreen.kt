@@ -1,0 +1,164 @@
+package com.mapmory.shared.presentation.triprecord.screen
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.domain.model.TripRecordData
+import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
+
+@Composable
+fun TripRecordListScreen(
+    uiState: TripRecordListUiState,
+    query: TripRecordQuery,
+    locations: List<Location>,
+    onKeywordChanged: (String) -> Unit,
+    onLocationChanged: (Long?) -> Unit,
+    onSearchClick: () -> Unit,
+    onPreviousPageClick: () -> Unit,
+    onNextPageClick: () -> Unit,
+    onCreateClick: () -> Unit,
+    onMapClick: () -> Unit,
+    onRecordClick: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Text(
+            text = "여행 기록",
+            style = MaterialTheme.typography.headlineMedium,
+        )
+        Button(onClick = onCreateClick) {
+            Text("기록 작성")
+        }
+        OutlinedButton(onClick = onMapClick) {
+            Text("지도 보기")
+        }
+        OutlinedTextField(
+            value = query.keyword.orEmpty(),
+            onValueChange = onKeywordChanged,
+            label = { Text("제목·내용 검색") },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(onClick = { onLocationChanged(null) }) {
+                Text(if (query.locationId == null) "✓ 전체" else "전체")
+            }
+            locations.filter { it.type == LocationType.DISTRICT }.forEach { location ->
+                OutlinedButton(onClick = { onLocationChanged(location.id) }) {
+                    Text(if (query.locationId == location.id) "✓ ${location.name}" else location.name)
+                }
+            }
+        }
+        Button(onClick = onSearchClick) {
+            Text("검색")
+        }
+
+        when (uiState) {
+            TripRecordListUiState.Idle,
+            TripRecordListUiState.Loading,
+            -> CircularProgressIndicator()
+
+            is TripRecordListUiState.Error -> Text(uiState.message)
+
+            is TripRecordListUiState.Success -> {
+                if (uiState.records.isEmpty()) {
+                    Text(
+                        if (query.keyword == null && query.locationId == null) {
+                            "아직 작성한 여행 기록이 없어요."
+                        } else {
+                            "조건에 맞는 여행 기록이 없어요."
+                        },
+                    )
+                } else {
+                    TripRecordList(
+                        records = uiState.records,
+                        locations = locations,
+                        onRecordClick = onRecordClick,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (uiState.totalPages > 1) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Button(
+                            onClick = onPreviousPageClick,
+                            enabled = uiState.page > 0,
+                        ) {
+                            Text("이전")
+                        }
+                        Text("${uiState.page + 1} / ${uiState.totalPages}")
+                        Button(
+                            onClick = onNextPageClick,
+                            enabled = uiState.page + 1 < uiState.totalPages,
+                        ) {
+                            Text("다음")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TripRecordList(
+    records: List<TripRecordData>,
+    locations: List<Location>,
+    onRecordClick: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(records, key = TripRecordData::id) { record ->
+            Card(
+                onClick = { onRecordClick(record.id) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(record.title, style = MaterialTheme.typography.titleMedium)
+                    locations.firstOrNull { it.id == record.locationId }?.let { location ->
+                        Text(location.name, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text(record.content, style = MaterialTheme.typography.bodyMedium)
+                    record.startDate?.let { startDate ->
+                        Text(
+                            text = if (record.endDate == null) startDate else "$startDate ~ ${record.endDate}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

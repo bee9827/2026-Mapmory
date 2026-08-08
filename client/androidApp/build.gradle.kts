@@ -1,6 +1,15 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
+}
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use(::load)
+    }
 }
 
 android {
@@ -13,6 +22,16 @@ android {
         targetSdk = libs.versions.compileSdk.get().toInt()
         versionCode = 1
         versionName = "0.1.0"
+        resValue(
+            type = "string",
+            name = "mapmory_api_base_url",
+            value = localProperties.getProperty("MAPMORY_API_BASE_URL").orEmpty(),
+        )
+    }
+
+    buildFeatures {
+        compose = true
+        resValues = true
     }
 
     buildTypes {
@@ -25,4 +44,6 @@ android {
 dependencies {
     implementation(project(":shared"))
     implementation("androidx.activity:activity-compose:1.11.0")
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.ktor.client.core)
 }

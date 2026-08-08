@@ -1,0 +1,44 @@
+package com.mapmory.shared.presentation.triprecord.viewmodel
+
+import com.mapmory.shared.data.repository.FakeTripRecordRepository
+import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.usecase.DeleteTripRecordUseCase
+import com.mapmory.shared.domain.usecase.GetTripRecordUseCase
+import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
+import com.mapmory.shared.runSuspend
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+
+class TripRecordDetailViewModelTest {
+    @Test
+    fun loadChangesStateForSuccessAndFailure() {
+        runSuspend {
+            val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+            val record = repository.createTripRecord(
+                TripRecordDraft(
+                    locationId = 101,
+                    title = "서울 여행",
+                    content = "한강을 걸었다.",
+                    startDate = null,
+                    endDate = null,
+                    mediaObjectKeys = emptyList(),
+                ),
+            ).getOrThrow()
+            val viewModel = TripRecordDetailViewModel(
+                getTripRecord = GetTripRecordUseCase(repository),
+                deleteTripRecord = DeleteTripRecordUseCase(repository),
+            )
+
+            viewModel.load(record.id)
+
+            val success = assertIs<TripRecordDetailUiState.Success>(viewModel.uiState)
+            assertEquals("서울 여행", success.record.title)
+
+            assertEquals(true, viewModel.delete())
+            viewModel.load(record.id)
+
+            assertIs<TripRecordDetailUiState.Error>(viewModel.uiState)
+        }
+    }
+}
