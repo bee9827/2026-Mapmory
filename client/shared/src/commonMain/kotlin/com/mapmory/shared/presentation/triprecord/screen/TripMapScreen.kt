@@ -24,11 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.map.domain.MapScope
 import com.mapmory.shared.presentation.map.ui.MapViewport
+import kotlin.math.roundToInt
 
 @Composable
 fun TripMapScreen(
     mapContent: @Composable () -> Unit,
     mapScope: MapScope = MapScope.WORLD,
+    visitedCount: Int = 0,
     onMapScopeChange: (MapScope) -> Unit = {},
     onBackClick: () -> Unit,
     onRecordClick: () -> Unit = onBackClick,
@@ -54,7 +56,7 @@ fun TripMapScreen(
                     },
                 )
                 Spacer(Modifier.height(4.dp))
-                MapSummaryCard(mapScope = mapScope)
+                MapSummaryCard(mapScope = mapScope, visitedCount = visitedCount)
                 Spacer(Modifier.height(10.dp))
                 MapScopeToggle(
                     selected = mapScope,
@@ -157,7 +159,10 @@ private fun MapScopeChip(
 }
 
 @Composable
-private fun MapSummaryCard(mapScope: MapScope) {
+private fun MapSummaryCard(
+    mapScope: MapScope,
+    visitedCount: Int,
+) {
     val title = when (mapScope) {
         MapScope.WORLD -> "나의 세계 지도"
         MapScope.KOREA -> "나의 대한민국 지도"
@@ -166,6 +171,9 @@ private fun MapSummaryCard(mapScope: MapScope) {
         MapScope.WORLD -> 195
         MapScope.KOREA -> 17
     }
+    val safeVisitedCount = visitedCount.coerceIn(0, total)
+    val completionPercent = (safeVisitedCount.toFloat() / total * 100f).roundToInt()
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,12 +194,12 @@ private fun MapSummaryCard(mapScope: MapScope) {
                     modifier = Modifier.padding(top = 3.dp),
                     verticalAlignment = Alignment.Bottom,
                 ) {
-                    Text("2", color = TripRecordPalette.accent, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+                    Text(safeVisitedCount.toString(), color = TripRecordPalette.accent, fontSize = 23.sp, fontWeight = FontWeight.Bold)
                     Text(" / $total", color = TripRecordPalette.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Text(
-                text = "1% 채움",
+                text = "$completionPercent% 채움",
                 color = TripRecordPalette.accent,
                 fontSize = 11.sp,
                 modifier = Modifier
