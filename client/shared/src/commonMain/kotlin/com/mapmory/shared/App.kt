@@ -5,7 +5,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.painter.Painter
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
@@ -29,10 +28,7 @@ private enum class AppDestination {
 }
 
 @Composable
-@Suppress("UNUSED_PARAMETER")
-fun MapmoryApp(
-    globePainter: @Composable () -> Painter,
-) {
+fun MapmoryApp() {
     var destination by remember { mutableStateOf(AppDestination.MAP) }
     var editorReturnDestination by remember { mutableStateOf(AppDestination.MAP) }
     var selectedRecordId by remember { mutableStateOf<Long?>(null) }

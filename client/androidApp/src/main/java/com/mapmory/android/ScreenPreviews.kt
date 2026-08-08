@@ -1,16 +1,10 @@
 package com.mapmory.android
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.mapmory.shared.MapmoryApp
 import com.mapmory.shared.domain.model.Location
@@ -18,6 +12,7 @@ import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.presentation.triprecord.screen.TripMapArtwork
 import com.mapmory.shared.presentation.triprecord.screen.TripMapScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordDetailScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordEditorScreen
@@ -27,16 +22,14 @@ import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
 
 @Preview(
-    name = "Mapmory 랜딩",
+    name = "지도",
     showBackground = true,
     widthDp = 412,
     heightDp = 900,
 )
 @Composable
 fun MapmoryAppPreview() {
-    MapmoryApp(
-        globePainter = { painterResource(R.drawable.globe_hero) },
-    )
+    MapmoryApp()
 }
 
 @Preview(
@@ -127,16 +120,7 @@ fun TripRecordEditorScreenPreview() {
 fun TripMapScreenPreview() {
     PreviewTheme {
         TripMapScreen(
-            mapContent = {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFFE6F0E3)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("지도 SDK 영역")
-                }
-            },
+            mapContent = { TripMapArtwork() },
             onBackClick = {},
         )
     }
