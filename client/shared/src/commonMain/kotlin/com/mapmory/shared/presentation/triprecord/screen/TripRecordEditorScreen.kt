@@ -38,7 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.domain.model.Location
@@ -265,7 +270,8 @@ fun TripRecordEditorScreen(
                         state = locationResultsListState,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 500.dp),
+                            .heightIn(max = 500.dp)
+                            .nestedScroll(consumeLocationListOverscrollConnection),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         contentPadding = PaddingValues(bottom = 24.dp),
                     ) {
@@ -389,6 +395,19 @@ private fun locationContext(location: Location, locations: List<Location>): Stri
     location.countryId != KoreaCountryId -> "세계 지도"
     location.type == LocationType.PROVINCE -> "대한민국"
     else -> locations.firstOrNull { it.id == location.parentId }?.name ?: "대한민국"
+}
+
+private val consumeLocationListOverscrollConnection = object : NestedScrollConnection {
+    override fun onPostScroll(
+        consumed: Offset,
+        available: Offset,
+        source: NestedScrollSource,
+    ): Offset = Offset(x = 0f, y = available.y)
+
+    override suspend fun onPostFling(
+        consumed: Velocity,
+        available: Velocity,
+    ): Velocity = Velocity(x = 0f, y = available.y)
 }
 
 
