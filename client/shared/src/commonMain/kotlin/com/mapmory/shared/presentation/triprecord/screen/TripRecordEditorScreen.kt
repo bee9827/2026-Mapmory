@@ -19,11 +19,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -31,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -65,7 +68,8 @@ fun TripRecordEditorScreen(
             .distinctBy(Location::regionCode)
     }
     var showLocationSheet by remember { mutableStateOf(false) }
-    var locationSearchQuery by remember { mutableStateOf("") }
+    var locationSearchQuery by rememberSaveable { mutableStateOf("") }
+    val locationResultsListState = rememberLazyListState()
     val filteredLocations = remember(locationSearchQuery, selectableLocations) {
         selectableLocations.filter { location ->
             locationSearchQuery.isBlank() ||
@@ -143,10 +147,7 @@ fun TripRecordEditorScreen(
                     LocationSelector(
                         selectedLocation = uiState.selectedLocation,
                         locations = locations,
-                        onClick = {
-                            locationSearchQuery = ""
-                            showLocationSheet = true
-                        },
+                        onClick = { showLocationSheet = true },
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
@@ -209,10 +210,7 @@ fun TripRecordEditorScreen(
 
     if (showLocationSheet) {
         ModalBottomSheet(
-            onDismissRequest = {
-                showLocationSheet = false
-                locationSearchQuery = ""
-            },
+            onDismissRequest = { showLocationSheet = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = TripRecordPalette.background,
             contentColor = TripRecordPalette.text,
@@ -241,6 +239,15 @@ fun TripRecordEditorScreen(
                     onValueChange = { locationSearchQuery = it },
                     placeholder = { Text("장소명 또는 코드 검색") },
                     singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = TripRecordPalette.text,
+                        unfocusedTextColor = TripRecordPalette.text,
+                        cursorColor = TripRecordPalette.accent,
+                        focusedBorderColor = TripRecordPalette.accent,
+                        unfocusedBorderColor = TripRecordPalette.line,
+                        focusedPlaceholderColor = TripRecordPalette.muted,
+                        unfocusedPlaceholderColor = TripRecordPalette.muted,
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 16.dp),
@@ -255,6 +262,7 @@ fun TripRecordEditorScreen(
                     )
                 } else {
                     LazyColumn(
+                        state = locationResultsListState,
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 500.dp),
@@ -269,7 +277,6 @@ fun TripRecordEditorScreen(
                                 onClick = {
                                     onLocationSelected(location)
                                     showLocationSheet = false
-                                    locationSearchQuery = ""
                                 },
                             )
                         }

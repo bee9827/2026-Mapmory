@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -40,9 +41,9 @@ internal fun WorldGlobe(
     modifier: Modifier = Modifier,
 ) {
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
-    var longitude by remember { mutableStateOf(InitialLongitude) }
-    var latitude by remember { mutableStateOf(0f) }
-    var zoom by remember { mutableStateOf(1f) }
+    var longitude by rememberSaveable { mutableStateOf(InitialLongitude) }
+    var latitude by rememberSaveable { mutableStateOf(0f) }
+    var zoom by rememberSaveable { mutableStateOf(1f) }
     val currentOnCountryClick by rememberUpdatedState(onCountryClick)
 
     // Keep the globe roll-free: longitude spin plus bounded latitude tilt only.
