@@ -52,8 +52,24 @@ fun MapmoryApp(
 ) {
     val navController = rememberNavController()
 
+    fun navigateBack(): Boolean {
+        if (navController.currentDestination?.id == navController.graph.startDestinationId) {
+            return false
+        }
+        if (navController.popBackStack()) {
+            return true
+        }
+
+        // popBackStack can empty the stack when a destination has no parent.
+        // Restore the home route instead of leaving NavHost without content.
+        navController.navigate(MapRoute) {
+            launchSingleTop = true
+        }
+        return true
+    }
+
     DisposableEffect(navigation, navController) {
-        navigation?.bindBackHandler { navController.popBackStack() }
+        navigation?.bindBackHandler(::navigateBack)
         onDispose { navigation?.unbindBackHandler() }
     }
 
@@ -267,7 +283,7 @@ fun MapmoryApp(
                     editorState = editorState.copy(endDate = date, errorMessage = null)
                 },
                 onSaveClick = ::saveEditor,
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navigateBack() },
                 onMapClick = { navigateToTab(MapRoute) },
                 onRecordClick = { navigateToTab(RecordsRoute) },
                 onProfileClick = { navigateToTab(ProfileRoute) },
@@ -290,7 +306,7 @@ fun MapmoryApp(
                 uiState = selectedRecord?.let(TripRecordDetailUiState::Success)
                     ?: TripRecordDetailUiState.Error("여행 기록을 찾을 수 없습니다."),
                 locations = appLocations,
-                onBackClick = { navController.popBackStack() },
+                onBackClick = { navigateBack() },
                 onEditClick = { selectedRecord?.let(::openEditScreen) },
                 onDeleteClick = {
                     records = records.filterNot { it.id == detailRoute.recordId }
