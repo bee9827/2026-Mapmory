@@ -24,7 +24,7 @@ class TripRecordEditorViewModelTest {
                 updateTripRecord = UpdateTripRecordUseCase(repository),
             )
 
-            viewModel.selectLocation(Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT))
+            viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
             viewModel.updateTitle("서울 여행")
             viewModel.updateContent("한강을 걸었다.")
 
@@ -37,11 +37,11 @@ class TripRecordEditorViewModelTest {
             val record = repository.getTripRecords(TripRecordQuery()).getOrThrow().records.single()
             viewModel.startEditing(
                 record = record,
-                location = Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT),
+                location = Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT),
             )
             viewModel.clearLocation()
             assertNull(viewModel.uiState.selectedLocation)
-            viewModel.selectLocation(Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT))
+            viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
             viewModel.updateTitle("서울 여름 여행")
 
             assertTrue(viewModel.save())
@@ -58,7 +58,7 @@ class TripRecordEditorViewModelTest {
                 updateTripRecord = UpdateTripRecordUseCase(repository),
             )
 
-            viewModel.selectLocation(Location(101, 1, 1, "KR-11-11680", "강남구", LocationType.DISTRICT))
+            viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
             viewModel.updateTitle("서울 여행")
             viewModel.updateEndDate("2026-08-01")
 

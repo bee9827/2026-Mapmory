@@ -14,6 +14,15 @@ from pathlib import Path
 
 PART_COUNT = 10
 
+# Natural Earth uses ``-99`` for territories without an official ISO code.
+# Keep those map-only entities addressable with two-letter user-assigned codes
+# while using ISO 3166-1 alpha-2 for every country that has an official code.
+NON_ISO_ALPHA_2_CODES = {
+    "CYN": "XC",  # Northern Cyprus
+    "KOS": "XK",  # Kosovo
+    "SOL": "XS",  # Somaliland
+}
+
 
 def number(value: float) -> str:
     value = round(float(value), 4)
@@ -32,9 +41,16 @@ def read_features(source: Path) -> list[tuple[str, str, list[list[list[float]]]]
     features = []
     for feature in json.loads(source.read_text())["features"]:
         properties = feature["properties"]
-        code = properties.get("ISO_A3")
+        code = properties.get("ISO_A2")
         if not code or code == "-99":
-            code = properties["ADM0_A3"]
+            alpha_3_code = properties.get("ISO_A3")
+            if not alpha_3_code or alpha_3_code == "-99":
+                alpha_3_code = properties["ADM0_A3"]
+            code = NON_ISO_ALPHA_2_CODES.get(alpha_3_code)
+            if code is None:
+                raise ValueError(
+                    f"Missing ISO 3166-1 alpha-2 code for {alpha_3_code}"
+                )
         name = properties.get("NAME") or code
         geometry = feature["geometry"]
         if geometry["type"] == "Polygon":

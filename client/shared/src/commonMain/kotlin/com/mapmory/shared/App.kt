@@ -11,6 +11,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.domain.model.KoreanDistrictCodes
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
@@ -52,7 +53,8 @@ fun MapmoryApp() {
     var editorState by remember {
         mutableStateOf(
             TripRecordEditorUiState(
-                selectedLocation = appLocations.firstOrNull { it.type == LocationType.DISTRICT },
+                selectedLocation = appLocations.firstOrNull { it.regionCode == DefaultDistrictCode }
+                    ?: appLocations.firstOrNull { it.type == LocationType.DISTRICT },
             ),
         )
     }
@@ -61,7 +63,7 @@ fun MapmoryApp() {
 
     fun mapLocationContains(selected: Location, recordLocation: Location): Boolean {
         return when {
-            selected.regionCode == "KOR" -> recordLocation.countryId == 1L || recordLocation.regionCode == "KOR"
+            selected.regionCode == "KR" -> recordLocation.countryId == 1L || recordLocation.regionCode == "KR"
             selected.countryId == 1L && selected.type == LocationType.PROVINCE ->
                 recordLocation.id == selected.id || recordLocation.parentId == selected.id
             else -> recordLocation.id == selected.id
@@ -81,6 +83,7 @@ fun MapmoryApp() {
     fun openCreateScreen(selectedLocation: Location? = null) {
         editorState = TripRecordEditorUiState(
             selectedLocation = selectedLocation
+                ?: appLocations.firstOrNull { it.regionCode == DefaultDistrictCode }
                 ?: appLocations.firstOrNull { it.type == LocationType.DISTRICT },
         )
         navController.navigate(CreateRoute)
@@ -150,7 +153,7 @@ fun MapmoryApp() {
 
     val visitedLocations = records.mapNotNull { record -> locationsById[record.locationId] }
     val visitedCountryCodes = visitedLocations.map { location ->
-        if (location.countryId == 1L) "KOR" else location.regionCode
+        if (location.countryId == 1L) "KR" else location.regionCode
     }.toSet()
     val visitedRegionCodes = visitedLocations.mapNotNull { location ->
         when {
@@ -356,6 +359,28 @@ private val appLocations = buildList {
         )
     }
 
+    val koreaProvinceIds = filter {
+        it.countryId == 1L && it.type == LocationType.PROVINCE
+    }.associate { it.regionCode to it.id }
+
+    KoreanDistrictCodes.forEachIndexed { index, district ->
+        val id = when (district.code) {
+            "11650" -> 3L
+            "11680" -> 2L
+            else -> 20_000L + index
+        }
+        add(
+            Location(
+                id = id,
+                countryId = 1L,
+                parentId = district.provinceCode?.let { koreaProvinceIds[it] },
+                regionCode = district.code,
+                name = district.name,
+                type = LocationType.DISTRICT,
+            ),
+        )
+    }
+
     GeneratedWorldMapData.countries.forEachIndexed { index, country ->
         val id = 10_000L + index
         add(
@@ -370,3 +395,5 @@ private val appLocations = buildList {
         )
     }
 }
+
+private const val DefaultDistrictCode = "11680"

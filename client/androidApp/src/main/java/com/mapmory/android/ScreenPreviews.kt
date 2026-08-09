@@ -142,7 +142,7 @@ private val previewLocations = listOf(
         id = 1L,
         countryId = 1L,
         parentId = null,
-        regionCode = "11",
+        regionCode = "KR-11",
         name = "서울특별시",
         type = LocationType.PROVINCE,
     ),

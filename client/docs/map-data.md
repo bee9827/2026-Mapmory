@@ -1,6 +1,8 @@
 # 지도 경계 데이터
 
-세계 지도는 [Natural Earth Admin 0 Countries 110m](https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/) 데이터를 사용합니다. 이 축척은 지구본 전체 화면에 맞는 저용량 개요용 데이터이며, Natural Earth의 사실상(de facto) 국가 경계를 따릅니다.
+세계 지도는 [Natural Earth Admin 0 Countries 110m](https://www.naturalearthdata.com/downloads/110m-cultural-vectors/110m-admin-0-countries/) 데이터를 사용합니다. 이 축척은 지구본 전체 화면에 맞는 저용량 개요용 데이터이며, Natural Earth의 사실상(de facto) 국가 경계를 따릅니다. 국가 코드는 ISO 3166-1 alpha-2를 사용합니다.
+
+Natural Earth에서 공식 코드가 없는 북키프로스, 코소보, 소말릴란드는 각각 `XC`, `XK`, `XS`라는 지도 전용 두 글자 코드를 사용합니다.
 
 원본 GeoJSON은 앱에 넣지 않습니다. 원본의 각 `Polygon`/`MultiPolygon`에서 외곽 링만 추출하고, 경도·위도를 소수점 4자리로 줄인 뒤 Kotlin 파일 10개로 분할합니다. 현재 생성 데이터는 약 177개 국가/영토를 포함합니다.
 
@@ -16,7 +18,7 @@ python3 tools/map/generate_world_map.py /tmp/ne_110m_admin_0_countries.geojson
 
 ## 대한민국 시·도 데이터
 
-대한민국 지도는 [geoBoundaries KOR ADM1](https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM1/)의 2021년 간소화 경계를 사용합니다. 17개 시·도와 섬을 포함하며 원본 GeoJSON은 앱에 포함하지 않습니다.
+대한민국 지도는 [geoBoundaries KOR ADM1](https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM1/)의 2021년 간소화 경계를 사용합니다. 17개 시·도와 섬을 포함하며 원본 GeoJSON은 앱에 포함하지 않습니다. 시·도 코드는 ISO 3166-2(`KR-11` 등)를 사용하고, 시·군·구 코드는 행정표준코드(`11680` 등)를 사용합니다.
 
 ```bash
 curl -L --fail -o /tmp/geoBoundaries-KOR-ADM1_simplified.geojson \
