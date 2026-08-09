@@ -98,7 +98,6 @@ fun TripRecordEditorScreenPreview() {
                 endDate = "2026-04-14",
             ),
             locations = previewLocations,
-            onProvinceChanged = {},
             onLocationSelected = {},
             onTitleChanged = {},
             onContentChanged = {},

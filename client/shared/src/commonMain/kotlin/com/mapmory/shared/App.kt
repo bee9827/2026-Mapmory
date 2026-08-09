@@ -1,6 +1,7 @@
 package com.mapmory.shared
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -9,9 +10,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.mapmory.shared.domain.model.KoreanCountryNames
+import com.mapmory.shared.domain.model.KoreanDistrictCodes
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.domain.model.KoreanDistrictCodes
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
@@ -45,8 +47,16 @@ private data class DetailRoute(
 )
 
 @Composable
-fun MapmoryApp() {
+fun MapmoryApp(
+    navigation: MapmoryNavigation? = null,
+) {
     val navController = rememberNavController()
+
+    DisposableEffect(navigation, navController) {
+        navigation?.bindBackHandler { navController.popBackStack() }
+        onDispose { navigation?.unbindBackHandler() }
+    }
+
     var mapScope by remember { mutableStateOf(MapScope.WORLD) }
     var records by remember { mutableStateOf(emptyList<TripRecordData>()) }
     var query by remember { mutableStateOf(TripRecordQuery()) }
@@ -72,11 +82,10 @@ fun MapmoryApp() {
 
     fun navigateToTab(route: Any) {
         navController.navigate(route) {
-            popUpTo(navController.graph.startDestinationId) {
-                saveState = true
+            popUpTo<MapRoute> {
+                inclusive = false
             }
             launchSingleTop = true
-            restoreState = true
         }
     }
 
@@ -242,7 +251,6 @@ fun MapmoryApp() {
             TripRecordEditorScreen(
                 uiState = editorState,
                 locations = appLocations,
-                onProvinceChanged = {},
                 onLocationSelected = { location ->
                     editorState = editorState.copy(selectedLocation = location, errorMessage = null)
                 },
@@ -389,7 +397,7 @@ private val appLocations = buildList {
                 countryId = id,
                 parentId = null,
                 regionCode = country.code,
-                name = country.name,
+                name = KoreanCountryNames.byCode[country.code] ?: country.name,
                 type = LocationType.PROVINCE,
             ),
         )
