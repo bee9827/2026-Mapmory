@@ -1,3 +1,6 @@
 spring:
   application:
     name: mapmory-backend
+  mvc:
+    problemdetails:
+      enabled: true
