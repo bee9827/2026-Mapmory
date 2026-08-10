@@ -27,4 +27,4 @@ Windows에서는 `./gradlew` 대신 `./gradlew.bat`을 사용합니다.
 
 ## 문서
 
-- [ADR 0001: API 오류 응답에 Problem Details를 사용한다](docs/adr/0001-use-problem-details-for-api-errors.md)
+- [ADR 0006: API 오류 응답에 Problem Details를 사용한다](docs/adr/0006-use-problem-details-for-api-errors.md)

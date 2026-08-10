@@ -1,4 +1,4 @@
-# ADR 0001: API 오류 응답에 Problem Details를 사용한다
+# ADR 0006: API 오류 응답에 Problem Details를 사용한다
 
 - 상태: 채택
 - 결정일: 2026-08-10
