@@ -10,6 +10,7 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.common.exception.ErrorCode;
 import com.mapmory.backend.common.exception.ErrorKind;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -17,6 +18,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@DisplayName("비즈니스 예외 처리기")
 class BusinessExceptionHandlerTest {
 
     private MockMvc mockMvc;
@@ -30,6 +32,7 @@ class BusinessExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("오류 코드 설정에 맞는 Problem Details를 반환한다")
     void returnsConfiguredProblemDetail() throws Exception {
         mockMvc.perform(get("/test/business-exception"))
                 .andExpect(status().isNotFound())

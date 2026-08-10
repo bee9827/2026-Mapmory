@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.mapmory.backend.common.ProblemDetailFactory;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -15,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@DisplayName("예상하지 못한 예외 처리기")
 class UnexpectedExceptionHandlerTest {
 
     private MockMvc mockMvc;
@@ -28,6 +30,7 @@ class UnexpectedExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("내부 예외 메시지를 숨기고 안전한 500 응답을 반환한다")
     void hidesInternalExceptionMessage() throws Exception {
         mockMvc.perform(get("/test/unexpected-exception"))
                 .andExpect(status().isInternalServerError())

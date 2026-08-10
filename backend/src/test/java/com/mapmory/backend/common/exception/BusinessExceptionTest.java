@@ -2,11 +2,14 @@ package com.mapmory.backend.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+@DisplayName("비즈니스 예외")
 class BusinessExceptionTest {
 
     @Test
+    @DisplayName("내부 예외 메시지에 안정적인 오류 코드를 포함한다")
     void includesErrorCodeInInternalMessage() {
         BusinessException exception = new BusinessException(
                 TestErrorCode.TRAVEL_RECORD_NOT_FOUND
@@ -17,6 +20,7 @@ class BusinessExceptionTest {
     }
 
     @Test
+    @DisplayName("클라이언트에 제공할 상세 메시지를 변경하지 않고 보관한다")
     void keepsPublicDetailUnchanged() {
         BusinessException exception = new BusinessException(
                 TestErrorCode.TRAVEL_RECORD_NOT_FOUND
