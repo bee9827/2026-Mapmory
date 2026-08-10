@@ -8,7 +8,7 @@
 ## 지도
 
 - [ ] `GET /travel-records/map` 응답 형식 확정
-- [x] 행정구역 GeoJSON과 `Location.regionCode` 매핑 규칙 확정
+- [ ] 행정구역 GeoJSON과 `Location.regionCode` 매핑 규칙 확정
 - [ ] 방문 지역 색칠 연결
 - [ ] 지도 데이터·렌더링 방식 결정
 

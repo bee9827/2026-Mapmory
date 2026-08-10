@@ -1,24 +1,15 @@
 package com.mapmory.shared
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
-import com.mapmory.shared.domain.model.KoreanCountryNames
-import com.mapmory.shared.domain.model.KoreanDistrictCodes
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordQuery
-import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
-import com.mapmory.shared.presentation.map.domain.MapScope
-import com.mapmory.shared.presentation.map.ui.MapArtwork
+import com.mapmory.shared.presentation.triprecord.screen.TripMapArtwork
 import com.mapmory.shared.presentation.triprecord.screen.TripMapScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripProfileScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordDetailScreen
@@ -27,111 +18,42 @@ import com.mapmory.shared.presentation.triprecord.screen.TripRecordListScreen
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
-import kotlinx.serialization.Serializable
 
-@Serializable
-private data object MapRoute
-
-@Serializable
-private data object RecordsRoute
-
-@Serializable
-private data object CreateRoute
-
-@Serializable
-private data object ProfileRoute
-
-@Serializable
-private data class DetailRoute(
-    val recordId: Long,
-)
+private enum class AppDestination {
+    MAP,
+    RECORDS,
+    CREATE,
+    PROFILE,
+    DETAIL,
+}
 
 @Composable
-fun MapmoryApp(
-    navigation: MapmoryNavigation? = null,
-) {
-    val navController = rememberNavController()
-
-    fun navigateBack(): Boolean {
-        if (navController.currentDestination?.id == navController.graph.startDestinationId) {
-            return false
-        }
-        if (navController.popBackStack()) {
-            return true
-        }
-
-        // popBackStack can empty the stack when a destination has no parent.
-        // Restore the home route instead of leaving NavHost without content.
-        navController.navigate(MapRoute) {
-            launchSingleTop = true
-        }
-        return true
-    }
-
-    DisposableEffect(navigation, navController) {
-        navigation?.bindBackHandler(::navigateBack)
-        onDispose { navigation?.unbindBackHandler() }
-    }
-
-    var mapScope by remember { mutableStateOf(MapScope.WORLD) }
+fun MapmoryApp() {
+    var destination by remember { mutableStateOf(AppDestination.MAP) }
+    var editorReturnDestination by remember { mutableStateOf(AppDestination.MAP) }
+    var selectedRecordId by remember { mutableStateOf<Long?>(null) }
     var records by remember { mutableStateOf(emptyList<TripRecordData>()) }
     var query by remember { mutableStateOf(TripRecordQuery()) }
     var editorState by remember {
         mutableStateOf(
             TripRecordEditorUiState(
-                selectedLocation = appLocations.firstOrNull { it.regionCode == DefaultDistrictCode }
-                    ?: appLocations.firstOrNull { it.type == LocationType.DISTRICT },
+                selectedLocation = appLocations.firstOrNull { it.type == LocationType.DISTRICT },
             ),
         )
     }
 
-    val locationsById = remember { appLocations.associateBy(Location::id) }
-
-    fun mapLocationContains(selected: Location, recordLocation: Location): Boolean {
-        return when {
-            selected.regionCode == "KR" -> recordLocation.countryId == 1L || recordLocation.regionCode == "KR"
-            selected.countryId == 1L && selected.type == LocationType.PROVINCE ->
-                recordLocation.id == selected.id || recordLocation.parentId == selected.id
-            else -> recordLocation.id == selected.id
-        }
-    }
-
-    fun navigateToTab(route: Any) {
-        navController.navigate(route) {
-            popUpTo<MapRoute> {
-                inclusive = false
-            }
-            launchSingleTop = true
-        }
-    }
-
-    fun openCreateScreen(selectedLocation: Location? = null) {
+    fun openCreateScreen(returnTo: AppDestination) {
+        editorReturnDestination = returnTo
         editorState = TripRecordEditorUiState(
-            selectedLocation = selectedLocation
-                ?: appLocations.firstOrNull { it.regionCode == DefaultDistrictCode }
-                ?: appLocations.firstOrNull { it.type == LocationType.DISTRICT },
+            selectedLocation = appLocations.firstOrNull { it.type == LocationType.DISTRICT },
         )
-        navController.navigate(CreateRoute)
-    }
-
-    fun handleMapLocationClick(scope: MapScope, regionCode: String) {
-        val location = appLocations.firstOrNull { it.regionCode == regionCode } ?: return
-        val hasRecords = records.any { record ->
-            locationsById[record.locationId]?.let { recordLocation ->
-                mapLocationContains(location, recordLocation)
-            } == true
-        }
-        if (hasRecords) {
-            query = TripRecordQuery(locationId = location.id)
-            navigateToTab(RecordsRoute)
-        } else {
-            openCreateScreen(selectedLocation = location)
-        }
+        destination = AppDestination.CREATE
     }
 
     fun openEditScreen(record: TripRecordData) {
         val location = appLocations.firstOrNull { it.id == record.locationId }
             ?: appLocations.firstOrNull { it.type == LocationType.DISTRICT }
+        editorReturnDestination = AppDestination.DETAIL
         editorState = TripRecordEditorUiState(
             recordId = record.id,
             selectedLocation = location,
@@ -140,7 +62,7 @@ fun MapmoryApp(
             startDate = record.startDate.orEmpty(),
             endDate = record.endDate.orEmpty(),
         )
-        navController.navigate(CreateRoute)
+        destination = AppDestination.CREATE
     }
 
     fun saveEditor() {
@@ -168,256 +90,136 @@ fun MapmoryApp(
                 } else {
                     records.map { if (it.id == record.id) record else it }
                 }
+                selectedRecordId = record.id
                 query = TripRecordQuery()
-                if (!navController.popBackStack()) {
-                    navigateToTab(RecordsRoute)
+                destination = if (state.recordId == null) {
+                    AppDestination.RECORDS
+                } else {
+                    AppDestination.DETAIL
                 }
             }
         }
     }
 
-    val visitedLocations = records.mapNotNull { record -> locationsById[record.locationId] }
-    val visitedCountryCodes = visitedLocations.map { location ->
-        if (location.countryId == 1L) "KR" else location.regionCode
-    }.toSet()
-    val visitedRegionCodes = visitedLocations.mapNotNull { location ->
-        when {
-            location.countryId != 1L -> null
-            location.type == LocationType.PROVINCE -> location.regionCode
-            else -> locationsById[location.parentId]?.regionCode
-        }
-    }.toSet()
-
-    val selectedFilterLocation = query.locationId?.let { locationsById[it] }
     val visibleRecords = records.filter { record ->
-        val recordLocation = locationsById[record.locationId]
-        val matchesLocation = when {
-            selectedFilterLocation == null -> true
-            recordLocation == null -> false
-            else -> mapLocationContains(selectedFilterLocation, recordLocation)
-        }
-        matchesLocation &&
+        (query.locationId == null || record.locationId == query.locationId) &&
             (query.keyword.isNullOrBlank() ||
                 record.title.contains(query.keyword.orEmpty(), ignoreCase = true) ||
                 record.content.contains(query.keyword.orEmpty(), ignoreCase = true))
     }
+    val selectedRecord = records.firstOrNull { it.id == selectedRecordId }
 
-    NavHost(
-        navController = navController,
-        startDestination = MapRoute,
-    ) {
-        composable<MapRoute> {
-            TripMapScreen(
-                mapScope = mapScope,
-                visitedCount = if (mapScope == MapScope.WORLD) {
-                    visitedCountryCodes.size
-                } else {
-                    visitedRegionCodes.size
-                },
-                onMapScopeChange = { mapScope = it },
-                mapContent = {
-                    // Map taps are resolved to a location and routed to records or the editor.
-                    MapArtwork(
-                        scope = mapScope,
-                        visitedCountryCodes = visitedCountryCodes,
-                        visitedRegionCodes = visitedRegionCodes,
-                        onCountryClick = { countryCode ->
-                            handleMapLocationClick(MapScope.WORLD, countryCode)
-                        },
-                        onRegionClick = { regionCode ->
-                            handleMapLocationClick(MapScope.KOREA, regionCode)
-                        },
-                    )
-                },
-                onBackClick = {},
-                onRecordClick = { navigateToTab(RecordsRoute) },
-                onCreateClick = { openCreateScreen() },
-                onProfileClick = { navigateToTab(ProfileRoute) },
-            )
-        }
-
-        composable<RecordsRoute> {
-            TripRecordListScreen(
-                uiState = TripRecordListUiState.Success(
-                    records = visibleRecords,
-                    page = 0,
-                    totalPages = 1,
-                ),
-                query = query,
-                locations = appLocations,
-                onKeywordChanged = { keyword ->
-                    query = query.copy(keyword = keyword.ifBlank { null }, page = 0)
-                },
-                onLocationChanged = { locationId ->
-                    query = query.copy(locationId = locationId, page = 0)
-                },
-                onSearchClick = {},
-                onPreviousPageClick = {},
-                onNextPageClick = {},
-                onCreateClick = { openCreateScreen() },
-                onMapClick = { navigateToTab(MapRoute) },
-                onRecordClick = { recordId ->
-                    navController.navigate(DetailRoute(recordId))
-                },
-                onProfileClick = { navigateToTab(ProfileRoute) },
-            )
-        }
-
-        composable<CreateRoute> {
-            TripRecordEditorScreen(
-                uiState = editorState,
-                locations = appLocations,
-                onLocationSelected = { location ->
-                    editorState = editorState.copy(selectedLocation = location, errorMessage = null)
-                },
-                onTitleChanged = { title ->
-                    editorState = editorState.copy(title = title, errorMessage = null)
-                },
-                onContentChanged = { content ->
-                    editorState = editorState.copy(content = content, errorMessage = null)
-                },
-                onStartDateChanged = { date ->
-                    editorState = editorState.copy(startDate = date, errorMessage = null)
-                },
-                onEndDateChanged = { date ->
-                    editorState = editorState.copy(endDate = date, errorMessage = null)
-                },
-                onSaveClick = ::saveEditor,
-                onBackClick = { navigateBack() },
-                onMapClick = { navigateToTab(MapRoute) },
-                onRecordClick = { navigateToTab(RecordsRoute) },
-                onProfileClick = { navigateToTab(ProfileRoute) },
-            )
-        }
-
-        composable<ProfileRoute> {
-            TripProfileScreen(
-                onMapClick = { navigateToTab(MapRoute) },
-                onRecordClick = { navigateToTab(RecordsRoute) },
-                onCreateClick = { openCreateScreen() },
-                onProfileClick = { navigateToTab(ProfileRoute) },
-            )
-        }
-
-        composable<DetailRoute> { backStackEntry ->
-            val detailRoute = backStackEntry.toRoute<DetailRoute>()
-            val selectedRecord = records.firstOrNull { it.id == detailRoute.recordId }
-            TripRecordDetailScreen(
-                uiState = selectedRecord?.let(TripRecordDetailUiState::Success)
-                    ?: TripRecordDetailUiState.Error("여행 기록을 찾을 수 없습니다."),
-                locations = appLocations,
-                onBackClick = { navigateBack() },
-                onEditClick = { selectedRecord?.let(::openEditScreen) },
-                onDeleteClick = {
-                    records = records.filterNot { it.id == detailRoute.recordId }
-                    navController.popBackStack()
-                },
-                onMapClick = { navigateToTab(MapRoute) },
-                onRecordClick = { navigateToTab(RecordsRoute) },
-                onCreateClick = { openCreateScreen() },
-                onProfileClick = { navigateToTab(ProfileRoute) },
-            )
-        }
-    }
-}
-
-private val appLocations = buildList {
-    add(
-        Location(
-            id = 1L,
-            countryId = 1L,
-            parentId = null,
-            regionCode = "KR-11",
-            name = "서울특별시",
-            type = LocationType.PROVINCE,
-        ),
-    )
-    add(
-        Location(
-            id = 2L,
-            countryId = 1L,
-            parentId = 1L,
-            regionCode = "11680",
-            name = "강남구",
-            type = LocationType.DISTRICT,
-        ),
-    )
-    add(
-        Location(
-            id = 3L,
-            countryId = 1L,
-            parentId = 1L,
-            regionCode = "11650",
-            name = "서초구",
-            type = LocationType.DISTRICT,
-        ),
-    )
-
-    listOf(
-        4L to ("KR-26" to "부산광역시"),
-        5L to ("KR-27" to "대구광역시"),
-        6L to ("KR-28" to "인천광역시"),
-        7L to ("KR-29" to "광주광역시"),
-        8L to ("KR-30" to "대전광역시"),
-        9L to ("KR-31" to "울산광역시"),
-        10L to ("KR-50" to "세종특별자치시"),
-        11L to ("KR-41" to "경기도"),
-        12L to ("KR-42" to "강원특별자치도"),
-        13L to ("KR-43" to "충청북도"),
-        14L to ("KR-44" to "충청남도"),
-        15L to ("KR-45" to "전북특별자치도"),
-        16L to ("KR-46" to "전라남도"),
-        17L to ("KR-47" to "경상북도"),
-        18L to ("KR-48" to "경상남도"),
-        19L to ("KR-49" to "제주특별자치도"),
-    ).forEach { (id, region) ->
-        add(
-            Location(
-                id = id,
-                countryId = 1L,
-                parentId = null,
-                regionCode = region.first,
-                name = region.second,
-                type = LocationType.PROVINCE,
-            ),
+    when (destination) {
+        AppDestination.MAP -> TripMapScreen(
+            mapContent = { TripMapArtwork() },
+            onBackClick = {},
+            onRecordClick = { destination = AppDestination.RECORDS },
+            onCreateClick = { openCreateScreen(AppDestination.MAP) },
+            onProfileClick = { destination = AppDestination.PROFILE },
         )
-    }
 
-    val koreaProvinceIds = filter {
-        it.countryId == 1L && it.type == LocationType.PROVINCE
-    }.associate { it.regionCode to it.id }
-
-    KoreanDistrictCodes.forEachIndexed { index, district ->
-        val id = when (district.code) {
-            "11650" -> 3L
-            "11680" -> 2L
-            else -> 20_000L + index
-        }
-        add(
-            Location(
-                id = id,
-                countryId = 1L,
-                parentId = district.provinceCode?.let { koreaProvinceIds[it] },
-                regionCode = district.code,
-                name = district.name,
-                type = LocationType.DISTRICT,
+        AppDestination.RECORDS -> TripRecordListScreen(
+            uiState = TripRecordListUiState.Success(
+                records = visibleRecords,
+                page = 0,
+                totalPages = 1,
             ),
+            query = query,
+            locations = appLocations,
+            onKeywordChanged = { keyword ->
+                query = query.copy(keyword = keyword.ifBlank { null }, page = 0)
+            },
+            onLocationChanged = { locationId ->
+                query = query.copy(locationId = locationId, page = 0)
+            },
+            onSearchClick = {},
+            onPreviousPageClick = {},
+            onNextPageClick = {},
+            onCreateClick = { openCreateScreen(AppDestination.RECORDS) },
+            onMapClick = { destination = AppDestination.MAP },
+            onRecordClick = { recordId ->
+                selectedRecordId = recordId
+                destination = AppDestination.DETAIL
+            },
+            onProfileClick = { destination = AppDestination.PROFILE },
         )
-    }
 
-    GeneratedWorldMapData.countries.forEachIndexed { index, country ->
-        val id = 10_000L + index
-        add(
-            Location(
-                id = id,
-                countryId = id,
-                parentId = null,
-                regionCode = country.code,
-                name = KoreanCountryNames.byCode[country.code] ?: country.name,
-                type = LocationType.PROVINCE,
-            ),
+        AppDestination.CREATE -> TripRecordEditorScreen(
+            uiState = editorState,
+            locations = appLocations,
+            onProvinceChanged = {},
+            onLocationSelected = { location ->
+                editorState = editorState.copy(selectedLocation = location, errorMessage = null)
+            },
+            onTitleChanged = { title ->
+                editorState = editorState.copy(title = title, errorMessage = null)
+            },
+            onContentChanged = { content ->
+                editorState = editorState.copy(content = content, errorMessage = null)
+            },
+            onStartDateChanged = { date ->
+                editorState = editorState.copy(startDate = date, errorMessage = null)
+            },
+            onEndDateChanged = { date ->
+                editorState = editorState.copy(endDate = date, errorMessage = null)
+            },
+            onSaveClick = ::saveEditor,
+            onBackClick = { destination = editorReturnDestination },
+            onMapClick = { destination = AppDestination.MAP },
+            onRecordClick = { destination = AppDestination.RECORDS },
+            onProfileClick = { destination = AppDestination.PROFILE },
+        )
+
+        AppDestination.PROFILE -> TripProfileScreen(
+            onMapClick = { destination = AppDestination.MAP },
+            onRecordClick = { destination = AppDestination.RECORDS },
+            onCreateClick = { openCreateScreen(AppDestination.PROFILE) },
+            onProfileClick = { destination = AppDestination.PROFILE },
+        )
+
+        AppDestination.DETAIL -> TripRecordDetailScreen(
+            uiState = selectedRecord?.let(TripRecordDetailUiState::Success)
+                ?: TripRecordDetailUiState.Error("여행 기록을 찾을 수 없습니다."),
+            locations = appLocations,
+            onBackClick = { destination = AppDestination.RECORDS },
+            onEditClick = { selectedRecord?.let(::openEditScreen) },
+            onDeleteClick = {
+                selectedRecordId?.let { recordId ->
+                    records = records.filterNot { it.id == recordId }
+                }
+                destination = AppDestination.RECORDS
+            },
+            onMapClick = { destination = AppDestination.MAP },
+            onRecordClick = { destination = AppDestination.RECORDS },
+            onCreateClick = { openCreateScreen(AppDestination.DETAIL) },
+            onProfileClick = { destination = AppDestination.PROFILE },
         )
     }
 }
 
-private const val DefaultDistrictCode = "11680"
+private val appLocations = listOf(
+    Location(
+        id = 1L,
+        countryId = 1L,
+        parentId = null,
+        regionCode = "11",
+        name = "서울특별시",
+        type = LocationType.PROVINCE,
+    ),
+    Location(
+        id = 2L,
+        countryId = 1L,
+        parentId = 1L,
+        regionCode = "11680",
+        name = "강남구",
+        type = LocationType.DISTRICT,
+    ),
+    Location(
+        id = 3L,
+        countryId = 1L,
+        parentId = 1L,
+        regionCode = "11650",
+        name = "서초구",
+        type = LocationType.DISTRICT,
+    ),
+)

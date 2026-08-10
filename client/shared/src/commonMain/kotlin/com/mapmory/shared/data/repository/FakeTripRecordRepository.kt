@@ -1,8 +1,8 @@
 package com.mapmory.shared.data.repository
 
+import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
-import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordPage
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.model.dateValidationError
