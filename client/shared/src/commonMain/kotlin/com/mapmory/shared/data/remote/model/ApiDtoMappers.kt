@@ -3,9 +3,9 @@ package com.mapmory.shared.data.remote.model
 import com.mapmory.shared.domain.model.Country
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordPage
 
 fun CountryDto.toDomain(): Country = Country(
