@@ -7,7 +7,7 @@
 | 구분 | 값 |
 | --- | --- |
 | Base URL | `/api/v1` |
-| 요청·응답 | `application/json; charset=UTF-8` |
+| 요청·응답 | 성공은 `application/json`, 오류는 `application/problem+json` |
 | 날짜 | `YYYY-MM-DD` |
 | 시간 | ISO 8601 offset datetime. 예: `2026-07-13T09:30:00+09:00` |
 | 임시 사용자 식별 | `X-Member-Id: {memberId}` 요청 헤더 |
@@ -25,13 +25,16 @@
 
 ```json
 {
+  "title": "요청 값이 올바르지 않습니다.",
+  "status": 400,
+  "detail": "1개의 값이 유효하지 않습니다.",
+  "instance": "/api/v1/travel-records",
   "code": "VALIDATION_ERROR",
-  "message": "요청 값이 올바르지 않습니다.",
-  "fieldErrors": [{ "field": "title", "reason": "필수 값입니다." }]
+  "errors": [{ "field": "title", "detail": "필수 값입니다." }]
 }
 ```
 
-`fieldErrors`는 입력값 검증 실패일 때만 반환하며, 그 외 오류에서는 빈 배열이거나 생략할 수 있다.
+오류 응답은 RFC 9457 Problem Details 형식을 사용한다. `errors`는 입력값 검증 실패일 때만 반환하며, 그 외 오류에서는 생략한다. `type`을 생략하면 기본값은 `about:blank`다.
 
 | 상태 | 사용 예 |
 | --- | --- |

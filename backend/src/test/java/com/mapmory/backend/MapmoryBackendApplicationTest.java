@@ -1,7 +1,6 @@
 package com.mapmory.backend;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
 /**
  * 애플리케이션 컨텍스트 로딩 검증.
@@ -11,9 +10,9 @@ import org.springframework.boot.test.context.SpringBootTest;
  *   - ddl-auto: validate 로 엔티티와 테이블 일치 검증
  *   - 빈 생성 및 의존성 주입
  */
-class MapmoryBackendApplicationTests extends IntegrationTest {
+class MapmoryBackendApplicationTest extends IntegrationTest {
 
     @Test
-    void contextLoads() {
+    void loadsApplicationContext() {
     }
 }

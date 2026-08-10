@@ -24,3 +24,7 @@ Windows에서는 `./gradlew` 대신 `./gradlew.bat`을 사용합니다.
 빌드가 성공하면 실행 가능한 `build/libs/mapmory-backend.jar`가 생성됩니다.
 
 클라이언트와는 소스 코드를 직접 참조하지 않고 HTTP API 계약으로만 통신합니다.
+
+## 문서
+
+- [ADR 0006: API 오류 응답에 Problem Details를 사용한다](docs/adr/0006-use-problem-details-for-api-errors.md)

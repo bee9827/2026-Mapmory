@@ -1,6 +1,9 @@
 spring:
   application:
     name: mapmory-backend
+  mvc:
+    problemdetails:
+      enabled: true
   profiles:
     default: local
   jpa:
