@@ -27,8 +27,7 @@ Kotlin 2.4.10의 공식 KMP 호환 범위에 맞추기 위해 AGP 9.1.0을 사�
 ## 지도
 
 현재는 외부 지도 SDK를 사용하지 않는다. 지도 기능은 행정구역 GeoJSON과
-`Location.regionCode`를 매칭하며, 대한민국 시·도는 ISO 3166-2, 시·군·구는
-행정표준코드를 사용한다.
+`Location.regionCode` 매핑 규칙, 지도 데이터 제공 방식을 확정한 뒤 별도 검토한다.
 
 ## Mapmory API Base URL
 
