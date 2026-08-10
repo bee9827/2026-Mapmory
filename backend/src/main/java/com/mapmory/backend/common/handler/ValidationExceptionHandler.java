@@ -1,0 +1,87 @@
+package com.mapmory.backend.common.handler;
+
+import com.mapmory.backend.common.ProblemDetailFactory;
+import com.mapmory.backend.common.exception.FieldErrorDetail;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
+import java.util.List;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
+@RestControllerAdvice
+public class ValidationExceptionHandler {
+
+    private final ProblemDetailFactory problemDetailFactory;
+
+    public ValidationExceptionHandler(ProblemDetailFactory problemDetailFactory) {
+        this.problemDetailFactory = problemDetailFactory;
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ProblemDetail> handleBodyValidation(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request
+    ) {
+        List<FieldErrorDetail> errors = exception.getBindingResult().getFieldErrors().stream()
+                .map(ValidationExceptionHandler::toFieldErrorDetail)
+                .toList();
+        return problemDetailFactory.validation(errors, request);
+    }
+
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ProblemDetail> handleMethodValidation(
+            HandlerMethodValidationException exception,
+            HttpServletRequest request
+    ) {
+        List<FieldErrorDetail> errors = exception.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream()
+                        .map(error -> new FieldErrorDetail(
+                                parameterName(result.getMethodParameter().getParameterName(),
+                                        result.getMethodParameter().getParameterIndex()),
+                                message(error)
+                        )))
+                .toList();
+        return problemDetailFactory.validation(errors, request);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ProblemDetail> handleConstraintViolation(
+            ConstraintViolationException exception,
+            HttpServletRequest request
+    ) {
+        List<FieldErrorDetail> errors = exception.getConstraintViolations().stream()
+                .map(violation -> new FieldErrorDetail(
+                        violation.getPropertyPath().toString(),
+                        violation.getMessage()
+                ))
+                .toList();
+        return problemDetailFactory.validation(errors, request);
+    }
+
+    private static FieldErrorDetail toFieldErrorDetail(FieldError error) {
+        return new FieldErrorDetail(error.getField(), message(error));
+    }
+
+    private static String message(MessageSourceResolvable error) {
+        if(error.getDefaultMessage() == null) {
+            return "유효하지 않은 값입니다.";
+        }
+        return error.getDefaultMessage();
+    }
+
+    private static String parameterName(String name, int index) {
+        if(name == null) {
+            return "arg" + index;
+        }
+        return name;
+    }
+}
