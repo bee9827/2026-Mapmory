@@ -5,6 +5,9 @@ import com.mapmory.backend.common.exception.FieldErrorDetail;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.util.List;
+import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -19,6 +22,8 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
 @RestControllerAdvice
 public class ValidationExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(ValidationExceptionHandler.class);
 
     private final ProblemDetailFactory problemDetailFactory;
 
@@ -42,13 +47,22 @@ public class ValidationExceptionHandler {
             HandlerMethodValidationException exception,
             HttpServletRequest request
     ) {
-        List<FieldErrorDetail> errors = exception.getParameterValidationResults().stream()
-                .flatMap(result -> result.getResolvableErrors().stream()
-                        .map(error -> new FieldErrorDetail(
-                                parameterName(result.getMethodParameter().getParameterName(),
-                                        result.getMethodParameter().getParameterIndex()),
-                                message(error)
-                        )))
+        if (exception.isForReturnValue()) {
+            log.error("Controller return value validation failed: method={}, uri={}",
+                    request.getMethod(), request.getRequestURI(), exception);
+            return problemDetailFactory.internalServerError(request);
+        }
+
+        Stream<FieldErrorDetail> parameterErrors = exception.getParameterValidationResults().stream()
+                .flatMap(result -> result.getResolvableErrors().stream().map(error -> new FieldErrorDetail(
+                        parameterName(result.getMethodParameter().getParameterName(),
+                                result.getMethodParameter().getParameterIndex()),
+                        message(error)
+                )));
+        Stream<FieldErrorDetail> crossParameterErrors = exception.getCrossParameterValidationResults().stream()
+                .map(error -> new FieldErrorDetail("arguments", message(error)));
+
+        List<FieldErrorDetail> errors = Stream.concat(parameterErrors, crossParameterErrors)
                 .toList();
         return problemDetailFactory.validation(errors, request);
     }
