@@ -1,6 +1,7 @@
 package com.mapmory.backend.travelrecord.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.region.Region;
@@ -10,7 +11,9 @@ import com.mapmory.backend.travelrecord.TravelRecord;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -33,13 +36,16 @@ class TravelRecordRepositoryTest {
     @DisplayName("국가별 지도 요약을 조회할 때")
     class FindCountryMapSummaries {
 
-        @Test
-        @DisplayName("국가와 하위 Region의 현재 회원 기록을 합산하고 0건인 국가도 반환한다")
-        void aggregatesCurrentMemberRecordsAndIncludesEmptyCountries() {
-            Member member = persist(Member.of("회원", UUID.randomUUID()));
+        private Member member;
+        private Region visitedCountry;
+        private Region emptyCountry;
+
+        @BeforeEach
+        void setUp() {
+            member = persist(Member.of("회원", UUID.randomUUID()));
             Member otherMember = persist(Member.of("다른 회원", UUID.randomUUID()));
-            Region visitedCountry = persist(Region.of(null, null, "X1", "방문 국가", RegionType.COUNTRY));
-            Region emptyCountry = persist(Region.of(null, null, "X2", "미방문 국가", RegionType.COUNTRY));
+            visitedCountry = persist(Region.of(null, null, "X1", "방문 국가", RegionType.COUNTRY));
+            emptyCountry = persist(Region.of(null, null, "X2", "미방문 국가", RegionType.COUNTRY));
             Region province = persist(Region.of(
                     visitedCountry,
                     visitedCountry,
@@ -59,22 +65,51 @@ class TravelRecordRepositoryTest {
             persist(record(otherMember, district, "다른 회원 기록"));
             entityManager.flush();
             entityManager.clear();
+        }
 
+        @Test
+        @DisplayName("국가와 하위 Region의 기록을 합산하고 0건 국가의 Projection도 반환한다")
+        void aggregatesRecordsAndReturnsEmptyCountryProjection() {
             List<CountryMapSummaryQueryResult> results =
                     travelRecordRepository.findCountryMapSummaries(member.getId());
 
             assertThat(results)
-                    .filteredOn(result -> result.getRegionCode().startsWith("X"))
+                    .filteredOn(result -> Set.of("X1", "X2").contains(result.getRegionCode()))
                     .extracting(
+                            CountryMapSummaryQueryResult::getRegionId,
                             CountryMapSummaryQueryResult::getRegionCode,
+                            CountryMapSummaryQueryResult::getName,
                             CountryMapSummaryQueryResult::getRecordCount
                     )
                     .containsExactly(
-                            org.assertj.core.groups.Tuple.tuple("X1", 2L),
-                            org.assertj.core.groups.Tuple.tuple("X2", 0L)
+                            tuple(visitedCountry.getId(), "X1", "방문 국가", 2L),
+                            tuple(emptyCountry.getId(), "X2", "미방문 국가", 0L)
                     );
-            assertThat(emptyCountry.getId()).isNotNull();
         }
+
+        @Test
+        @DisplayName("다른 회원의 기록과 국가가 아닌 Region 결과는 포함하지 않는다")
+        void excludesOtherMemberRecordsAndNonCountryRows() {
+            List<CountryMapSummaryQueryResult> results =
+                    travelRecordRepository.findCountryMapSummaries(member.getId());
+
+            assertThat(results)
+                    .extracting(CountryMapSummaryQueryResult::getRegionCode)
+                    .doesNotContain("X1-P1", "X1-D1");
+            assertThat(resultFor(results, "X1").getRecordCount())
+                    .as("다른 회원의 기록은 국가 집계에 포함하지 않는다")
+                    .isEqualTo(2L);
+        }
+    }
+
+    private CountryMapSummaryQueryResult resultFor(
+            List<CountryMapSummaryQueryResult> results,
+            String regionCode
+    ) {
+        return results.stream()
+                .filter(result -> result.getRegionCode().equals(regionCode))
+                .findFirst()
+                .orElseThrow();
     }
 
     private TravelRecord record(Member member, Region region, String title) {
