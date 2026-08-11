@@ -24,6 +24,23 @@ Kotlin 2.4.10의 공식 KMP 호환 범위에 맞추기 위해 AGP 9.1.0을 사�
 - `shared`는 Android와 iOS에서 함께 사용하는 코드만 관리합니다.
 - Backend 소스와 의존성은 클라이언트 Gradle 프로젝트에 포함하지 않습니다.
 
+## 지도
+
+현재는 외부 지도 SDK를 사용하지 않는다. 지도 기능은 행정구역 GeoJSON과
+`Location.regionCode`를 매칭하며, 대한민국 시·도는 ISO 3166-2, 시·군·구는
+행정표준코드를 사용한다.
+
+## Mapmory API Base URL
+
+Backend를 연결할 때만 `client/local.properties`에 API 주소를 추가한다.
+
+```properties
+MAPMORY_API_BASE_URL=http://10.0.2.2:8080/api/v1
+```
+
+Android 여행 기록 API 연결은 백엔드·클라이언트 도메인 매핑을 합의한 뒤 추가한다.
+Android 에뮬레이터에서 호스트 PC의 `localhost`는 `10.0.2.2`로 접근한다.
+
 ## 현재 검증 상태
 
 - JDK 21: 로컬 확인 완료
