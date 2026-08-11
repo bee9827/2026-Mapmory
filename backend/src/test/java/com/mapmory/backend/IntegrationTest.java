@@ -1,5 +1,6 @@
 package com.mapmory.backend;
 
+import com.mapmory.backend.support.MySqlTestContainerConfig;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
