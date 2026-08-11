@@ -11,6 +11,7 @@ import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
 import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
 import com.mapmory.backend.travelrecord.mapsummary.service.CountryMapSummaryService;
+import com.mapmory.backend.travelrecord.mapsummary.service.ProvinceMapSummaryService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -31,6 +32,9 @@ class RegionMapSummaryControllerTest {
 
     @MockitoBean
     private CountryMapSummaryService countryMapSummaryService;
+
+    @MockitoBean
+    private ProvinceMapSummaryService provinceMapSummaryService;
 
     @Nested
     @DisplayName("GET /api/v1/travel-records/map-summary/regions")
@@ -89,6 +93,43 @@ class RegionMapSummaryControllerTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                     .andExpect(jsonPath("$.errors[0].field").value("X-Member-Id"));
+        }
+
+        @Test
+        @DisplayName("상위 국가 ID가 있으면 시도별 지도 요약을 반환한다")
+        void returnsProvinceSummariesForParentCountry() throws Exception {
+            when(provinceMapSummaryService.getProvinceSummaries(10L, 1L)).thenReturn(List.of(
+                    new RegionMapSummaryResponse(
+                            15L,
+                            "49",
+                            RegionType.PROVINCE,
+                            "제주특별자치도",
+                            3L,
+                            MapColorLevel.MEDIUM
+                    )
+            ));
+
+            mockMvc.perform(get("/api/v1/travel-records/map-summary/regions")
+                            .header("X-Member-Id", 10L)
+                            .queryParam("parentRegionId", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data[0].regionId").value(15))
+                    .andExpect(jsonPath("$.data[0].regionCode").value("49"))
+                    .andExpect(jsonPath("$.data[0].regionType").value("PROVINCE"))
+                    .andExpect(jsonPath("$.data[0].count").value(3))
+                    .andExpect(jsonPath("$.data[0].level").value("MEDIUM"));
+
+            verify(provinceMapSummaryService).getProvinceSummaries(10L, 1L);
+        }
+
+        @Test
+        @DisplayName("상위 국가 ID가 양수가 아니면 400을 반환한다")
+        void rejectsNonPositiveParentRegionId() throws Exception {
+            mockMvc.perform(get("/api/v1/travel-records/map-summary/regions")
+                            .header("X-Member-Id", 10L)
+                            .queryParam("parentRegionId", "0"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
         }
     }
 }

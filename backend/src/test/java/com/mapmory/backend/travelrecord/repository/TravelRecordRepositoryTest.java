@@ -70,16 +70,16 @@ class TravelRecordRepositoryTest {
         @Test
         @DisplayName("국가와 하위 Region의 기록을 합산하고 0건 국가의 Projection도 반환한다")
         void aggregatesRecordsAndReturnsEmptyCountryProjection() {
-            List<CountryMapSummaryQueryResult> results =
+            List<RegionMapSummaryQueryResult> results =
                     travelRecordRepository.findCountryMapSummaries(member.getId());
 
             assertThat(results)
                     .filteredOn(result -> Set.of("X1", "X2").contains(result.getRegionCode()))
                     .extracting(
-                            CountryMapSummaryQueryResult::getRegionId,
-                            CountryMapSummaryQueryResult::getRegionCode,
-                            CountryMapSummaryQueryResult::getName,
-                            CountryMapSummaryQueryResult::getRecordCount
+                            RegionMapSummaryQueryResult::getRegionId,
+                            RegionMapSummaryQueryResult::getRegionCode,
+                            RegionMapSummaryQueryResult::getName,
+                            RegionMapSummaryQueryResult::getRecordCount
                     )
                     .containsExactly(
                             tuple(visitedCountry.getId(), "X1", "방문 국가", 2L),
@@ -90,11 +90,11 @@ class TravelRecordRepositoryTest {
         @Test
         @DisplayName("다른 회원의 기록과 국가가 아닌 Region 결과는 포함하지 않는다")
         void excludesOtherMemberRecordsAndNonCountryRows() {
-            List<CountryMapSummaryQueryResult> results =
+            List<RegionMapSummaryQueryResult> results =
                     travelRecordRepository.findCountryMapSummaries(member.getId());
 
             assertThat(results)
-                    .extracting(CountryMapSummaryQueryResult::getRegionCode)
+                    .extracting(RegionMapSummaryQueryResult::getRegionCode)
                     .doesNotContain("X1-P1", "X1-D1");
             assertThat(resultFor(results, "X1").getRecordCount())
                     .as("다른 회원의 기록은 국가 집계에 포함하지 않는다")
@@ -102,8 +102,84 @@ class TravelRecordRepositoryTest {
         }
     }
 
-    private CountryMapSummaryQueryResult resultFor(
-            List<CountryMapSummaryQueryResult> results,
+    @Nested
+    @DisplayName("시도별 지도 요약을 조회할 때")
+    class FindProvinceMapSummaries {
+
+        private Member member;
+        private Region country;
+        private Region visitedProvince;
+        private Region emptyProvince;
+
+        @BeforeEach
+        void setUp() {
+            member = persist(Member.of("회원", UUID.randomUUID()));
+            Member otherMember = persist(Member.of("다른 회원", UUID.randomUUID()));
+            country = persist(Region.of(null, null, "Y1", "조회 국가", RegionType.COUNTRY));
+            visitedProvince = persist(Region.of(
+                    country,
+                    country,
+                    "Y1-P1",
+                    "방문 시도",
+                    RegionType.PROVINCE
+            ));
+            emptyProvince = persist(Region.of(
+                    country,
+                    country,
+                    "Y1-P2",
+                    "미방문 시도",
+                    RegionType.PROVINCE
+            ));
+            Region district = persist(Region.of(
+                    visitedProvince,
+                    country,
+                    "Y1-D1",
+                    "방문 세부 지역",
+                    RegionType.DISTRICT
+            ));
+            persist(record(member, visitedProvince, "시도 기록"));
+            persist(record(member, district, "세부 지역 기록"));
+            persist(record(otherMember, district, "다른 회원 기록"));
+            entityManager.flush();
+            entityManager.clear();
+        }
+
+        @Test
+        @DisplayName("시도와 직속 하위 Region의 기록을 합산하고 0건 시도의 Projection도 반환한다")
+        void aggregatesRecordsAndReturnsEmptyProvinceProjection() {
+            List<RegionMapSummaryQueryResult> results =
+                    travelRecordRepository.findProvinceMapSummaries(member.getId(), country.getId());
+
+            assertThat(results)
+                    .extracting(
+                            RegionMapSummaryQueryResult::getRegionId,
+                            RegionMapSummaryQueryResult::getRegionCode,
+                            RegionMapSummaryQueryResult::getName,
+                            RegionMapSummaryQueryResult::getRecordCount
+                    )
+                    .containsExactly(
+                            tuple(visitedProvince.getId(), "Y1-P1", "방문 시도", 2L),
+                            tuple(emptyProvince.getId(), "Y1-P2", "미방문 시도", 0L)
+                    );
+        }
+
+        @Test
+        @DisplayName("다른 회원의 기록과 시도가 아닌 Region 결과는 포함하지 않는다")
+        void excludesOtherMemberRecordsAndNonProvinceRows() {
+            List<RegionMapSummaryQueryResult> results =
+                    travelRecordRepository.findProvinceMapSummaries(member.getId(), country.getId());
+
+            assertThat(results)
+                    .extracting(RegionMapSummaryQueryResult::getRegionCode)
+                    .doesNotContain("Y1-D1");
+            assertThat(resultFor(results, "Y1-P1").getRecordCount())
+                    .as("다른 회원의 기록은 시도 집계에 포함하지 않는다")
+                    .isEqualTo(2L);
+        }
+    }
+
+    private RegionMapSummaryQueryResult resultFor(
+            List<RegionMapSummaryQueryResult> results,
             String regionCode
     ) {
         return results.stream()

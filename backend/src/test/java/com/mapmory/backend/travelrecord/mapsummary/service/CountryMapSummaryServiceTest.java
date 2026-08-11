@@ -13,7 +13,7 @@ import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
 import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
 import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
-import com.mapmory.backend.travelrecord.repository.CountryMapSummaryQueryResult;
+import com.mapmory.backend.travelrecord.repository.RegionMapSummaryQueryResult;
 import com.mapmory.backend.travelrecord.repository.TravelRecordRepository;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -77,13 +77,13 @@ class CountryMapSummaryServiceTest {
         return new CountryMapSummaryService(memberRepository, travelRecordRepository, levelPolicy);
     }
 
-    private static CountryMapSummaryQueryResult result(
+    private static RegionMapSummaryQueryResult result(
             Long regionId,
             String regionCode,
             String name,
             long recordCount
     ) {
-        return new CountryMapSummaryQueryResult() {
+        return new RegionMapSummaryQueryResult() {
             @Override
             public Long getRegionId() {
                 return regionId;
