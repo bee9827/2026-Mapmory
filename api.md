@@ -292,7 +292,7 @@
       "regionType": "COUNTRY",
       "name": "대한민국",
       "count": 12,
-      "level": 3
+      "level": "HIGH"
     },
     {
       "regionId": 2,
@@ -300,7 +300,7 @@
       "regionType": "COUNTRY",
       "name": "일본",
       "count": 0,
-      "level": 0
+      "level": "NONE"
     }
   ]
 }
@@ -308,13 +308,13 @@
 
 - `region_type = COUNTRY`인 모든 Region을 `regionCode` 오름차순으로 반환한다.
 - 현재 회원의 국가 Region 기록과 해당 국가의 모든 하위 Region 기록을 합산한다.
-- 기록이 없는 국가도 `count = 0`, `level = 0`으로 반환한다.
+- 기록이 없는 국가도 `count = 0`, `level = NONE`으로 반환한다.
 - `regionId`는 후속 하위 Region 지도 요약 요청에 사용한다.
 - `regionCode`는 안드로이드 로컬 지도 데이터와 매칭하는 표준 코드다.
 
 | 기록 수 | `level` |
-| ---: | ---: |
-| `0` | `0` |
-| `1~2` | `1` |
-| `3~5` | `2` |
-| `6 이상` | `3` |
+| ---: | --- |
+| `0` | `NONE` |
+| `1~2` | `LOW` |
+| `3~5` | `MEDIUM` |
+| `6 이상` | `HIGH` |

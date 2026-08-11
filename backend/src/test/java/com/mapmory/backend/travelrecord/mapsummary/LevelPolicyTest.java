@@ -19,16 +19,16 @@ class LevelPolicyTest {
     class CalculateLevel {
 
         @DisplayName("경계값에 맞는 단계를 반환한다")
-        @ParameterizedTest(name = "기록 수 {0}건은 {1}단계다")
+        @ParameterizedTest(name = "기록 수 {0}건은 {1} 단계다")
         @CsvSource({
-                "0, 0",
-                "1, 1",
-                "2, 1",
-                "3, 2",
-                "5, 2",
-                "6, 3"
+                "0, NONE",
+                "1, LOW",
+                "2, LOW",
+                "3, MEDIUM",
+                "5, MEDIUM",
+                "6, HIGH"
         })
-        void returnsLevelForBoundary(long count, int expectedLevel) {
+        void returnsLevelForBoundary(long count, MapColorLevel expectedLevel) {
             assertThat(levelPolicy.levelFor(count)).isEqualTo(expectedLevel);
         }
 
@@ -46,14 +46,14 @@ class LevelPolicyTest {
     class CreatePolicy {
 
         @Test
-        @DisplayName("1단계 최대 기록 수는 1 이상이어야 한다")
+        @DisplayName("LOW 최대 기록 수는 1 이상이어야 한다")
         void rejectsInvalidLevelOneMaximum() {
             assertThatThrownBy(() -> LevelPolicy.of(0, 5))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
         @Test
-        @DisplayName("2단계 최대 기록 수는 1단계 최대 기록 수보다 커야 한다")
+        @DisplayName("MEDIUM 최대 기록 수는 LOW 최대 기록 수보다 커야 한다")
         void rejectsInvalidLevelTwoMaximum() {
             assertThatThrownBy(() -> LevelPolicy.of(2, 2))
                     .isInstanceOf(IllegalArgumentException.class);

@@ -43,7 +43,7 @@ class RegionMapSummaryControllerTest {
                             RegionType.COUNTRY,
                             "대한민국",
                             3L,
-                            2
+                            MapColorLevel.MEDIUM
                     )
             ));
 
@@ -55,7 +55,7 @@ class RegionMapSummaryControllerTest {
                     .andExpect(jsonPath("$.data[0].regionType").value("COUNTRY"))
                     .andExpect(jsonPath("$.data[0].name").value("대한민국"))
                     .andExpect(jsonPath("$.data[0].count").value(3))
-                    .andExpect(jsonPath("$.data[0].level").value(2));
+                    .andExpect(jsonPath("$.data[0].level").value("MEDIUM"));
 
             verify(countryMapSummaryService).getCountrySummaries(10L);
         }

@@ -20,7 +20,8 @@
 - 후속 이슈에서 같은 URI에 `parentRegionId`를 추가해 특정 Region의 직속 자식 요약을 조회한다.
 - 응답은 후속 요청용 `regionId`와 로컬 지도 매칭용 `regionCode`를 함께 제공한다.
 - 클라이언트는 `regionId`를 행정 코드처럼 영구 저장하지 않고 API 탐색에만 사용한다.
-- 기록이 없는 Region도 `count = 0`, `level = 0`으로 반환한다.
+- 기록이 없는 Region도 `count = 0`, `level = NONE`으로 반환한다.
+- 색상 단계는 비율이 아닌 고정 기록 수 구간이므로 `NONE`, `LOW`, `MEDIUM`, `HIGH` enum으로 표현한다.
 - 국가 집계는 국가 Region 자체와 `root_id`가 해당 국가인 모든 하위 Region의 기록을 포함한다.
 
 ## 조회 방식

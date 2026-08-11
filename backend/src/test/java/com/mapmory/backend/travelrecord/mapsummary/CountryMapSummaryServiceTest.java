@@ -52,7 +52,7 @@ class CountryMapSummaryServiceTest {
                     RegionType.COUNTRY,
                     "대한민국",
                     3L,
-                    2
+                    MapColorLevel.MEDIUM
             ));
         }
 

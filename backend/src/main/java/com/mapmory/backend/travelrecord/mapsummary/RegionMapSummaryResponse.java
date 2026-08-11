@@ -8,7 +8,7 @@ public record RegionMapSummaryResponse(
         RegionType regionType,
         String name,
         long count,
-        int level
+        MapColorLevel level
 ) {
 
     public static RegionMapSummaryResponse from(
