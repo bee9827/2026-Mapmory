@@ -1,6 +1,6 @@
 package com.mapmory.backend.travelrecord.repository;
 
-public interface CountryMapSummaryQueryResult {
+public interface RegionMapSummaryQueryResult {
 
     Long getRegionId();
 

@@ -57,4 +57,8 @@ public class Region extends BaseEntity {
     public Long getId() {
         return id;
     }
+
+    public RegionType getRegionType() {
+        return regionType;
+    }
 }
