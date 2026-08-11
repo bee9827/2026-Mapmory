@@ -28,7 +28,7 @@
 | `GET` | `/travel-records/{travelRecordId}` * | 내 여행 기록 상세 조회 |
 | `PUT` | `/travel-records/{travelRecordId}` * | 내 여행 기록 전체 수정 |
 | `DELETE` | `/travel-records/{travelRecordId}` * | 내 여행 기록 삭제 |
-| `GET` | `/travel-records/statistics` * | 선택 지역과 하위 지역의 기록 수 조회 |
+| `GET` | `/travel-records/map-summary/regions` * | 국가별 지도 색칠 정보 조회 |
 
 ### 공통 응답
 
@@ -275,42 +275,46 @@
 - `PUT /api/v1/travel-records/{travelRecordId}`: 생성과 같은 요청 본문으로 전체 수정한다.
 - `DELETE /api/v1/travel-records/{travelRecordId}`: 기록을 삭제한다. 연결된 `record_media` 행은 CASCADE 삭제한다. S3 객체 삭제는 별도 처리한다.
 
-## 5. 지역별 여행 기록 통계 API
+## 5. 지도 요약 API
 
-### 선택 지역 기록 수 조회
+### 국가별 지도 색칠 정보 조회
 
-`GET /api/v1/travel-records/statistics`
-
-| 파라미터 | 필수 | 설명 |
-| --- | --- | --- |
-| `countryCode` | 예 | 통계를 낼 국가 |
-| `provinceCode` | 아니요 | 특정 시도 통계 |
-| `districtCode` | 아니요 | 특정 시군구 통계 |
-
-#### 요청 예시
-
-```http
-GET /api/v1/travel-records/statistics?countryCode=KR&provinceCode=49
-X-Member-Id: 10
-```
+`GET /api/v1/travel-records/map-summary/regions`
 
 #### Response `200 OK`
 
 ```json
 {
-  "data": {
-    "countryCode": "KR",
-    "provinceCode": "49",
-    "districtCode": null,
-    "recordCount": 5
-  }
+  "data": [
+    {
+      "regionId": 1,
+      "regionCode": "KR",
+      "regionType": "COUNTRY",
+      "name": "대한민국",
+      "count": 12,
+      "level": 3
+    },
+    {
+      "regionId": 2,
+      "regionCode": "JP",
+      "regionType": "COUNTRY",
+      "name": "일본",
+      "count": 0,
+      "level": 0
+    }
+  ]
 }
 ```
 
-서버는 요청한 Region 자신과 모든 하위 Region에 저장된 현재 회원의 기록을 집계한다.
+- `region_type = COUNTRY`인 모든 Region을 `regionCode` 오름차순으로 반환한다.
+- 현재 회원의 국가 Region 기록과 해당 국가의 모든 하위 Region 기록을 합산한다.
+- 기록이 없는 국가도 `count = 0`, `level = 0`으로 반환한다.
+- `regionId`는 후속 하위 Region 지도 요약 요청에 사용한다.
+- `regionCode`는 안드로이드 로컬 지도 데이터와 매칭하는 표준 코드다.
 
-| 요청 | 집계 범위 |
-| --- | --- |
-| `countryCode=KR` | 대한민국 및 모든 시도·시군구 기록 |
-| `countryCode=KR&provinceCode=49` | 제주특별자치도 및 하위 시군구 기록 |
-| `countryCode=KR&provinceCode=49&districtCode=50110` | 제주시 기록 |
+| 기록 수 | `level` |
+| ---: | ---: |
+| `0` | `0` |
+| `1~2` | `1` |
+| `3~5` | `2` |
+| `6 이상` | `3` |
