@@ -14,6 +14,12 @@ keystore.properties
 .env.*
 !.env.example
 
+# Local workspace metadata
+.DS_Store
+**/.DS_Store
+.omx/
+**/.omx/
+
 
 .kotlin/
 **/.kotlin/
