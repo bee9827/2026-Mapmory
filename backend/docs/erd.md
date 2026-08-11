@@ -2,54 +2,9 @@
 
 > 기준일: 2026-08-11 · 범위: 지역 선택, 지도 마킹, 여행 기록, 이미지 첨부
 
-```mermaid
-erDiagram
-    MEMBER ||--o{ TRAVEL_RECORD : writes
-    REGION ||--o{ REGION : parent_of
-    REGION ||--o{ REGION : roots
-    REGION ||--o{ TRAVEL_RECORD : selected_by
-    TRAVEL_RECORD ||--o{ RECORD_MEDIA : has
 
-    MEMBER {
-        bigint id PK
-        varchar name
-        char uuid UK
-        datetime created_at
-        datetime updated_at
-    }
+<img width="588" height="364" alt="스크린샷 2026-08-11 오후 3 04 34" src="https://github.com/user-attachments/assets/1d24fb8f-2ca7-400a-8525-cea938246569" />
 
-    REGION {
-        bigint id PK
-        bigint parent_id FK
-        bigint root_id FK
-        varchar region_code
-        varchar name
-        varchar region_type
-        datetime created_at
-        datetime updated_at
-    }
-
-    TRAVEL_RECORD {
-        bigint id PK
-        bigint member_id FK
-        bigint region_id FK
-        varchar title
-        text content
-        date start_date
-        date end_date
-        datetime created_at
-        datetime updated_at
-    }
-
-    RECORD_MEDIA {
-        bigint id PK
-        bigint travel_record_id FK
-        varchar object_key UK
-        varchar thumb_key
-        int sort_order
-        datetime created_at
-    }
-```
 
 ## 테이블 역할
 
