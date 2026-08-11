@@ -17,7 +17,7 @@
 지도 요약 API는 Region 계층을 기준으로 구성한다.
 
 - 최초 `GET /api/v1/travel-records/map-summary/regions` 요청은 모든 국가 Region의 요약을 반환한다.
-- 후속 이슈에서 같은 URI에 `parentRegionId`를 추가해 특정 Region의 직속 자식 요약을 조회한다.
+- 같은 URI에 `parentRegionId`를 추가해 특정 Region의 직속 자식 요약을 조회한다.
 - 응답은 후속 요청용 `regionId`와 로컬 지도 매칭용 `regionCode`를 함께 제공한다.
 - 클라이언트는 `regionId`를 행정 코드처럼 영구 저장하지 않고 API 탐색에만 사용한다.
 - 기록이 없는 Region도 `count = 0`, `level = NONE`으로 반환한다.

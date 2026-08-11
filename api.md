@@ -318,3 +318,44 @@
 | `1~2` | `LOW` |
 | `3~5` | `MEDIUM` |
 | `6 이상` | `HIGH` |
+
+### 시도별 지도 색칠 정보 조회
+
+`GET /api/v1/travel-records/map-summary/regions?parentRegionId={countryRegionId}`
+
+최초 국가별 응답에서 받은 `COUNTRY` Region의 `regionId`를 `parentRegionId`로 전달한다.
+
+#### 요청 예시
+
+```http
+GET /api/v1/travel-records/map-summary/regions?parentRegionId=1
+X-Member-Id: 10
+```
+
+#### Response `200 OK`
+
+```json
+{
+  "data": [
+    {
+      "regionId": 15,
+      "regionCode": "49",
+      "regionType": "PROVINCE",
+      "name": "제주특별자치도",
+      "count": 5,
+      "level": "MEDIUM"
+    }
+  ]
+}
+```
+
+- `parentRegionId`가 가리키는 국가의 모든 직속 `PROVINCE`를 반환한다.
+- 현재 회원의 시도 Region 기록과 해당 시도의 직속 하위 Region 기록을 합산한다.
+- 기록이 없는 시도도 `count = 0`, `level = NONE`으로 반환한다.
+- 정렬 및 색상 단계 규칙은 국가별 조회와 같다.
+
+| 상태 | `code` | 조건 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | `parentRegionId`가 양수가 아님 |
+| `400` | `INVALID_PARENT_REGION_TYPE` | 상위 Region이 국가가 아님 |
+| `404` | `REGION_NOT_FOUND` | 상위 Region이 존재하지 않음 |
