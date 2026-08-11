@@ -7,5 +7,5 @@ package com.mapmory.shared
  * displays the link only when this value is not blank.
  */
 object PrivacyPolicy {
-    const val URL = ""
+    const val URL = "https://woowacourse-teams.github.io/2026-Mapmory/privacy-policy.html"
 }
