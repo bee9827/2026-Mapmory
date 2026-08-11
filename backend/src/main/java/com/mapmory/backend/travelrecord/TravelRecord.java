@@ -1,9 +1,8 @@
 package com.mapmory.backend.travelrecord;
 
 import com.mapmory.backend.common.entity.BaseEntity;
-import com.mapmory.backend.country.Country;
-import com.mapmory.backend.location.Location;
 import com.mapmory.backend.member.Member;
+import com.mapmory.backend.region.Region;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -26,17 +25,13 @@ public class TravelRecord extends BaseEntity {
     private Member member;
 
     @ManyToOne(optional = false)
-    @JoinColumn(name = "country_id", nullable = false)
-    private Country country;
-
-    @ManyToOne(optional = true)
-    @JoinColumn(name = "location_id")
-    private Location location;
+    @JoinColumn(name = "region_id", nullable = false)
+    private Region region;
 
     @Column(nullable = false, length = 200)
     private String title;
 
-    @Column(columnDefinition = "text")
+    @Column(nullable = false, columnDefinition = "text")
     private String content;
 
     @Column(nullable = false)
@@ -49,16 +44,14 @@ public class TravelRecord extends BaseEntity {
 
     private TravelRecord(
             Member member,
-            Country country,
-            Location location,
+            Region region,
             String title,
             String content,
             LocalDate startDate,
             LocalDate endDate
     ) {
         this.member = member;
-        this.country = country;
-        this.location = location;
+        this.region = region;
         this.title = title;
         this.content = content;
         this.startDate = startDate;
@@ -67,14 +60,13 @@ public class TravelRecord extends BaseEntity {
 
     public static TravelRecord of(
             Member member,
-            Country country,
-            Location location,
+            Region region,
             String title,
             String content,
             LocalDate startDate,
             LocalDate endDate
     ) {
-        return new TravelRecord(member, country, location, title, content, startDate, endDate);
+        return new TravelRecord(member, region, title, content, startDate, endDate);
     }
 
 }

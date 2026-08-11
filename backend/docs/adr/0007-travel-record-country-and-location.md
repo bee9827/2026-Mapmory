@@ -1,6 +1,6 @@
 # ADR 0007. 여행 기록의 국가와 세부 지역 저장 방식
 
-- 상태: 채택
+- 상태: 대체됨 (ADR 0008)
 - 날짜: 2026-08-11
 - 관련: `V4__create_travel_record.sql`, `V9__add_country_to_travel_record.sql`, ADR 0004
 
