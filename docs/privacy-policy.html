@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Mapmory 개인정보 처리방침">
+  <title>Mapmory 개인정보 처리방침</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: #172126; background: #f5f7f8; line-height: 1.75; }
+    main {
+      width: min(100% - 32px, 900px);
+      margin: 24px auto;
+      padding: 48px 40px 64px;
+      border-radius: 16px;
+      background: #fff;
+      box-shadow: 0 8px 28px rgb(8 32 39 / 8%);
+    }
+    h1 { margin: 0; color: #082027; font-size: clamp(1.8rem, 5vw, 2.4rem); }
+    h2 {
+      margin: 44px 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #dbe4e7;
+      color: #0d3037;
+      font-size: 1.3rem;
+    }
+    p, li, th, td { overflow-wrap: anywhere; }
+    ul, ol { padding-left: 24px; }
+    a { color: #08786c; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { padding: 12px; border: 1px solid #dbe4e7; text-align: left; vertical-align: top; }
+    th { background: #f0f7f5; color: #173e42; }
+    .meta { margin-top: 12px; color: #526168; font-size: .95rem; }
+    .summary {
+      margin-top: 24px;
+      padding: 18px 20px;
+      border: 1px solid #cde5de;
+      border-radius: 10px;
+      background: #eef8f5;
+    }
+    .toc {
+      margin-top: 28px;
+      padding: 18px 22px;
+      border-radius: 10px;
+      background: #f7f9fa;
+    }
+    .toc strong { color: #0d3037; }
+    .toc ol { columns: 2; column-gap: 32px; margin-bottom: 0; }
+    .notice {
+      margin-top: 18px;
+      padding: 16px 18px;
+      border-left: 4px solid #0f8c7d;
+      background: #f3faf8;
+    }
+    .muted { color: #526168; font-size: .95rem; }
+    footer { margin-top: 48px; color: #66757b; font-size: .9rem; }
+
+    @media (max-width: 640px) {
+      main { width: 100%; margin: 0; padding: 32px 20px 48px; border-radius: 0; box-shadow: none; }
+      h2 { margin-top: 34px; }
+      .toc ol { columns: 1; }
+      table, thead, tbody, tr, th, td { display: block; }
+      thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+      tr { margin-bottom: 14px; border: 1px solid #dbe4e7; }
+      td { border: 0; border-bottom: 1px solid #e5ecee; }
+      td:last-child { border-bottom: 0; }
+      td::before { display: block; margin-bottom: 4px; color: #526168; font-size: .85rem; font-weight: 700; }
+      td:nth-child(1)::before { content: "기능"; }
+      td:nth-child(2)::before { content: "처리 목적"; }
+      td:nth-child(3)::before { content: "처리 정보"; }
+      td:nth-child(4)::before { content: "저장·보유 기간"; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Mapmory 개인정보 처리방침</h1>
+  <p class="meta">시행일: 2026년 8월 11일</p>
+
+  <div class="summary">
+    <strong>현재 Mapmory는 이용자의 개인정보를 외부 서버로 전송·수집하거나 제3자에게 제공하지 않습니다.</strong>
+    여행 기록과 지역 검색 정보는 기능 제공에 필요한 동안 이용자의 기기 내 메모리에서만 일시적으로 처리됩니다.
+  </div>
+
+  <p>Mapmory(이하 “서비스”)는 여행 기록을 지역 단위로 작성하고 확인할 수 있는 모바일 애플리케이션입니다. Mapmory는 「개인정보 보호법」 제30조에 따라 현재 제공되는 서비스의 개인정보 처리 현황과 이용자의 권리 보호에 관한 사항을 다음과 같이 공개합니다.</p>
+
+  <nav class="toc" aria-label="목차">
+    <strong>목차</strong>
+    <ol>
+      <li><a href="#purpose">처리 목적·항목·보유기간</a></li>
+      <li><a href="#children">만 14세 미만 아동의 정보</a></li>
+      <li><a href="#sharing">제3자 제공·위탁·국외 이전</a></li>
+      <li><a href="#destruction">개인정보의 파기</a></li>
+      <li><a href="#permissions">카메라 및 사진 접근 권한</a></li>
+      <li><a href="#security">안전성 확보조치</a></li>
+      <li><a href="#rights">정보주체의 권리와 행사방법</a></li>
+      <li><a href="#officer">개인정보 보호책임자</a></li>
+      <li><a href="#remedy">권익침해 구제방법</a></li>
+      <li><a href="#changes">처리방침의 변경</a></li>
+    </ol>
+  </nav>
+
+  <section id="purpose">
+    <h2>1. 개인정보의 처리 목적, 처리 항목 및 보유기간</h2>
+    <p>현재 서비스는 회원가입·로그인 기능을 제공하지 않으며, 이름, 이메일 주소, 전화번호, 회원 ID, 기기 식별자, 광고 식별자, IP 주소 또는 접속 기록을 개발자의 서버로 수집하거나 보유하지 않습니다.</p>
+    <p>이용자가 서비스 기능을 사용하면서 직접 입력하거나 선택한 정보는 다음과 같이 기기 내에서만 처리됩니다.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">기능</th>
+          <th scope="col">처리 목적</th>
+          <th scope="col">처리 정보</th>
+          <th scope="col">저장·보유 기간</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>여행 기록 작성·조회·수정·삭제</td>
+          <td>이용자가 작성한 여행 기록을 앱 화면에 표시하고 관리</td>
+          <td>여행 제목, 내용, 시작일·종료일, 이용자가 직접 선택한 국가·행정구역</td>
+          <td>기기 내 메모리에서만 처리되며, 이용자가 삭제하거나 앱 프로세스가 종료될 때까지</td>
+        </tr>
+        <tr>
+          <td>지역 검색·선택</td>
+          <td>이용자가 원하는 국가·행정구역을 검색하고 선택</td>
+          <td>앱 내 지역 검색어, 선택한 국가·행정구역</td>
+          <td>기능 이용에 필요한 동안 기기 내 메모리에서 일시 처리되며, 늦어도 앱 프로세스 종료 시 소멸</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>위 정보는 개발자 또는 제3자의 서버로 전송되지 않으며, 개발자가 열람할 수 없습니다. 자유 입력란에 개인정보나 민감한 정보를 작성하지 않도록 주의해 주시기 바랍니다.</p>
+  </section>
+
+  <section id="children">
+    <h2>2. 만 14세 미만 아동의 개인정보</h2>
+    <p>현재 서비스는 이용자의 연령을 확인하지 않으며, 만 14세 미만 아동의 개인정보를 별도로 수집하거나 보유하지 않습니다.</p>
+  </section>
+
+  <section id="sharing">
+    <h2>3. 개인정보의 제3자 제공, 처리위탁 및 국외 이전</h2>
+    <p>현재 서비스는 개인정보를 외부 서버로 수집하거나 보유하지 않으므로 개인정보의 제3자 제공, 처리업무 위탁 및 국외 이전을 하지 않습니다.</p>
+  </section>
+
+  <section id="destruction">
+    <h2>4. 개인정보의 파기절차 및 파기방법</h2>
+    <p>개발자가 보유하는 이용자 개인정보가 없으므로 별도의 서버 파기 대상은 없습니다. 기기 내 메모리에서 처리되는 여행 기록은 이용자가 앱에서 삭제하거나 앱 프로세스가 종료되면 소멸합니다. 개발자가 운영하는 서버나 백업에 별도 사본이 남지 않습니다.</p>
+  </section>
+
+  <section id="permissions">
+    <h2>5. 카메라 및 사진 접근 권한</h2>
+    <p>Android 앱 설치 파일에는 카메라 및 사진 접근 권한이 선언되어 있으나, 현재 기능에서는 해당 권한을 요청하거나 카메라·사진에 접근하지 않습니다. 사진을 선택·촬영·저장·업로드하거나 외부로 전송하지 않습니다.</p>
+  </section>
+
+  <section id="security">
+    <h2>6. 개인정보의 안전성 확보조치</h2>
+    <p>서비스는 개인정보 보호를 위해 현재 제공되는 기능에서 이용자 입력 정보를 외부 서버로 전송하지 않고, 기능 제공에 필요한 정보만 기기 내 메모리에서 일시 처리합니다. 또한 광고·분석·추적 목적의 외부 SDK를 사용하지 않아 외부 제공 범위를 최소화하고 있습니다.</p>
+  </section>
+
+  <section id="rights">
+    <h2>7. 정보주체와 법정대리인의 권리·의무 및 행사방법</h2>
+    <p>이용자는 앱에서 자신이 작성한 여행 기록을 확인·수정·삭제할 수 있습니다. 개발자가 운영하는 서버에는 이용자 정보가 저장되지 않으므로 개발자가 서버에서 별도로 열람·정정·삭제하거나 이용 정지할 정보는 없습니다.</p>
+    <p>개인정보 처리 여부나 권리 행사에 관한 문의는 아래 개인정보 보호책임자에게 이메일로 요청할 수 있으며, 법정대리인도 같은 방법으로 문의할 수 있습니다.</p>
+  </section>
+
+  <section id="officer">
+    <h2>8. 개인정보 보호책임자 및 문의처</h2>
+    <p>Mapmory는 개인정보 보호 관련 문의와 불만 처리를 위하여 아래와 같이 개인정보 보호책임자를 지정하고 있습니다.</p>
+    <ul>
+      <li>개인정보처리자 및 개인정보 보호책임자: 한수진 (Mapmory)</li>
+      <li>이메일: <a href="mailto:sjhan0711@gmail.com">sjhan0711@gmail.com</a></li>
+    </ul>
+  </section>
+
+  <section id="remedy">
+    <h2>9. 개인정보 침해에 대한 권익침해 구제방법</h2>
+    <p>개인정보 침해와 관련하여 상담이나 구제가 필요한 경우 다음 기관에 문의할 수 있습니다.</p>
+    <ul>
+      <li>개인정보분쟁조정위원회: 1833-6972, <a href="https://www.kopico.go.kr">www.kopico.go.kr</a></li>
+      <li>개인정보침해 신고센터: 국번 없이 118, <a href="https://privacy.kisa.or.kr">privacy.kisa.or.kr</a></li>
+      <li>경찰청 사이버범죄 신고시스템: 국번 없이 182, <a href="https://ecrm.police.go.kr">ecrm.police.go.kr</a></li>
+    </ul>
+  </section>
+
+  <section id="changes">
+    <h2>10. 개인정보 처리방침의 변경에 관한 사항</h2>
+    <div class="notice">
+      <strong>변경 이력</strong><br>
+      2026년 8월 11일: 개인정보 처리방침 최초 제정 및 시행
+    </div>
+  </section>
+
+  <footer>Mapmory · 개인정보 보호 문의: <a href="mailto:sjhan0711@gmail.com">sjhan0711@gmail.com</a></footer>
+</main>
+</body>
+</html>
