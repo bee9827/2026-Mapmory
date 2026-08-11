@@ -2,7 +2,7 @@
 
 - 상태: 채택
 - 날짜: 2026-08-11
-- 관련: ADR 0003, ADR 0004, ADR 0007
+- 관련: `V10__unify_country_and_location_as_region.sql`, ADR 0003, ADR 0004, ADR 0007
 
 ---
 
