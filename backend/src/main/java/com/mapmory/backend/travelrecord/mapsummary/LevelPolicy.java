@@ -3,11 +3,12 @@ package com.mapmory.backend.travelrecord.mapsummary;
 public record LevelPolicy(long lowMaxRecordCount, long mediumMaxRecordCount) {
 
     private static final long NO_RECORD_COUNT = 0;
+    private static final long MINIMUM_LOW_MAX_RECORD_COUNT = 1;
     private static final long DEFAULT_LOW_MAX_RECORD_COUNT = 2;
     private static final long DEFAULT_MEDIUM_MAX_RECORD_COUNT = 5;
 
     public LevelPolicy {
-        if (lowMaxRecordCount < 1) {
+        if (lowMaxRecordCount < MINIMUM_LOW_MAX_RECORD_COUNT) {
             throw new IllegalArgumentException("lowMaxRecordCount는 1 이상이어야 합니다.");
         }
         if (mediumMaxRecordCount <= lowMaxRecordCount) {
