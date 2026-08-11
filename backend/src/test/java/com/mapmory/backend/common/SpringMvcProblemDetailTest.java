@@ -14,7 +14,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@WebMvcTest(properties = "spring.mvc.problemdetails.enabled=true")
+@WebMvcTest(
+        controllers = SpringMvcProblemDetailTest.MethodRestrictedController.class,
+        properties = "spring.mvc.problemdetails.enabled=true"
+)
 @Import({ProblemDetailFactory.class, SpringMvcProblemDetailTest.MethodRestrictedController.class})
 class SpringMvcProblemDetailTest {
 

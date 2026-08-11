@@ -69,4 +69,7 @@ public class TravelRecord extends BaseEntity {
         return new TravelRecord(member, region, title, content, startDate, endDate);
     }
 
+    public Long getId() {
+        return id;
+    }
 }
