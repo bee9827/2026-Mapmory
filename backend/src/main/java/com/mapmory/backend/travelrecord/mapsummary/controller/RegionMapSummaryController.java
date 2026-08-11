@@ -1,6 +1,8 @@
-package com.mapmory.backend.travelrecord.mapsummary;
+package com.mapmory.backend.travelrecord.mapsummary.controller;
 
 import com.mapmory.backend.common.dto.ApiResponse;
+import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
+import com.mapmory.backend.travelrecord.mapsummary.service.CountryMapSummaryService;
 import jakarta.validation.constraints.Positive;
 import java.util.List;
 import org.springframework.validation.annotation.Validated;

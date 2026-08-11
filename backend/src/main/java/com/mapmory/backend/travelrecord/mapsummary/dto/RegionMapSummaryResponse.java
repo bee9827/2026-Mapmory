@@ -1,6 +1,9 @@
-package com.mapmory.backend.travelrecord.mapsummary;
+package com.mapmory.backend.travelrecord.mapsummary.dto;
 
 import com.mapmory.backend.region.RegionType;
+import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
+import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
+import com.mapmory.backend.travelrecord.repository.CountryMapSummaryQueryResult;
 
 public record RegionMapSummaryResponse(
         Long regionId,

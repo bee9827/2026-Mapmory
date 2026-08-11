@@ -1,4 +1,4 @@
-package com.mapmory.backend.travelrecord.mapsummary;
+package com.mapmory.backend.travelrecord.repository;
 
 public interface CountryMapSummaryQueryResult {
 

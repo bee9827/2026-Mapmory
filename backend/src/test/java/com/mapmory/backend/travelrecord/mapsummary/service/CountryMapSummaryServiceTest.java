@@ -1,4 +1,4 @@
-package com.mapmory.backend.travelrecord.mapsummary;
+package com.mapmory.backend.travelrecord.mapsummary.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,10 +7,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mapmory.backend.common.exception.BusinessException;
-import com.mapmory.backend.member.MemberErrorCode;
-import com.mapmory.backend.member.MemberRepository;
+import com.mapmory.backend.member.exception.MemberErrorCode;
+import com.mapmory.backend.member.repository.MemberRepository;
 import com.mapmory.backend.region.RegionType;
-import com.mapmory.backend.travelrecord.TravelRecordRepository;
+import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
+import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
+import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
+import com.mapmory.backend.travelrecord.repository.CountryMapSummaryQueryResult;
+import com.mapmory.backend.travelrecord.repository.TravelRecordRepository;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

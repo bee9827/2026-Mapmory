@@ -1,9 +1,11 @@
-package com.mapmory.backend.travelrecord.mapsummary;
+package com.mapmory.backend.travelrecord.mapsummary.service;
 
 import com.mapmory.backend.common.exception.BusinessException;
-import com.mapmory.backend.member.MemberErrorCode;
-import com.mapmory.backend.member.MemberRepository;
-import com.mapmory.backend.travelrecord.TravelRecordRepository;
+import com.mapmory.backend.member.exception.MemberErrorCode;
+import com.mapmory.backend.member.repository.MemberRepository;
+import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
+import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
+import com.mapmory.backend.travelrecord.repository.TravelRecordRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

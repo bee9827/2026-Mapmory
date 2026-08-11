@@ -1,4 +1,4 @@
-package com.mapmory.backend.travelrecord.mapsummary;
+package com.mapmory.backend.travelrecord.mapsummary.policy;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

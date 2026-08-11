@@ -1,6 +1,6 @@
-package com.mapmory.backend.travelrecord;
+package com.mapmory.backend.travelrecord.repository;
 
-import com.mapmory.backend.travelrecord.mapsummary.CountryMapSummaryQueryResult;
+import com.mapmory.backend.travelrecord.TravelRecord;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

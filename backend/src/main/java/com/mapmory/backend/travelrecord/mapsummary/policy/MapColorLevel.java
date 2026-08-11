@@ -1,4 +1,4 @@
-package com.mapmory.backend.travelrecord.mapsummary;
+package com.mapmory.backend.travelrecord.mapsummary.policy;
 
 public enum MapColorLevel {
     NONE,

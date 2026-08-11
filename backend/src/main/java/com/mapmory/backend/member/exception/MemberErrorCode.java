@@ -1,4 +1,4 @@
-package com.mapmory.backend.member;
+package com.mapmory.backend.member.exception;
 
 import com.mapmory.backend.common.exception.ErrorCode;
 import com.mapmory.backend.common.exception.ErrorKind;

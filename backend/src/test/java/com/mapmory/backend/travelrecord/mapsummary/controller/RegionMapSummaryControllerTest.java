@@ -1,4 +1,4 @@
-package com.mapmory.backend.travelrecord.mapsummary;
+package com.mapmory.backend.travelrecord.mapsummary.controller;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -8,6 +8,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.mapmory.backend.common.ProblemDetailFactory;
 import com.mapmory.backend.region.RegionType;
+import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
+import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
+import com.mapmory.backend.travelrecord.mapsummary.service.CountryMapSummaryService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
