@@ -20,8 +20,8 @@ android {
         applicationId = "com.mapmory.android"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.compileSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         resValue(
             type = "string",
             name = "mapmory_api_base_url",
