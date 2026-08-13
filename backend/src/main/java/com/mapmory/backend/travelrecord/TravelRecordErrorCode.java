@@ -17,24 +17,6 @@ public enum TravelRecordErrorCode implements ErrorCode {
             "요청 값이 올바르지 않습니다.",
             "지역 코드 형식이 올바르지 않습니다."
     ),
-    COUNTRY_NOT_FOUND(
-            ErrorKind.NOT_FOUND,
-            "COUNTRY_NOT_FOUND",
-            "국가를 찾을 수 없습니다.",
-            "요청한 국가 코드에 해당하는 국가가 없습니다."
-    ),
-    REGION_NOT_FOUND(
-            ErrorKind.NOT_FOUND,
-            "REGION_NOT_FOUND",
-            "지역을 찾을 수 없습니다.",
-            "요청한 지역 코드에 해당하는 지역이 없습니다."
-    ),
-    INVALID_REGION_HIERARCHY(
-            ErrorKind.INVALID_INPUT,
-            "INVALID_REGION_HIERARCHY",
-            "지역 계층이 올바르지 않습니다.",
-            "요청한 지역은 선택한 상위 지역에 속하지 않습니다."
-    ),
     INVALID_PAGINATION(
             ErrorKind.INVALID_INPUT,
             "VALIDATION_ERROR",
