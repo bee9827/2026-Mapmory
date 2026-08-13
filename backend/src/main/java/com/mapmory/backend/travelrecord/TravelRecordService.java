@@ -52,9 +52,7 @@ public class TravelRecordService {
 
         TravelRecord savedTravelRecord = travelRecordRepository.save(travelRecord);
 
-        List<String> objectKeys = request.objectKeys() == null
-                ? List.of()
-                : request.objectKeys();
+        List<String> objectKeys = request.objectKeys() == null ? List.of() : request.objectKeys();
 
         for (int index = 0; index < objectKeys.size(); index++) {
             RecordMedia recordMedia = RecordMedia.of(
@@ -72,24 +70,14 @@ public class TravelRecordService {
 
     @Transactional(readOnly = true)
     public Page<TravelRecord> findAll(Long memberId, String countryCode, String provinceCode, String districtCode, int page, int size) {
-        Pageable pageable = PageRequest.of(
-                page,
-                size,
-                Sort.by(Sort.Direction.DESC, "createdAt")
-        );
+        Pageable pageable = createPageable(page, size);
 
-        // 필터로 들어온 조건이 없으면 = 내 기록 전체 조회
         if (countryCode == null) {
             return travelRecordRepository.findByMemberId(memberId, pageable);
         }
 
-        Region country = regionRepository
-                .findByParentIsNullAndRegionTypeAndRegionCode(
-                        RegionType.COUNTRY,
-                        countryCode
-                ).orElseThrow();
+        Region country = findCountry(countryCode);
 
-        // COUNTRY 타입이면서 부모가 없는 최상위 국가 Region을 찾기
         if (provinceCode == null) {
             return travelRecordRepository.findByMemberIdAndCountryId(
                     memberId,
@@ -98,11 +86,7 @@ public class TravelRecordService {
             );
         }
 
-        Region province = regionRepository.findByParentIdAndRegionTypeAndRegionCode(
-                country.getId(),
-                RegionType.PROVINCE,
-                provinceCode
-        ).orElseThrow();
+        Region province = findProvince(country, provinceCode);
 
         if (districtCode == null) {
             return travelRecordRepository.findByMemberIdAndProvinceId(
@@ -112,12 +96,7 @@ public class TravelRecordService {
             );
         }
 
-        Region district = regionRepository
-                .findByParentIdAndRegionTypeAndRegionCode(
-                        province.getId(),
-                        RegionType.DISTRICT,
-                        districtCode
-                ).orElseThrow();
+        Region district = findDistrict(province, districtCode);
 
         return travelRecordRepository.findByMemberIdAndRegionId(
                 memberId,
@@ -126,32 +105,45 @@ public class TravelRecordService {
         );
     }
 
-    private Region resolveRegion(TravelRecordRequest request) {
-        // countryCode → provinceCode → districtCode로 Region 탐색
+    private Pageable createPageable(int page, int size) {
+        return PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+    }
 
-        // 국가 조건 : parentId가 없어야 함 + RegionType = COUNTRY + countryCode
-        Region country = regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(
-                RegionType.COUNTRY,
-                request.countryCode()
-        ).orElseThrow();
+    private Region resolveRegion(TravelRecordRequest request) {
+        Region country = findCountry(request.countryCode());
 
         if (request.provinceCode() == null && request.districtCode() == null) {
             return country;
         }
 
-        // 중간 지역 조건 : parentId = country_id + RegionType = PROVINCE + provinceCode
-        Region province = regionRepository.findByParentIdAndRegionTypeAndRegionCode(
+        Region province = findProvince(country, request.provinceCode());
+        return findDistrict(province, request.districtCode());
+    }
+
+    private Region findCountry(String countryCode) {
+        return regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(
+                RegionType.COUNTRY,
+                countryCode
+        ).orElseThrow();
+    }
+
+    private Region findProvince(Region country, String provinceCode) {
+        return regionRepository.findByParentIdAndRegionTypeAndRegionCode(
                 country.getId(),
                 RegionType.PROVINCE,
-                request.provinceCode()
+                provinceCode
         ).orElseThrow();
+    }
 
-        // 세부 지역 조건 : parentId = province_id + RegionType = DISTRICT + districtCode
-        return regionRepository
-                .findByParentIdAndRegionTypeAndRegionCode(
+    private Region findDistrict(Region province, String districtCode) {
+        return regionRepository.findByParentIdAndRegionTypeAndRegionCode(
                 province.getId(),
                 RegionType.DISTRICT,
-                request.districtCode()
+                districtCode
         ).orElseThrow();
     }
 }
