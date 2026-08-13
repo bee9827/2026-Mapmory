@@ -183,6 +183,11 @@ public class TravelRecordService {
                 province.getId(),
                 RegionType.DISTRICT,
                 districtCode
-        ).orElseThrow();
+        ).orElseGet(() -> {
+            if (regionRepository.existsByRegionTypeAndRegionCode(RegionType.DISTRICT, districtCode)) {
+                throw new BusinessException(TravelRecordErrorCode.INVALID_REGION_HIERARCHY);
+            }
+            throw new BusinessException(TravelRecordErrorCode.REGION_NOT_FOUND);
+        });
     }
 }
