@@ -3,6 +3,7 @@ package com.mapmory.backend.travelrecord;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordResponse;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -26,17 +27,19 @@ public class TravelRecordController {
     }
 
     @PostMapping("/travel-records")
-    public ResponseEntity<CreateTravelRecordResponse> create(@RequestHeader("X-Member-Id") Long memberId,
-                                                             @Valid @RequestBody TravelRecordRequest travelRecordRequest
+    public ResponseEntity<TravelRecordResponse<CreateTravelRecordResponse>> create(
+            @RequestHeader("X-Member-Id") Long memberId,
+            @Valid @RequestBody TravelRecordRequest travelRecordRequest
     ) {
         TravelRecord travelRecord = travelRecordService.create(memberId, travelRecordRequest);
         CreateTravelRecordResponse response = CreateTravelRecordResponse.from(travelRecord);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(TravelRecordResponse.of(response));
     }
 
     @GetMapping("/travel-records")
-    public ResponseEntity<TravelRecordListResponse> findAll(
+    public ResponseEntity<TravelRecordResponse<TravelRecordListResponse>> findAll(
             @RequestHeader("X-Member-Id") Long memberId,
             @RequestParam(required = false) String countryCode,
             @RequestParam(required = false) String provinceCode,
@@ -44,8 +47,16 @@ public class TravelRecordController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        Page<TravelRecord> travelRecords = travelRecordService.findAll(memberId, countryCode, provinceCode, districtCode, page, size);
+        Page<TravelRecord> travelRecords = travelRecordService.findAll(
+                memberId,
+                countryCode,
+                provinceCode,
+                districtCode,
+                page,
+                size
+        );
+        TravelRecordListResponse response = TravelRecordListResponse.from(travelRecords);
 
-        return ResponseEntity.ok(TravelRecordListResponse.from(travelRecords));
+        return ResponseEntity.ok(TravelRecordResponse.of(response));
     }
 }

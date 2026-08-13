@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
+import com.mapmory.backend.travelrecord.dto.TravelRecordResponse;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -50,11 +51,13 @@ class TravelRecordControllerTest {
 
         when(travelRecordService.create(10L, request)).thenReturn(travelRecord);
 
-        ResponseEntity<CreateTravelRecordResponse> response =
+        ResponseEntity<TravelRecordResponse<CreateTravelRecordResponse>> response =
                 travelRecordController.create(10L, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).isEqualTo(new CreateTravelRecordResponse(1L));
+        assertThat(response.getBody()).isEqualTo(
+                TravelRecordResponse.of(new CreateTravelRecordResponse(1L))
+        );
         verify(travelRecordService).create(10L, request);
     }
 }
