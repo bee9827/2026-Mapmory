@@ -204,6 +204,66 @@ class TravelRecordServiceTest {
     }
 
     @Test
+    void rejectsDistrictThatDoesNotExist() {
+        Region korea = mock(Region.class);
+        Region jeju = mock(Region.class);
+
+        when(korea.getId()).thenReturn(1L);
+        when(jeju.getId()).thenReturn(2L);
+        when(regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(
+                RegionType.COUNTRY,
+                "KR"
+        )).thenReturn(Optional.of(korea));
+        when(regionRepository.findByParentIdAndRegionTypeAndRegionCode(
+                1L,
+                RegionType.PROVINCE,
+                "49"
+        )).thenReturn(Optional.of(jeju));
+        when(regionRepository.findByParentIdAndRegionTypeAndRegionCode(
+                2L,
+                RegionType.DISTRICT,
+                "99999"
+        )).thenReturn(Optional.empty());
+        when(regionRepository.existsByRegionTypeAndRegionCode(RegionType.DISTRICT, "99999"))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, "KR", "49", "99999", 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("REGION_NOT_FOUND");
+    }
+
+    @Test
+    void rejectsDistrictOutsideSelectedProvince() {
+        Region korea = mock(Region.class);
+        Region jeju = mock(Region.class);
+
+        when(korea.getId()).thenReturn(1L);
+        when(jeju.getId()).thenReturn(2L);
+        when(regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(
+                RegionType.COUNTRY,
+                "KR"
+        )).thenReturn(Optional.of(korea));
+        when(regionRepository.findByParentIdAndRegionTypeAndRegionCode(
+                1L,
+                RegionType.PROVINCE,
+                "49"
+        )).thenReturn(Optional.of(jeju));
+        when(regionRepository.findByParentIdAndRegionTypeAndRegionCode(
+                2L,
+                RegionType.DISTRICT,
+                "11110"
+        )).thenReturn(Optional.empty());
+        when(regionRepository.existsByRegionTypeAndRegionCode(RegionType.DISTRICT, "11110"))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, "KR", "49", "11110", 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("INVALID_REGION_HIERARCHY");
+    }
+
+    @Test
     void findsTravelRecordsByCountry() {
         Region korea = mock(Region.class);
 
