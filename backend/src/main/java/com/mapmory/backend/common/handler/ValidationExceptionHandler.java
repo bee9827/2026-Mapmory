@@ -15,9 +15,11 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @Order(Ordered.HIGHEST_PRECEDENCE + 1)
 @RestControllerAdvice
@@ -79,6 +81,28 @@ public class ValidationExceptionHandler {
                 ))
                 .toList();
         return problemDetailFactory.validation(errors, request);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<ProblemDetail> handleMissingRequestHeader(
+            MissingRequestHeaderException exception,
+            HttpServletRequest request
+    ) {
+        return problemDetailFactory.validation(
+                List.of(new FieldErrorDetail(exception.getHeaderName(), "필수 요청 헤더입니다.")),
+                request
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleRequestValueTypeMismatch(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request
+    ) {
+        return problemDetailFactory.validation(
+                List.of(new FieldErrorDetail(exception.getName(), "값의 형식이 올바르지 않습니다.")),
+                request
+        );
     }
 
     private static FieldErrorDetail toFieldErrorDetail(FieldError error) {
