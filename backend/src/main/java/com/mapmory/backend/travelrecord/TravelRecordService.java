@@ -54,6 +54,7 @@ public class TravelRecordService {
 
         List<String> objectKeys = request.objectKeys() == null ? List.of() : request.objectKeys();
 
+        // TODO : save or saveAll 결정하고 적용하기
         for (int index = 0; index < objectKeys.size(); index++) {
             RecordMedia recordMedia = RecordMedia.of(
                     savedTravelRecord,
