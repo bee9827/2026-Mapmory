@@ -9,13 +9,14 @@ import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
 
-    private static final String DEFAULT_NAME = "회원";
+    private static final String DEFAULT_NAME_PREFIX = "회원";
 
     private final KakaoApiClient kakaoApiClient;
     private final MemberRepository memberRepository;
@@ -57,7 +58,8 @@ public class AuthService {
 
     private String resolveName(String nickname) {
         if (nickname == null || nickname.isBlank()) {
-            return DEFAULT_NAME;
+            // 닉네임 미동의 시 구분 가능한 기본 이름을 부여한다. (예: 회원58213)
+            return DEFAULT_NAME_PREFIX + ThreadLocalRandom.current().nextInt(10_000, 100_000);
         }
         return nickname;
     }
