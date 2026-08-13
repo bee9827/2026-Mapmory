@@ -4,6 +4,7 @@ import com.mapmory.backend.auth.dto.LoginResponse;
 import com.mapmory.backend.auth.jwt.JwtProvider;
 import com.mapmory.backend.auth.kakao.KakaoApiClient;
 import com.mapmory.backend.auth.kakao.KakaoUserResponse;
+import com.mapmory.backend.auth.refresh.RefreshTokenService;
 import com.mapmory.backend.member.AuthProvider;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
@@ -21,15 +22,18 @@ public class AuthService {
     private final KakaoApiClient kakaoApiClient;
     private final MemberRepository memberRepository;
     private final JwtProvider jwtProvider;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthService(
             KakaoApiClient kakaoApiClient,
             MemberRepository memberRepository,
-            JwtProvider jwtProvider
+            JwtProvider jwtProvider,
+            RefreshTokenService refreshTokenService
     ) {
         this.kakaoApiClient = kakaoApiClient;
         this.memberRepository = memberRepository;
         this.jwtProvider = jwtProvider;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Transactional
@@ -43,7 +47,8 @@ public class AuthService {
         Member member = existing.orElseGet(() -> register(providerId, kakaoUser.nickname()));
 
         String accessToken = jwtProvider.issueAccessToken(member.getId());
-        return new LoginResponse(accessToken, isNewMember);
+        String refreshToken = refreshTokenService.issue(member);
+        return new LoginResponse(accessToken, refreshToken, isNewMember);
     }
 
     private Member register(String providerId, String nickname) {
