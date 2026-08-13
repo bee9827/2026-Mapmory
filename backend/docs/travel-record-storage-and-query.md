@@ -119,6 +119,25 @@ GET /api/v1/travel-records?countryCode=KR&provinceCode=49&districtCode=50110
 | 시도 | `PROVINCE` | `region.id = provinceId OR region.parent.id = provinceId` |
 | 시군구 | `DISTRICT` | `region.id = districtId` |
 
+### 요청 검증과 예외 처리
+
+목록 조회는 Repository 호출 전에 다음 조건을 검증한다.
+
+| 조건 | 응답 |
+| --- | --- |
+| `X-Member-Id` 누락·형식 오류·0 이하 | `400 VALIDATION_ERROR` |
+| 회원이 존재하지 않음 | `404 MEMBER_NOT_FOUND` |
+| `provinceCode`에 `countryCode`가 없음 | `400 REGION_REQUIRED` |
+| `districtCode`에 `countryCode` 또는 `provinceCode`가 없음 | `400 REGION_REQUIRED` |
+| 지역 코드 형식 오류, `page < 0`, `size`가 1 미만 또는 100 초과 | `400 VALIDATION_ERROR` |
+| 국가 코드가 존재하지 않음 | `404 COUNTRY_NOT_FOUND` |
+| 시도 또는 시군구 코드가 존재하지 않음 | `404 REGION_NOT_FOUND` |
+| 요청한 시도·시군구가 선택한 상위 Region의 직계 자식이 아님 | `400 INVALID_REGION_HIERARCHY` |
+
+지역 경로 탐색과 계층 예외 변환은 `RegionResolver`가 담당한다. 시도·시군구의 소속 관계는 코드 접두사가 아닌 `parent_id`로 확인한다.
+
+조건에 맞는 여행 기록이 없으면 오류 없이 `200 OK`와 빈 목록을 반환한다.
+
 ### 국가 필터 예시
 
 대한민국 ID가 `1`이고 제주시의 `root_id`가 `1`이면, 다음 두 종류가 대한민국 목록에 포함된다.
