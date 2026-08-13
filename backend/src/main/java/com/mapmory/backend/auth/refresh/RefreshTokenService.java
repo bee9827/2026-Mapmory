@@ -28,11 +28,17 @@ public class RefreshTokenService {
     private static final int RAW_TOKEN_BYTES = 32;
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenReuseDetector refreshTokenReuseDetector;
     private final Duration refreshTokenValidity;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    public RefreshTokenService(RefreshTokenRepository refreshTokenRepository, JwtProperties jwtProperties) {
+    public RefreshTokenService(
+            RefreshTokenRepository refreshTokenRepository,
+            RefreshTokenReuseDetector refreshTokenReuseDetector,
+            JwtProperties jwtProperties
+    ) {
         this.refreshTokenRepository = refreshTokenRepository;
+        this.refreshTokenReuseDetector = refreshTokenReuseDetector;
         this.refreshTokenValidity = jwtProperties.refreshTokenValidity();
     }
 
@@ -55,7 +61,8 @@ public class RefreshTokenService {
         LocalDateTime now = LocalDateTime.now();
         if (refreshToken.isRevoked()) {
             // 이미 폐기된 토큰의 재사용 → 탈취로 간주하고 회원의 유효 토큰을 모두 폐기한다.
-            refreshTokenRepository.revokeAllActiveByMember(refreshToken.getMember(), now);
+            // 폐기는 별도 트랜잭션에서 커밋해야 아래 예외로 롤백되지 않는다.
+            refreshTokenReuseDetector.revokeAllActiveTokens(refreshToken.getMember(), now);
             throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
         if (refreshToken.isExpired(now)) {
