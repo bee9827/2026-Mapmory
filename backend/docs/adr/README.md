@@ -14,3 +14,4 @@ Mapmory 백엔드의 주요 설계 결정을 기록한다.
 | [0008](0008-unify-country-and-location-as-region.md) | 국가와 행정구역을 Region 계층으로 통합 | 채택 |
 | [0009](0009-authentication-with-spring-security-and-jwt.md) | 인증·인가에 Spring Security와 자체 JWT 사용 | 채택 |
 | [0010](0010-social-login-and-member-identifier.md) | 소셜 로그인(카카오 토큰 검증)과 회원 식별자 분리 | 채택 |
+| [0011](0011-refresh-token-rotation.md) | refresh 토큰 해시 저장·회전·폐기와 재사용 감지 | 채택 |
