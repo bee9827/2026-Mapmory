@@ -145,6 +145,19 @@ class TravelRecordServiceTest {
     }
 
     @Test
+    void rejectsNonexistentCountryCode() {
+        when(regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(
+                RegionType.COUNTRY,
+                "ZZ"
+        )).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, "ZZ", null, null, 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("COUNTRY_NOT_FOUND");
+    }
+
+    @Test
     void findsTravelRecordsByCountry() {
         Region korea = mock(Region.class);
 

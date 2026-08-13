@@ -16,6 +16,12 @@ public enum TravelRecordErrorCode implements ErrorCode {
             "VALIDATION_ERROR",
             "요청 값이 올바르지 않습니다.",
             "지역 코드 형식이 올바르지 않습니다."
+    ),
+    COUNTRY_NOT_FOUND(
+            ErrorKind.NOT_FOUND,
+            "COUNTRY_NOT_FOUND",
+            "국가를 찾을 수 없습니다.",
+            "요청한 국가 코드에 해당하는 국가가 없습니다."
     );
 
     private final ErrorKind kind;

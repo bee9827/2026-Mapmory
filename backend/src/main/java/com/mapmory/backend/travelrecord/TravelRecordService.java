@@ -162,7 +162,7 @@ public class TravelRecordService {
         return regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(
                 RegionType.COUNTRY,
                 countryCode
-        ).orElseThrow();
+        ).orElseThrow(() -> new BusinessException(TravelRecordErrorCode.COUNTRY_NOT_FOUND));
     }
 
     private Region findProvince(Region country, String provinceCode) {
