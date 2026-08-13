@@ -39,9 +39,11 @@ public class ProblemResponseWriter {
                 .from(status, errorCode, errorCode.detail(), request)
                 .getBody();
 
+        // getOutputStream + UTF-8 바이트로 직접 기록해, 앱의 나머지 오류 응답과 동일하게
+        // charset 파라미터 없는 application/problem+json 을 유지한다.
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-        response.getWriter().write(jsonMapper.writeValueAsString(body));
+        response.getOutputStream()
+                .write(jsonMapper.writeValueAsString(body).getBytes(StandardCharsets.UTF_8));
     }
 }
