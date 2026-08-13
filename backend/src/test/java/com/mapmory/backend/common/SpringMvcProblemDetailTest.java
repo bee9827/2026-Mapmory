@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
         controllers = SpringMvcProblemDetailTest.MethodRestrictedController.class,
         properties = "spring.mvc.problemdetails.enabled=true"
 )
-@Import({ProblemDetailFactory.class, SpringMvcProblemDetailTest.MethodRestrictedController.class})
+@Import({ProblemDetailFactory.class})
 class SpringMvcProblemDetailTest {
 
     @Autowired

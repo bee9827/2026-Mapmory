@@ -2,23 +2,26 @@ package com.mapmory.backend.travelrecord;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionRepository;
 import com.mapmory.backend.region.RegionType;
+import com.mapmory.backend.support.MySqlTestContainerConfig;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.transaction.annotation.Transactional;
 
-class TravelRecordRepositoryTest extends IntegrationTest {
+@DataJpaTest
+@Import(MySqlTestContainerConfig.class)
+class TravelRecordRepositoryTest {
 
     @Autowired
     private TravelRecordRepository travelRecordRepository;
@@ -33,7 +36,6 @@ class TravelRecordRepositoryTest extends IntegrationTest {
     private EntityManager entityManager;
 
     @Test
-    @Transactional
     void savesTravelRecord() {
         Member member = memberRepository.save(Member.of("테스터", UUID.randomUUID()));
         Region testCountry = regionRepository.save(
@@ -59,7 +61,6 @@ class TravelRecordRepositoryTest extends IntegrationTest {
     }
 
     @Test
-    @Transactional
     void findsTravelRecordsByMemberWithPagination() {
         Member member = memberRepository.save(
                 Member.of("테스터", UUID.randomUUID())
