@@ -13,7 +13,7 @@ public enum MemberErrorCode implements ErrorCode {
 
     @Override
     public String code() {
-        return null;
+        return name();
     }
 
     @Override
