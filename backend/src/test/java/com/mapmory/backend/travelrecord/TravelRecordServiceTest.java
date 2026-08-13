@@ -1,6 +1,7 @@
 package com.mapmory.backend.travelrecord;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
+import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionRepository;
 import com.mapmory.backend.region.RegionType;
@@ -108,6 +110,22 @@ class TravelRecordServiceTest {
 
         assertThat(pageable.getPageNumber()).isZero();
         assertThat(pageable.getPageSize()).isEqualTo(20);
+    }
+
+    @Test
+    void rejectsProvinceFilterWithoutCountryFilter() {
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, null, "49", null, 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("REGION_REQUIRED");
+    }
+
+    @Test
+    void rejectsDistrictFilterWithoutProvinceFilter() {
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, "KR", null, "50110", 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("REGION_REQUIRED");
     }
 
     @Test
