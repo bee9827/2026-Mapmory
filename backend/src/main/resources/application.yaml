@@ -25,6 +25,9 @@ jwt:
   # 서명 키(jwt.secret)는 프로파일별로 주입한다. (local: application-local, prod: 환경변수)
   access-token-validity: PT30M
 
+kakao:
+  user-info-uri: https://kapi.kakao.com/v2/user/me
+
 server:
   port: 8080
   servlet:

@@ -19,6 +19,11 @@ public enum AuthErrorCode implements ErrorCode {
             ErrorKind.ACCESS_DENIED,
             "접근 권한이 없습니다.",
             "요청한 리소스에 접근할 권한이 없습니다."
+    ),
+    INVALID_KAKAO_TOKEN(
+            ErrorKind.AUTHENTICATION_REQUIRED,
+            "카카오 인증에 실패했습니다.",
+            "카카오 access token이 유효하지 않습니다."
     );
 
     private final ErrorKind kind;
