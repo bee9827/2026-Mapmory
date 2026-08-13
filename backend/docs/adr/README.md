@@ -12,3 +12,4 @@ Mapmory 백엔드의 주요 설계 결정을 기록한다.
 | [0006](0006-use-problem-details-for-api-errors.md) | API 오류 응답에 Problem Details 사용 | 채택 |
 | [0007](0007-travel-record-country-and-location.md) | 여행 기록의 국가와 세부 지역 저장 방식 | 대체됨 (ADR 0008) |
 | [0008](0008-unify-country-and-location-as-region.md) | 국가와 행정구역을 Region 계층으로 통합 | 채택 |
+| [0009](0009-authentication-with-spring-security-and-jwt.md) | 인증·인가에 Spring Security와 자체 JWT 사용 | 채택 |
