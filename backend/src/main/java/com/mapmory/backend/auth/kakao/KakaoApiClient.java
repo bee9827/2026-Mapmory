@@ -21,8 +21,8 @@ public class KakaoApiClient {
     private final RestClient restClient;
     private final String userInfoUri;
 
-    public KakaoApiClient(RestClient.Builder restClientBuilder, KakaoProperties kakaoProperties) {
-        this.restClient = restClientBuilder.build();
+    public KakaoApiClient(KakaoProperties kakaoProperties) {
+        this.restClient = RestClient.create();
         this.userInfoUri = kakaoProperties.userInfoUri();
     }
 
