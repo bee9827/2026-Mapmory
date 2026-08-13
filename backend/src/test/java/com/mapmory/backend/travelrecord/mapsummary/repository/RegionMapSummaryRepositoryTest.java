@@ -7,7 +7,6 @@ import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.support.MySqlTestContainerConfig;
 import com.mapmory.backend.travelrecord.TravelRecord;
-import com.mapmory.backend.travelrecord.TravelRecordRepository;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.List;
@@ -22,14 +21,14 @@ import org.springframework.context.annotation.Import;
 
 @DataJpaTest
 @Import(MySqlTestContainerConfig.class)
-@DisplayName("여행 기록 Repository")
-class TravelRecordRepositoryTest {
+@DisplayName("지역 지도 요약 Repository")
+class RegionMapSummaryRepositoryTest {
 
     @Autowired
     private EntityManager entityManager;
 
     @Autowired
-    private TravelRecordRepository travelRecordRepository;
+    private RegionMapSummaryRepository regionMapSummaryRepository;
 
     @Nested
     @DisplayName("루트 지역별 지도 요약을 조회할 때")
@@ -184,7 +183,7 @@ class TravelRecordRepositoryTest {
         if (parent != null) {
             parentRegionId = parent.id();
         }
-        return travelRecordRepository.findRegionMapSummaries(member.getId(), parentRegionId);
+        return regionMapSummaryRepository.findRegionMapSummaries(member.getId(), parentRegionId);
     }
 
     private void assertSummaries(

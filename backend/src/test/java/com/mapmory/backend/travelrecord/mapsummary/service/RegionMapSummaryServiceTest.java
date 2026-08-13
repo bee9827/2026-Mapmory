@@ -12,10 +12,10 @@ import com.mapmory.backend.member.MemberRepository;
 import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.region.exception.RegionErrorCode;
 import com.mapmory.backend.region.RegionRepository;
-import com.mapmory.backend.travelrecord.TravelRecordRepository;
 import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
 import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
 import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryQueryResult;
+import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryRepository;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -37,7 +37,7 @@ class RegionMapSummaryServiceTest {
     private RegionRepository regionRepository;
 
     @Mock
-    private TravelRecordRepository travelRecordRepository;
+    private RegionMapSummaryRepository regionMapSummaryRepository;
 
     private final LevelPolicy levelPolicy = LevelPolicy.standard();
 
@@ -50,7 +50,7 @@ class RegionMapSummaryServiceTest {
         void returnsRootCountrySummaries() {
             RegionMapSummaryService service = service();
             when(memberRepository.existsById(10L)).thenReturn(true);
-            when(travelRecordRepository.findRegionMapSummaries(10L, null))
+            when(regionMapSummaryRepository.findRegionMapSummaries(10L, null))
                     .thenReturn(List.of(result(1L, "KR", "대한민국", "COUNTRY", 3L)));
 
             List<RegionMapSummaryResponse> responses = service.getSummaries(10L, null);
@@ -82,7 +82,7 @@ class RegionMapSummaryServiceTest {
             RegionMapSummaryService service = service();
             when(memberRepository.existsById(10L)).thenReturn(true);
             when(regionRepository.existsById(parentRegionId)).thenReturn(true);
-            when(travelRecordRepository.findRegionMapSummaries(10L, parentRegionId))
+            when(regionMapSummaryRepository.findRegionMapSummaries(10L, parentRegionId))
                     .thenReturn(List.of(result(childRegionId, regionCode, name, regionType, 1L)));
 
             List<RegionMapSummaryResponse> responses = service.getSummaries(10L, parentRegionId);
@@ -107,7 +107,7 @@ class RegionMapSummaryServiceTest {
                     .isInstanceOfSatisfying(BusinessException.class, exception ->
                             assertThat(exception.getErrorCode()).isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND));
             verify(regionRepository, never()).existsById(1L);
-            verify(travelRecordRepository, never()).findRegionMapSummaries(999L, 1L);
+            verify(regionMapSummaryRepository, never()).findRegionMapSummaries(999L, 1L);
         }
 
         @Test
@@ -120,7 +120,7 @@ class RegionMapSummaryServiceTest {
             assertThatThrownBy(() -> service.getSummaries(10L, 999L))
                     .isInstanceOfSatisfying(BusinessException.class, exception ->
                             assertThat(exception.getErrorCode()).isEqualTo(RegionErrorCode.REGION_NOT_FOUND));
-            verify(travelRecordRepository, never()).findRegionMapSummaries(10L, 999L);
+            verify(regionMapSummaryRepository, never()).findRegionMapSummaries(10L, 999L);
         }
     }
 
@@ -128,7 +128,7 @@ class RegionMapSummaryServiceTest {
         return new RegionMapSummaryService(
                 memberRepository,
                 regionRepository,
-                travelRecordRepository,
+                regionMapSummaryRepository,
                 levelPolicy
         );
     }

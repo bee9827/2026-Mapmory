@@ -5,9 +5,9 @@ import com.mapmory.backend.member.exception.MemberErrorCode;
 import com.mapmory.backend.member.MemberRepository;
 import com.mapmory.backend.region.exception.RegionErrorCode;
 import com.mapmory.backend.region.RegionRepository;
-import com.mapmory.backend.travelrecord.TravelRecordRepository;
 import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
 import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
+import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,18 +17,18 @@ public class RegionMapSummaryService {
 
     private final MemberRepository memberRepository;
     private final RegionRepository regionRepository;
-    private final TravelRecordRepository travelRecordRepository;
+    private final RegionMapSummaryRepository regionMapSummaryRepository;
     private final LevelPolicy levelPolicy;
 
     public RegionMapSummaryService(
             MemberRepository memberRepository,
             RegionRepository regionRepository,
-            TravelRecordRepository travelRecordRepository,
+            RegionMapSummaryRepository regionMapSummaryRepository,
             LevelPolicy levelPolicy
     ) {
         this.memberRepository = memberRepository;
         this.regionRepository = regionRepository;
-        this.travelRecordRepository = travelRecordRepository;
+        this.regionMapSummaryRepository = regionMapSummaryRepository;
         this.levelPolicy = levelPolicy;
     }
 
@@ -36,7 +36,7 @@ public class RegionMapSummaryService {
     public List<RegionMapSummaryResponse> getSummaries(Long memberId, Long parentRegionId) {
         validateMember(memberId);
         validateParentRegion(parentRegionId);
-        return travelRecordRepository.findRegionMapSummaries(memberId, parentRegionId).stream()
+        return regionMapSummaryRepository.findRegionMapSummaries(memberId, parentRegionId).stream()
                 .map(result -> RegionMapSummaryResponse.from(result, levelPolicy))
                 .toList();
     }
