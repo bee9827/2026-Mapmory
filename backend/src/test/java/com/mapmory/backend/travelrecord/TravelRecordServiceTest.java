@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -18,6 +19,7 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -43,6 +45,11 @@ class TravelRecordServiceTest {
 
     @InjectMocks
     private TravelRecordService travelRecordService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(memberRepository.existsById(10L)).thenReturn(true);
+    }
 
     @Test
     void createsCountryTravelRecord() {
@@ -282,6 +289,16 @@ class TravelRecordServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
                 .isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
+    void rejectsNonexistentMember() {
+        when(memberRepository.existsById(10L)).thenReturn(false);
+
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, null, null, null, 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("MEMBER_NOT_FOUND");
     }
 
     @Test

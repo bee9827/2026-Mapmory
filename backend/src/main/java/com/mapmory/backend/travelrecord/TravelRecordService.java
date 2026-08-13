@@ -77,6 +77,7 @@ public class TravelRecordService {
         validateRegionCodeFormat(countryCode, provinceCode, districtCode);
         validateRegionFilterHierarchy(countryCode, provinceCode, districtCode);
         validatePagination(page, size);
+        validateMemberExists(memberId);
         Pageable pageable = createPageable(page, size);
 
         if (countryCode == null) {
@@ -148,6 +149,12 @@ public class TravelRecordService {
                     TravelRecordErrorCode.INVALID_PAGINATION,
                     "page는 0 이상이고 size는 1 이상 %d 이하여야 합니다.".formatted(MAX_PAGE_SIZE)
             );
+        }
+    }
+
+    private void validateMemberExists(Long memberId) {
+        if (!memberRepository.existsById(memberId)) {
+            throw new BusinessException(TravelRecordErrorCode.MEMBER_NOT_FOUND);
         }
     }
 
