@@ -34,6 +34,12 @@ public enum TravelRecordErrorCode implements ErrorCode {
             "INVALID_REGION_HIERARCHY",
             "지역 계층이 올바르지 않습니다.",
             "요청한 지역은 선택한 상위 지역에 속하지 않습니다."
+    ),
+    INVALID_PAGINATION(
+            ErrorKind.INVALID_INPUT,
+            "VALIDATION_ERROR",
+            "요청 값이 올바르지 않습니다.",
+            "페이지 번호 또는 페이지 크기가 올바르지 않습니다."
     );
 
     private final ErrorKind kind;

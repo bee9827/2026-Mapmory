@@ -264,6 +264,27 @@ class TravelRecordServiceTest {
     }
 
     @Test
+    void rejectsNegativePage() {
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, null, null, null, -1, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
+    void rejectsPageSizeOutsideAllowedRange() {
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, null, null, null, 0, 0))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("VALIDATION_ERROR");
+
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, null, null, null, 0, 101))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
     void findsTravelRecordsByCountry() {
         Region korea = mock(Region.class);
 

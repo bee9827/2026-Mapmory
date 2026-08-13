@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TravelRecordService {
 
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final TravelRecordRepository travelRecordRepository;
     private final RegionRepository regionRepository;
     private final MemberRepository memberRepository;
@@ -74,6 +76,7 @@ public class TravelRecordService {
     public Page<TravelRecord> findAll(Long memberId, String countryCode, String provinceCode, String districtCode, int page, int size) {
         validateRegionCodeFormat(countryCode, provinceCode, districtCode);
         validateRegionFilterHierarchy(countryCode, provinceCode, districtCode);
+        validatePagination(page, size);
         Pageable pageable = createPageable(page, size);
 
         if (countryCode == null) {
@@ -137,6 +140,15 @@ public class TravelRecordService {
 
     private boolean isBlank(String value) {
         return value != null && value.isBlank();
+    }
+
+    private void validatePagination(int page, int size) {
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new BusinessException(
+                    TravelRecordErrorCode.INVALID_PAGINATION,
+                    "page는 0 이상이고 size는 1 이상 %d 이하여야 합니다.".formatted(MAX_PAGE_SIZE)
+            );
+        }
     }
 
     private Pageable createPageable(int page, int size) {
