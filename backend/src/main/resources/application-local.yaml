@@ -1,4 +1,8 @@
 spring:
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/local-migration
   datasource:
     url: jdbc:mysql://localhost:3306/mapmory?serverTimezone=UTC&characterEncoding=UTF-8
     username: root
