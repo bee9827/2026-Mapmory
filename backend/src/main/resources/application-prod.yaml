@@ -8,6 +8,9 @@ spring:
       maximum-pool-size: 10
       connection-timeout: 3000
 
+jwt:
+  secret: ${JWT_SECRET}
+
 logging:
   level:
     org.hibernate.SQL: warn
