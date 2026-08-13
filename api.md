@@ -239,8 +239,8 @@
 | `countryCode` | 아니요 | 선택 국가 자체와 `root_id`가 해당 국가인 모든 하위 Region 기록 |
 | `provinceCode` | 아니요 | 선택 시도 자체와 `parent_id`가 해당 시도인 시·군·구 기록. `countryCode` 필수 |
 | `districtCode` | 아니요 | 선택 시·군·구에 직접 저장된 기록. `countryCode`, `provinceCode` 필수 |
-| `page` | 아니요 | 기본값 `0` |
-| `size` | 아니요 | 기본값 `20` |
+| `page` | 아니요 | 기본값 `0`, 0 이상 |
+| `size` | 아니요 | 기본값 `20`, 1 이상 100 이하 |
 
 #### 조회 예시
 
@@ -282,7 +282,22 @@ GET /api/v1/travel-records?countryCode=KR&provinceCode=49&districtCode=50110
 }
 ```
 
-목록에는 본문과 전체 미디어 목록을 포함하지 않는다. `thumbnailUrl` 필드는 후속 구현을 위해 포함했으며 현재는 `null`을 반환한다. `keyword` 검색과 페이지 크기 최대값 검증은 아직 구현하지 않았다.
+목록에는 본문과 전체 미디어 목록을 포함하지 않는다. `thumbnailUrl` 필드는 후속 구현을 위해 포함했으며 현재는 `null`을 반환한다.
+
+#### 검증 및 오류 응답
+
+`X-Member-Id` 헤더는 필수이며 양의 정수여야 한다. 헤더 누락·형식 오류·0 이하 값은 `400 VALIDATION_ERROR`를 반환한다.
+
+| 상태 | `code` | 조건 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | 지역 코드 형식이 올바르지 않음, `page < 0`, `size`가 1 미만 또는 100 초과 |
+| `400` | `REGION_REQUIRED` | `provinceCode`에 `countryCode`가 없거나, `districtCode`에 `countryCode` 또는 `provinceCode`가 없음 |
+| `404` | `MEMBER_NOT_FOUND` | `X-Member-Id`에 해당하는 회원이 없음 |
+| `404` | `COUNTRY_NOT_FOUND` | `countryCode`에 해당하는 국가가 없음 |
+| `404` | `REGION_NOT_FOUND` | 요청한 시도 또는 시군구 코드가 없음 |
+| `400` | `INVALID_REGION_HIERARCHY` | 시도가 선택 국가의 직계 자식이 아니거나, 시군구가 선택 시도의 직계 자식이 아님 |
+
+조건에 맞는 기록이 없는 경우는 오류가 아니며 `200 OK`와 빈 `items`를 반환한다.
 
 ### 여행 기록 상세 조회
 
