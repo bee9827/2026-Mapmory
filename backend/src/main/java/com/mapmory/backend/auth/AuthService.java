@@ -1,6 +1,7 @@
 package com.mapmory.backend.auth;
 
 import com.mapmory.backend.auth.dto.LoginResponse;
+import com.mapmory.backend.auth.dto.TokenResponse;
 import com.mapmory.backend.auth.jwt.JwtProvider;
 import com.mapmory.backend.auth.kakao.KakaoApiClient;
 import com.mapmory.backend.auth.kakao.KakaoUserResponse;
@@ -49,6 +50,19 @@ public class AuthService {
         String accessToken = jwtProvider.issueAccessToken(member.getId());
         String refreshToken = refreshTokenService.issue(member);
         return new LoginResponse(accessToken, refreshToken, isNewMember);
+    }
+
+    @Transactional
+    public TokenResponse refresh(String refreshToken) {
+        Member member = refreshTokenService.validateAndRevoke(refreshToken);
+        String accessToken = jwtProvider.issueAccessToken(member.getId());
+        String newRefreshToken = refreshTokenService.issue(member);
+        return new TokenResponse(accessToken, newRefreshToken);
+    }
+
+    @Transactional
+    public void logout(String refreshToken) {
+        refreshTokenService.revoke(refreshToken);
     }
 
     private Member register(String providerId, String nickname) {
