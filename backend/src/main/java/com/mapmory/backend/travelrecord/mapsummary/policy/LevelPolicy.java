@@ -1,27 +1,27 @@
 package com.mapmory.backend.travelrecord.mapsummary.policy;
 
-public record LevelPolicy(long lowMaxRecordCount, long mediumMaxRecordCount) {
+public record LevelPolicy(long lowMaxRecordCount, long middleMaxRecordCount) {
 
     private static final long NO_RECORD_COUNT = 0;
     private static final long MINIMUM_LOW_MAX_RECORD_COUNT = 1;
     private static final long DEFAULT_LOW_MAX_RECORD_COUNT = 2;
-    private static final long DEFAULT_MEDIUM_MAX_RECORD_COUNT = 5;
+    private static final long DEFAULT_MIDDLE_MAX_RECORD_COUNT = 5;
 
     public LevelPolicy {
         if (lowMaxRecordCount < MINIMUM_LOW_MAX_RECORD_COUNT) {
             throw new IllegalArgumentException("lowMaxRecordCount는 1 이상이어야 합니다.");
         }
-        if (mediumMaxRecordCount <= lowMaxRecordCount) {
-            throw new IllegalArgumentException("mediumMaxRecordCount는 lowMaxRecordCount보다 커야 합니다.");
+        if (middleMaxRecordCount <= lowMaxRecordCount) {
+            throw new IllegalArgumentException("middleMaxRecordCount는 lowMaxRecordCount보다 커야 합니다.");
         }
     }
 
-    public static LevelPolicy of(long lowMaxRecordCount, long mediumMaxRecordCount) {
-        return new LevelPolicy(lowMaxRecordCount, mediumMaxRecordCount);
+    public static LevelPolicy of(long lowMaxRecordCount, long middleMaxRecordCount) {
+        return new LevelPolicy(lowMaxRecordCount, middleMaxRecordCount);
     }
 
     public static LevelPolicy standard() {
-        return LevelPolicy.of(DEFAULT_LOW_MAX_RECORD_COUNT, DEFAULT_MEDIUM_MAX_RECORD_COUNT);
+        return LevelPolicy.of(DEFAULT_LOW_MAX_RECORD_COUNT, DEFAULT_MIDDLE_MAX_RECORD_COUNT);
     }
 
     public MapColorLevel levelFor(long count) {
@@ -34,8 +34,8 @@ public record LevelPolicy(long lowMaxRecordCount, long mediumMaxRecordCount) {
         if (count <= lowMaxRecordCount) {
             return MapColorLevel.LOW;
         }
-        if (count <= mediumMaxRecordCount) {
-            return MapColorLevel.MEDIUM;
+        if (count <= middleMaxRecordCount) {
+            return MapColorLevel.MIDDLE;
         }
         return MapColorLevel.HIGH;
     }

@@ -278,7 +278,7 @@
 
 ## 5. 지도 요약 API
 
-지도 요약 응답에는 현재 회원의 기록이 있는 Region만 포함한다. 응답에 없는 Region은 앱에서 `count = 0`, `level = 0`으로 처리한다.
+지도 요약 응답에는 현재 회원의 기록이 있는 Region만 포함한다. 응답에 없는 Region은 앱에서 `count = 0`, `level = NONE`으로 처리한다.
 
 ### 루트 Region별 지도 색칠 정보 조회
 
@@ -295,7 +295,7 @@
       "regionType": "COUNTRY",
       "name": "대한민국",
       "count": 12,
-      "level": 3
+      "level": "HIGH"
     }
   ]
 }
@@ -308,10 +308,10 @@
 
 | 기록 수 | `level` |
 | ---: | --- |
-| `0` | `0` |
-| `1~2` | `1` |
-| `3~5` | `2` |
-| `6 이상` | `3` |
+| `0` | `NONE` |
+| `1~2` | `LOW` |
+| `3~5` | `MIDDLE` |
+| `6 이상` | `HIGH` |
 
 ### 직속 하위 Region별 지도 색칠 정보 조회
 
@@ -337,7 +337,7 @@ X-Member-Id: 10
       "regionType": "PROVINCE",
       "name": "제주특별자치도",
       "count": 5,
-      "level": 2
+      "level": "MIDDLE"
     }
   ]
 }

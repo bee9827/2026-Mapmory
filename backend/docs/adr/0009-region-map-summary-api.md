@@ -20,8 +20,8 @@
 - `GET /api/v1/travel-records/map-summary/regions/{regionId}/children`은 특정 Region의 기록이 있는 직속 자식 요약을 반환한다.
 - 응답은 후속 요청용 `regionId`와 로컬 지도 매칭용 `code`를 함께 제공한다.
 - 클라이언트는 `regionId`를 행정 코드처럼 영구 저장하지 않고 API 탐색에만 사용한다.
-- 기록이 없는 Region은 응답에서 제외하고 클라이언트가 `count = 0`, `level = 0`으로 처리한다.
-- 서버 내부에서는 색상 단계를 `NONE`, `LOW`, `MEDIUM`, `HIGH` enum으로 계산하고 API에서는 `0`부터 `3`까지의 숫자로 표현한다.
+- 기록이 없는 Region은 응답에서 제외하고 클라이언트가 `count = 0`, `level = NONE`으로 처리한다.
+- 색상 단계는 의미가 드러나는 `NONE`, `LOW`, `MIDDLE`, `HIGH` 문자열로 표현한다.
 - 각 결과 Region은 자신과 모든 하위 Region의 기록을 포함한다.
 
 ## 조회 방식

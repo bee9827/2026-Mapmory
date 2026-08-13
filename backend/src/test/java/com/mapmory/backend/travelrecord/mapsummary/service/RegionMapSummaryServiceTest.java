@@ -14,6 +14,7 @@ import com.mapmory.backend.region.exception.RegionErrorCode;
 import com.mapmory.backend.region.RegionRepository;
 import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
 import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
+import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
 import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryQueryResult;
 import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryRepository;
 import java.util.List;
@@ -61,7 +62,7 @@ class RegionMapSummaryServiceTest {
                     RegionType.COUNTRY,
                     "대한민국",
                     3L,
-                    2
+                    MapColorLevel.MIDDLE
             ));
             verify(regionRepository, never()).existsById(org.mockito.ArgumentMatchers.anyLong());
         }
@@ -93,7 +94,7 @@ class RegionMapSummaryServiceTest {
                     RegionType.valueOf(regionType),
                     name,
                     1L,
-                    1
+                    MapColorLevel.LOW
             ));
         }
 

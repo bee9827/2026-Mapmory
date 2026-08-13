@@ -7,8 +7,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.mapmory.backend.common.ProblemDetailFactory;
+import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.member.exception.MemberErrorCode;
 import com.mapmory.backend.region.RegionType;
+import com.mapmory.backend.region.exception.RegionErrorCode;
 import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
+import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
 import com.mapmory.backend.travelrecord.mapsummary.service.RegionMapSummaryService;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +40,7 @@ class RegionMapSummaryControllerTest {
     class GetRootSummaries {
 
         @Test
-        @DisplayName("회원의 루트 지역별 지도 요약을 숫자 단계와 함께 반환한다")
+        @DisplayName("회원의 루트 지역별 지도 요약을 의미 기반 단계와 함께 반환한다")
         void returnsRootSummaries() throws Exception {
             when(regionMapSummaryService.getSummaries(10L, null)).thenReturn(List.of(
                     new RegionMapSummaryResponse(
@@ -45,7 +49,7 @@ class RegionMapSummaryControllerTest {
                             RegionType.COUNTRY,
                             "대한민국",
                             3L,
-                            2
+                            MapColorLevel.MIDDLE
                     )
             ));
 
@@ -57,7 +61,7 @@ class RegionMapSummaryControllerTest {
                     .andExpect(jsonPath("$.data[0].regionType").value("COUNTRY"))
                     .andExpect(jsonPath("$.data[0].name").value("대한민국"))
                     .andExpect(jsonPath("$.data[0].count").value(3))
-                    .andExpect(jsonPath("$.data[0].level").value(2));
+                    .andExpect(jsonPath("$.data[0].level").value("MIDDLE"));
 
             verify(regionMapSummaryService).getSummaries(10L, null);
         }
@@ -89,6 +93,18 @@ class RegionMapSummaryControllerTest {
                     .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                     .andExpect(jsonPath("$.errors[0].field").value("X-Member-Id"));
         }
+
+        @Test
+        @DisplayName("회원을 찾을 수 없으면 MEMBER_NOT_FOUND를 반환한다")
+        void returnsMemberNotFound() throws Exception {
+            when(regionMapSummaryService.getSummaries(999L, null))
+                    .thenThrow(new BusinessException(MemberErrorCode.MEMBER_NOT_FOUND));
+
+            mockMvc.perform(get("/api/v1/travel-records/map-summary/regions/roots")
+                            .header("X-Member-Id", 999L))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("MEMBER_NOT_FOUND"));
+        }
     }
 
     @Nested
@@ -105,7 +121,7 @@ class RegionMapSummaryControllerTest {
                             RegionType.PROVINCE,
                             "제주특별자치도",
                             3L,
-                            2
+                            MapColorLevel.MIDDLE
                     )
             ));
 
@@ -116,7 +132,7 @@ class RegionMapSummaryControllerTest {
                     .andExpect(jsonPath("$.data[0].code").value("49"))
                     .andExpect(jsonPath("$.data[0].regionType").value("PROVINCE"))
                     .andExpect(jsonPath("$.data[0].count").value(3))
-                    .andExpect(jsonPath("$.data[0].level").value(2));
+                    .andExpect(jsonPath("$.data[0].level").value("MIDDLE"));
 
             verify(regionMapSummaryService).getSummaries(10L, 1L);
         }
@@ -128,6 +144,18 @@ class RegionMapSummaryControllerTest {
                             .header("X-Member-Id", 10L))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        }
+
+        @Test
+        @DisplayName("상위 지역을 찾을 수 없으면 REGION_NOT_FOUND를 반환한다")
+        void returnsRegionNotFound() throws Exception {
+            when(regionMapSummaryService.getSummaries(10L, 999L))
+                    .thenThrow(new BusinessException(RegionErrorCode.REGION_NOT_FOUND));
+
+            mockMvc.perform(get("/api/v1/travel-records/map-summary/regions/999/children")
+                            .header("X-Member-Id", 10L))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("REGION_NOT_FOUND"));
         }
     }
 }
