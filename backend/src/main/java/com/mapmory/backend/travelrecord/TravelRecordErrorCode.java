@@ -10,6 +10,12 @@ public enum TravelRecordErrorCode implements ErrorCode {
             "REGION_REQUIRED",
             "필수 지역 정보가 없습니다.",
             "하위 지역을 조회하려면 상위 지역 코드를 함께 입력해야 합니다."
+    ),
+    INVALID_REGION_CODE(
+            ErrorKind.INVALID_INPUT,
+            "VALIDATION_ERROR",
+            "요청 값이 올바르지 않습니다.",
+            "지역 코드 형식이 올바르지 않습니다."
     );
 
     private final ErrorKind kind;

@@ -129,6 +129,22 @@ class TravelRecordServiceTest {
     }
 
     @Test
+    void rejectsInvalidCountryCodeFormat() {
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, "kr", null, null, 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
+    void rejectsBlankRegionCode() {
+        assertThatThrownBy(() -> travelRecordService.findAll(10L, "KR", " ", null, 0, 20))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("VALIDATION_ERROR");
+    }
+
+    @Test
     void findsTravelRecordsByCountry() {
         Region korea = mock(Region.class);
 

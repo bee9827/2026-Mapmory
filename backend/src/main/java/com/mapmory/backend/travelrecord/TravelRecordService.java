@@ -72,6 +72,7 @@ public class TravelRecordService {
 
     @Transactional(readOnly = true)
     public Page<TravelRecord> findAll(Long memberId, String countryCode, String provinceCode, String districtCode, int page, int size) {
+        validateRegionCodeFormat(countryCode, provinceCode, districtCode);
         validateRegionFilterHierarchy(countryCode, provinceCode, districtCode);
         Pageable pageable = createPageable(page, size);
 
@@ -120,6 +121,22 @@ public class TravelRecordService {
         if (provinceCode == null && districtCode != null) {
             throw new BusinessException(TravelRecordErrorCode.REGION_REQUIRED);
         }
+    }
+
+    private void validateRegionCodeFormat(
+            String countryCode,
+            String provinceCode,
+            String districtCode
+    ) {
+        if ((countryCode != null && !countryCode.matches("[A-Z]{2}"))
+                || isBlank(provinceCode)
+                || isBlank(districtCode)) {
+            throw new BusinessException(TravelRecordErrorCode.INVALID_REGION_CODE);
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value != null && value.isBlank();
     }
 
     private Pageable createPageable(int page, int size) {
