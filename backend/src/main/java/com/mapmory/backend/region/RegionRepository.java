@@ -15,4 +15,6 @@ public interface RegionRepository extends JpaRepository<Region, Long> {
             RegionType regionType,
             String regionCode
     );
+
+    boolean existsByRegionTypeAndRegionCode(RegionType regionType, String regionCode);
 }
