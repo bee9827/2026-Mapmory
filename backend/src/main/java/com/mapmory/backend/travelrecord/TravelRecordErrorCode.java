@@ -1,0 +1,46 @@
+package com.mapmory.backend.travelrecord;
+
+import com.mapmory.backend.common.exception.ErrorCode;
+import com.mapmory.backend.common.exception.ErrorKind;
+
+public enum TravelRecordErrorCode implements ErrorCode {
+
+    REGION_REQUIRED(
+            ErrorKind.INVALID_INPUT,
+            "REGION_REQUIRED",
+            "필수 지역 정보가 없습니다.",
+            "하위 지역을 조회하려면 상위 지역 코드를 함께 입력해야 합니다."
+    );
+
+    private final ErrorKind kind;
+    private final String code;
+    private final String title;
+    private final String detail;
+
+    TravelRecordErrorCode(ErrorKind kind, String code, String title, String detail) {
+        this.kind = kind;
+        this.code = code;
+        this.title = title;
+        this.detail = detail;
+    }
+
+    @Override
+    public ErrorKind kind() {
+        return kind;
+    }
+
+    @Override
+    public String code() {
+        return code;
+    }
+
+    @Override
+    public String title() {
+        return title;
+    }
+
+    @Override
+    public String detail() {
+        return detail;
+    }
+}

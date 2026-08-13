@@ -2,6 +2,7 @@ package com.mapmory.backend.travelrecord;
 
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
+import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.region.Region;
@@ -71,6 +72,7 @@ public class TravelRecordService {
 
     @Transactional(readOnly = true)
     public Page<TravelRecord> findAll(Long memberId, String countryCode, String provinceCode, String districtCode, int page, int size) {
+        validateRegionFilterHierarchy(countryCode, provinceCode, districtCode);
         Pageable pageable = createPageable(page, size);
 
         if (countryCode == null) {
@@ -104,6 +106,20 @@ public class TravelRecordService {
                 district.getId(),
                 pageable
         );
+    }
+
+    private void validateRegionFilterHierarchy(
+            String countryCode,
+            String provinceCode,
+            String districtCode
+    ) {
+        if (countryCode == null && (provinceCode != null || districtCode != null)) {
+            throw new BusinessException(TravelRecordErrorCode.REGION_REQUIRED);
+        }
+
+        if (provinceCode == null && districtCode != null) {
+            throw new BusinessException(TravelRecordErrorCode.REGION_REQUIRED);
+        }
     }
 
     private Pageable createPageable(int page, int size) {
