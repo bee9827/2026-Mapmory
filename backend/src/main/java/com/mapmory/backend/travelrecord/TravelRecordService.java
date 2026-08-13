@@ -170,7 +170,12 @@ public class TravelRecordService {
                 country.getId(),
                 RegionType.PROVINCE,
                 provinceCode
-        ).orElseThrow();
+        ).orElseGet(() -> {
+            if (regionRepository.existsByRegionTypeAndRegionCode(RegionType.PROVINCE, provinceCode)) {
+                throw new BusinessException(TravelRecordErrorCode.INVALID_REGION_HIERARCHY);
+            }
+            throw new BusinessException(TravelRecordErrorCode.REGION_NOT_FOUND);
+        });
     }
 
     private Region findDistrict(Region province, String districtCode) {
