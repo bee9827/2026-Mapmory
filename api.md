@@ -205,6 +205,8 @@
 | `endDate` | LocalDate | 아니요 | 시작일보다 빠를 수 없음 |
 | `objectKeys` | String[] | 아니요 | 업로드 완료된 Object Key 목록 |
 
+`objectKeys`는 배열 순서대로 `record_media.sort_order`를 0부터 부여해 저장한다. 값이 없거나 `null`이면 미디어를 생성하지 않는다.
+
 #### Response `201 Created`
 
 ```json
@@ -230,14 +232,57 @@
 
 `GET /api/v1/travel-records`
 
+현재 회원의 기록을 생성일시 내림차순으로 조회한다.
+
 | 파라미터 | 필수 | 설명 |
 | --- | --- | --- |
-| `countryCode` | 아니요 | 선택 국가와 하위 Region 기록 필터 |
-| `provinceCode` | 아니요 | 선택 시도와 하위 Region 기록 필터. `countryCode` 필수 |
-| `districtCode` | 아니요 | 선택 시군구 기록 필터. `provinceCode` 필수 |
-| `keyword` | 아니요 | 제목·본문 검색 |
+| `countryCode` | 아니요 | 선택 국가 자체와 `root_id`가 해당 국가인 모든 하위 Region 기록 |
+| `provinceCode` | 아니요 | 선택 시도 자체와 `parent_id`가 해당 시도인 시·군·구 기록. `countryCode` 필수 |
+| `districtCode` | 아니요 | 선택 시·군·구에 직접 저장된 기록. `countryCode`, `provinceCode` 필수 |
 | `page` | 아니요 | 기본값 `0` |
-| `size` | 아니요 | 기본값 `20`, 최대 `100` |
+| `size` | 아니요 | 기본값 `20` |
+
+#### 조회 예시
+
+```http
+# 내 전체 기록
+GET /api/v1/travel-records
+
+# 대한민국과 모든 하위 지역 기록
+GET /api/v1/travel-records?countryCode=KR
+
+# 제주특별자치도와 하위 시·군·구 기록
+GET /api/v1/travel-records?countryCode=KR&provinceCode=49
+
+# 제주시 기록
+GET /api/v1/travel-records?countryCode=KR&provinceCode=49&districtCode=50110
+```
+
+#### Response `200 OK`
+
+```json
+{
+  "data": {
+    "items": [
+      {
+        "id": 101,
+        "title": "비 오는 날의 제주시",
+        "regionName": "제주시",
+        "startDate": "2026-08-11",
+        "endDate": null,
+        "thumbnailUrl": null
+      }
+    ],
+    "page": 0,
+    "size": 20,
+    "totalElements": 1,
+    "totalPages": 1,
+    "hasNext": false
+  }
+}
+```
+
+목록에는 본문과 전체 미디어 목록을 포함하지 않는다. `thumbnailUrl` 필드는 후속 구현을 위해 포함했으며 현재는 `null`을 반환한다. `keyword` 검색과 페이지 크기 최대값 검증은 아직 구현하지 않았다.
 
 ### 여행 기록 상세 조회
 

@@ -1,0 +1,226 @@
+# 여행 기록 저장 및 목록 조회 방식
+
+> 기준일: 2026-08-13 · 현재 구현된 생성 및 목록 조회 기준
+
+## 1. 목적
+
+여행 기록은 해외에서는 국가 단위로, 대한민국에서는 시·군·구 단위로 저장한다. 국가와 행정구역은 모두 `region` 테이블에 저장하며, 여행 기록은 최종 선택된 `region_id` 하나만 참조한다.
+
+```mermaid
+flowchart LR
+    M["Member"] --> TR["TravelRecord"]
+    TR --> R["Region"]
+    TR --> RM["RecordMedia 0..N"]
+    C["COUNTRY"] --> P["PROVINCE"]
+    P --> D["DISTRICT"]
+```
+
+## 2. 관련 테이블
+
+| 테이블 | 여행 기록 기능에서의 역할 |
+| --- | --- |
+| `member` | 여행 기록 작성자 |
+| `region` | 국가·시도·시군구 계층과 코드 보관 |
+| `travel_record` | 작성자, 최종 Region, 제목, 본문, 여행 날짜 보관 |
+| `record_media` | 여행 기록에 연결된 이미지 Object Key와 노출 순서 보관 |
+
+### 주요 관계
+
+| 관계 | 컬럼 | 필수 여부 |
+| --- | --- | --- |
+| 여행 기록 → 회원 | `travel_record.member_id` | 필수 |
+| 여행 기록 → 선택 지역 | `travel_record.region_id` | 필수 |
+| 미디어 → 여행 기록 | `record_media.travel_record_id` | 필수 |
+| Region → 직접 부모 | `region.parent_id` | COUNTRY는 `NULL` |
+| Region → 국가 루트 | `region.root_id` | COUNTRY는 `NULL` |
+
+## 3. Region 데이터 구조
+
+| id | parent_id | root_id | region_code | region_type | name |
+| ---: | ---: | ---: | --- | --- | --- |
+| 1 | `NULL` | `NULL` | `KR` | `COUNTRY` | 대한민국 |
+| 2 | 1 | 1 | `49` | `PROVINCE` | 제주특별자치도 |
+| 3 | 2 | 1 | `50110` | `DISTRICT` | 제주시 |
+| 4 | `NULL` | `NULL` | `JP` | `COUNTRY` | 일본 |
+
+- `parent_id`는 직접 부모를 나타낸다.
+- `root_id`는 해당 Region이 속한 국가 ID다.
+- 계층은 코드 접두사가 아니라 `parent_id`로만 판단한다.
+
+## 4. 여행 기록 생성
+
+### 요청에서 DB 저장까지
+
+```text
+Controller
+  → X-Member-Id와 TravelRecordRequest 수신
+Service
+  → 회원 참조 조회
+  → 국가 → 시도 → 시군구 순서로 Region 조회
+  → TravelRecord 저장
+  → objectKeys 순서대로 RecordMedia 저장
+Controller
+  → 저장된 TravelRecord를 생성 응답 DTO로 변환
+  → 성공 응답을 data 필드로 감싸 반환
+```
+
+### 계층별 Region 선택
+
+| 요청 | Region 탐색 | `travel_record.region_id` |
+| --- | --- | --- |
+| `countryCode=JP` | 부모가 없는 `COUNTRY JP` 조회 | 일본 Region ID |
+| `countryCode=KR`, `provinceCode=49`, `districtCode=50110` | 대한민국 → 제주 → 제주시 순서로 조회 | 제주시 Region ID |
+
+국내 기록 예시:
+
+```json
+{
+  "countryCode": "KR",
+  "provinceCode": "49",
+  "districtCode": "50110",
+  "title": "제주 여행",
+  "content": "제주시를 걸었다.",
+  "startDate": "2026-08-11",
+  "endDate": null,
+  "objectKeys": [
+    "travel-records/1/a.jpg",
+    "travel-records/1/b.jpg"
+  ]
+}
+```
+
+저장 결과 예시:
+
+| 테이블 | 저장 내용 |
+| --- | --- |
+| `travel_record` | `member_id=1`, `region_id=제주시 ID`, 제목·본문·날짜 |
+| 첫 번째 `record_media` | `object_key=a.jpg`, `sort_order=0` |
+| 두 번째 `record_media` | `object_key=b.jpg`, `sort_order=1` |
+
+여행 기록과 미디어 저장은 하나의 트랜잭션에서 실행한다. 중간 저장이 실패하면 전체 작업이 롤백된다.
+
+## 5. 여행 기록 목록 조회
+
+목록 API는 Controller 하나에서 선택 Query Parameter를 받는다. 국가·시도·시군구마다 별도 Controller를 만들지 않는다.
+
+```http
+GET /api/v1/travel-records
+GET /api/v1/travel-records?countryCode=KR
+GET /api/v1/travel-records?countryCode=KR&provinceCode=49
+GET /api/v1/travel-records?countryCode=KR&provinceCode=49&districtCode=50110
+```
+
+### 필터별 조회 조건
+
+| 전달된 필터 | 기준 Region | Repository 조회 조건 |
+| --- | --- | --- |
+| 없음 | 없음 | `member_id` 일치 |
+| 국가 | `COUNTRY` | `region.id = countryId OR region.root.id = countryId` |
+| 시도 | `PROVINCE` | `region.id = provinceId OR region.parent.id = provinceId` |
+| 시군구 | `DISTRICT` | `region.id = districtId` |
+
+### 국가 필터 예시
+
+대한민국 ID가 `1`이고 제주시의 `root_id`가 `1`이면, 다음 두 종류가 대한민국 목록에 포함된다.
+
+```text
+travel_record.region_id = 1       // 대한민국 자체 기록
+travel_record.region.root_id = 1  // 대한민국 하위 지역 기록
+```
+
+JPQL은 다음 의미로 사용한다.
+
+```java
+WHERE tr.member.id = :memberId
+  AND (
+      tr.region.id = :countryId
+      OR tr.region.root.id = :countryId
+  )
+```
+
+### 시도 필터 예시
+
+제주특별자치도 ID가 `2`이면 제주 자체 기록과 부모가 제주인 시군구 기록을 조회한다.
+
+```java
+WHERE tr.member.id = :memberId
+  AND (
+      tr.region.id = :provinceId
+      OR tr.region.parent.id = :provinceId
+  )
+```
+
+### 시군구 필터 예시
+
+제주시 ID가 `3`이면 해당 Region에 직접 연결된 기록만 조회한다.
+
+```text
+member_id = 요청 회원 ID
+region_id = 3
+```
+
+## 6. 페이징과 응답
+
+Service는 `PageRequest`를 이용해 최신 생성순으로 조회한다.
+
+```java
+PageRequest.of(
+        page,
+        size,
+        Sort.by(Sort.Direction.DESC, "createdAt")
+)
+```
+
+| 응답 필드 | 의미 |
+| --- | --- |
+| `items` | 현재 페이지의 여행 기록 요약 목록 |
+| `page` | 현재 페이지 번호 |
+| `size` | 페이지 크기 |
+| `totalElements` | 조건에 맞는 전체 기록 수 |
+| `totalPages` | 전체 페이지 수 |
+| `hasNext` | 다음 페이지 존재 여부 |
+
+목록 아이템은 `id`, `title`, `regionName`, `startDate`, `endDate`, `thumbnailUrl`만 반환한다. 본문과 전체 이미지 목록은 목록 응답에서 제외한다.
+
+생성과 목록 조회의 성공 응답은 다음처럼 `data` 필드로 감싼다.
+
+```json
+{
+  "data": {
+    "id": 101
+  }
+}
+```
+
+오류 응답은 성공 응답 래퍼를 사용하지 않고 RFC 9457 Problem Details 구조를 유지한다.
+
+## 7. 계층별 책임
+
+| 계층 | 책임 |
+| --- | --- |
+| Controller | HTTP 헤더·Query Parameter 수신, 응답 DTO 변환 |
+| Service | Region 경로 결정, 저장 흐름과 조회 분기, 트랜잭션 관리 |
+| Repository | 회원·Region 조건에 맞는 DB 조회 및 페이징 |
+| Entity | 테이블 매핑과 연관관계 표현 |
+| DTO | API 요청·응답 데이터 표현 |
+
+## 8. 현재 후속 작업
+
+| 항목 | 상태 |
+| --- | --- |
+| 여행 기록과 미디어 기본 저장 | 구현 |
+| 전체·국가·시도·시군구 목록 조회 | 구현 |
+| 생성·목록 페이징 테스트 | 구현 |
+| 목록 썸네일 URL 생성 | 미구현, 현재 `null` |
+| 키워드 검색 | 미구현 |
+| 날짜 범위 검증 | 미구현 |
+| Object Key 소유권·업로드 검증 | 미구현 |
+| Region 미존재 도메인 예외 | 미구현 |
+| 성공 응답 `data` 래퍼 | 구현 |
+
+## 9. 관련 문서
+
+- [API 명세](../../api.md)
+- [ERD](erd.md)
+- [ADR 0004: 지역 코드 체계와 계층 판단 방식](adr/0004-region-code-system.md)
+- [ADR 0008: 국가와 행정구역을 Region 계층으로 통합](adr/0008-unify-country-and-location-as-region.md)
