@@ -13,6 +13,9 @@ import java.time.LocalDate;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.transaction.annotation.Transactional;
 
 class TravelRecordRepositoryTest extends IntegrationTest {
@@ -53,5 +56,41 @@ class TravelRecordRepositoryTest extends IntegrationTest {
 
         assertThat(travelRecord.getId()).isNotNull();
         assertThat(travelRecordRepository.findById(travelRecord.getId())).isPresent();
+    }
+
+    @Test
+    @Transactional
+    void findsTravelRecordsByMemberWithPagination() {
+        Member member = memberRepository.save(
+                Member.of("테스터", UUID.randomUUID())
+        );
+
+        Region country = regionRepository.save(
+                Region.of(null, null, "XX", "테스트 국가", RegionType.COUNTRY)
+        );
+
+        travelRecordRepository.save(
+                TravelRecord.of(
+                        member,
+                        country,
+                        "첫 번째 기록",
+                        "",
+                        LocalDate.of(2026, 8, 10),
+                        null
+                )
+        );
+
+        Page<TravelRecord> result = travelRecordRepository.findByMemberId(
+                member.getId(),
+                PageRequest.of(
+                        0, // 첫 페이지
+                        20, // 최대 20개
+                        Sort.by(Sort.Direction.DESC, "createdAt")
+                )
+        );
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.hasNext()).isFalse();
     }
 }

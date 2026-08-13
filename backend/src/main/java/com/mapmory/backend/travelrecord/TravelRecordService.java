@@ -9,7 +9,12 @@ import com.mapmory.backend.region.RegionRepository;
 import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TravelRecordService {
@@ -31,6 +36,7 @@ public class TravelRecordService {
         this.recordMediaRepository = recordMediaRepository;
     }
 
+    @Transactional
     public TravelRecord create(Long memberId, TravelRecordRequest request) {
         Member member = memberRepository.getReferenceById(memberId);
         Region region = resolveRegion(request);
@@ -62,6 +68,62 @@ public class TravelRecordService {
         }
 
         return savedTravelRecord;
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TravelRecord> findAll(Long memberId, String countryCode, String provinceCode, String districtCode, int page, int size) {
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        // 필터로 들어온 조건이 없으면 = 내 기록 전체 조회
+        if (countryCode == null) {
+            return travelRecordRepository.findByMemberId(memberId, pageable);
+        }
+
+        Region country = regionRepository
+                .findByParentIsNullAndRegionTypeAndRegionCode(
+                        RegionType.COUNTRY,
+                        countryCode
+                ).orElseThrow();
+
+        // COUNTRY 타입이면서 부모가 없는 최상위 국가 Region을 찾기
+        if (provinceCode == null) {
+            return travelRecordRepository.findByMemberIdAndCountryId(
+                    memberId,
+                    country.getId(),
+                    pageable
+            );
+        }
+
+        Region province = regionRepository.findByParentIdAndRegionTypeAndRegionCode(
+                country.getId(),
+                RegionType.PROVINCE,
+                provinceCode
+        ).orElseThrow();
+
+        if (districtCode == null) {
+            return travelRecordRepository.findByMemberIdAndProvinceId(
+                    memberId,
+                    province.getId(),
+                    pageable
+            );
+        }
+
+        Region district = regionRepository
+                .findByParentIdAndRegionTypeAndRegionCode(
+                        province.getId(),
+                        RegionType.DISTRICT,
+                        districtCode
+                ).orElseThrow();
+
+        return travelRecordRepository.findByMemberIdAndRegionId(
+                memberId,
+                district.getId(),
+                pageable
+        );
     }
 
     private Region resolveRegion(TravelRecordRequest request) {
