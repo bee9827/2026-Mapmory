@@ -6,8 +6,7 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.region.Region;
-import com.mapmory.backend.region.RegionRepository;
-import com.mapmory.backend.region.RegionType;
+import com.mapmory.backend.region.RegionResolver;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -23,19 +22,19 @@ public class TravelRecordService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final TravelRecordRepository travelRecordRepository;
-    private final RegionRepository regionRepository;
+    private final RegionResolver regionResolver;
     private final MemberRepository memberRepository;
     private final RecordMediaRepository recordMediaRepository;
 
     public TravelRecordService(
             TravelRecordRepository travelRecordRepository,
             MemberRepository memberRepository,
-            RegionRepository regionRepository,
+            RegionResolver regionResolver,
             RecordMediaRepository recordMediaRepository
     ) {
         this.travelRecordRepository = travelRecordRepository;
         this.memberRepository = memberRepository;
-        this.regionRepository = regionRepository;
+        this.regionResolver = regionResolver;
         this.recordMediaRepository = recordMediaRepository;
     }
 
@@ -84,7 +83,7 @@ public class TravelRecordService {
             return travelRecordRepository.findByMemberId(memberId, pageable);
         }
 
-        Region country = findCountry(countryCode);
+        Region country = regionResolver.findCountry(countryCode);
 
         if (provinceCode == null) {
             return travelRecordRepository.findByMemberIdAndCountryId(
@@ -94,7 +93,7 @@ public class TravelRecordService {
             );
         }
 
-        Region province = findProvince(country, provinceCode);
+        Region province = regionResolver.findProvince(country, provinceCode);
 
         if (districtCode == null) {
             return travelRecordRepository.findByMemberIdAndProvinceId(
@@ -104,7 +103,7 @@ public class TravelRecordService {
             );
         }
 
-        Region district = findDistrict(province, districtCode);
+        Region district = regionResolver.findDistrict(province, districtCode);
 
         return travelRecordRepository.findByMemberIdAndRegionId(
                 memberId,
@@ -167,46 +166,13 @@ public class TravelRecordService {
     }
 
     private Region resolveRegion(TravelRecordRequest request) {
-        Region country = findCountry(request.countryCode());
+        Region country = regionResolver.findCountry(request.countryCode());
 
         if (request.provinceCode() == null && request.districtCode() == null) {
             return country;
         }
 
-        Region province = findProvince(country, request.provinceCode());
-        return findDistrict(province, request.districtCode());
-    }
-
-    private Region findCountry(String countryCode) {
-        return regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(
-                RegionType.COUNTRY,
-                countryCode
-        ).orElseThrow(() -> new BusinessException(TravelRecordErrorCode.COUNTRY_NOT_FOUND));
-    }
-
-    private Region findProvince(Region country, String provinceCode) {
-        return regionRepository.findByParentIdAndRegionTypeAndRegionCode(
-                country.getId(),
-                RegionType.PROVINCE,
-                provinceCode
-        ).orElseGet(() -> {
-            if (regionRepository.existsByRegionTypeAndRegionCode(RegionType.PROVINCE, provinceCode)) {
-                throw new BusinessException(TravelRecordErrorCode.INVALID_REGION_HIERARCHY);
-            }
-            throw new BusinessException(TravelRecordErrorCode.REGION_NOT_FOUND);
-        });
-    }
-
-    private Region findDistrict(Region province, String districtCode) {
-        return regionRepository.findByParentIdAndRegionTypeAndRegionCode(
-                province.getId(),
-                RegionType.DISTRICT,
-                districtCode
-        ).orElseGet(() -> {
-            if (regionRepository.existsByRegionTypeAndRegionCode(RegionType.DISTRICT, districtCode)) {
-                throw new BusinessException(TravelRecordErrorCode.INVALID_REGION_HIERARCHY);
-            }
-            throw new BusinessException(TravelRecordErrorCode.REGION_NOT_FOUND);
-        });
+        Region province = regionResolver.findProvince(country, request.provinceCode());
+        return regionResolver.findDistrict(province, request.districtCode());
     }
 }
