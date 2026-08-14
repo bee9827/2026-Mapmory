@@ -234,11 +234,13 @@ private fun TripRecordCard(
         colors = CardDefaults.cardColors(containerColor = TripRecordPalette.surface),
     ) {
         Column {
-            TripPhotoPlaceholder(
+            TripPhotoImage(
+                previewBytes = record.media.minByOrNull { it.sortOrder }?.previewBytes,
+                contentDescription = record.title,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(222.dp),
-                variant = record.id.toInt(),
+                placeholderVariant = record.id.toInt(),
             )
             Column(Modifier.padding(18.dp)) {
                 Text(

@@ -1,6 +1,7 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,10 +30,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
+import org.jetbrains.compose.resources.decodeToImageBitmap
 
 internal object TripRecordPalette {
     val background = Color(0xFF07171B)
@@ -284,6 +288,28 @@ internal fun TripPhotoPlaceholder(
                 strokeWidth = size.minDimension * 0.012f,
             )
         }
+    }
+}
+
+@Composable
+internal fun TripPhotoImage(
+    previewBytes: ByteArray?,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    placeholderVariant: Int = 0,
+) {
+    val bitmap = remember(previewBytes) {
+        previewBytes?.let { bytes -> runCatching { bytes.decodeToImageBitmap() }.getOrNull() }
+    }
+    if (bitmap == null) {
+        TripPhotoPlaceholder(modifier, placeholderVariant)
+    } else {
+        Image(
+            bitmap = bitmap,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.clip(RoundedCornerShape(18.dp)),
+        )
     }
 }
 

@@ -15,10 +15,14 @@ import com.mapmory.shared.domain.model.KoreanDistrictCodes
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
+import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
 import com.mapmory.shared.presentation.map.domain.MapScope
 import com.mapmory.shared.presentation.map.ui.MapArtwork
+import com.mapmory.shared.presentation.photo.MaxPhotosPerRecord
+import com.mapmory.shared.presentation.photo.SelectedPhoto
+import com.mapmory.shared.presentation.photo.mergeSelectedPhotos
 import com.mapmory.shared.presentation.triprecord.screen.TripMapScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripProfileScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordDetailScreen
@@ -77,12 +81,7 @@ fun MapmoryApp(
     var records by remember { mutableStateOf(emptyList<TripRecordData>()) }
     var query by remember { mutableStateOf(TripRecordQuery()) }
     var editorState by remember {
-        mutableStateOf(
-            TripRecordEditorUiState(
-                selectedLocation = appLocations.firstOrNull { it.regionCode == DefaultDistrictCode }
-                    ?: appLocations.firstOrNull { it.type == LocationType.DISTRICT },
-            ),
-        )
+        mutableStateOf(TripRecordEditorUiState())
     }
 
     val locationsById = remember { appLocations.associateBy(Location::id) }
@@ -107,9 +106,9 @@ fun MapmoryApp(
 
     fun openCreateScreen(selectedLocation: Location? = null) {
         editorState = TripRecordEditorUiState(
-            selectedLocation = selectedLocation
-                ?: appLocations.firstOrNull { it.regionCode == DefaultDistrictCode }
-                ?: appLocations.firstOrNull { it.type == LocationType.DISTRICT },
+            // 지도에서 진입했을 때만 해당 지역을 기준으로 삼는다.
+            // 일반 작성 진입에서는 사용자가 장소를 명시적으로 고르게 한다.
+            selectedLocation = selectedLocation,
         )
         navController.navigate(CreateRoute)
     }
@@ -139,6 +138,14 @@ fun MapmoryApp(
             content = record.content,
             startDate = record.startDate.orEmpty(),
             endDate = record.endDate.orEmpty(),
+            mediaObjectKeys = record.media.map(TripRecordMedia::objectKey),
+            selectedPhotos = record.media.map { media ->
+                SelectedPhoto(
+                    id = media.objectKey,
+                    displayName = media.objectKey.substringAfterLast('/'),
+                    previewBytes = media.previewBytes,
+                )
+            },
         )
         navController.navigate(CreateRoute)
     }
@@ -159,7 +166,22 @@ fun MapmoryApp(
                     content = state.content.trim(),
                     startDate = state.startDate.ifBlank { null },
                     endDate = state.endDate.ifBlank { null },
-                    media = previousRecord?.media.orEmpty(),
+                    media = state.selectedPhotos.mapIndexed { index, photo ->
+                        TripRecordMedia(
+                            id = previousRecord
+                                ?.media
+                                ?.firstOrNull { it.objectKey == photo.id }
+                                ?.id
+                                ?: -(index + 1L),
+                            objectKey = photo.id,
+                            sortOrder = index,
+                            url = previousRecord
+                                ?.media
+                                ?.firstOrNull { it.objectKey == photo.id }
+                                ?.url,
+                            previewBytes = photo.previewBytes,
+                        )
+                    },
                     createdAt = previousRecord?.createdAt.orEmpty(),
                     updatedAt = previousRecord?.updatedAt.orEmpty(),
                 )
@@ -281,6 +303,29 @@ fun MapmoryApp(
                 },
                 onEndDateChanged = { date ->
                     editorState = editorState.copy(endDate = date, errorMessage = null)
+                },
+                onPhotosAdded = { photos ->
+                    val requestedCount = (editorState.selectedPhotos + photos)
+                        .distinctBy(SelectedPhoto::id)
+                        .size
+                    val merged = mergeSelectedPhotos(editorState.selectedPhotos, photos)
+                    editorState = editorState.copy(
+                        selectedPhotos = merged,
+                        mediaObjectKeys = merged.map(SelectedPhoto::id),
+                        errorMessage = if (merged.size < requestedCount) {
+                            "사진은 최대 ${MaxPhotosPerRecord}장까지 추가할 수 있어요."
+                        } else {
+                            null
+                        },
+                    )
+                },
+                onPhotoRemoved = { photoId ->
+                    val remaining = editorState.selectedPhotos.filterNot { it.id == photoId }
+                    editorState = editorState.copy(
+                        selectedPhotos = remaining,
+                        mediaObjectKeys = remaining.map(SelectedPhoto::id),
+                        errorMessage = null,
+                    )
                 },
                 onSaveClick = ::saveEditor,
                 onBackClick = { navigateBack() },
@@ -419,5 +464,3 @@ private val appLocations = buildList {
         )
     }
 }
-
-private const val DefaultDistrictCode = "11680"

@@ -17,6 +17,9 @@
     <!-- Android 14 (API 34) 이상의 선택한 사진 접근 -->
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
 
+    <!-- 원본 사진의 EXIF GPS를 읽어 장소 기반 사진을 추천 -->
+    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+
     <uses-feature
         android:name="android.hardware.camera.any"
         android:required="false" />

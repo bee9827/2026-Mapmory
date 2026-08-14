@@ -41,6 +41,8 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
+            implementation("androidx.activity:activity-compose:1.11.0")
+            implementation("androidx.exifinterface:exifinterface:1.4.1")
         }
 
         jvmMain.dependencies {
