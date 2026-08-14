@@ -26,6 +26,8 @@
 
     <application
         android:label="Mapmory"
+        android:icon="@drawable/mapmory_icon"
+        android:roundIcon="@drawable/mapmory_icon"
         android:theme="@style/Theme.Mapmory">
         <activity
             android:name=".MainActivity"
