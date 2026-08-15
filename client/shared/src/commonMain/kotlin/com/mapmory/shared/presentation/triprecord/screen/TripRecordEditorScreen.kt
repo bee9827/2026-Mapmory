@@ -424,7 +424,7 @@ private fun PhotoEditor(
             PhotoActionButton(icon = "＋", label = "사진 추가", onClick = onAddClick)
         }
         if (recommendationsAvailable) {
-            PhotoActionButton(icon = "⌖", label = "장소 추천", onClick = onRecommendClick)
+            PhotoActionButton(icon = "⌖", label = "위치 기반 사진 \n 불러오기", onClick = onRecommendClick)
         }
     }
 }
