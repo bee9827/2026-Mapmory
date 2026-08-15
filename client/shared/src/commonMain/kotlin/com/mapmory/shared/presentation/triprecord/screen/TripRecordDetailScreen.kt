@@ -10,12 +10,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,18 +73,70 @@ fun TripRecordDetailScreen(
                     is TripRecordDetailUiState.Success -> {
                         val record = uiState.record
                         val location = locations.firstOrNull { it.id == record.locationId }
+                        val media = remember(record.id, record.media) {
+                            record.media.sortedBy { it.sortOrder }
+                        }
                         Column(Modifier.fillMaxSize()) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(1f),
                             ) {
-                                TripPhotoImage(
-                                    previewBytes = record.media.minByOrNull { it.sortOrder }?.previewBytes,
-                                    contentDescription = record.title,
-                                    modifier = Modifier.fillMaxSize(),
-                                    placeholderVariant = record.id.toInt() + 1,
-                                )
+                                if (media.isEmpty()) {
+                                    TripPhotoImage(
+                                        previewBytes = null,
+                                        contentDescription = record.title,
+                                        modifier = Modifier.fillMaxSize(),
+                                        placeholderVariant = record.id.toInt() + 1,
+                                    )
+                                } else {
+                                    val pagerState = rememberPagerState(
+                                        pageCount = { media.size },
+                                    )
+                                    LaunchedEffect(record.id) {
+                                        pagerState.scrollToPage(0)
+                                    }
+                                    HorizontalPager(
+                                        state = pagerState,
+                                        modifier = Modifier.fillMaxSize(),
+                                    ) { page ->
+                                        val photo = media[page]
+                                        TripPhotoImage(
+                                            previewBytes = photo.previewBytes,
+                                            contentDescription = "${record.title} 사진 ${page + 1}",
+                                            modifier = Modifier.fillMaxSize(),
+                                            placeholderVariant = record.id.toInt() + page + 1,
+                                        )
+                                    }
+                                    if (media.size > 1) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            modifier = Modifier
+                                                .align(Alignment.BottomCenter)
+                                                .padding(bottom = 18.dp)
+                                                .background(
+                                                    color = TripRecordPalette.background.copy(alpha = 0.72f),
+                                                    shape = RoundedCornerShape(12.dp),
+                                                )
+                                                .padding(horizontal = 9.dp, vertical = 7.dp),
+                                        ) {
+                                            repeat(media.size) { page ->
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(if (page == pagerState.currentPage) 7.dp else 5.dp)
+                                                        .background(
+                                                            color = if (page == pagerState.currentPage) {
+                                                                TripRecordPalette.accent
+                                                            } else {
+                                                                TripRecordPalette.muted.copy(alpha = 0.7f)
+                                                            },
+                                                            shape = CircleShape,
+                                                        ),
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
