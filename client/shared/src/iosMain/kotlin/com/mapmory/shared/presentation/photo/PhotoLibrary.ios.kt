@@ -28,6 +28,7 @@ import platform.Photos.PHFetchOptions
 import platform.Photos.PHImageContentModeAspectFill
 import platform.Photos.PHImageManager
 import platform.Photos.PHImageRequestOptions
+import platform.Photos.PHImageRequestOptionsDeliveryModeHighQualityFormat
 import platform.Photos.PHPhotoLibrary
 import platform.PhotosUI.PHPickerConfiguration
 import platform.PhotosUI.PHPickerFilter
@@ -264,8 +265,14 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
 
     private fun loadAsset(asset: PHAsset, completion: (SelectedPhoto?) -> Unit) {
         val options = PHImageRequestOptions().apply {
+            // The default delivery mode is opportunistic, so Photos can invoke the
+            // callback first with a degraded preview and then with the final image.
+            // We store the callback result as the preview bytes, so accepting that
+            // first callback leaves the selected photo permanently pixelated.
+            deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat
             networkAccessAllowed = true
         }
+        var didComplete = false
         PHImageManager.defaultManager().requestImageForAsset(
             asset = asset,
             targetSize = CGSizeMake(PreviewSize, PreviewSize),
@@ -277,6 +284,11 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
             val latitude = coordinate?.useContents { latitude }
             val longitude = coordinate?.useContents { longitude }
             onMain {
+                // Keep this guard even with high-quality delivery: an asset may
+                // still produce more than one callback when an iCloud download
+                // fails or is cancelled.
+                if (didComplete) return@onMain
+                didComplete = true
                 completion(
                     data?.let {
                         SelectedPhoto(
