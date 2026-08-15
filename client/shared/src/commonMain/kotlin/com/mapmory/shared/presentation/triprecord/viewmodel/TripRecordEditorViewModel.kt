@@ -9,6 +9,7 @@ import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.dateValidationError
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
 import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
+import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 
 class TripRecordEditorViewModel(
@@ -31,6 +32,13 @@ class TripRecordEditorViewModel(
             startDate = record.startDate.orEmpty(),
             endDate = record.endDate.orEmpty(),
             mediaObjectKeys = record.media.map { it.objectKey },
+            selectedPhotos = record.media.map { media ->
+                SelectedPhoto(
+                    id = media.objectKey,
+                    displayName = media.objectKey.substringAfterLast('/'),
+                    previewBytes = media.previewBytes,
+                )
+            },
         )
     }
 
@@ -66,7 +74,10 @@ class TripRecordEditorViewModel(
     }
 
     fun removeMediaObjectKey(objectKey: String) {
-        uiState = uiState.copy(mediaObjectKeys = uiState.mediaObjectKeys - objectKey)
+        uiState = uiState.copy(
+            mediaObjectKeys = uiState.mediaObjectKeys - objectKey,
+            selectedPhotos = uiState.selectedPhotos.filterNot { it.id == objectKey },
+        )
     }
 
     suspend fun save(): Boolean {

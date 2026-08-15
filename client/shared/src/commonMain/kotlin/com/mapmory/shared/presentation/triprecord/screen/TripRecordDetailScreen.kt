@@ -74,9 +74,11 @@ fun TripRecordDetailScreen(
                                     .fillMaxWidth()
                                     .weight(1f),
                             ) {
-                                TripPhotoPlaceholder(
+                                TripPhotoImage(
+                                    previewBytes = record.media.minByOrNull { it.sortOrder }?.previewBytes,
+                                    contentDescription = record.title,
                                     modifier = Modifier.fillMaxSize(),
-                                    variant = record.id.toInt() + 1,
+                                    placeholderVariant = record.id.toInt() + 1,
                                 )
                                 Row(
                                     modifier = Modifier
