@@ -8,7 +8,6 @@ import com.mapmory.shared.domain.model.Location
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.useContents
 import kotlinx.cinterop.usePinned
-import platform.CoreGraphics.CGSizeMake
 import platform.CoreLocation.CLGeocoder
 import platform.CoreLocation.CLPlacemark
 import platform.CoreLocation.CLLocation
@@ -25,10 +24,10 @@ import platform.Photos.PHAuthorizationStatusAuthorized
 import platform.Photos.PHAuthorizationStatusLimited
 import platform.Photos.PHAuthorizationStatusNotDetermined
 import platform.Photos.PHFetchOptions
-import platform.Photos.PHImageContentModeAspectFill
 import platform.Photos.PHImageManager
 import platform.Photos.PHImageRequestOptions
 import platform.Photos.PHImageRequestOptionsDeliveryModeHighQualityFormat
+import platform.Photos.PHImageRequestOptionsVersionCurrent
 import platform.Photos.PHPhotoLibrary
 import platform.PhotosUI.PHPickerConfiguration
 import platform.PhotosUI.PHPickerFilter
@@ -36,8 +35,6 @@ import platform.PhotosUI.PHPickerResult
 import platform.PhotosUI.PHPickerViewController
 import platform.PhotosUI.PHPickerViewControllerDelegateProtocol
 import platform.UIKit.UIApplication
-import platform.UIKit.UIImage
-import platform.UIKit.UIImageJPEGRepresentation
 import platform.UIKit.UIViewController
 import platform.UIKit.UIWindow
 import platform.darwin.NSObject
@@ -232,20 +229,17 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
             return
         }
         result.itemProvider.loadDataRepresentationForTypeIdentifier("public.image") { data, _ ->
-            if (data == null) {
+            if (data == null || data.length == 0UL) {
                 completion(null)
                 return@loadDataRepresentationForTypeIdentifier
             }
-            val preview = UIImageJPEGRepresentation(UIImage(data), PreviewJpegQuality)
             onMain {
                 completion(
-                    preview?.let {
-                        SelectedPhoto(
-                            id = result.assetIdentifier ?: "ios-${data.hash}",
-                            displayName = result.itemProvider.suggestedName ?: "여행 사진",
-                            previewBytes = it.toByteArray(),
-                        )
-                    },
+                    SelectedPhoto(
+                        id = result.assetIdentifier ?: "ios-${data.hash}",
+                        displayName = result.itemProvider.suggestedName ?: "여행 사진",
+                        previewBytes = data.toByteArray(),
+                    ),
                 )
             }
         }
@@ -265,21 +259,17 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
 
     private fun loadAsset(asset: PHAsset, completion: (SelectedPhoto?) -> Unit) {
         val options = PHImageRequestOptions().apply {
-            // The default delivery mode is opportunistic, so Photos can invoke the
-            // callback first with a degraded preview and then with the final image.
-            // We store the callback result as the preview bytes, so accepting that
-            // first callback leaves the selected photo permanently pixelated.
+            // Request the largest current representation, preserving Photos edits
+            // while avoiding any thumbnail-sized or degraded image.
+            version = PHImageRequestOptionsVersionCurrent
             deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat
             networkAccessAllowed = true
         }
         var didComplete = false
-        PHImageManager.defaultManager().requestImageForAsset(
+        PHImageManager.defaultManager().requestImageDataAndOrientationForAsset(
             asset = asset,
-            targetSize = CGSizeMake(PreviewSize, PreviewSize),
-            contentMode = PHImageContentModeAspectFill,
             options = options,
-        ) { image, _ ->
-            val data = image?.let { UIImageJPEGRepresentation(it, PreviewJpegQuality) }
+        ) { data, _, _, _ ->
             val coordinate = asset.location?.coordinate
             val latitude = coordinate?.useContents { latitude }
             val longitude = coordinate?.useContents { longitude }
@@ -290,7 +280,7 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
                 if (didComplete) return@onMain
                 didComplete = true
                 completion(
-                    data?.let {
+                    data?.takeIf { it.length > 0UL }?.let {
                         SelectedPhoto(
                             id = asset.localIdentifier,
                             displayName = asset.displayName(),
@@ -349,7 +339,5 @@ private fun onMain(block: () -> Unit) {
     dispatch_async(dispatch_get_main_queue(), block)
 }
 
-private const val PreviewSize = 960.0
-private const val PreviewJpegQuality = 0.84
 private const val MaxReverseGeocodeCandidates = 60
 private const val MaxRecommendedPhotos = 12
