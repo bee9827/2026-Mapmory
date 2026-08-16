@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -71,6 +72,21 @@ public class TravelRecordController {
             @PathVariable @Positive Long travelRecordId
     ) {
         TravelRecordDetailResponse response = travelRecordService.findById(memberId, travelRecordId);
+
+        return ResponseEntity.ok(TravelRecordResponse.of(response));
+    }
+
+    @PutMapping("/travel-records/{travelRecordId}")
+    public ResponseEntity<TravelRecordResponse<TravelRecordDetailResponse>> update(
+            @RequestHeader("X-Member-Id") @Positive Long memberId,
+            @PathVariable @Positive Long travelRecordId,
+            @Valid @RequestBody TravelRecordRequest travelRecordRequest
+    ) {
+        TravelRecordDetailResponse response = travelRecordService.update(
+                memberId,
+                travelRecordId,
+                travelRecordRequest
+        );
 
         return ResponseEntity.ok(TravelRecordResponse.of(response));
     }

@@ -34,6 +34,12 @@ public enum TravelRecordErrorCode implements ErrorCode {
             "TRAVEL_RECORD_NOT_FOUND",
             "여행 일지를 찾을 수 없습니다.",
             "요청한 여행 일지가 없거나 조회할 권한이 없습니다."
+    ),
+    INVALID_OBJECT_KEY(
+            ErrorKind.INVALID_INPUT,
+            "INVALID_OBJECT_KEY",
+            "Object Key가 올바르지 않습니다.",
+            "중복되거나 다른 여행 일지에서 사용 중인 Object Key가 포함되어 있습니다."
     );
 
     private final ErrorKind kind;

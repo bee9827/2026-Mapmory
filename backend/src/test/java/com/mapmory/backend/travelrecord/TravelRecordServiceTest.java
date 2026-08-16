@@ -3,6 +3,7 @@ package com.mapmory.backend.travelrecord;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -146,6 +147,180 @@ class TravelRecordServiceTest {
                 .thenReturn(Optional.empty());
 
         assertError(() -> travelRecordService.findById(10L, 101L), "TRAVEL_RECORD_NOT_FOUND");
+        verify(recordMediaRepository, never()).findByTravelRecordIdOrderBySortOrderAsc(101L);
+    }
+
+    @Test
+    void updatesTravelRecordAndSynchronizesMedia() {
+        Region country = Region.of(null, null, "KR", "대한민국", RegionType.COUNTRY);
+        Region province = Region.of(country, country, "49", "제주특별자치도", RegionType.PROVINCE);
+        Region district = Region.of(province, country, "50110", "제주시", RegionType.DISTRICT);
+        TravelRecord travelRecord = TravelRecord.of(
+                mock(Member.class),
+                country,
+                "기존 제목",
+                "기존 본문",
+                LocalDate.of(2026, 8, 1),
+                null
+        );
+        ReflectionTestUtils.setField(travelRecord, "id", 101L);
+        RecordMedia mediaA = RecordMedia.of(travelRecord, "travel-records/10/a.jpg", null, 0);
+        RecordMedia mediaB = RecordMedia.of(travelRecord, "travel-records/10/b.jpg", null, 1);
+        TravelRecordRequest request = new TravelRecordRequest(
+                "KR",
+                "49",
+                "50110",
+                "수정된 제목",
+                "수정된 본문",
+                LocalDate.of(2026, 8, 11),
+                LocalDate.of(2026, 8, 13),
+                List.of("travel-records/10/b.jpg", "travel-records/10/c.jpg")
+        );
+        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
+                .thenReturn(Optional.of(travelRecord));
+        when(regionResolver.findCountry("KR")).thenReturn(country);
+        when(regionResolver.findProvince(country, "49")).thenReturn(province);
+        when(regionResolver.findDistrict(province, "50110")).thenReturn(district);
+        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
+                .thenReturn(List.of(mediaA, mediaB));
+        when(recordMediaRepository.findByObjectKeyIn(List.of("travel-records/10/c.jpg")))
+                .thenReturn(List.of());
+        when(recordMediaRepository.saveAll(anyList()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        TravelRecordDetailResponse result = travelRecordService.update(10L, 101L, request);
+
+        assertThat(result.title()).isEqualTo("수정된 제목");
+        assertThat(result.content()).isEqualTo("수정된 본문");
+        assertThat(result.region().district().code()).isEqualTo("50110");
+        assertThat(result.objectKeys()).containsExactly(
+                "travel-records/10/b.jpg",
+                "travel-records/10/c.jpg"
+        );
+        assertThat(mediaB.getSortOrder()).isZero();
+        verify(recordMediaRepository).deleteAll(org.mockito.ArgumentMatchers.argThat(records -> {
+            java.util.Iterator<? extends RecordMedia> iterator = records.iterator();
+            return iterator.hasNext()
+                    && iterator.next() == mediaA
+                    && !iterator.hasNext();
+        }));
+    }
+
+    @Test
+    void rejectsDuplicateObjectKeysWhenUpdating() {
+        TravelRecord travelRecord = mock(TravelRecord.class);
+        TravelRecordRequest request = new TravelRecordRequest(
+                "JP",
+                null,
+                null,
+                "일본 여행",
+                "본문",
+                LocalDate.of(2026, 8, 11),
+                null,
+                List.of("travel-records/10/a.jpg", "travel-records/10/a.jpg")
+        );
+        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
+                .thenReturn(Optional.of(travelRecord));
+
+        assertError(() -> travelRecordService.update(10L, 101L, request), "INVALID_OBJECT_KEY");
+        verify(regionResolver, never()).findCountry("JP");
+    }
+
+    @Test
+    void rejectsObjectKeyAlreadyUsedByAnotherTravelRecord() {
+        Region japan = Region.of(null, null, "JP", "일본", RegionType.COUNTRY);
+        TravelRecord travelRecord = TravelRecord.of(
+                mock(Member.class),
+                japan,
+                "일본 여행",
+                "본문",
+                LocalDate.of(2026, 8, 11),
+                null
+        );
+        TravelRecordRequest request = new TravelRecordRequest(
+                "JP",
+                null,
+                null,
+                "수정된 일본 여행",
+                "수정된 본문",
+                LocalDate.of(2026, 8, 12),
+                null,
+                List.of("travel-records/20/used.jpg")
+        );
+        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
+                .thenReturn(Optional.of(travelRecord));
+        when(regionResolver.findCountry("JP")).thenReturn(japan);
+        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
+                .thenReturn(List.of());
+        when(recordMediaRepository.findByObjectKeyIn(List.of("travel-records/20/used.jpg")))
+                .thenReturn(List.of(mock(RecordMedia.class)));
+
+        assertError(() -> travelRecordService.update(10L, 101L, request), "INVALID_OBJECT_KEY");
+        assertThat(travelRecord.getTitle()).isEqualTo("일본 여행");
+        verify(recordMediaRepository, never()).saveAll(anyList());
+    }
+
+    @Test
+    void removesAllMediaWhenObjectKeysAreNull() {
+        Region japan = Region.of(null, null, "JP", "일본", RegionType.COUNTRY);
+        TravelRecord travelRecord = TravelRecord.of(
+                mock(Member.class),
+                japan,
+                "기존 제목",
+                "기존 본문",
+                LocalDate.of(2026, 8, 11),
+                null
+        );
+        RecordMedia existingMedia = RecordMedia.of(
+                travelRecord,
+                "travel-records/10/a.jpg",
+                null,
+                0
+        );
+        TravelRecordRequest request = new TravelRecordRequest(
+                "JP",
+                null,
+                null,
+                "수정된 제목",
+                "수정된 본문",
+                LocalDate.of(2026, 8, 12),
+                null,
+                null
+        );
+        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
+                .thenReturn(Optional.of(travelRecord));
+        when(regionResolver.findCountry("JP")).thenReturn(japan);
+        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
+                .thenReturn(List.of(existingMedia));
+        when(recordMediaRepository.saveAll(anyList()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        TravelRecordDetailResponse result = travelRecordService.update(10L, 101L, request);
+
+        assertThat(result.objectKeys()).isEmpty();
+        verify(recordMediaRepository).deleteAll(org.mockito.ArgumentMatchers.argThat(records ->
+                records.iterator().hasNext()
+        ));
+        verify(recordMediaRepository, never()).findByObjectKeyIn(anyList());
+    }
+
+    @Test
+    void rejectsUpdatingMissingOrOtherMembersTravelRecord() {
+        TravelRecordRequest request = new TravelRecordRequest(
+                "JP",
+                null,
+                null,
+                "일본 여행",
+                "본문",
+                LocalDate.of(2026, 8, 11),
+                null,
+                List.of()
+        );
+        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
+                .thenReturn(Optional.empty());
+
+        assertError(() -> travelRecordService.update(10L, 101L, request), "TRAVEL_RECORD_NOT_FOUND");
+        verify(regionResolver, never()).findCountry("JP");
         verify(recordMediaRepository, never()).findByTravelRecordIdOrderBySortOrderAsc(101L);
     }
 

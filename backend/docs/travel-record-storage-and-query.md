@@ -261,7 +261,31 @@ Repository에서 `travelRecordId`와 `memberId`를 함께 조건으로 사용한
 
 국가 단위 기록은 `province`와 `district`가 `null`이다. 현재는 S3 객체 키만 제공하며, Presigned GET URL 변환은 S3 연동 시 추가한다.
 
-## 9. 현재 후속 작업
+## 9. 여행 기록 수정
+
+수정 API는 현재 회원이 소유한 기록을 생성 요청과 같은 본문으로 전체 수정한다.
+
+```http
+PUT /api/v1/travel-records/{travelRecordId}
+X-Member-Id: 10
+```
+
+Service는 `travelRecordId`와 `memberId`로 소유권을 확인한 후 새 Region 경로를 조회한다. 기록이 없거나 다른 회원의 기록이면 모두 `404 TRAVEL_RECORD_NOT_FOUND`를 반환한다.
+
+미디어는 전체 삭제 후 재생성하지 않고 기존 목록과 요청의 `objectKeys`를 비교한다.
+
+| 구분 | 처리 |
+| --- | --- |
+| 기존과 요청에 모두 존재 | 기존 미디어를 유지하고 `sort_order` 변경 |
+| 기존에만 존재 | `record_media` 삭제 |
+| 요청에만 존재 | 새 `record_media` 생성 |
+| 요청이 `null` 또는 빈 배열 | 기존 미디어 전체 삭제 |
+
+중복 Object Key 또는 다른 여행 기록에서 이미 사용 중인 Object Key는 `400 INVALID_OBJECT_KEY`로 거부한다. Object Key의 회원 소유권과 S3 업로드 완료 여부 검증은 후속 작업이다.
+
+수정 성공 시 변경된 여행 기록을 상세 조회와 같은 응답 구조로 반환한다. 기록과 미디어 변경은 하나의 트랜잭션에서 처리하므로 중간에 실패하면 전체 변경이 롤백된다.
+
+## 10. 현재 후속 작업
 
 | 항목 | 상태 |
 | --- | --- |
@@ -269,6 +293,7 @@ Repository에서 `travelRecordId`와 `memberId`를 함께 조건으로 사용한
 | 전체·국가·시도·시군구 목록 조회 | 구현 |
 | 생성·목록 페이징 테스트 | 구현 |
 | 여행 기록 상세 조회 및 소유권 검사 | 구현 |
+| 여행 기록 전체 수정 및 미디어 동기화 | 구현 |
 | 목록 썸네일 URL 생성 | 미구현, 현재 `null` |
 | 상세 조회 Object Key의 Presigned GET URL 변환 | 미구현 |
 | 키워드 검색 | 미구현 |
@@ -277,7 +302,7 @@ Repository에서 `travelRecordId`와 `memberId`를 함께 조건으로 사용한
 | Region 미존재 도메인 예외 | 미구현 |
 | 성공 응답 `data` 래퍼 | 구현 |
 
-## 10. 관련 문서
+## 11. 관련 문서
 
 - [API 명세](../../api.md)
 - [ERD](erd.md)

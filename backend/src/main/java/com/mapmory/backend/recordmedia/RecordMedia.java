@@ -52,6 +52,10 @@ public class RecordMedia {
         return new RecordMedia(travelRecord, objectKey, thumbKey, sortOrder);
     }
 
+    public void updateSortOrder(int sortOrder) {
+        this.sortOrder = sortOrder;
+    }
+
     public Long getId() {
         return id;
     }
