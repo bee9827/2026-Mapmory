@@ -3,6 +3,7 @@ package com.mapmory.backend.travelrecord;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordResponse;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.Valid;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -59,6 +61,16 @@ public class TravelRecordController {
                 size
         );
         TravelRecordListResponse response = TravelRecordListResponse.from(travelRecords);
+
+        return ResponseEntity.ok(TravelRecordResponse.of(response));
+    }
+
+    @GetMapping("/travel-records/{travelRecordId}")
+    public ResponseEntity<TravelRecordResponse<TravelRecordDetailResponse>> findById(
+            @RequestHeader("X-Member-Id") @Positive Long memberId,
+            @PathVariable @Positive Long travelRecordId
+    ) {
+        TravelRecordDetailResponse response = travelRecordService.findById(memberId, travelRecordId);
 
         return ResponseEntity.ok(TravelRecordResponse.of(response));
     }

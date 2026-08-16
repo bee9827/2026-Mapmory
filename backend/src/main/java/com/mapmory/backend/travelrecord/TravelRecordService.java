@@ -8,6 +8,7 @@ import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
+import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -69,6 +70,16 @@ public class TravelRecordService {
         }
 
         return savedTravelRecord;
+    }
+
+    @Transactional(readOnly = true)
+    public TravelRecordDetailResponse findById(Long memberId, Long travelRecordId) {
+        TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, memberId)
+                .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
+        List<RecordMedia> recordMedia = recordMediaRepository
+                .findByTravelRecordIdOrderBySortOrderAsc(travelRecordId);
+
+        return TravelRecordDetailResponse.from(travelRecord, recordMedia);
     }
 
     @Transactional(readOnly = true)

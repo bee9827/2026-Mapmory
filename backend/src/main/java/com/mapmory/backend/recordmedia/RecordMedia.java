@@ -55,4 +55,12 @@ public class RecordMedia {
     public Long getId() {
         return id;
     }
+
+    public String getObjectKey() {
+        return objectKey;
+    }
+
+    public int getSortOrder() {
+        return sortOrder;
+    }
 }

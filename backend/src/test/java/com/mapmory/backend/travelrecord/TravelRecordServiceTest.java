@@ -6,18 +6,23 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
+import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
+import com.mapmory.backend.region.RegionType;
+import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,6 +34,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class TravelRecordServiceTest {
@@ -71,6 +77,76 @@ class TravelRecordServiceTest {
         assertThat(result).isNotNull();
         verify(regionResolver).findCountry("JP");
         verify(travelRecordRepository).save(any(TravelRecord.class));
+    }
+
+    @Test
+    void findsTravelRecordDetailWithRegionHierarchyAndOrderedObjectKeys() {
+        Region country = Region.of(null, null, "KR", "대한민국", RegionType.COUNTRY);
+        Region province = Region.of(country, country, "49", "제주특별자치도", RegionType.PROVINCE);
+        Region district = Region.of(province, country, "50110", "제주시", RegionType.DISTRICT);
+        TravelRecord travelRecord = TravelRecord.of(
+                mock(Member.class),
+                district,
+                "제주 여행",
+                "제주시를 걸었다.",
+                LocalDate.of(2026, 8, 11),
+                LocalDate.of(2026, 8, 13)
+        );
+        ReflectionTestUtils.setField(travelRecord, "id", 101L);
+        List<RecordMedia> recordMedia = List.of(
+                RecordMedia.of(travelRecord, "mapmory/travel-records/a.jpg", null, 0),
+                RecordMedia.of(travelRecord, "mapmory/travel-records/b.jpg", null, 1)
+        );
+        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
+                .thenReturn(Optional.of(travelRecord));
+        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
+                .thenReturn(recordMedia);
+
+        TravelRecordDetailResponse result = travelRecordService.findById(10L, 101L);
+
+        assertThat(result.id()).isEqualTo(101L);
+        assertThat(result.content()).isEqualTo("제주시를 걸었다.");
+        assertThat(result.region().country().code()).isEqualTo("KR");
+        assertThat(result.region().province().code()).isEqualTo("49");
+        assertThat(result.region().district().code()).isEqualTo("50110");
+        assertThat(result.objectKeys()).containsExactly(
+                "mapmory/travel-records/a.jpg",
+                "mapmory/travel-records/b.jpg"
+        );
+    }
+
+    @Test
+    void returnsEmptyObjectKeysForTravelRecordWithoutMedia() {
+        Region japan = Region.of(null, null, "JP", "일본", RegionType.COUNTRY);
+        TravelRecord travelRecord = TravelRecord.of(
+                mock(Member.class),
+                japan,
+                "일본 여행",
+                "도쿄 여행",
+                LocalDate.of(2026, 8, 11),
+                null
+        );
+        ReflectionTestUtils.setField(travelRecord, "id", 102L);
+        when(travelRecordRepository.findByIdAndMemberId(102L, 10L))
+                .thenReturn(Optional.of(travelRecord));
+        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(102L))
+                .thenReturn(List.of());
+
+        TravelRecordDetailResponse result = travelRecordService.findById(10L, 102L);
+
+        assertThat(result.region().country().code()).isEqualTo("JP");
+        assertThat(result.region().province()).isNull();
+        assertThat(result.region().district()).isNull();
+        assertThat(result.objectKeys()).isEmpty();
+    }
+
+    @Test
+    void rejectsMissingOrOtherMembersTravelRecord() {
+        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
+                .thenReturn(Optional.empty());
+
+        assertError(() -> travelRecordService.findById(10L, 101L), "TRAVEL_RECORD_NOT_FOUND");
+        verify(recordMediaRepository, never()).findByTravelRecordIdOrderBySortOrderAsc(101L);
     }
 
     @Test

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
+import com.mapmory.backend.recordmedia.RecordMedia;
+import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionRepository;
 import com.mapmory.backend.region.RegionType;
@@ -31,6 +33,9 @@ class TravelRecordRepositoryTest {
 
     @Autowired
     private RegionRepository regionRepository;
+
+    @Autowired
+    private RecordMediaRepository recordMediaRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -93,5 +98,37 @@ class TravelRecordRepositoryTest {
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.hasNext()).isFalse();
+    }
+
+    @Test
+    void findsOwnedTravelRecordAndMediaInSortOrder() {
+        Member owner = memberRepository.save(Member.of("작성자", UUID.randomUUID()));
+        Member otherMember = memberRepository.save(Member.of("다른 회원", UUID.randomUUID()));
+        Region country = regionRepository.save(
+                Region.of(null, null, "YY", "상세 조회 국가", RegionType.COUNTRY)
+        );
+        TravelRecord travelRecord = travelRecordRepository.save(
+                TravelRecord.of(
+                        owner,
+                        country,
+                        "상세 조회 기록",
+                        "본문",
+                        LocalDate.of(2026, 8, 11),
+                        null
+                )
+        );
+        recordMediaRepository.save(RecordMedia.of(travelRecord, "mapmory/detail/b.jpg", null, 1));
+        recordMediaRepository.save(RecordMedia.of(travelRecord, "mapmory/detail/a.jpg", null, 0));
+
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(travelRecordRepository.findByIdAndMemberId(travelRecord.getId(), owner.getId()))
+                .isPresent();
+        assertThat(travelRecordRepository.findByIdAndMemberId(travelRecord.getId(), otherMember.getId()))
+                .isEmpty();
+        assertThat(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(travelRecord.getId()))
+                .extracting(RecordMedia::getObjectKey)
+                .containsExactly("mapmory/detail/a.jpg", "mapmory/detail/b.jpg");
     }
 }

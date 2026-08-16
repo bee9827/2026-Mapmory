@@ -1,6 +1,6 @@
-# 여행 기록 저장 및 목록 조회 방식
+# 여행 기록 저장 및 조회 방식
 
-> 기준일: 2026-08-13 · 현재 구현된 생성 및 목록 조회 기준
+> 기준일: 2026-08-16 · 현재 구현된 생성, 목록 및 상세 조회 기준
 
 ## 1. 목적
 
@@ -223,21 +223,61 @@ PageRequest.of(
 | Entity | 테이블 매핑과 연관관계 표현 |
 | DTO | API 요청·응답 데이터 표현 |
 
-## 8. 현재 후속 작업
+## 8. 여행 기록 상세 조회
+
+상세 조회는 요청 회원이 소유한 기록만 반환한다.
+
+```http
+GET /api/v1/travel-records/{travelRecordId}
+X-Member-Id: 10
+```
+
+Repository에서 `travelRecordId`와 `memberId`를 함께 조건으로 사용한다. 기록이 없거나 다른 회원의 기록인 경우 모두 `404 TRAVEL_RECORD_NOT_FOUND`를 반환하여 기록의 존재 여부가 노출되지 않게 한다.
+
+응답에는 제목, 본문, 여행 날짜, 국가·시도·시군구 계층, 생성·수정 시각을 포함한다. 미디어는 `sort_order` 오름차순의 `objectKeys` 배열로 반환한다.
+
+```json
+{
+  "data": {
+    "id": 101,
+    "title": "제주 여행",
+    "content": "제주시를 걸었다.",
+    "region": {
+      "country": {"code": "KR", "name": "대한민국"},
+      "province": {"code": "49", "name": "제주특별자치도"},
+      "district": {"code": "50110", "name": "제주시"}
+    },
+    "startDate": "2026-08-11",
+    "endDate": "2026-08-13",
+    "objectKeys": [
+      "mapmory/travel-records/a.jpg",
+      "mapmory/travel-records/b.jpg"
+    ],
+    "createdAt": "2026-08-14T10:30:00",
+    "updatedAt": "2026-08-15T09:00:00"
+  }
+}
+```
+
+국가 단위 기록은 `province`와 `district`가 `null`이다. 현재는 S3 객체 키만 제공하며, Presigned GET URL 변환은 S3 연동 시 추가한다.
+
+## 9. 현재 후속 작업
 
 | 항목 | 상태 |
 | --- | --- |
 | 여행 기록과 미디어 기본 저장 | 구현 |
 | 전체·국가·시도·시군구 목록 조회 | 구현 |
 | 생성·목록 페이징 테스트 | 구현 |
+| 여행 기록 상세 조회 및 소유권 검사 | 구현 |
 | 목록 썸네일 URL 생성 | 미구현, 현재 `null` |
+| 상세 조회 Object Key의 Presigned GET URL 변환 | 미구현 |
 | 키워드 검색 | 미구현 |
 | 날짜 범위 검증 | 미구현 |
 | Object Key 소유권·업로드 검증 | 미구현 |
 | Region 미존재 도메인 예외 | 미구현 |
 | 성공 응답 `data` 래퍼 | 구현 |
 
-## 9. 관련 문서
+## 10. 관련 문서
 
 - [API 명세](../../api.md)
 - [ERD](erd.md)

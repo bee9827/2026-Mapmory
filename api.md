@@ -303,32 +303,42 @@ GET /api/v1/travel-records?countryCode=KR&provinceCode=49&districtCode=50110
 
 `GET /api/v1/travel-records/{travelRecordId}`
 
+`X-Member-Id` 헤더와 `travelRecordId`는 양의 정수여야 한다. 현재 회원이 소유한 기록만 조회하며, 기록이 없거나 다른 회원의 기록이면 모두 `404 TRAVEL_RECORD_NOT_FOUND`를 반환한다.
+
 #### Response `200 OK`
 
 ```json
 {
   "data": {
     "id": 101,
-    "region": {
-      "countryCode": "KR",
-      "provinceCode": "49",
-      "districtCode": "50110",
-      "name": "제주시"
-    },
     "title": "비 오는 날의 제주시",
     "content": "골목을 걸으며 오래된 가게들을 기록했다.",
+    "region": {
+      "country": {
+        "code": "KR",
+        "name": "대한민국"
+      },
+      "province": {
+        "code": "49",
+        "name": "제주특별자치도"
+      },
+      "district": {
+        "code": "50110",
+        "name": "제주시"
+      }
+    },
     "startDate": "2026-08-11",
     "endDate": null,
-    "media": [
-      {
-        "id": 1,
-        "objectKey": "travel-records/10/550e8400-e29b-41d4-a716-446655440000.jpg",
-        "sortOrder": 0
-      }
-    ]
+    "objectKeys": [
+      "travel-records/10/550e8400-e29b-41d4-a716-446655440000.jpg"
+    ],
+    "createdAt": "2026-08-14T10:30:00",
+    "updatedAt": "2026-08-15T09:00:00"
   }
 }
 ```
+
+`objectKeys`는 `record_media.sort_order` 오름차순으로 반환하며 미디어가 없으면 빈 배열이다. 국가 단위 기록은 `province`와 `district`가 `null`이다. Presigned GET URL 변환은 S3 조회 연동 시 추가한다.
 
 ### 여행 기록 수정 및 삭제
 

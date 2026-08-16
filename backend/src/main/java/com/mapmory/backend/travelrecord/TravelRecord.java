@@ -77,6 +77,10 @@ public class TravelRecord extends BaseEntity {
         return title;
     }
 
+    public String getContent() {
+        return content;
+    }
+
     public Region getRegion() {
         return region;
     }
