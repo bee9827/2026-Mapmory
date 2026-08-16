@@ -118,6 +118,14 @@ public class TravelRecordService {
         return TravelRecordDetailResponse.from(travelRecord, updatedMedia);
     }
 
+    @Transactional
+    public void delete(Long memberId, Long travelRecordId) {
+        TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, memberId)
+                .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
+
+        travelRecordRepository.delete(travelRecord);
+    }
+
     @Transactional(readOnly = true)
     public Page<TravelRecord> findAll(Long memberId, String countryCode, String provinceCode, String districtCode, int page, int size) {
         validateRegionCodeFormat(countryCode, provinceCode, districtCode);

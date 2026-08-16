@@ -368,7 +368,22 @@ Region 관련 오류는 생성 API와 동일하게 처리한다.
 
 ### 여행 기록 삭제
 
-`DELETE /api/v1/travel-records/{travelRecordId}`: 기록을 삭제한다. 연결된 `record_media` 행은 CASCADE 삭제한다. S3 객체 삭제는 별도 처리한다.
+`DELETE /api/v1/travel-records/{travelRecordId}`
+
+현재 회원이 소유한 여행 기록을 삭제한다. 기록이 없거나 다른 회원의 기록이면 존재 여부를 숨기기 위해 동일하게 `404 TRAVEL_RECORD_NOT_FOUND`를 반환한다.
+
+연결된 `record_media` 행은 DB의 `ON DELETE CASCADE`로 함께 삭제한다. S3 실제 객체 삭제는 후속 작업으로 처리한다.
+
+#### Response `204 No Content`
+
+응답 본문은 없다.
+
+#### 오류 응답
+
+| 상태 | `code` | 조건 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | 회원 ID 또는 여행 기록 ID가 양의 정수가 아님 |
+| `404` | `TRAVEL_RECORD_NOT_FOUND` | 기록이 없거나 현재 회원의 기록이 아님 |
 
 ## 5. 지역별 여행 기록 통계 API
 
