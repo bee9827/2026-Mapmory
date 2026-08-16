@@ -41,7 +41,7 @@ class TravelRecordRepositoryTest {
     private EntityManager entityManager;
 
     @Test
-    void savesTravelRecord() {
+    void 여행_일지를_저장한다() {
         Member member = memberRepository.save(Member.of("테스터", UUID.randomUUID()));
         Region testCountry = regionRepository.save(
                 Region.of(null, null, "ZZ", "테스트 국가", RegionType.COUNTRY)
@@ -66,7 +66,7 @@ class TravelRecordRepositoryTest {
     }
 
     @Test
-    void findsTravelRecordsByMemberWithPagination() {
+    void 회원의_여행_일지를_페이지로_조회한다() {
         Member member = memberRepository.save(
                 Member.of("테스터", UUID.randomUUID())
         );
@@ -101,7 +101,7 @@ class TravelRecordRepositoryTest {
     }
 
     @Test
-    void findsOwnedTravelRecordAndMediaInSortOrder() {
+    void 소유한_일지와_정렬된_미디어를_조회한다() {
         Member owner = memberRepository.save(Member.of("작성자", UUID.randomUUID()));
         Member otherMember = memberRepository.save(Member.of("다른 회원", UUID.randomUUID()));
         Region country = regionRepository.save(

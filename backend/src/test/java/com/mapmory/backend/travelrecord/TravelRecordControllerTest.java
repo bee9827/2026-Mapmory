@@ -41,7 +41,7 @@ class TravelRecordControllerTest {
     private TravelRecordController travelRecordController;
 
     @Test
-    void createsTravelRecord() {
+    void 여행_일지를_생성한다() {
         TravelRecordRequest request = new TravelRecordRequest(
                 "JP",
                 null,
@@ -75,7 +75,7 @@ class TravelRecordControllerTest {
     }
 
     @Test
-    void findsTravelRecordDetail() {
+    void 여행_일지_상세_조회를_서비스에_위임한다() {
         TravelRecordDetailResponse detail = new TravelRecordDetailResponse(
                 101L,
                 "제주 여행",
@@ -102,7 +102,7 @@ class TravelRecordControllerTest {
     }
 
     @Test
-    void respondsWithTravelRecordDetail() throws Exception {
+    void 여행_일지_상세_HTTP_응답을_반환한다() throws Exception {
         TravelRecordDetailResponse detail = new TravelRecordDetailResponse(
                 101L,
                 "제주 여행",
@@ -133,7 +133,7 @@ class TravelRecordControllerTest {
     }
 
     @Test
-    void updatesTravelRecord() throws Exception {
+    void 여행_일지를_수정한다() throws Exception {
         TravelRecordDetailResponse detail = new TravelRecordDetailResponse(
                 101L,
                 "수정된 제주 여행",
@@ -180,7 +180,7 @@ class TravelRecordControllerTest {
     }
 
     @Test
-    void rejectsRequestWithoutMemberIdHeader() throws Exception {
+    void 회원_ID_헤더가_없으면_요청을_거부한다() throws Exception {
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(travelRecordController)
                 .setControllerAdvice(new ValidationExceptionHandler(new ProblemDetailFactory()))
                 .build();
