@@ -1,6 +1,7 @@
 package com.mapmory.backend.auth.security;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -65,6 +66,14 @@ class SecurityIntegrationTest extends IntegrationTest {
     void 화이트리스트_경로는_토큰_없이_접근된다() throws Exception {
         mockMvc.perform(get("/health"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void 화이트리스트_경로의_에러는_401로_덮이지_않고_원래_상태가_유지된다() throws Exception {
+        // permitAll 인 /api/v1/auth/** 아래 없는 경로 → 404가 /error로 재디스패치된다.
+        // ERROR 디스패치가 permitAll이 아니면 이 응답이 401로 덮인다.
+        mockMvc.perform(post("/api/v1/auth/no-such-endpoint"))
+                .andExpect(status().isNotFound());
     }
 
     @TestConfiguration
