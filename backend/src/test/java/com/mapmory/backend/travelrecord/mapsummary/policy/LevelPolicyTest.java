@@ -24,8 +24,8 @@ class LevelPolicyTest {
                 "0, NONE",
                 "1, LOW",
                 "2, LOW",
-                "3, MIDDLE",
-                "5, MIDDLE",
+                "3, MEDIUM",
+                "5, MEDIUM",
                 "6, HIGH"
         })
         void returnsLevelForBoundary(long count, MapColorLevel expectedLevel) {
@@ -53,7 +53,7 @@ class LevelPolicyTest {
         }
 
         @Test
-        @DisplayName("MIDDLE 최대 기록 수는 LOW 최대 기록 수보다 커야 한다")
+        @DisplayName("MEDIUM 최대 기록 수는 LOW 최대 기록 수보다 커야 한다")
         void rejectsInvalidLevelTwoMaximum() {
             assertThatThrownBy(() -> LevelPolicy.of(2, 2))
                     .isInstanceOf(IllegalArgumentException.class);

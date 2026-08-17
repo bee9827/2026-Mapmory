@@ -49,7 +49,7 @@ class RegionMapSummaryControllerTest {
                             RegionType.COUNTRY,
                             "대한민국",
                             3L,
-                            MapColorLevel.MIDDLE
+                            MapColorLevel.MEDIUM
                     )
             ));
 
@@ -61,7 +61,7 @@ class RegionMapSummaryControllerTest {
                     .andExpect(jsonPath("$.data[0].regionType").value("COUNTRY"))
                     .andExpect(jsonPath("$.data[0].name").value("대한민국"))
                     .andExpect(jsonPath("$.data[0].count").value(3))
-                    .andExpect(jsonPath("$.data[0].level").value("MIDDLE"));
+                    .andExpect(jsonPath("$.data[0].level").value("MEDIUM"));
 
             verify(regionMapSummaryService).getSummaries(10L, null);
         }
@@ -121,7 +121,7 @@ class RegionMapSummaryControllerTest {
                             RegionType.PROVINCE,
                             "제주특별자치도",
                             3L,
-                            MapColorLevel.MIDDLE
+                            MapColorLevel.MEDIUM
                     )
             ));
 
@@ -132,7 +132,7 @@ class RegionMapSummaryControllerTest {
                     .andExpect(jsonPath("$.data[0].code").value("49"))
                     .andExpect(jsonPath("$.data[0].regionType").value("PROVINCE"))
                     .andExpect(jsonPath("$.data[0].count").value(3))
-                    .andExpect(jsonPath("$.data[0].level").value("MIDDLE"));
+                    .andExpect(jsonPath("$.data[0].level").value("MEDIUM"));
 
             verify(regionMapSummaryService).getSummaries(10L, 1L);
         }

@@ -310,7 +310,7 @@
 | ---: | --- |
 | `0` | `NONE` |
 | `1~2` | `LOW` |
-| `3~5` | `MIDDLE` |
+| `3~5` | `MEDIUM` |
 | `6 이상` | `HIGH` |
 
 ### 직속 하위 Region별 지도 색칠 정보 조회
@@ -337,7 +337,7 @@ X-Member-Id: 10
       "regionType": "PROVINCE",
       "name": "제주특별자치도",
       "count": 5,
-      "level": "MIDDLE"
+      "level": "MEDIUM"
     }
   ]
 }
