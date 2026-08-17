@@ -6,16 +6,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.mapmory.shared.domain.model.Location
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.useContents
 import kotlinx.cinterop.usePinned
+import platform.CoreFoundation.CFRelease
+import platform.CoreGraphics.CGImageRelease
 import platform.CoreLocation.CLGeocoder
 import platform.CoreLocation.CLPlacemark
 import platform.CoreLocation.CLLocation
+import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSData
 import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.getBytes
 import platform.Foundation.NSSortDescriptor
+import platform.ImageIO.CGImageSourceCreateThumbnailAtIndex
+import platform.ImageIO.CGImageSourceCreateWithData
+import platform.ImageIO.kCGImageSourceCreateThumbnailFromImageAlways
+import platform.ImageIO.kCGImageSourceCreateThumbnailWithTransform
+import platform.ImageIO.kCGImageSourceThumbnailMaxPixelSize
 import platform.Photos.PHAccessLevelReadWrite
 import platform.Photos.PHAsset
 import platform.Photos.PHAssetMediaTypeImage
@@ -34,6 +43,8 @@ import platform.PhotosUI.PHPickerResult
 import platform.PhotosUI.PHPickerViewController
 import platform.PhotosUI.PHPickerViewControllerDelegateProtocol
 import platform.UIKit.UIApplication
+import platform.UIKit.UIImage
+import platform.UIKit.UIImageJPEGRepresentation
 import platform.UIKit.UIViewController
 import platform.UIKit.UIWindow
 import platform.darwin.NSObject
@@ -269,6 +280,9 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
             val coordinate = asset.location?.coordinate
             val latitude = coordinate?.useContents { latitude }
             val longitude = coordinate?.useContents { longitude }
+            val previewBytes = data
+                ?.takeIf { it.length > 0UL }
+                ?.toPreviewByteArray()
             onMain {
                 // requestImageDataAndOrientationForAsset invokes its result handler once.
                 // Keep completion serialized on the main queue with the other photo paths.
@@ -279,7 +293,7 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
                         SelectedPhoto(
                             id = asset.localIdentifier,
                             displayName = asset.displayName(),
-                            previewBytes = it.toByteArray(),
+                            previewBytes = previewBytes,
                             latitude = latitude,
                             longitude = longitude,
                             capturedAt = asset.creationDate?.formattedPhotoDate(),
@@ -319,6 +333,39 @@ private fun NSData.toByteArray(): ByteArray {
     }
 }
 
+private fun NSData.toPreviewByteArray(): ByteArray? {
+    val retainedData = CFBridgingRetain(this) ?: return null
+    val imageSource = CGImageSourceCreateWithData(retainedData.reinterpret(), null)
+    CFRelease(retainedData)
+    if (imageSource == null) return null
+
+    val thumbnailOptions = mapOf(
+        kCGImageSourceCreateThumbnailFromImageAlways to true,
+        kCGImageSourceCreateThumbnailWithTransform to true,
+        kCGImageSourceThumbnailMaxPixelSize to PreviewSizePx,
+    )
+    val retainedOptions = CFBridgingRetain(thumbnailOptions) ?: run {
+        CFRelease(imageSource.reinterpret())
+        return null
+    }
+    val thumbnail = CGImageSourceCreateThumbnailAtIndex(
+        imageSource,
+        0UL,
+        retainedOptions.reinterpret(),
+    )
+    CFRelease(retainedOptions)
+    CFRelease(imageSource.reinterpret())
+    if (thumbnail == null) return null
+
+    val previewImage = UIImage.imageWithCGImage(thumbnail)
+    CGImageRelease(thumbnail)
+    val previewData = UIImageJPEGRepresentation(
+        previewImage,
+        PreviewJpegQuality,
+    ) ?: return null
+    return previewData.toByteArray()
+}
+
 private fun topViewController(): UIViewController? {
     val application = UIApplication.sharedApplication
     val window = application.keyWindow
@@ -336,3 +383,5 @@ private fun onMain(block: () -> Unit) {
 
 private const val MaxReverseGeocodeCandidates = 60
 private const val MaxRecommendedPhotos = 12
+private const val PreviewSizePx = 960
+private const val PreviewJpegQuality = 0.84
