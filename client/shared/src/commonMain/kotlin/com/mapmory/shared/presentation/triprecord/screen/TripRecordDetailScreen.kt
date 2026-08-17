@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
@@ -167,6 +168,7 @@ private fun TripRecordPhotoSection(
                 contentDescription = record.title,
                 modifier = Modifier.fillMaxSize(),
                 placeholderVariant = record.id.toInt() + 1,
+                shape = RectangleShape,
             )
         } else {
             val pagerState = rememberPagerState(pageCount = { media.size })
@@ -183,6 +185,7 @@ private fun TripRecordPhotoSection(
                     contentDescription = "${record.title} 사진 ${page + 1}",
                     modifier = Modifier.fillMaxSize(),
                     placeholderVariant = record.id.toInt() + page + 1,
+                    shape = RectangleShape,
                 )
             }
             if (media.size > 1) {

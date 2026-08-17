@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -241,6 +242,7 @@ private fun TripBottomItem(
 internal fun TripPhotoPlaceholder(
     modifier: Modifier = Modifier,
     variant: Int = 0,
+    shape: Shape = RoundedCornerShape(18.dp),
 ) {
     val skyColors = when (variant % 3) {
         0 -> listOf(Color(0xFFEEA16C), Color(0xFFE56A66), Color(0xFF305C6B))
@@ -249,7 +251,7 @@ internal fun TripPhotoPlaceholder(
     }
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .clip(shape)
             .background(Brush.verticalGradient(skyColors)),
     ) {
         Canvas(Modifier.fillMaxSize()) {
@@ -299,18 +301,19 @@ internal fun TripPhotoImage(
     contentDescription: String,
     modifier: Modifier = Modifier,
     placeholderVariant: Int = 0,
+    shape: Shape = RoundedCornerShape(18.dp),
 ) {
     val bitmap = remember(previewBytes) {
         previewBytes?.let { bytes -> runCatching { bytes.decodeToImageBitmap() }.getOrNull() }
     }
     if (bitmap == null) {
-        TripPhotoPlaceholder(modifier, placeholderVariant)
+        TripPhotoPlaceholder(modifier, placeholderVariant, shape)
     } else {
         Image(
             bitmap = bitmap,
             contentDescription = contentDescription,
             contentScale = ContentScale.Crop,
-            modifier = modifier.clip(RoundedCornerShape(18.dp)),
+            modifier = modifier.clip(shape),
         )
     }
 }
