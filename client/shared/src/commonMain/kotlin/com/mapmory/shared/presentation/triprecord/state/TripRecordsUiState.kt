@@ -1,14 +1,10 @@
 package com.mapmory.shared.presentation.triprecord.state
 
-import androidx.compose.runtime.Immutable
-
-@Immutable
 data class TripRecordFilterUiState(
     val locationId: Long? = null,
     val keyword: String = "",
 )
 
-@Immutable
 data class TripRecordsUiState(
     val records: List<TripRecordItemUiState> = emptyList(),
     val visibleRecords: List<TripRecordItemUiState> = emptyList(),
@@ -17,7 +13,6 @@ data class TripRecordsUiState(
     val effect: TripRecordEffect? = null,
 )
 
-@Immutable
 sealed interface TripRecordEffect {
     data object OpenRecords : TripRecordEffect
 

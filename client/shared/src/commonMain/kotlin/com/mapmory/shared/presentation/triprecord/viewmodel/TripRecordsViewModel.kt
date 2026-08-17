@@ -1,6 +1,5 @@
 package com.mapmory.shared.presentation.triprecord.viewmodel
 
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -58,7 +57,6 @@ sealed interface TripRecordAction {
  * 여행 기록 도메인 컬렉션을 단일 원본으로 관리한다.
  * UI는 [uiState]만 읽고 모든 변경은 [onAction]으로 전달한다.
  */
-@Stable
 class TripRecordsViewModel(
     locations: List<Location>,
     initialRecords: TripRecords = TripRecords(),

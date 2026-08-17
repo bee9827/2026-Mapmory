@@ -1,9 +1,7 @@
 package com.mapmory.shared.presentation.triprecord.state
 
-import androidx.compose.runtime.Immutable
 import com.mapmory.shared.domain.model.Location
 
-@Immutable
 data class TripRecordEditorUiState(
     val recordId: Long? = null,
     val selectedLocation: Location? = null,

@@ -1,8 +1,5 @@
 package com.mapmory.shared.presentation.triprecord.state
 
-import androidx.compose.runtime.Immutable
-
-@Immutable
 sealed interface TripRecordDetailUiState {
     data object Idle : TripRecordDetailUiState
 

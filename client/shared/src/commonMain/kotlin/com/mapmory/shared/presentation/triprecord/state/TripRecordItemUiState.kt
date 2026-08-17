@@ -1,12 +1,10 @@
 package com.mapmory.shared.presentation.triprecord.state
 
-import androidx.compose.runtime.Immutable
 import com.mapmory.shared.domain.TripRecord
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 
 /** 화면에 필요한 여행 기록 표현. 도메인 모델과 플랫폼 사진 데이터를 UI 경계에서 분리한다. */
-@Immutable
 data class TripRecordItemUiState(
     val id: Long,
     val title: String,
@@ -17,7 +15,6 @@ data class TripRecordItemUiState(
     val photos: List<TripRecordPhotoUiState>,
 )
 
-@Immutable
 data class TripRecordPhotoUiState(
     val id: String,
     val displayName: String,
@@ -29,7 +26,6 @@ data class TripRecordPhotoUiState(
 )
 
 /** ByteArray의 변경 가능성을 UI 상태 밖으로 숨기고 생성 시점에 방어적으로 복사한다. */
-@Immutable
 class PhotoPreviewBytes private constructor(
     private val value: ByteArray,
 ) {
