@@ -24,7 +24,7 @@ import androidx.compose.ui.graphics.toArgb
 import com.mapmory.shared.MapmoryApp
 import com.mapmory.shared.MapmoryNavigation
 
-private val SystemBarColor = Color(0xFF07171B)
+private val SystemBarColor = Color(0xFF111518)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

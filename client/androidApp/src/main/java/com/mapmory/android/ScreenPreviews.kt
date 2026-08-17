@@ -65,7 +65,7 @@ fun TripRecordListScreenPreview() {
     name = "여행 기록 상세",
     showBackground = true,
     widthDp = 412,
-    heightDp = 760,
+    heightDp = 900,
 )
 @Composable
 fun TripRecordDetailScreenPreview() {

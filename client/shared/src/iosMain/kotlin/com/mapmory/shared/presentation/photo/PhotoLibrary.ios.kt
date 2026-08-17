@@ -6,17 +6,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.mapmory.shared.domain.model.Location
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.useContents
 import kotlinx.cinterop.usePinned
-import platform.CoreGraphics.CGSizeMake
+import platform.CoreFoundation.CFRelease
+import platform.CoreGraphics.CGImageRelease
 import platform.CoreLocation.CLGeocoder
 import platform.CoreLocation.CLPlacemark
 import platform.CoreLocation.CLLocation
+import platform.Foundation.CFBridgingRetain
 import platform.Foundation.NSData
 import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.getBytes
 import platform.Foundation.NSSortDescriptor
+import platform.ImageIO.CGImageSourceCreateThumbnailAtIndex
+import platform.ImageIO.CGImageSourceCreateWithData
+import platform.ImageIO.kCGImageSourceCreateThumbnailFromImageAlways
+import platform.ImageIO.kCGImageSourceCreateThumbnailWithTransform
+import platform.ImageIO.kCGImageSourceThumbnailMaxPixelSize
 import platform.Photos.PHAccessLevelReadWrite
 import platform.Photos.PHAsset
 import platform.Photos.PHAssetMediaTypeImage
@@ -25,9 +33,9 @@ import platform.Photos.PHAuthorizationStatusAuthorized
 import platform.Photos.PHAuthorizationStatusLimited
 import platform.Photos.PHAuthorizationStatusNotDetermined
 import platform.Photos.PHFetchOptions
-import platform.Photos.PHImageContentModeAspectFill
 import platform.Photos.PHImageManager
 import platform.Photos.PHImageRequestOptions
+import platform.Photos.PHImageRequestOptionsVersionCurrent
 import platform.Photos.PHPhotoLibrary
 import platform.PhotosUI.PHPickerConfiguration
 import platform.PhotosUI.PHPickerFilter
@@ -231,20 +239,17 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
             return
         }
         result.itemProvider.loadDataRepresentationForTypeIdentifier("public.image") { data, _ ->
-            if (data == null) {
-                completion(null)
+            if (data == null || data.length == 0UL) {
+                onMain { completion(null) }
                 return@loadDataRepresentationForTypeIdentifier
             }
-            val preview = UIImageJPEGRepresentation(UIImage(data), PreviewJpegQuality)
             onMain {
                 completion(
-                    preview?.let {
-                        SelectedPhoto(
-                            id = result.assetIdentifier ?: "ios-${data.hash}",
-                            displayName = result.itemProvider.suggestedName ?: "여행 사진",
-                            previewBytes = it.toByteArray(),
-                        )
-                    },
+                    SelectedPhoto(
+                        id = result.assetIdentifier ?: "ios-${data.hash}",
+                        displayName = result.itemProvider.suggestedName ?: "여행 사진",
+                        previewBytes = data.toByteArray(),
+                    ),
                 )
             }
         }
@@ -264,25 +269,31 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
 
     private fun loadAsset(asset: PHAsset, completion: (SelectedPhoto?) -> Unit) {
         val options = PHImageRequestOptions().apply {
+            version = PHImageRequestOptionsVersionCurrent
             networkAccessAllowed = true
         }
-        PHImageManager.defaultManager().requestImageForAsset(
+        var didComplete = false
+        PHImageManager.defaultManager().requestImageDataAndOrientationForAsset(
             asset = asset,
-            targetSize = CGSizeMake(PreviewSize, PreviewSize),
-            contentMode = PHImageContentModeAspectFill,
             options = options,
-        ) { image, _ ->
-            val data = image?.let { UIImageJPEGRepresentation(it, PreviewJpegQuality) }
+        ) { data, _, _, _ ->
             val coordinate = asset.location?.coordinate
             val latitude = coordinate?.useContents { latitude }
             val longitude = coordinate?.useContents { longitude }
+            val previewBytes = data
+                ?.takeIf { it.length > 0UL }
+                ?.toPreviewByteArray()
             onMain {
+                // requestImageDataAndOrientationForAsset invokes its result handler once.
+                // Keep completion serialized on the main queue with the other photo paths.
+                if (didComplete) return@onMain
+                didComplete = true
                 completion(
-                    data?.let {
+                    data?.takeIf { it.length > 0UL }?.let {
                         SelectedPhoto(
                             id = asset.localIdentifier,
                             displayName = asset.displayName(),
-                            previewBytes = it.toByteArray(),
+                            previewBytes = previewBytes,
                             latitude = latitude,
                             longitude = longitude,
                             capturedAt = asset.creationDate?.formattedPhotoDate(),
@@ -322,6 +333,39 @@ private fun NSData.toByteArray(): ByteArray {
     }
 }
 
+private fun NSData.toPreviewByteArray(): ByteArray? {
+    val retainedData = CFBridgingRetain(this) ?: return null
+    val imageSource = CGImageSourceCreateWithData(retainedData.reinterpret(), null)
+    CFRelease(retainedData)
+    if (imageSource == null) return null
+
+    val thumbnailOptions = mapOf(
+        kCGImageSourceCreateThumbnailFromImageAlways to true,
+        kCGImageSourceCreateThumbnailWithTransform to true,
+        kCGImageSourceThumbnailMaxPixelSize to PreviewSizePx,
+    )
+    val retainedOptions = CFBridgingRetain(thumbnailOptions) ?: run {
+        CFRelease(imageSource.reinterpret())
+        return null
+    }
+    val thumbnail = CGImageSourceCreateThumbnailAtIndex(
+        imageSource,
+        0UL,
+        retainedOptions.reinterpret(),
+    )
+    CFRelease(retainedOptions)
+    CFRelease(imageSource.reinterpret())
+    if (thumbnail == null) return null
+
+    val previewImage = UIImage.imageWithCGImage(thumbnail)
+    CGImageRelease(thumbnail)
+    val previewData = UIImageJPEGRepresentation(
+        previewImage,
+        PreviewJpegQuality,
+    ) ?: return null
+    return previewData.toByteArray()
+}
+
 private fun topViewController(): UIViewController? {
     val application = UIApplication.sharedApplication
     val window = application.keyWindow
@@ -337,7 +381,7 @@ private fun onMain(block: () -> Unit) {
     dispatch_async(dispatch_get_main_queue(), block)
 }
 
-private const val PreviewSize = 960.0
-private const val PreviewJpegQuality = 0.84
 private const val MaxReverseGeocodeCandidates = 60
 private const val MaxRecommendedPhotos = 12
+private const val PreviewSizePx = 960
+private const val PreviewJpegQuality = 0.84

@@ -30,7 +30,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,13 +42,13 @@ import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
 import org.jetbrains.compose.resources.decodeToImageBitmap
 
 internal object TripRecordPalette {
-    val background = Color(0xFF07171B)
-    val surface = Color(0xFF0C2026)
+    val background = Color(0xFF111518)
+    val surface = Color(0xFF1A1E22)
     val surfaceElevated = Color(0xFF102A32)
     val line = Color(0xFF1B363E)
     val text = Color(0xFFE9F4F2)
     val muted = Color(0xFF81999E)
-    val accent = Color(0xFF19E5A2)
+    val accent = Color(0xFF35C988)
     val accentSoft = Color(0xFF123E3A)
     val danger = Color(0xFFFF6264)
 }
@@ -100,6 +104,7 @@ internal fun TripRecordTopBar(
         if (onBackClick != null) {
             TripIconButton(
                 label = "←",
+                contentDescription = "뒤로가기",
                 onClick = onBackClick,
             )
             Spacer(Modifier.width(14.dp))
@@ -120,20 +125,27 @@ internal fun TripRecordTopBar(
 @Composable
 internal fun TripIconButton(
     label: String,
+    contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    containerColor: Color = TripRecordPalette.surface,
+    contentColor: Color = TripRecordPalette.text,
 ) {
     Box(
         modifier = modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(TripRecordPalette.surface)
-            .clickable(onClick = onClick),
+            .background(containerColor)
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(
+                role = Role.Button,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            color = TripRecordPalette.text,
+            color = contentColor,
             fontSize = if (label == "•••") 20.sp else 28.sp,
             fontWeight = FontWeight.Light,
         )
@@ -239,6 +251,7 @@ private fun TripBottomItem(
 internal fun TripPhotoPlaceholder(
     modifier: Modifier = Modifier,
     variant: Int = 0,
+    shape: Shape = RoundedCornerShape(18.dp),
 ) {
     val skyColors = when (variant % 3) {
         0 -> listOf(Color(0xFFEEA16C), Color(0xFFE56A66), Color(0xFF305C6B))
@@ -247,7 +260,7 @@ internal fun TripPhotoPlaceholder(
     }
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .clip(shape)
             .background(Brush.verticalGradient(skyColors)),
     ) {
         Canvas(Modifier.fillMaxSize()) {
@@ -297,18 +310,19 @@ internal fun TripPhotoImage(
     contentDescription: String,
     modifier: Modifier = Modifier,
     placeholderVariant: Int = 0,
+    shape: Shape = RoundedCornerShape(18.dp),
 ) {
     val bitmap = remember(previewBytes) {
         previewBytes?.let { bytes -> runCatching { bytes.decodeToImageBitmap() }.getOrNull() }
     }
     if (bitmap == null) {
-        TripPhotoPlaceholder(modifier, placeholderVariant)
+        TripPhotoPlaceholder(modifier, placeholderVariant, shape)
     } else {
         Image(
             bitmap = bitmap,
             contentDescription = contentDescription,
             contentScale = ContentScale.Crop,
-            modifier = modifier.clip(RoundedCornerShape(18.dp)),
+            modifier = modifier.clip(shape),
         )
     }
 }

@@ -1,7 +1,6 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -436,8 +435,7 @@ private fun PhotoActionButton(icon: String, label: String, onClick: () -> Unit) 
             .size(84.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .background(TripRecordPalette.surface)
-            .border(1.dp, TripRecordPalette.line, RoundedCornerShape(16.dp)),
+            .background(TripRecordPalette.surface),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -456,12 +454,7 @@ private fun RecommendedPhoto(
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(18.dp))
-                .clickable(onClick = onClick)
-                .border(
-                    width = if (selected) 3.dp else 1.dp,
-                    color = if (selected) TripRecordPalette.accent else TripRecordPalette.line,
-                    shape = RoundedCornerShape(18.dp),
-                ),
+                .clickable(onClick = onClick),
         ) {
             PhotoPreview(photo, Modifier.size(132.dp, 100.dp))
             if (selected) {
@@ -519,7 +512,6 @@ private fun LocationSelector(
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
             .background(TripRecordPalette.surface)
-            .border(1.dp, TripRecordPalette.line, RoundedCornerShape(16.dp))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
