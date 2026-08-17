@@ -13,9 +13,9 @@ struct MapmoryApp: App {
         WindowGroup {
             ZStack {
                 systemBarColor
-                    .ignoresSafeArea()
                 ComposeView()
             }
+            .ignoresSafeArea()
         }
     }
 }

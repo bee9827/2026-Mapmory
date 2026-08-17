@@ -1,5 +1,9 @@
 package com.mapmory.shared
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -7,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -50,6 +55,7 @@ private data class DetailRoute(
 @Composable
 fun MapmoryApp(
     navigation: MapmoryNavigation? = null,
+    contentWindowInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
 ) {
     val navController = rememberNavController()
     val recordsViewModel = remember { TripRecordsViewModel(appLocations) }
@@ -129,6 +135,7 @@ fun MapmoryApp(
     ) {
         composable<MapRoute> {
             TripMapScreen(
+                modifier = Modifier.windowInsetsPadding(contentWindowInsets),
                 mapScope = mapScope,
                 visitedCount = if (mapScope == MapScope.WORLD) {
                     visitedCountryCodes.size
@@ -161,6 +168,7 @@ fun MapmoryApp(
 
         composable<RecordsRoute> {
             TripRecordListScreen(
+                modifier = Modifier.windowInsetsPadding(contentWindowInsets),
                 uiState = TripRecordListUiState.Success(
                     records = recordsUiState.visibleRecords,
                     page = 0,
@@ -190,6 +198,7 @@ fun MapmoryApp(
 
         composable<CreateRoute> {
             TripRecordEditorScreen(
+                modifier = Modifier.windowInsetsPadding(contentWindowInsets),
                 uiState = recordsUiState.editor,
                 locations = appLocations,
                 onLocationSelected = { location ->
@@ -223,6 +232,7 @@ fun MapmoryApp(
 
         composable<ProfileRoute> {
             TripProfileScreen(
+                modifier = Modifier.windowInsetsPadding(contentWindowInsets),
                 onMapClick = { navigateToTab(MapRoute) },
                 onRecordClick = { navigateToTab(RecordsRoute) },
                 onCreateClick = {
@@ -236,6 +246,11 @@ fun MapmoryApp(
             val detailRoute = backStackEntry.toRoute<DetailRoute>()
             val selectedRecord = recordsUiState.records.firstOrNull { it.id == detailRoute.recordId }
             TripRecordDetailScreen(
+                modifier = Modifier.windowInsetsPadding(
+                    contentWindowInsets.only(
+                        WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom,
+                    ),
+                ),
                 uiState = selectedRecord?.let(TripRecordDetailUiState::Success)
                     ?: TripRecordDetailUiState.Error("여행 기록을 찾을 수 없습니다."),
                 onBackClick = { navigateBack() },
