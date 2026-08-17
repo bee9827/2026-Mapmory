@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,17 +29,14 @@ public class RefreshTokenService {
     private static final int RAW_TOKEN_BYTES = 32;
 
     private final RefreshTokenRepository refreshTokenRepository;
-    private final RefreshTokenReuseDetector refreshTokenReuseDetector;
     private final Duration refreshTokenValidity;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public RefreshTokenService(
             RefreshTokenRepository refreshTokenRepository,
-            RefreshTokenReuseDetector refreshTokenReuseDetector,
             JwtProperties jwtProperties
     ) {
         this.refreshTokenRepository = refreshTokenRepository;
-        this.refreshTokenReuseDetector = refreshTokenReuseDetector;
         this.refreshTokenValidity = jwtProperties.refreshTokenValidity();
     }
 
@@ -51,26 +49,31 @@ public class RefreshTokenService {
     }
 
     /**
-     * 회전을 위한 검증. 유효하면 기존 토큰을 폐기하고 소유 회원을 돌려준다.
+     * 회전을 위한 검증.
+     *
+     * 토큰 행에 비관적 락(FOR UPDATE)을 걸어 같은 토큰 동시 사용의 이중 회전을 막는다.
+     * 반환값으로 결과를 구분한다.
+     *   - 유효: 기존 토큰을 폐기하고 소유 회원을 담아 반환(Optional.of)
+     *   - 재사용(이미 폐기된 토큰): 탈취로 간주해 회원의 유효 토큰을 모두 폐기하고 Optional.empty 반환
+     *     (폐기를 커밋해야 하므로 여기서 예외를 던지지 않는다. 401 변환은 호출부가 한다.)
+     *   - 없음/만료: 남길 부작용이 없으므로 예외로 던진다.
      */
     @Transactional
-    public Member validateAndRevoke(String rawToken) {
-        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash(rawToken))
+    public Optional<Member> validateAndRevoke(String rawToken) {
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenHashForUpdate(hash(rawToken))
                 .orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN));
 
         LocalDateTime now = LocalDateTime.now();
         if (refreshToken.isRevoked()) {
-            // 이미 폐기된 토큰의 재사용 → 탈취로 간주하고 회원의 유효 토큰을 모두 폐기한다.
-            // 폐기는 별도 트랜잭션에서 커밋해야 아래 예외로 롤백되지 않는다.
-            refreshTokenReuseDetector.revokeAllActiveTokens(refreshToken.getMember(), now);
-            throw new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+            refreshTokenRepository.revokeAllActiveByMember(refreshToken.getMember(), now);
+            return Optional.empty();
         }
         if (refreshToken.isExpired(now)) {
             throw new BusinessException(AuthErrorCode.EXPIRED_REFRESH_TOKEN);
         }
 
         refreshToken.revoke(now);
-        return refreshToken.getMember();
+        return Optional.of(refreshToken.getMember());
     }
 
     @Transactional

@@ -2,10 +2,12 @@ package com.mapmory.backend.auth;
 
 import com.mapmory.backend.auth.dto.LoginResponse;
 import com.mapmory.backend.auth.dto.TokenResponse;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.auth.jwt.JwtProvider;
 import com.mapmory.backend.auth.kakao.KakaoApiClient;
 import com.mapmory.backend.auth.kakao.KakaoUserResponse;
 import com.mapmory.backend.auth.refresh.RefreshTokenService;
+import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
@@ -52,9 +54,11 @@ public class AuthService {
         return new LoginResponse(accessToken, refreshToken, isNewMember);
     }
 
-    @Transactional
+    // @Transactional을 두지 않는다. validateAndRevoke가 자체 트랜잭션에서 (재사용 시) 토큰 폐기를
+    // 커밋한 뒤, 재사용이면 여기서 트랜잭션 밖에서 401을 던져 그 폐기가 롤백되지 않게 한다.
     public TokenResponse refresh(String refreshToken) {
-        Member member = refreshTokenService.validateAndRevoke(refreshToken);
+        Member member = refreshTokenService.validateAndRevoke(refreshToken)
+                .orElseThrow(() -> new BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN));
         String accessToken = jwtProvider.issueAccessToken(member.getId());
         String newRefreshToken = refreshTokenService.issue(member);
         return new TokenResponse(accessToken, newRefreshToken);
