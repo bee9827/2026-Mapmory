@@ -1,5 +1,6 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -30,9 +31,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -187,7 +191,7 @@ private fun TripRecordPhotoSection(
                     currentPage = pagerState.currentPage,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 18.dp),
+                        .padding(bottom = 24.dp),
                 )
             }
         }
@@ -325,21 +329,26 @@ private fun TripRecordBottomCard(
             .verticalScroll(scrollState)
             .padding(horizontal = 24.dp, vertical = 24.dp),
     ) {
-        Column(
+        val dateRange = record.formattedDateRange()
+
+        Row(
             modifier = Modifier.padding(bottom = 17.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "대한민국 · ${location?.name ?: "여행지"}",
-                color = TripRecordPalette.accent,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
+            RecordMetadataChip(
+                text = location?.name ?: "여행지",
+                icon = RecordMetadataIcon.Location,
+                containerColor = TripRecordPalette.accentSoft,
+                contentColor = TripRecordPalette.accent,
+                modifier = Modifier.weight(weight = 1f, fill = false),
             )
-            record.startDate?.let { date ->
-                Text(
-                    text = date.replace('-', '.'),
-                    color = TripRecordPalette.muted,
-                    fontSize = 11.sp,
+            dateRange?.let {
+                RecordMetadataChip(
+                    text = it,
+                    icon = RecordMetadataIcon.Date,
+                    containerColor = TripRecordMetadataDateBackground,
+                    contentColor = TripRecordPalette.text,
                 )
             }
         }
@@ -357,6 +366,122 @@ private fun TripRecordBottomCard(
         )
     }
 }
+
+@Composable
+private fun RecordMetadataChip(
+    text: String,
+    icon: RecordMetadataIcon,
+    containerColor: Color,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .background(containerColor, RoundedCornerShape(10.dp))
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RecordMetadataIcon(
+            icon = icon,
+            color = contentColor,
+            modifier = Modifier.size(10.dp),
+        )
+        Text(
+            text = text,
+            color = contentColor,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun RecordMetadataIcon(
+    icon: RecordMetadataIcon,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Canvas(modifier = modifier) {
+        val strokeWidth = 1.25.dp.toPx()
+        val center = Offset(size.width / 2f, size.height / 2f)
+
+        when (icon) {
+            RecordMetadataIcon.Location -> {
+                val radius = size.minDimension * 0.27f
+                drawCircle(
+                    color = color,
+                    radius = radius,
+                    center = center,
+                    style = Stroke(width = strokeWidth),
+                )
+                drawCircle(color = color, radius = strokeWidth * 0.7f, center = center)
+                val markerGap = radius * 0.75f
+                drawLine(color, Offset(center.x, 0f), Offset(center.x, markerGap), strokeWidth)
+                drawLine(
+                    color,
+                    Offset(center.x, size.height - markerGap),
+                    Offset(center.x, size.height),
+                    strokeWidth,
+                )
+                drawLine(color, Offset(0f, center.y), Offset(markerGap, center.y), strokeWidth)
+                drawLine(
+                    color,
+                    Offset(size.width - markerGap, center.y),
+                    Offset(size.width, center.y),
+                    strokeWidth,
+                )
+            }
+
+            RecordMetadataIcon.Date -> {
+                val radius = size.minDimension * 0.37f
+                drawCircle(
+                    color = color,
+                    radius = radius,
+                    center = center,
+                    style = Stroke(width = strokeWidth),
+                )
+                drawLine(
+                    color = color,
+                    start = center,
+                    end = Offset(center.x, center.y - radius * 0.55f),
+                    strokeWidth = strokeWidth,
+                )
+                drawLine(
+                    color = color,
+                    start = center,
+                    end = Offset(center.x + radius * 0.5f, center.y),
+                    strokeWidth = strokeWidth,
+                )
+            }
+        }
+    }
+}
+
+private fun TripRecordData.formattedDateRange(): String? {
+    val formattedStartDate = startDate?.toMetadataDate()
+    val formattedEndDate = endDate?.toMetadataDate()
+
+    return when {
+        formattedStartDate == null -> formattedEndDate
+        formattedEndDate == null || formattedStartDate == formattedEndDate -> formattedStartDate
+        else -> "$formattedStartDate – $formattedEndDate"
+    }
+}
+
+private fun String.toMetadataDate(): String {
+    val dateParts = split('-')
+    return if (dateParts.size == 3) dateParts.joinToString(". ") else replace('-', '.')
+}
+
+private enum class RecordMetadataIcon {
+    Location,
+    Date,
+}
+
+private val TripRecordMetadataDateBackground = Color(0xFF24292D)
 
 private fun Modifier.overlapPhoto(overlap: Dp): Modifier = layout { measurable, constraints ->
     val overlapPx = overlap.roundToPx()
