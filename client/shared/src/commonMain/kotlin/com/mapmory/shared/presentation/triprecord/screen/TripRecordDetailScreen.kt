@@ -268,6 +268,7 @@ private fun DetailBackButton(
 ) {
     TripIconButton(
         label = "←",
+        contentDescription = "뒤로가기",
         onClick = onClick,
         containerColor = TripRecordPalette.surface.copy(alpha = 0.5f),
         contentColor = Color.White,
@@ -286,6 +287,7 @@ private fun DetailMoreButton(
     Box(modifier = modifier) {
         TripIconButton(
             label = "•••",
+            contentDescription = "더보기",
             onClick = { expanded = true },
             containerColor = TripRecordPalette.surface.copy(alpha = 0.5f),
             contentColor = Color.White,

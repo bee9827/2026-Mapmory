@@ -32,6 +32,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -101,6 +104,7 @@ internal fun TripRecordTopBar(
         if (onBackClick != null) {
             TripIconButton(
                 label = "←",
+                contentDescription = "뒤로가기",
                 onClick = onBackClick,
             )
             Spacer(Modifier.width(14.dp))
@@ -121,6 +125,7 @@ internal fun TripRecordTopBar(
 @Composable
 internal fun TripIconButton(
     label: String,
+    contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     containerColor: Color = TripRecordPalette.surface,
@@ -131,7 +136,11 @@ internal fun TripIconButton(
             .size(48.dp)
             .clip(CircleShape)
             .background(containerColor)
-            .clickable(onClick = onClick),
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(
+                role = Role.Button,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
