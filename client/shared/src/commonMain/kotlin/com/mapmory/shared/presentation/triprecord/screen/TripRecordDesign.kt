@@ -38,13 +38,13 @@ import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
 import org.jetbrains.compose.resources.decodeToImageBitmap
 
 internal object TripRecordPalette {
-    val background = Color(0xFF07171B)
-    val surface = Color(0xFF0C2026)
+    val background = Color(0xFF111518)
+    val surface = Color(0xFF1A1E22)
     val surfaceElevated = Color(0xFF102A32)
     val line = Color(0xFF1B363E)
     val text = Color(0xFFE9F4F2)
     val muted = Color(0xFF81999E)
-    val accent = Color(0xFF19E5A2)
+    val accent = Color(0xFF35C988)
     val accentSoft = Color(0xFF123E3A)
     val danger = Color(0xFFFF6264)
 }
@@ -122,18 +122,20 @@ internal fun TripIconButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    containerColor: Color = TripRecordPalette.surface,
+    contentColor: Color = TripRecordPalette.text,
 ) {
     Box(
         modifier = modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(TripRecordPalette.surface)
+            .background(containerColor)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            color = TripRecordPalette.text,
+            color = contentColor,
             fontSize = if (label == "•••") 20.sp else 28.sp,
             fontWeight = FontWeight.Light,
         )

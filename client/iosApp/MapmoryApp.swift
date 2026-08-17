@@ -1,7 +1,11 @@
 import Shared
 import SwiftUI
 
-private let systemBarColor = Color(red: 0.027, green: 0.090, blue: 0.106)
+private let systemBarColor = Color(
+    red: 17.0 / 255.0,
+    green: 21.0 / 255.0,
+    blue: 24.0 / 255.0
+)
 
 @main
 struct MapmoryApp: App {
@@ -20,9 +24,9 @@ private struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         let viewController = MainViewControllerKt.MainViewController()
         viewController.view.backgroundColor = UIColor(
-            red: 0.027,
-            green: 0.090,
-            blue: 0.106,
+            red: 17.0 / 255.0,
+            green: 21.0 / 255.0,
+            blue: 24.0 / 255.0,
             alpha: 1,
         )
         return viewController
