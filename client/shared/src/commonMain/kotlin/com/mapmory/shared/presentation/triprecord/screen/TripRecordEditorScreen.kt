@@ -53,6 +53,7 @@ import com.mapmory.shared.presentation.photo.MaxPhotosPerRecord
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
+import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -388,7 +389,7 @@ fun TripRecordEditorScreen(
 
 @Composable
 private fun PhotoEditor(
-    photos: List<SelectedPhoto>,
+    photos: List<TripRecordPhotoUiState>,
     onAddClick: () -> Unit,
     onRecommendClick: () -> Unit,
     onRemoveClick: (String) -> Unit,
@@ -484,6 +485,16 @@ private fun RecommendedPhoto(
 private fun PhotoPreview(photo: SelectedPhoto, modifier: Modifier = Modifier) {
     TripPhotoImage(
         previewBytes = photo.previewBytes,
+        contentDescription = photo.displayName,
+        modifier = modifier,
+        placeholderVariant = photo.id.hashCode(),
+    )
+}
+
+@Composable
+private fun PhotoPreview(photo: TripRecordPhotoUiState, modifier: Modifier = Modifier) {
+    TripPhotoImage(
+        previewBytes = photo.previewBytes?.bytesForDecoding(),
         contentDescription = photo.displayName,
         modifier = modifier,
         placeholderVariant = photo.id.hashCode(),

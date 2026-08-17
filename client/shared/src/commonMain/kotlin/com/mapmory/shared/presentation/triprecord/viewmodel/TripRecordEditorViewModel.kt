@@ -11,6 +11,7 @@ import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
 import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
+import com.mapmory.shared.presentation.triprecord.state.toTripRecordPhotoUiState
 
 class TripRecordEditorViewModel(
     private val createTripRecord: CreateTripRecordUseCase,
@@ -37,7 +38,7 @@ class TripRecordEditorViewModel(
                     id = media.objectKey,
                     displayName = media.objectKey.substringAfterLast('/'),
                     previewBytes = media.previewBytes,
-                )
+                ).toTripRecordPhotoUiState(media.sortOrder)
             },
         )
     }

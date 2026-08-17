@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
+import com.mapmory.shared.presentation.triprecord.state.toTripRecordItemUiState
 
 /** 여행 기록 목록 화면의 상태와 조회 동작을 관리한다. */
 class TripRecordListViewModel(
@@ -31,7 +32,7 @@ class TripRecordListViewModel(
         uiState = getTripRecords(query).fold(
             onSuccess = { page ->
                 TripRecordListUiState.Success(
-                    records = page.records,
+                    records = page.records.map { it.toTripRecordItemUiState() },
                     page = page.page,
                     totalPages = page.totalPages,
                 )
