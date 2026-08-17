@@ -26,7 +26,6 @@ import platform.Photos.PHAuthorizationStatusNotDetermined
 import platform.Photos.PHFetchOptions
 import platform.Photos.PHImageManager
 import platform.Photos.PHImageRequestOptions
-import platform.Photos.PHImageRequestOptionsDeliveryModeHighQualityFormat
 import platform.Photos.PHImageRequestOptionsVersionCurrent
 import platform.Photos.PHPhotoLibrary
 import platform.PhotosUI.PHPickerConfiguration
@@ -230,7 +229,7 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
         }
         result.itemProvider.loadDataRepresentationForTypeIdentifier("public.image") { data, _ ->
             if (data == null || data.length == 0UL) {
-                completion(null)
+                onMain { completion(null) }
                 return@loadDataRepresentationForTypeIdentifier
             }
             onMain {
@@ -259,10 +258,7 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
 
     private fun loadAsset(asset: PHAsset, completion: (SelectedPhoto?) -> Unit) {
         val options = PHImageRequestOptions().apply {
-            // Request the largest current representation, preserving Photos edits
-            // while avoiding any thumbnail-sized or degraded image.
             version = PHImageRequestOptionsVersionCurrent
-            deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat
             networkAccessAllowed = true
         }
         var didComplete = false
@@ -274,9 +270,8 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
             val latitude = coordinate?.useContents { latitude }
             val longitude = coordinate?.useContents { longitude }
             onMain {
-                // Keep this guard even with high-quality delivery: an asset may
-                // still produce more than one callback when an iCloud download
-                // fails or is cancelled.
+                // requestImageDataAndOrientationForAsset invokes its result handler once.
+                // Keep completion serialized on the main queue with the other photo paths.
                 if (didComplete) return@onMain
                 didComplete = true
                 completion(
