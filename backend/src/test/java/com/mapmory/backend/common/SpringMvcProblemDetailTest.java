@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -29,12 +30,14 @@ import org.springframework.web.bind.annotation.RestController;
 )
 @AutoConfigureMockMvc(addFilters = false)
 @Import({ProblemDetailFactory.class, SpringMvcProblemDetailTest.MethodRestrictedController.class})
+@DisplayName("Spring MVC 기본 Problem Details")
 class SpringMvcProblemDetailTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @Test
+    @DisplayName("지원하지 않는 HTTP 메서드는 Problem Details로 반환한다")
     void returnsProblemDetailWhenHttpMethodIsNotSupported() throws Exception {
         mockMvc.perform(post("/test/method-restricted"))
                 .andExpect(status().isMethodNotAllowed())
