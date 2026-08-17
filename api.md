@@ -28,7 +28,8 @@
 | `GET` | `/travel-records/{travelRecordId}` * | 내 여행 기록 상세 조회 |
 | `PUT` | `/travel-records/{travelRecordId}` * | 내 여행 기록 전체 수정 |
 | `DELETE` | `/travel-records/{travelRecordId}` * | 내 여행 기록 삭제 |
-| `GET` | `/travel-records/statistics` * | 선택 지역과 하위 지역의 기록 수 조회 |
+| `GET` | `/travel-records/map-summary/regions/roots` * | 루트 Region별 지도 색칠 정보 조회 |
+| `GET` | `/travel-records/map-summary/regions/{regionId}/children` * | 직속 하위 Region별 지도 색칠 정보 조회 |
 
 ### 공통 응답
 
@@ -275,22 +276,53 @@
 - `PUT /api/v1/travel-records/{travelRecordId}`: 생성과 같은 요청 본문으로 전체 수정한다.
 - `DELETE /api/v1/travel-records/{travelRecordId}`: 기록을 삭제한다. 연결된 `record_media` 행은 CASCADE 삭제한다. S3 객체 삭제는 별도 처리한다.
 
-## 5. 지역별 여행 기록 통계 API
+## 5. 지도 요약 API
 
-### 선택 지역 기록 수 조회
+지도 요약 응답에는 현재 회원의 기록이 있는 Region만 포함한다. 응답에 없는 Region은 앱에서 `count = 0`, `level = NONE`으로 처리한다.
 
-`GET /api/v1/travel-records/statistics`
+### 루트 Region별 지도 색칠 정보 조회
 
-| 파라미터 | 필수 | 설명 |
-| --- | --- | --- |
-| `countryCode` | 예 | 통계를 낼 국가 |
-| `provinceCode` | 아니요 | 특정 시도 통계 |
-| `districtCode` | 아니요 | 특정 시군구 통계 |
+`GET /api/v1/travel-records/map-summary/regions/roots`
+
+#### Response `200 OK`
+
+```json
+{
+  "data": [
+    {
+      "regionId": 1,
+      "code": "KR",
+      "regionType": "COUNTRY",
+      "name": "대한민국",
+      "count": 12,
+      "level": "HIGH"
+    }
+  ]
+}
+```
+
+- 기록이 있는 `region_type = COUNTRY` Region을 `code` 오름차순으로 반환한다.
+- 현재 회원의 국가 Region 기록과 해당 국가의 모든 하위 Region 기록을 합산한다.
+- `regionId`는 후속 하위 Region 지도 요약 요청에 사용한다.
+- `code`는 안드로이드 로컬 지도 데이터와 매칭하는 표준 코드다.
+
+| 기록 수 | `level` |
+| ---: | --- |
+| `0` | `NONE` |
+| `1~2` | `LOW` |
+| `3~5` | `MEDIUM` |
+| `6 이상` | `HIGH` |
+
+### 직속 하위 Region별 지도 색칠 정보 조회
+
+`GET /api/v1/travel-records/map-summary/regions/{regionId}/children`
+
+이전 지도 요약 응답에서 받은 `regionId`를 경로에 전달한다.
 
 #### 요청 예시
 
 ```http
-GET /api/v1/travel-records/statistics?countryCode=KR&provinceCode=49
+GET /api/v1/travel-records/map-summary/regions/1/children
 X-Member-Id: 10
 ```
 
@@ -298,19 +330,25 @@ X-Member-Id: 10
 
 ```json
 {
-  "data": {
-    "countryCode": "KR",
-    "provinceCode": "49",
-    "districtCode": null,
-    "recordCount": 5
-  }
+  "data": [
+    {
+      "regionId": 15,
+      "code": "49",
+      "regionType": "PROVINCE",
+      "name": "제주특별자치도",
+      "count": 5,
+      "level": "MEDIUM"
+    }
+  ]
 }
 ```
 
-서버는 요청한 Region 자신과 모든 하위 Region에 저장된 현재 회원의 기록을 집계한다.
+- `COUNTRY` ID를 전달하면 기록이 있는 직속 `PROVINCE`를 반환한다.
+- `PROVINCE` ID를 전달하면 기록이 있는 직속 `DISTRICT`를 반환한다.
+- 각 결과 Region 자신과 모든 하위 Region에 저장된 현재 회원의 기록을 합산한다.
+- 정렬 및 색상 단계 규칙은 국가별 조회와 같다.
 
-| 요청 | 집계 범위 |
-| --- | --- |
-| `countryCode=KR` | 대한민국 및 모든 시도·시군구 기록 |
-| `countryCode=KR&provinceCode=49` | 제주특별자치도 및 하위 시군구 기록 |
-| `countryCode=KR&provinceCode=49&districtCode=50110` | 제주시 기록 |
+| 상태 | `code` | 조건 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | `regionId`가 양수가 아님 |
+| `404` | `REGION_NOT_FOUND` | 상위 Region이 존재하지 않음 |

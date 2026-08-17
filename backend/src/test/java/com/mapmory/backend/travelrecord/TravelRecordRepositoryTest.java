@@ -11,10 +11,12 @@ import com.mapmory.backend.region.RegionType;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 
+@DisplayName("여행 기록 Repository")
 class TravelRecordRepositoryTest extends IntegrationTest {
 
     @Autowired
@@ -31,6 +33,7 @@ class TravelRecordRepositoryTest extends IntegrationTest {
 
     @Test
     @Transactional
+    @DisplayName("여행 기록을 저장하고 ID로 다시 조회한다")
     void savesTravelRecord() {
         Member member = memberRepository.save(Member.of("테스터", UUID.randomUUID()));
         Region testCountry = regionRepository.save(
