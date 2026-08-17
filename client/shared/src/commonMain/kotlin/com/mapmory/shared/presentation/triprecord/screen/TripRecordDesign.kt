@@ -80,10 +80,15 @@ internal fun TripRecordBackground(
 ) {
     TripRecordTheme {
         Surface(
-            modifier = modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             color = TripRecordPalette.background,
-            content = content,
-        )
+        ) {
+            Box(
+                modifier = modifier.fillMaxSize(),
+            ) {
+                content()
+            }
+        }
     }
 }
 

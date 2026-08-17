@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -41,14 +42,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mapmory.shared.domain.model.Location
-import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
+import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
 
 @Composable
 fun TripRecordDetailScreen(
     uiState: TripRecordDetailUiState,
-    locations: List<Location>,
     onBackClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
@@ -84,10 +83,8 @@ fun TripRecordDetailScreen(
 
                     is TripRecordDetailUiState.Success -> {
                         val record = uiState.record
-                        val location = locations.firstOrNull { it.id == record.locationId }
                         TripRecordDetailContent(
                             record = record,
-                            location = location,
                             onBackClick = onBackClick,
                             onEditClick = onEditClick,
                             onDeleteClick = { showDeleteDialog = true },
@@ -122,8 +119,7 @@ fun TripRecordDetailScreen(
 
 @Composable
 private fun TripRecordDetailContent(
-    record: TripRecordData,
-    location: Location?,
+    record: TripRecordItemUiState,
     onBackClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
@@ -140,7 +136,6 @@ private fun TripRecordDetailContent(
         )
         TripRecordBottomCard(
             record = record,
-            location = location,
             modifier = Modifier
                 .overlapPhoto(24.dp)
                 .fillMaxWidth()
@@ -151,14 +146,14 @@ private fun TripRecordDetailContent(
 
 @Composable
 private fun TripRecordPhotoSection(
-    record: TripRecordData,
+    record: TripRecordItemUiState,
     onBackClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val media = remember(record.id, record.media) {
-        record.media.sortedBy { it.sortOrder }
+    val media = remember(record.id, record.photos) {
+        record.photos.sortedBy { it.sortOrder }
     }
 
     Box(modifier = modifier) {
@@ -181,7 +176,7 @@ private fun TripRecordPhotoSection(
             ) { page ->
                 val photo = media[page]
                 TripPhotoImage(
-                    previewBytes = photo.previewBytes,
+                    previewBytes = photo.previewBytes?.bytesForDecoding(),
                     contentDescription = "${record.title} 사진 ${page + 1}",
                     modifier = Modifier.fillMaxSize(),
                     placeholderVariant = record.id.toInt() + page + 1,
@@ -203,7 +198,9 @@ private fun TripRecordPhotoSection(
             onBackClick = onBackClick,
             onEditClick = onEditClick,
             onDeleteClick = onDeleteClick,
-            modifier = Modifier.align(Alignment.TopCenter),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding(),
         )
     }
 }
@@ -316,8 +313,7 @@ private fun DetailMoreButton(
 
 @Composable
 private fun TripRecordBottomCard(
-    record: TripRecordData,
-    location: Location?,
+    record: TripRecordItemUiState,
     modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
@@ -342,7 +338,7 @@ private fun TripRecordBottomCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RecordMetadataChip(
-                text = location?.name ?: "여행지",
+                text = record.locationName,
                 icon = RecordMetadataIcon.Location,
                 containerColor = TripRecordPalette.accentSoft,
                 contentColor = TripRecordPalette.accent,
@@ -465,7 +461,7 @@ private fun RecordMetadataIcon(
     }
 }
 
-private fun TripRecordData.formattedDateRange(): String? {
+private fun TripRecordItemUiState.formattedDateRange(): String? {
     val formattedStartDate = startDate?.toMetadataDate()
     val formattedEndDate = endDate?.toMetadataDate()
 
