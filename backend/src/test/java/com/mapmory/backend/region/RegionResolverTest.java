@@ -28,7 +28,7 @@ class RegionResolverTest {
         when(regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(RegionType.COUNTRY, "KR"))
                 .thenReturn(Optional.of(korea));
 
-        assertThat(regionResolver.findCountry("KR")).isEqualTo(korea);
+        assertThat(regionResolver.resolve("KR", null, null)).isEqualTo(korea);
     }
 
     @Test
@@ -36,33 +36,52 @@ class RegionResolverTest {
         when(regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(RegionType.COUNTRY, "ZZ"))
                 .thenReturn(Optional.empty());
 
-        assertError(() -> regionResolver.findCountry("ZZ"), "REGION_NOT_FOUND");
+        assertError(() -> regionResolver.resolve("ZZ", null, null), "REGION_NOT_FOUND");
+    }
+
+    @Test
+    void resolvesProvinceByItsDirectParent() {
+        Region korea = parent(1L);
+        Region jeju = mock(Region.class);
+        when(regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(RegionType.COUNTRY, "KR"))
+                .thenReturn(Optional.of(korea));
+        when(regionRepository.findByParentIdAndRegionTypeAndRegionCode(1L, RegionType.PROVINCE, "49"))
+                .thenReturn(Optional.of(jeju));
+
+        assertThat(regionResolver.resolve("KR", "49", null)).isEqualTo(jeju);
     }
 
     @Test
     void distinguishesMissingChildFromInvalidHierarchy() {
         Region korea = parent(1L);
+        when(regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(RegionType.COUNTRY, "KR"))
+                .thenReturn(Optional.of(korea));
         when(regionRepository.findByParentIdAndRegionTypeAndRegionCode(1L, RegionType.PROVINCE, "99"))
                 .thenReturn(Optional.empty());
         when(regionRepository.existsByRegionTypeAndRegionCode(RegionType.PROVINCE, "99")).thenReturn(false);
 
-        assertError(() -> regionResolver.findProvince(korea, "99"), "REGION_NOT_FOUND");
+        assertError(() -> regionResolver.resolve("KR", "99", null), "REGION_NOT_FOUND");
 
         when(regionRepository.findByParentIdAndRegionTypeAndRegionCode(1L, RegionType.PROVINCE, "49"))
                 .thenReturn(Optional.empty());
         when(regionRepository.existsByRegionTypeAndRegionCode(RegionType.PROVINCE, "49")).thenReturn(true);
 
-        assertError(() -> regionResolver.findProvince(korea, "49"), "INVALID_REGION_HIERARCHY");
+        assertError(() -> regionResolver.resolve("KR", "49", null), "INVALID_REGION_HIERARCHY");
     }
 
     @Test
     void resolvesDistrictByItsDirectParent() {
+        Region korea = parent(1L);
         Region jeju = parent(2L);
         Region jejuCity = mock(Region.class);
+        when(regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(RegionType.COUNTRY, "KR"))
+                .thenReturn(Optional.of(korea));
+        when(regionRepository.findByParentIdAndRegionTypeAndRegionCode(1L, RegionType.PROVINCE, "49"))
+                .thenReturn(Optional.of(jeju));
         when(regionRepository.findByParentIdAndRegionTypeAndRegionCode(2L, RegionType.DISTRICT, "50110"))
                 .thenReturn(Optional.of(jejuCity));
 
-        assertThat(regionResolver.findDistrict(jeju, "50110")).isEqualTo(jejuCity);
+        assertThat(regionResolver.resolve("KR", "49", "50110")).isEqualTo(jejuCity);
     }
 
     private Region parent(Long id) {

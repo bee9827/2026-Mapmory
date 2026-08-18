@@ -42,7 +42,11 @@ public class TravelRecordService {
     public TravelRecord create(Long memberId, TravelRecordRequest request) {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.MEMBER_NOT_FOUND));
-        Region region = resolveRegion(request);
+        Region region = regionResolver.resolve(
+                request.countryCode(),
+                request.provinceCode(),
+                request.districtCode()
+        );
 
         TravelRecord travelRecord = TravelRecord.of(
                 member,
@@ -84,31 +88,27 @@ public class TravelRecordService {
             return travelRecordRepository.findByMemberId(memberId, pageable);
         }
 
-        Region country = regionResolver.findCountry(countryCode);
+        Region region = regionResolver.resolve(countryCode, provinceCode, districtCode);
 
         if (provinceCode == null) {
             return travelRecordRepository.findByMemberIdAndCountryId(
                     memberId,
-                    country.getId(),
+                    region.getId(),
                     pageable
             );
         }
-
-        Region province = regionResolver.findProvince(country, provinceCode);
 
         if (districtCode == null) {
             return travelRecordRepository.findByMemberIdAndProvinceId(
                     memberId,
-                    province.getId(),
+                    region.getId(),
                     pageable
             );
         }
 
-        Region district = regionResolver.findDistrict(province, districtCode);
-
         return travelRecordRepository.findByMemberIdAndRegionId(
                 memberId,
-                district.getId(),
+                region.getId(),
                 pageable
         );
     }
@@ -164,16 +164,5 @@ public class TravelRecordService {
                 size,
                 Sort.by(Sort.Direction.DESC, "createdAt")
         );
-    }
-
-    private Region resolveRegion(TravelRecordRequest request) {
-        Region country = regionResolver.findCountry(request.countryCode());
-
-        if (request.provinceCode() == null && request.districtCode() == null) {
-            return country;
-        }
-
-        Region province = regionResolver.findProvince(country, request.provinceCode());
-        return regionResolver.findDistrict(province, request.districtCode());
     }
 }
