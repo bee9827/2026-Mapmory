@@ -16,7 +16,7 @@ public class RegionResolver {
         return regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(
                 RegionType.COUNTRY,
                 countryCode
-        ).orElseThrow(() -> new BusinessException(RegionErrorCode.COUNTRY_NOT_FOUND));
+        ).orElseThrow(() -> new BusinessException(RegionErrorCode.REGION_NOT_FOUND));
     }
 
     public Region findProvince(Region country, String provinceCode) {

@@ -36,7 +36,7 @@ class RegionResolverTest {
         when(regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(RegionType.COUNTRY, "ZZ"))
                 .thenReturn(Optional.empty());
 
-        assertError(() -> regionResolver.findCountry("ZZ"), "COUNTRY_NOT_FOUND");
+        assertError(() -> regionResolver.findCountry("ZZ"), "REGION_NOT_FOUND");
     }
 
     @Test

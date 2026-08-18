@@ -130,8 +130,7 @@ GET /api/v1/travel-records?countryCode=KR&provinceCode=49&districtCode=50110
 | `provinceCode`에 `countryCode`가 없음 | `400 REGION_REQUIRED` |
 | `districtCode`에 `countryCode` 또는 `provinceCode`가 없음 | `400 REGION_REQUIRED` |
 | 지역 코드 형식 오류, `page < 0`, `size`가 1 미만 또는 100 초과 | `400 VALIDATION_ERROR` |
-| 국가 코드가 존재하지 않음 | `404 COUNTRY_NOT_FOUND` |
-| 시도 또는 시군구 코드가 존재하지 않음 | `404 REGION_NOT_FOUND` |
+| 국가·시도·시군구 코드가 존재하지 않음 | `404 REGION_NOT_FOUND` |
 | 요청한 시도·시군구가 선택한 상위 Region의 직계 자식이 아님 | `400 INVALID_REGION_HIERARCHY` |
 
 지역 경로 탐색과 계층 예외 변환은 `RegionResolver`가 담당한다. 시도·시군구의 소속 관계는 코드 접두사가 아닌 `parent_id`로 확인한다.
