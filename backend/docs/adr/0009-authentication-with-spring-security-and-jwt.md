@@ -20,7 +20,7 @@
 ### Spring Security를 도입하고 우리 서비스의 JWT(access token)를 직접 발급·검증한다
 
 - access token은 HS256으로 서명한 JWT다. 페이로드의 `sub`에 memberId를 담는다.
-- 서명·만료만으로 검증하므로 매 요청에 DB 조회가 필요 없다(무상태).
+- 토큰 자체의 서명·만료 검증에는 DB 조회가 필요 없다.
 - 발급/검증 로직은 `JwtProvider`에 모으고, 키·만료는 `jwt.*` 설정으로 주입한다.
   (`jwt.secret`은 프로파일별: local은 개발용, prod는 환경변수)
 
@@ -29,11 +29,13 @@
 서버는 `HttpSession`을 만들지 않는다. 매 요청마다 필터가 토큰을 검증해
 `SecurityContext`를 새로 구성한다. 다중 기기·수평 확장에 유리하다.
 
-### 인증은 필터에서, memberId 주입은 ArgumentResolver로 한다
+### 인증은 필터에서, Member 주입은 ArgumentResolver로 한다
 
 - `JwtAuthenticationFilter`가 `Authorization: Bearer` 토큰을 검증해
   `SecurityContext`에 memberId를 등록한다.
-- 컨트롤러는 `@LoginMemberId`로 인증된 memberId를 주입받는다. (`X-Member-Id` 헤더 제거)
+- `LoginMemberArgumentResolver`는 `SecurityContext`의 memberId로 회원을 조회하고,
+  컨트롤러는 `@LoginMember`로 인증된 `Member`를 주입받는다. (`X-Member-Id` 헤더 제거)
+- `@LoginMember`가 선언된 요청은 현재 회원의 존재를 확인하기 위해 DB를 한 번 조회한다.
 
 ### 필터 단계의 인증·인가 실패도 Problem Details로 응답한다
 
@@ -70,5 +72,6 @@ redirect 기반 `oauth2-client` 자동화 이득은 받지 않는다. 그러나 
 ### 비용과 주의점
 
 - Spring Security의 러닝 커브와, 필터 계층 예외를 별도 처리기로 다뤄야 하는 점.
+- `@LoginMember`가 선언된 요청마다 회원 조회가 한 번 발생한다.
 - `ErrorKind`가 추가되면 웹 계층의 HTTP 상태 매핑도 함께 추가해야 한다.
 - refresh token 전략은 별도 결정으로 다룬다(후속).

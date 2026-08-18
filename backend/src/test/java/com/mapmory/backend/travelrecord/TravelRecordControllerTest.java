@@ -9,7 +9,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.mapmory.backend.auth.security.LoginMemberId;
+import com.mapmory.backend.auth.security.LoginMember;
+import com.mapmory.backend.member.Member;
 import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.RegionDetailResponse;
 import com.mapmory.backend.travelrecord.dto.RegionItemResponse;
@@ -18,6 +19,7 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecord.dto.TravelRecordResponse;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
@@ -40,6 +42,11 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 class TravelRecordControllerTest {
 
     private static final long MEMBER_ID = 10L;
+    private static final Member MEMBER = Member.of("테스터", UUID.randomUUID());
+
+    static {
+        ReflectionTestUtils.setField(MEMBER, "id", MEMBER_ID);
+    }
 
     @Mock
     private TravelRecordService travelRecordService;
@@ -47,14 +54,14 @@ class TravelRecordControllerTest {
     @InjectMocks
     private TravelRecordController travelRecordController;
 
-    // @LoginMemberId를 고정 memberId로 해석하는 리졸버. standalone MockMvc에서 HTTP·JSON 레이어만
+    // @LoginMember를 고정 Member로 해석하는 리졸버. standalone MockMvc에서 HTTP·JSON 레이어만
     // 검증하고, 실제 인증(401 등)은 SecurityIntegrationTest가 담당한다.
     private MockMvc mockMvcWithLoginMember() {
         return MockMvcBuilders.standaloneSetup(travelRecordController)
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
                     public boolean supportsParameter(MethodParameter parameter) {
-                        return parameter.hasParameterAnnotation(LoginMemberId.class);
+                        return parameter.hasParameterAnnotation(LoginMember.class);
                     }
 
                     @Override
@@ -64,7 +71,7 @@ class TravelRecordControllerTest {
                             NativeWebRequest webRequest,
                             WebDataBinderFactory binderFactory
                     ) {
-                        return MEMBER_ID;
+                        return MEMBER;
                     }
                 })
                 .build();
@@ -92,37 +99,37 @@ class TravelRecordControllerTest {
         );
         ReflectionTestUtils.setField(travelRecord, "id", 1L);
 
-        when(travelRecordService.create(MEMBER_ID, request)).thenReturn(travelRecord);
+        when(travelRecordService.create(MEMBER, request)).thenReturn(travelRecord);
 
         ResponseEntity<TravelRecordResponse<CreateTravelRecordResponse>> response =
-                travelRecordController.create(MEMBER_ID, request);
+                travelRecordController.create(MEMBER, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isEqualTo(
                 TravelRecordResponse.of(new CreateTravelRecordResponse(1L))
         );
-        verify(travelRecordService).create(MEMBER_ID, request);
+        verify(travelRecordService).create(MEMBER, request);
     }
 
     @Test
     void 여행_일지_상세_조회를_서비스에_위임한다() {
         TravelRecordDetailResponse detail = detail("제주 여행", "제주시를 걸었다.",
                 List.of("mapmory/travel-records/a.jpg"));
-        when(travelRecordService.findById(MEMBER_ID, 101L)).thenReturn(detail);
+        when(travelRecordService.findById(MEMBER, 101L)).thenReturn(detail);
 
         ResponseEntity<TravelRecordResponse<TravelRecordDetailResponse>> response =
-                travelRecordController.findById(MEMBER_ID, 101L);
+                travelRecordController.findById(MEMBER, 101L);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(TravelRecordResponse.of(detail));
-        verify(travelRecordService).findById(MEMBER_ID, 101L);
+        verify(travelRecordService).findById(MEMBER, 101L);
     }
 
     @Test
     void 여행_일지_상세_HTTP_응답을_반환한다() throws Exception {
         TravelRecordDetailResponse detail = detail("제주 여행", "제주시를 걸었다.",
                 List.of("mapmory/travel-records/a.jpg"));
-        when(travelRecordService.findById(MEMBER_ID, 101L)).thenReturn(detail);
+        when(travelRecordService.findById(MEMBER, 101L)).thenReturn(detail);
 
         mockMvcWithLoginMember().perform(get("/api/v1/travel-records/101"))
                 .andExpect(status().isOk())
@@ -139,7 +146,7 @@ class TravelRecordControllerTest {
         TravelRecordDetailResponse detail = detail("수정된 제주 여행", "수정된 본문",
                 List.of("travel-records/10/b.jpg"));
         when(travelRecordService.update(
-                ArgumentMatchers.eq(MEMBER_ID),
+                ArgumentMatchers.eq(MEMBER),
                 ArgumentMatchers.eq(101L),
                 ArgumentMatchers.any(TravelRecordRequest.class)
         )).thenReturn(detail);
@@ -171,7 +178,7 @@ class TravelRecordControllerTest {
         mockMvcWithLoginMember().perform(delete("/api/v1/travel-records/101"))
                 .andExpect(status().isNoContent());
 
-        verify(travelRecordService).delete(MEMBER_ID, 101L);
+        verify(travelRecordService).delete(MEMBER, 101L);
     }
 
     private TravelRecordDetailResponse detail(String title, String content, List<String> objectKeys) {

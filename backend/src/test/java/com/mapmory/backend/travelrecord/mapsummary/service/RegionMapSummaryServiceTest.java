@@ -7,8 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mapmory.backend.common.exception.BusinessException;
-import com.mapmory.backend.member.exception.MemberErrorCode;
-import com.mapmory.backend.member.MemberRepository;
+import com.mapmory.backend.member.Member;
 import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.region.exception.RegionErrorCode;
 import com.mapmory.backend.region.RegionRepository;
@@ -32,7 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class RegionMapSummaryServiceTest {
 
     @Mock
-    private MemberRepository memberRepository;
+    private Member member;
 
     @Mock
     private RegionRepository regionRepository;
@@ -50,11 +49,11 @@ class RegionMapSummaryServiceTest {
         @DisplayName("부모 ID가 없으면 루트 국가별 요약을 반환한다")
         void returnsRootCountrySummaries() {
             RegionMapSummaryService service = service();
-            when(memberRepository.existsById(10L)).thenReturn(true);
+            when(member.getId()).thenReturn(10L);
             when(regionMapSummaryRepository.findRegionMapSummaries(10L, null))
                     .thenReturn(List.of(result(1L, "KR", "대한민국", "COUNTRY", 3L)));
 
-            List<RegionMapSummaryResponse> responses = service.getSummaries(10L, null);
+            List<RegionMapSummaryResponse> responses = service.getSummaries(member, null);
 
             assertThat(responses).containsExactly(new RegionMapSummaryResponse(
                     1L,
@@ -81,12 +80,12 @@ class RegionMapSummaryServiceTest {
                 String name
         ) {
             RegionMapSummaryService service = service();
-            when(memberRepository.existsById(10L)).thenReturn(true);
+            when(member.getId()).thenReturn(10L);
             when(regionRepository.existsById(parentRegionId)).thenReturn(true);
             when(regionMapSummaryRepository.findRegionMapSummaries(10L, parentRegionId))
                     .thenReturn(List.of(result(childRegionId, regionCode, name, regionType, 1L)));
 
-            List<RegionMapSummaryResponse> responses = service.getSummaries(10L, parentRegionId);
+            List<RegionMapSummaryResponse> responses = service.getSummaries(member, parentRegionId);
 
             assertThat(responses).containsExactly(new RegionMapSummaryResponse(
                     childRegionId,
@@ -99,26 +98,12 @@ class RegionMapSummaryServiceTest {
         }
 
         @Test
-        @DisplayName("회원을 찾을 수 없으면 Region과 기록을 조회하지 않는다")
-        void rejectsUnknownMember() {
-            RegionMapSummaryService service = service();
-            when(memberRepository.existsById(999L)).thenReturn(false);
-
-            assertThatThrownBy(() -> service.getSummaries(999L, 1L))
-                    .isInstanceOfSatisfying(BusinessException.class, exception ->
-                            assertThat(exception.getErrorCode()).isEqualTo(MemberErrorCode.MEMBER_NOT_FOUND));
-            verify(regionRepository, never()).existsById(1L);
-            verify(regionMapSummaryRepository, never()).findRegionMapSummaries(999L, 1L);
-        }
-
-        @Test
         @DisplayName("부모 Region을 찾을 수 없으면 기록을 조회하지 않는다")
         void rejectsUnknownParentRegion() {
             RegionMapSummaryService service = service();
-            when(memberRepository.existsById(10L)).thenReturn(true);
             when(regionRepository.existsById(999L)).thenReturn(false);
 
-            assertThatThrownBy(() -> service.getSummaries(10L, 999L))
+            assertThatThrownBy(() -> service.getSummaries(member, 999L))
                     .isInstanceOfSatisfying(BusinessException.class, exception ->
                             assertThat(exception.getErrorCode()).isEqualTo(RegionErrorCode.REGION_NOT_FOUND));
             verify(regionMapSummaryRepository, never()).findRegionMapSummaries(10L, 999L);
@@ -127,7 +112,6 @@ class RegionMapSummaryServiceTest {
 
     private RegionMapSummaryService service() {
         return new RegionMapSummaryService(
-                memberRepository,
                 regionRepository,
                 regionMapSummaryRepository,
                 levelPolicy
