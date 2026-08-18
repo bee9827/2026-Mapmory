@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
+import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.location.Geocoder
@@ -25,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.exifinterface.media.ExifInterface
+import com.mapmory.shared.data.local.photo.PhotoMetadataDatabase
+import com.mapmory.shared.data.local.photo.PhotoMetadataEntity
 import com.mapmory.shared.domain.model.Location
 import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
@@ -144,16 +147,14 @@ private fun requiredRecommendationPermissions(): Array<String> = buildList {
 }.toTypedArray()
 
 private data class GalleryEntry(
-    val uri: Uri,
-    val name: String,
-    val capturedAtMillis: Long?,
+    val photo: PhotoMetadataEntity,
     val latitude: Double,
     val longitude: Double,
     val distanceMeters: Float,
 )
 
 @Suppress("DEPRECATION")
-private fun Context.recommendPhotos(
+private suspend fun Context.recommendPhotos(
     target: Location,
     parentName: String?,
 ): List<SelectedPhoto> {
@@ -165,48 +166,20 @@ private fun Context.recommendPhotos(
     val targetLatitude = targetAddress.latitude
     val targetLongitude = targetAddress.longitude
     val radius = target.recommendationRadiusMeters()
-    val projection = arrayOf(
-        MediaStore.Images.Media._ID,
-        MediaStore.Images.Media.DISPLAY_NAME,
-        MediaStore.Images.Media.DATE_TAKEN,
-    )
-    val entries = mutableListOf<GalleryEntry>()
-
-    contentResolver.query(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-        projection,
-        null,
-        null,
-        "${MediaStore.Images.Media.DATE_TAKEN} DESC",
-    )?.use { cursor ->
-        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-        val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-        val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_TAKEN)
-        while (cursor.moveToNext()) {
-            val uri = ContentUris.withAppendedId(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                cursor.getLong(idColumn),
-            )
-            val coordinates = readCoordinates(uri) ?: continue
-            val distance = FloatArray(1)
-            android.location.Location.distanceBetween(
-                targetLatitude,
-                targetLongitude,
-                coordinates.first,
-                coordinates.second,
-                distance,
-            )
-            if (distance[0] <= radius) {
-                entries += GalleryEntry(
-                    uri = uri,
-                    name = cursor.getString(nameColumn) ?: "여행 사진",
-                    capturedAtMillis = cursor.getLong(dateColumn).takeIf { it > 0L },
-                    latitude = coordinates.first,
-                    longitude = coordinates.second,
-                    distanceMeters = distance[0],
-                )
-            }
-        }
+    val photos = syncPhotoMetadata()
+    val entries = photos.mapNotNull { photo ->
+        val latitude = photo.latitude ?: return@mapNotNull null
+        val longitude = photo.longitude ?: return@mapNotNull null
+        val distance = FloatArray(1)
+        android.location.Location.distanceBetween(
+            targetLatitude,
+            targetLongitude,
+            latitude,
+            longitude,
+            distance,
+        )
+        if (distance[0] > radius) return@mapNotNull null
+        GalleryEntry(photo, latitude, longitude, distance[0])
     }
 
     if (!Geocoder.isPresent()) {
@@ -228,12 +201,79 @@ private fun Context.recommendPhotos(
         .take(MaxRecommendedPhotos)
         .mapNotNull { entry ->
             readPhoto(
-                uri = entry.uri,
-                knownName = entry.name,
+                uri = Uri.parse(entry.photo.contentUri),
+                knownName = entry.photo.displayName,
                 knownCoordinates = entry.latitude to entry.longitude,
-                knownCapturedAtMillis = entry.capturedAtMillis,
+                knownCapturedAtMillis = entry.photo.capturedAtMillis,
             )
         }
+}
+
+private suspend fun Context.syncPhotoMetadata(): List<PhotoMetadataEntity> {
+    val dao = PhotoMetadataDatabase.getInstance(this).photoMetadataDao()
+    val previousById = dao.getAll().associateBy(PhotoMetadataEntity::mediaId)
+    val scanId = System.currentTimeMillis()
+    val projection = arrayOf(
+        MediaStore.Images.Media._ID,
+        MediaStore.Images.Media.DISPLAY_NAME,
+        MediaStore.Images.Media.DATE_TAKEN,
+        MediaStore.Images.Media.DATE_MODIFIED,
+        MediaStore.Images.Media.MIME_TYPE,
+        MediaStore.Images.Media.SIZE,
+        MediaStore.Images.Media.WIDTH,
+        MediaStore.Images.Media.HEIGHT,
+    )
+    val photos = contentResolver.query(
+        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+        projection,
+        null,
+        null,
+        "${MediaStore.Images.Media.DATE_TAKEN} DESC",
+    )?.use { cursor ->
+        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+        buildList<PhotoMetadataEntity> {
+            while (cursor.moveToNext()) {
+                val mediaId = cursor.getLong(idColumn)
+                val uri = ContentUris.withAppendedId(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    mediaId,
+                )
+                val modifiedAtSeconds = cursor.getLongOrNull(MediaStore.Images.Media.DATE_MODIFIED) ?: 0L
+                val previous = previousById[mediaId]
+                val coordinates = if (
+                    previous != null &&
+                    previous.modifiedAtSeconds == modifiedAtSeconds &&
+                    previous.latitude != null &&
+                    previous.longitude != null
+                ) {
+                    requireNotNull(previous.latitude) to requireNotNull(previous.longitude)
+                } else {
+                    readCoordinates(uri)
+                }
+                add(
+                    PhotoMetadataEntity(
+                        mediaId = mediaId,
+                        contentUri = uri.toString(),
+                        displayName = cursor.getStringOrNull(MediaStore.Images.Media.DISPLAY_NAME)
+                            ?: "여행 사진",
+                        capturedAtMillis = cursor.getLongOrNull(MediaStore.Images.Media.DATE_TAKEN)
+                            ?.takeIf { it > 0L },
+                        modifiedAtSeconds = modifiedAtSeconds,
+                        latitude = coordinates?.first,
+                        longitude = coordinates?.second,
+                        mimeType = cursor.getStringOrNull(MediaStore.Images.Media.MIME_TYPE),
+                        sizeBytes = cursor.getLongOrNull(MediaStore.Images.Media.SIZE) ?: 0L,
+                        width = cursor.getIntOrNull(MediaStore.Images.Media.WIDTH) ?: 0,
+                        height = cursor.getIntOrNull(MediaStore.Images.Media.HEIGHT) ?: 0,
+                        scanId = scanId,
+                    ),
+                )
+            }
+        }
+    } ?: return emptyList()
+
+    dao.replaceSnapshot(photos, scanId)
+    return photos
 }
 
 private fun Address.toAdministrativeArea(): PhotoAdministrativeArea = PhotoAdministrativeArea(
@@ -250,7 +290,11 @@ private fun Context.readPhoto(
     knownCoordinates: Pair<Double, Double>? = null,
     knownCapturedAtMillis: Long? = null,
 ): SelectedPhoto? = runCatching {
-    val metadata = queryPhotoMetadata(uri)
+    val metadata = if (knownName == null && knownCapturedAtMillis == null) {
+        queryPhotoMetadata(uri)
+    } else {
+        null to null
+    }
     val coordinates = knownCoordinates ?: readCoordinates(uri)
     val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         contentResolver.loadThumbnail(uri, Size(PreviewSizePx, PreviewSizePx), null)
@@ -305,6 +349,15 @@ private fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = runCatchi
         ExifInterface(input).latLong?.let { it[0] to it[1] }
     }
 }.getOrNull()
+
+private fun Cursor.getStringOrNull(columnName: String): String? =
+    getColumnIndex(columnName).takeIf { it >= 0 }?.let(::getString)
+
+private fun Cursor.getLongOrNull(columnName: String): Long? =
+    getColumnIndex(columnName).takeIf { it >= 0 && !isNull(it) }?.let(::getLong)
+
+private fun Cursor.getIntOrNull(columnName: String): Int? =
+    getColumnIndex(columnName).takeIf { it >= 0 && !isNull(it) }?.let(::getInt)
 
 private fun formatDate(epochMillis: Long?): String? = epochMillis?.let {
     SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(it))
