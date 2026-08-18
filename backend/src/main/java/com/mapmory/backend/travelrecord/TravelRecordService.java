@@ -222,14 +222,11 @@ public class TravelRecordService {
     }
 
     private Region resolveRegion(TravelRecordRequest request) {
-        Region country = regionResolver.findCountry(request.countryCode());
-
-        if (request.provinceCode() == null && request.districtCode() == null) {
-            return country;
-        }
-
-        Region province = regionResolver.findProvince(country, request.provinceCode());
-        return regionResolver.findDistrict(province, request.districtCode());
+        return regionResolver.resolve(
+                request.countryCode(),
+                request.provinceCode(),
+                request.districtCode()
+        );
     }
 
     private void validateUniqueObjectKeys(List<String> objectKeys) {

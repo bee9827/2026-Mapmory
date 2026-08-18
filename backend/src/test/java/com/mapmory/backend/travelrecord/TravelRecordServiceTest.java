@@ -178,9 +178,7 @@ class TravelRecordServiceTest {
         );
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
-        when(regionResolver.findCountry("KR")).thenReturn(country);
-        when(regionResolver.findProvince(country, "49")).thenReturn(province);
-        when(regionResolver.findDistrict(province, "50110")).thenReturn(district);
+        when(regionResolver.resolve("KR", "49", "50110")).thenReturn(district);
         when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
                 .thenReturn(List.of(mediaA, mediaB));
         when(recordMediaRepository.findByObjectKeyIn(List.of("travel-records/10/c.jpg")))
@@ -223,7 +221,7 @@ class TravelRecordServiceTest {
                 .thenReturn(Optional.of(travelRecord));
 
         assertError(() -> travelRecordService.update(10L, 101L, request), "INVALID_OBJECT_KEY");
-        verify(regionResolver, never()).findCountry("JP");
+        verify(regionResolver, never()).resolve("JP", null, null);
     }
 
     @Test
@@ -249,7 +247,7 @@ class TravelRecordServiceTest {
         );
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
-        when(regionResolver.findCountry("JP")).thenReturn(japan);
+        when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
         when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
                 .thenReturn(List.of());
         when(recordMediaRepository.findByObjectKeyIn(List.of("travel-records/20/used.jpg")))
@@ -289,7 +287,7 @@ class TravelRecordServiceTest {
         );
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
-        when(regionResolver.findCountry("JP")).thenReturn(japan);
+        when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
         when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
                 .thenReturn(List.of(existingMedia));
         when(recordMediaRepository.saveAll(anyList()))
@@ -320,7 +318,7 @@ class TravelRecordServiceTest {
                 .thenReturn(Optional.empty());
 
         assertError(() -> travelRecordService.update(10L, 101L, request), "TRAVEL_RECORD_NOT_FOUND");
-        verify(regionResolver, never()).findCountry("JP");
+        verify(regionResolver, never()).resolve("JP", null, null);
         verify(recordMediaRepository, never()).findByTravelRecordIdOrderBySortOrderAsc(101L);
     }
 

@@ -3,9 +3,13 @@ package com.mapmory.backend.travelrecord;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.mapmory.backend.common.ProblemDetailFactory;
-import com.mapmory.backend.common.handler.ValidationExceptionHandler;
+import com.mapmory.backend.auth.security.LoginMemberId;
 import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.RegionDetailResponse;
 import com.mapmory.backend.travelrecord.dto.RegionItemResponse;
@@ -16,30 +20,55 @@ import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.bind.support.WebDataBinderFactory;
+import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.method.support.HandlerMethodArgumentResolver;
+import org.springframework.web.method.support.ModelAndViewContainer;
 
 @ExtendWith(MockitoExtension.class)
 class TravelRecordControllerTest {
+
+    private static final long MEMBER_ID = 10L;
 
     @Mock
     private TravelRecordService travelRecordService;
 
     @InjectMocks
     private TravelRecordController travelRecordController;
+
+    // @LoginMemberId를 고정 memberId로 해석하는 리졸버. standalone MockMvc에서 HTTP·JSON 레이어만
+    // 검증하고, 실제 인증(401 등)은 SecurityIntegrationTest가 담당한다.
+    private MockMvc mockMvcWithLoginMember() {
+        return MockMvcBuilders.standaloneSetup(travelRecordController)
+                .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
+                    @Override
+                    public boolean supportsParameter(MethodParameter parameter) {
+                        return parameter.hasParameterAnnotation(LoginMemberId.class);
+                    }
+
+                    @Override
+                    public Object resolveArgument(
+                            MethodParameter parameter,
+                            ModelAndViewContainer mavContainer,
+                            NativeWebRequest webRequest,
+                            WebDataBinderFactory binderFactory
+                    ) {
+                        return MEMBER_ID;
+                    }
+                })
+                .build();
+    }
 
     @Test
     void 여행_일지를_생성한다() {
@@ -63,67 +92,39 @@ class TravelRecordControllerTest {
         );
         ReflectionTestUtils.setField(travelRecord, "id", 1L);
 
-        when(travelRecordService.create(10L, request)).thenReturn(travelRecord);
+        when(travelRecordService.create(MEMBER_ID, request)).thenReturn(travelRecord);
 
         ResponseEntity<TravelRecordResponse<CreateTravelRecordResponse>> response =
-                travelRecordController.create(10L, request);
+                travelRecordController.create(MEMBER_ID, request);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).isEqualTo(
                 TravelRecordResponse.of(new CreateTravelRecordResponse(1L))
         );
-        verify(travelRecordService).create(10L, request);
+        verify(travelRecordService).create(MEMBER_ID, request);
     }
 
     @Test
     void 여행_일지_상세_조회를_서비스에_위임한다() {
-        TravelRecordDetailResponse detail = new TravelRecordDetailResponse(
-                101L,
-                "제주 여행",
-                "제주시를 걸었다.",
-                new RegionDetailResponse(
-                        new RegionItemResponse("KR", "대한민국"),
-                        new RegionItemResponse("49", "제주특별자치도"),
-                        new RegionItemResponse("50110", "제주시")
-                ),
-                LocalDate.of(2026, 8, 11),
-                LocalDate.of(2026, 8, 13),
-                List.of("mapmory/travel-records/a.jpg"),
-                null,
-                null
-        );
-        when(travelRecordService.findById(10L, 101L)).thenReturn(detail);
+        TravelRecordDetailResponse detail = detail("제주 여행", "제주시를 걸었다.",
+                List.of("mapmory/travel-records/a.jpg"));
+        when(travelRecordService.findById(MEMBER_ID, 101L)).thenReturn(detail);
 
         ResponseEntity<TravelRecordResponse<TravelRecordDetailResponse>> response =
-                travelRecordController.findById(10L, 101L);
+                travelRecordController.findById(MEMBER_ID, 101L);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isEqualTo(TravelRecordResponse.of(detail));
-        verify(travelRecordService).findById(10L, 101L);
+        verify(travelRecordService).findById(MEMBER_ID, 101L);
     }
 
     @Test
     void 여행_일지_상세_HTTP_응답을_반환한다() throws Exception {
-        TravelRecordDetailResponse detail = new TravelRecordDetailResponse(
-                101L,
-                "제주 여행",
-                "제주시를 걸었다.",
-                new RegionDetailResponse(
-                        new RegionItemResponse("KR", "대한민국"),
-                        new RegionItemResponse("49", "제주특별자치도"),
-                        new RegionItemResponse("50110", "제주시")
-                ),
-                LocalDate.of(2026, 8, 11),
-                LocalDate.of(2026, 8, 13),
-                List.of("mapmory/travel-records/a.jpg"),
-                null,
-                null
-        );
-        when(travelRecordService.findById(10L, 101L)).thenReturn(detail);
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(travelRecordController).build();
+        TravelRecordDetailResponse detail = detail("제주 여행", "제주시를 걸었다.",
+                List.of("mapmory/travel-records/a.jpg"));
+        when(travelRecordService.findById(MEMBER_ID, 101L)).thenReturn(detail);
 
-        mockMvc.perform(get("/api/v1/travel-records/101")
-                        .header("X-Member-Id", 10L))
+        mockMvcWithLoginMember().perform(get("/api/v1/travel-records/101"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.id").value(101L))
                 .andExpect(jsonPath("$.data.content").value("제주시를 걸었다."))
@@ -135,30 +136,15 @@ class TravelRecordControllerTest {
 
     @Test
     void 여행_일지를_수정한다() throws Exception {
-        TravelRecordDetailResponse detail = new TravelRecordDetailResponse(
-                101L,
-                "수정된 제주 여행",
-                "수정된 본문",
-                new RegionDetailResponse(
-                        new RegionItemResponse("KR", "대한민국"),
-                        new RegionItemResponse("49", "제주특별자치도"),
-                        new RegionItemResponse("50110", "제주시")
-                ),
-                LocalDate.of(2026, 8, 11),
-                LocalDate.of(2026, 8, 13),
-                List.of("travel-records/10/b.jpg"),
-                null,
-                null
-        );
+        TravelRecordDetailResponse detail = detail("수정된 제주 여행", "수정된 본문",
+                List.of("travel-records/10/b.jpg"));
         when(travelRecordService.update(
-                org.mockito.ArgumentMatchers.eq(10L),
-                org.mockito.ArgumentMatchers.eq(101L),
-                org.mockito.ArgumentMatchers.any(TravelRecordRequest.class)
+                ArgumentMatchers.eq(MEMBER_ID),
+                ArgumentMatchers.eq(101L),
+                ArgumentMatchers.any(TravelRecordRequest.class)
         )).thenReturn(detail);
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(travelRecordController).build();
 
-        mockMvc.perform(put("/api/v1/travel-records/101")
-                        .header("X-Member-Id", 10L)
+        mockMvcWithLoginMember().perform(put("/api/v1/travel-records/101")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -182,24 +168,27 @@ class TravelRecordControllerTest {
 
     @Test
     void 여행_일지를_삭제한다() throws Exception {
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(travelRecordController).build();
-
-        mockMvc.perform(delete("/api/v1/travel-records/101")
-                        .header("X-Member-Id", 10L))
+        mockMvcWithLoginMember().perform(delete("/api/v1/travel-records/101"))
                 .andExpect(status().isNoContent());
 
-        verify(travelRecordService).delete(10L, 101L);
+        verify(travelRecordService).delete(MEMBER_ID, 101L);
     }
 
-    @Test
-    void 회원_ID_헤더가_없으면_요청을_거부한다() throws Exception {
-        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(travelRecordController)
-                .setControllerAdvice(new ValidationExceptionHandler(new ProblemDetailFactory()))
-                .build();
-
-        mockMvc.perform(get("/api/v1/travel-records"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.errors[0].field").value("X-Member-Id"));
+    private TravelRecordDetailResponse detail(String title, String content, List<String> objectKeys) {
+        return new TravelRecordDetailResponse(
+                101L,
+                title,
+                content,
+                new RegionDetailResponse(
+                        new RegionItemResponse("KR", "대한민국"),
+                        new RegionItemResponse("49", "제주특별자치도"),
+                        new RegionItemResponse("50110", "제주시")
+                ),
+                LocalDate.of(2026, 8, 11),
+                LocalDate.of(2026, 8, 13),
+                objectKeys,
+                null,
+                null
+        );
     }
 }
