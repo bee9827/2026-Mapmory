@@ -57,9 +57,13 @@ import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.photo.MaxPhotosPerRecord
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
+import com.mapmory.shared.presentation.date.PlatformDatePicker
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+
+private const val StartDatePickerTarget = "start"
+private const val EndDatePickerTarget = "end"
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,6 +96,7 @@ fun TripRecordEditorScreen(
     var recommendedPhotos by remember { mutableStateOf(emptyList<SelectedPhoto>()) }
     var selectedRecommendationIds by remember { mutableStateOf(emptySet<String>()) }
     var showRecommendationSheet by remember { mutableStateOf(false) }
+    var datePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
     val dismissKeyboardOnTap = rememberDismissKeyboardOnTapModifier()
     val photoLibrary = rememberPhotoLibraryActions(
         onPhotosPicked = { photos ->
@@ -213,8 +218,8 @@ fun TripRecordEditorScreen(
                         endDate = uiState.endDate,
                         startDateError = uiState.errorMessageFor(TripRecordEditorErrorTarget.START_DATE),
                         endDateError = uiState.errorMessageFor(TripRecordEditorErrorTarget.END_DATE),
-                        onStartDateChanged = onStartDateChanged,
-                        onEndDateChanged = onEndDateChanged,
+                        onStartDateClick = { datePickerTarget = StartDatePickerTarget },
+                        onEndDateClick = { datePickerTarget = EndDatePickerTarget },
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                     )
                     EditorDivider(Modifier.padding(horizontal = 20.dp))
@@ -387,6 +392,31 @@ fun TripRecordEditorScreen(
             }
         }
     }
+
+    val activeDatePickerTarget = datePickerTarget
+    val isStartDatePicker = activeDatePickerTarget == StartDatePickerTarget
+    PlatformDatePicker(
+        visible = activeDatePickerTarget != null,
+        initialDate = when {
+            isStartDatePicker -> uiState.startDate
+            activeDatePickerTarget == EndDatePickerTarget -> uiState.endDate
+            else -> null
+        },
+        minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
+            uiState.startDate
+        } else {
+            null
+        },
+        onDateSelected = { date ->
+            if (isStartDatePicker) {
+                onStartDateChanged(date)
+            } else if (activeDatePickerTarget == EndDatePickerTarget) {
+                onEndDateChanged(date)
+            }
+            datePickerTarget = null
+        },
+        onDismiss = { datePickerTarget = null },
+    )
 }
 
 @Composable
@@ -542,8 +572,8 @@ private fun DateFields(
     endDate: String,
     startDateError: String?,
     endDateError: String?,
-    onStartDateChanged: (String) -> Unit,
-    onEndDateChanged: (String) -> Unit,
+    onStartDateClick: () -> Unit,
+    onEndDateClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -554,14 +584,14 @@ private fun DateFields(
             label = "시작",
             value = startDate,
             errorMessage = startDateError,
-            onValueChange = onStartDateChanged,
+            onClick = onStartDateClick,
             modifier = Modifier.weight(1f),
         )
         DateField(
             label = "종료",
             value = endDate,
             errorMessage = endDateError,
-            onValueChange = onEndDateChanged,
+            onClick = onEndDateClick,
             modifier = Modifier.weight(1f),
         )
     }
@@ -572,7 +602,7 @@ private fun DateField(
     label: String,
     value: String,
     errorMessage: String?,
-    onValueChange: (String) -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
@@ -588,35 +618,34 @@ private fun DateField(
                 .padding(top = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = TripRecordPalette.text,
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = value.ifBlank { "연도. 월. 일." },
+                    color = if (value.isBlank()) TripRecordPalette.muted else TripRecordPalette.text,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
-                ),
-                cursorBrush = SolidColor(TripRecordPalette.accent),
-                decorationBox = { innerTextField ->
-                    Box(contentAlignment = Alignment.CenterStart) {
-                        if (value.isBlank()) {
-                            Text(
-                                text = "연도. 월. 일.",
-                                color = TripRecordPalette.muted,
-                                fontSize = 11.sp,
-                            )
-                        }
-                        innerTextField()
-                    }
-                },
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                text = "□",
-                color = TripRecordPalette.muted,
-                fontSize = 10.sp,
-            )
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "▦",
+                    color = TripRecordPalette.muted,
+                    fontSize = 16.sp,
+                )
+            }
         }
         EditorErrorMessage(
             message = errorMessage,
