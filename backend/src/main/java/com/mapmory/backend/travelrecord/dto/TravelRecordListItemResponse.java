@@ -3,7 +3,7 @@ package com.mapmory.backend.travelrecord.dto;
 import com.mapmory.backend.travelrecord.TravelRecord;
 import java.time.LocalDate;
 
-public record TravelRecordSummaryResponse(
+public record TravelRecordListItemResponse(
         Long id,
         String title,
         String regionName,
@@ -11,10 +11,10 @@ public record TravelRecordSummaryResponse(
         LocalDate endDate,
         String thumbnailUrl
 ) {
-    public static TravelRecordSummaryResponse from(
+    public static TravelRecordListItemResponse from(
             TravelRecord travelRecord
     ) {
-        return new TravelRecordSummaryResponse(
+        return new TravelRecordListItemResponse(
                 travelRecord.getId(),
                 travelRecord.getTitle(),
                 travelRecord.getRegion().getName(),

@@ -5,7 +5,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 
 public record TravelRecordListResponse(
-        List<TravelRecordSummaryResponse> items,
+        List<TravelRecordListItemResponse> items,
         int page,
         int size,
         long totalElements,
@@ -17,7 +17,7 @@ public record TravelRecordListResponse(
     ) {
         return new TravelRecordListResponse(
                 travelRecords.getContent().stream()
-                        .map(TravelRecordSummaryResponse::from)
+                        .map(TravelRecordListItemResponse::from)
                         .toList(),
                 travelRecords.getNumber(),
                 travelRecords.getSize(),

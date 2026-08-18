@@ -28,7 +28,8 @@
 | `GET` | `/travel-records/{travelRecordId}` * | 내 여행 기록 상세 조회 |
 | `PUT` | `/travel-records/{travelRecordId}` * | 내 여행 기록 전체 수정 |
 | `DELETE` | `/travel-records/{travelRecordId}` * | 내 여행 기록 삭제 |
-| `GET` | `/travel-records/statistics` * | 선택 지역과 하위 지역의 기록 수 조회 |
+| `GET` | `/travel-records/map-summary/regions/roots` * | 루트 Region별 지도 색칠 정보 조회 |
+| `GET` | `/travel-records/map-summary/regions/{regionId}/children` * | 직속 하위 Region별 지도 색칠 정보 조회 |
 
 ### 공통 응답
 
@@ -219,9 +220,8 @@
 
 | 상태 | `code` | 조건 |
 | --- | --- | --- |
-| `404` | `COUNTRY_NOT_FOUND` | 국가 코드가 존재하지 않음 |
 | `400` | `REGION_REQUIRED` | 한국 기록에 시도 또는 시군구가 없음 |
-| `404` | `REGION_NOT_FOUND` | 요청 지역이 존재하지 않음 |
+| `404` | `REGION_NOT_FOUND` | 요청한 국가·시도·시군구가 존재하지 않음 |
 | `400` | `INVALID_REGION_HIERARCHY` | 요청 지역의 부모 관계가 맞지 않음 |
 | `400` | `INVALID_REGION_TYPE` | 한국 기록의 최종 지역이 `DISTRICT`가 아님 |
 | `400` | `INVALID_TRAVEL_DATE_RANGE` | 종료일이 시작일보다 빠름 |
@@ -293,8 +293,7 @@ GET /api/v1/travel-records?countryCode=KR&provinceCode=49&districtCode=50110
 | `400` | `VALIDATION_ERROR` | 지역 코드 형식이 올바르지 않음, `page < 0`, `size`가 1 미만 또는 100 초과 |
 | `400` | `REGION_REQUIRED` | `provinceCode`에 `countryCode`가 없거나, `districtCode`에 `countryCode` 또는 `provinceCode`가 없음 |
 | `404` | `MEMBER_NOT_FOUND` | `X-Member-Id`에 해당하는 회원이 없음 |
-| `404` | `COUNTRY_NOT_FOUND` | `countryCode`에 해당하는 국가가 없음 |
-| `404` | `REGION_NOT_FOUND` | 요청한 시도 또는 시군구 코드가 없음 |
+| `404` | `REGION_NOT_FOUND` | 요청한 국가·시도·시군구 코드가 없음 |
 | `400` | `INVALID_REGION_HIERARCHY` | 시도가 선택 국가의 직계 자식이 아니거나, 시군구가 선택 시도의 직계 자식이 아님 |
 
 조건에 맞는 기록이 없는 경우는 오류가 아니며 `200 OK`와 빈 `items`를 반환한다.
@@ -385,22 +384,53 @@ Region 관련 오류는 생성 API와 동일하게 처리한다.
 | `400` | `VALIDATION_ERROR` | 회원 ID 또는 여행 기록 ID가 양의 정수가 아님 |
 | `404` | `TRAVEL_RECORD_NOT_FOUND` | 기록이 없거나 현재 회원의 기록이 아님 |
 
-## 5. 지역별 여행 기록 통계 API
+## 5. 지도 요약 API
 
-### 선택 지역 기록 수 조회
+지도 요약 응답에는 현재 회원의 기록이 있는 Region만 포함한다. 응답에 없는 Region은 앱에서 `count = 0`, `level = NONE`으로 처리한다.
 
-`GET /api/v1/travel-records/statistics`
+### 루트 Region별 지도 색칠 정보 조회
 
-| 파라미터 | 필수 | 설명 |
-| --- | --- | --- |
-| `countryCode` | 예 | 통계를 낼 국가 |
-| `provinceCode` | 아니요 | 특정 시도 통계 |
-| `districtCode` | 아니요 | 특정 시군구 통계 |
+`GET /api/v1/travel-records/map-summary/regions/roots`
+
+#### Response `200 OK`
+
+```json
+{
+  "data": [
+    {
+      "regionId": 1,
+      "code": "KR",
+      "regionType": "COUNTRY",
+      "name": "대한민국",
+      "count": 12,
+      "level": "HIGH"
+    }
+  ]
+}
+```
+
+- 기록이 있는 `region_type = COUNTRY` Region을 `code` 오름차순으로 반환한다.
+- 현재 회원의 국가 Region 기록과 해당 국가의 모든 하위 Region 기록을 합산한다.
+- `regionId`는 후속 하위 Region 지도 요약 요청에 사용한다.
+- `code`는 안드로이드 로컬 지도 데이터와 매칭하는 표준 코드다.
+
+| 기록 수 | `level` |
+| ---: | --- |
+| `0` | `NONE` |
+| `1~2` | `LOW` |
+| `3~5` | `MEDIUM` |
+| `6 이상` | `HIGH` |
+
+### 직속 하위 Region별 지도 색칠 정보 조회
+
+`GET /api/v1/travel-records/map-summary/regions/{regionId}/children`
+
+이전 지도 요약 응답에서 받은 `regionId`를 경로에 전달한다.
 
 #### 요청 예시
 
 ```http
-GET /api/v1/travel-records/statistics?countryCode=KR&provinceCode=49
+GET /api/v1/travel-records/map-summary/regions/1/children
 X-Member-Id: 10
 ```
 
@@ -408,19 +438,25 @@ X-Member-Id: 10
 
 ```json
 {
-  "data": {
-    "countryCode": "KR",
-    "provinceCode": "49",
-    "districtCode": null,
-    "recordCount": 5
-  }
+  "data": [
+    {
+      "regionId": 15,
+      "code": "49",
+      "regionType": "PROVINCE",
+      "name": "제주특별자치도",
+      "count": 5,
+      "level": "MEDIUM"
+    }
+  ]
 }
 ```
 
-서버는 요청한 Region 자신과 모든 하위 Region에 저장된 현재 회원의 기록을 집계한다.
+- `COUNTRY` ID를 전달하면 기록이 있는 직속 `PROVINCE`를 반환한다.
+- `PROVINCE` ID를 전달하면 기록이 있는 직속 `DISTRICT`를 반환한다.
+- 각 결과 Region 자신과 모든 하위 Region에 저장된 현재 회원의 기록을 합산한다.
+- 정렬 및 색상 단계 규칙은 국가별 조회와 같다.
 
-| 요청 | 집계 범위 |
-| --- | --- |
-| `countryCode=KR` | 대한민국 및 모든 시도·시군구 기록 |
-| `countryCode=KR&provinceCode=49` | 제주특별자치도 및 하위 시군구 기록 |
-| `countryCode=KR&provinceCode=49&districtCode=50110` | 제주시 기록 |
+| 상태 | `code` | 조건 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | `regionId`가 양수가 아님 |
+| `404` | `REGION_NOT_FOUND` | 상위 Region이 존재하지 않음 |

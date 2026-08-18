@@ -12,19 +12,27 @@ public class RegionResolver {
         this.regionRepository = regionRepository;
     }
 
-    public Region findCountry(String countryCode) {
+    public Region resolve(String countryCode, String provinceCode, String districtCode) {
+        Region country = findCountry(countryCode);
+
+        if (provinceCode == null) {
+            return country;
+        }
+
+        Region province = findChild(country, RegionType.PROVINCE, provinceCode);
+
+        if (districtCode == null) {
+            return province;
+        }
+
+        return findChild(province, RegionType.DISTRICT, districtCode);
+    }
+
+    private Region findCountry(String countryCode) {
         return regionRepository.findByParentIsNullAndRegionTypeAndRegionCode(
                 RegionType.COUNTRY,
                 countryCode
-        ).orElseThrow(() -> new BusinessException(RegionErrorCode.COUNTRY_NOT_FOUND));
-    }
-
-    public Region findProvince(Region country, String provinceCode) {
-        return findChild(country, RegionType.PROVINCE, provinceCode);
-    }
-
-    public Region findDistrict(Region province, String districtCode) {
-        return findChild(province, RegionType.DISTRICT, districtCode);
+        ).orElseThrow(() -> new BusinessException(RegionErrorCode.REGION_NOT_FOUND));
     }
 
     private Region findChild(Region parent, RegionType regionType, String regionCode) {

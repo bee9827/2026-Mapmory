@@ -5,12 +5,6 @@ import com.mapmory.backend.common.exception.ErrorKind;
 
 public enum RegionErrorCode implements ErrorCode {
 
-    COUNTRY_NOT_FOUND(
-            ErrorKind.NOT_FOUND,
-            "COUNTRY_NOT_FOUND",
-            "국가를 찾을 수 없습니다.",
-            "요청한 국가 코드에 해당하는 국가가 없습니다."
-    ),
     REGION_NOT_FOUND(
             ErrorKind.NOT_FOUND,
             "REGION_NOT_FOUND",

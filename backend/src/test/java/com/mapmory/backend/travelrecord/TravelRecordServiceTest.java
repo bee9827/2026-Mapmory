@@ -68,15 +68,15 @@ class TravelRecordServiceTest {
                 "JP", null, null, "일본 여행", "", LocalDate.of(2026, 8, 11), null, List.of()
         );
 
-        when(memberRepository.getReferenceById(10L)).thenReturn(member);
-        when(regionResolver.findCountry("JP")).thenReturn(japan);
+        when(memberRepository.findById(10L)).thenReturn(Optional.of(member));
+        when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
         when(travelRecordRepository.save(any(TravelRecord.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         TravelRecord result = travelRecordService.create(10L, request);
 
         assertThat(result).isNotNull();
-        verify(regionResolver).findCountry("JP");
+        verify(regionResolver).resolve("JP", null, null);
         verify(travelRecordRepository).save(any(TravelRecord.class));
     }
 
@@ -342,7 +342,7 @@ class TravelRecordServiceTest {
     void 국가로_일지_목록을_조회한다() {
         Region korea = region(1L);
         Page<TravelRecord> expected = Page.empty();
-        when(regionResolver.findCountry("KR")).thenReturn(korea);
+        when(regionResolver.resolve("KR", null, null)).thenReturn(korea);
         when(travelRecordRepository.findByMemberIdAndCountryId(eq(10L), eq(1L), any(Pageable.class)))
                 .thenReturn(expected);
 
@@ -354,8 +354,7 @@ class TravelRecordServiceTest {
         Region korea = mock(Region.class);
         Region jeju = region(2L);
         Page<TravelRecord> expected = Page.empty();
-        when(regionResolver.findCountry("KR")).thenReturn(korea);
-        when(regionResolver.findProvince(korea, "49")).thenReturn(jeju);
+        when(regionResolver.resolve("KR", "49", null)).thenReturn(jeju);
         when(travelRecordRepository.findByMemberIdAndProvinceId(eq(10L), eq(2L), any(Pageable.class)))
                 .thenReturn(expected);
 
@@ -368,9 +367,7 @@ class TravelRecordServiceTest {
         Region jeju = mock(Region.class);
         Region jejuCity = region(3L);
         Page<TravelRecord> expected = Page.empty();
-        when(regionResolver.findCountry("KR")).thenReturn(korea);
-        when(regionResolver.findProvince(korea, "49")).thenReturn(jeju);
-        when(regionResolver.findDistrict(jeju, "50110")).thenReturn(jejuCity);
+        when(regionResolver.resolve("KR", "49", "50110")).thenReturn(jejuCity);
         when(travelRecordRepository.findByMemberIdAndRegionId(eq(10L), eq(3L), any(Pageable.class)))
                 .thenReturn(expected);
 
