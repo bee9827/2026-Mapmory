@@ -35,7 +35,7 @@ public class TravelRecordController {
 
     @PostMapping("/travel-records")
     public ResponseEntity<TravelRecordResponse<CreateTravelRecordResponse>> create(
-            @RequestHeader("X-Member-Id") @Positive Long memberId,
+            @LoginMemberId Long memberId,
             @Valid @RequestBody TravelRecordRequest travelRecordRequest
     ) {
         TravelRecord travelRecord = travelRecordService.create(memberId, travelRecordRequest);
@@ -47,7 +47,7 @@ public class TravelRecordController {
 
     @GetMapping("/travel-records")
     public ResponseEntity<TravelRecordResponse<TravelRecordListResponse>> findAll(
-            @RequestHeader("X-Member-Id") @Positive Long memberId,
+            @LoginMemberId Long memberId,
             @RequestParam(required = false) String countryCode,
             @RequestParam(required = false) String provinceCode,
             @RequestParam(required = false) String districtCode,
@@ -69,7 +69,7 @@ public class TravelRecordController {
 
     @GetMapping("/travel-records/{travelRecordId}")
     public ResponseEntity<TravelRecordResponse<TravelRecordDetailResponse>> findById(
-            @RequestHeader("X-Member-Id") @Positive Long memberId,
+            @LoginMemberId Long memberId,
             @PathVariable @Positive Long travelRecordId
     ) {
         TravelRecordDetailResponse response = travelRecordService.findById(memberId, travelRecordId);
@@ -79,7 +79,7 @@ public class TravelRecordController {
 
     @PutMapping("/travel-records/{travelRecordId}")
     public ResponseEntity<TravelRecordResponse<TravelRecordDetailResponse>> update(
-            @RequestHeader("X-Member-Id") @Positive Long memberId,
+            @LoginMemberId Long memberId,
             @PathVariable @Positive Long travelRecordId,
             @Valid @RequestBody TravelRecordRequest travelRecordRequest
     ) {
@@ -94,7 +94,7 @@ public class TravelRecordController {
 
     @DeleteMapping("/travel-records/{travelRecordId}")
     public ResponseEntity<Void> delete(
-            @RequestHeader("X-Member-Id") @Positive Long memberId,
+            @LoginMemberId Long memberId,
             @PathVariable @Positive Long travelRecordId
     ) {
         travelRecordService.delete(memberId, travelRecordId);
