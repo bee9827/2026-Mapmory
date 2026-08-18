@@ -29,6 +29,21 @@ jwt:
 kakao:
   user-info-uri: https://kapi.kakao.com/v2/user/me
 
+upload:
+  policy:
+    allowed-content-types:
+      - image/jpeg
+      - image/png
+      - image/webp
+      - image/heic
+    max-file-size: 10MB
+    max-files-per-request: 10
+    presigned-url-expiration: PT5M
+  storage:
+    s3:
+      bucket: ${AWS_S3_BUCKET:mapmory-local}
+      region: ${AWS_REGION:ap-northeast-2}
+
 server:
   port: 8080
   servlet:
