@@ -3,7 +3,6 @@ package com.mapmory.shared.presentation.triprecord.viewmodel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.mapmory.shared.domain.TripRecord
 import com.mapmory.shared.domain.TripRecords
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
