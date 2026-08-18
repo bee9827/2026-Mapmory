@@ -1,5 +1,6 @@
 package com.mapmory.backend.upload.service;
 
+import com.mapmory.backend.member.Member;
 import com.mapmory.backend.upload.dto.CreatePresignedUrlsRequest;
 import com.mapmory.backend.upload.dto.CreatePresignedUrlsResponse;
 import com.mapmory.backend.upload.dto.PresignedUploadResponse;
@@ -36,7 +37,7 @@ public class UploadService {
     }
 
     public CreatePresignedUrlsResponse createPresignedUrls(
-            Long memberId,
+            Member member,
             CreatePresignedUrlsRequest request
     ) {
         uploadPolicy.validateFileCount(request.files().size());
@@ -44,7 +45,7 @@ public class UploadService {
                 uploadPolicy.validateFile(file.fileName(), file.contentType(), file.fileSize()));
 
         List<PresignedUploadResponse> uploads = request.files().stream()
-                .map(file -> createPresignedUpload(memberId, file))
+                .map(file -> createPresignedUpload(member.getId(), file))
                 .toList();
         return new CreatePresignedUrlsResponse(uploads);
     }

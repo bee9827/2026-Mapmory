@@ -1,7 +1,6 @@
 package com.mapmory.backend.travelrecord;
 
 import com.mapmory.backend.member.Member;
-import com.mapmory.backend.member.MemberRepository;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
@@ -30,25 +29,20 @@ public class TravelRecordService {
 
     private final TravelRecordRepository travelRecordRepository;
     private final RegionResolver regionResolver;
-    private final MemberRepository memberRepository;
     private final RecordMediaRepository recordMediaRepository;
 
     public TravelRecordService(
             TravelRecordRepository travelRecordRepository,
-            MemberRepository memberRepository,
             RegionResolver regionResolver,
             RecordMediaRepository recordMediaRepository
     ) {
         this.travelRecordRepository = travelRecordRepository;
-        this.memberRepository = memberRepository;
         this.regionResolver = regionResolver;
         this.recordMediaRepository = recordMediaRepository;
     }
 
     @Transactional
-    public TravelRecord create(Long memberId, TravelRecordRequest request) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.MEMBER_NOT_FOUND));
+    public TravelRecord create(Member member, TravelRecordRequest request) {
         Region region = regionResolver.resolve(
                 request.countryCode(),
                 request.provinceCode(),
@@ -84,8 +78,8 @@ public class TravelRecordService {
     }
 
     @Transactional(readOnly = true)
-    public TravelRecordDetailResponse findById(Long memberId, Long travelRecordId) {
-        TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, memberId)
+    public TravelRecordDetailResponse findById(Member member, Long travelRecordId) {
+        TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, member.getId())
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
         List<RecordMedia> recordMedia = recordMediaRepository
                 .findByTravelRecordIdOrderBySortOrderAsc(travelRecordId);
@@ -95,11 +89,11 @@ public class TravelRecordService {
 
     @Transactional
     public TravelRecordDetailResponse update(
-            Long memberId,
+            Member member,
             Long travelRecordId,
             TravelRecordRequest request
     ) {
-        TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, memberId)
+        TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, member.getId())
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
         List<String> objectKeys = request.objectKeys() == null ? List.of() : request.objectKeys();
         validateUniqueObjectKeys(objectKeys);
@@ -124,19 +118,19 @@ public class TravelRecordService {
     }
 
     @Transactional
-    public void delete(Long memberId, Long travelRecordId) {
-        TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, memberId)
+    public void delete(Member member, Long travelRecordId) {
+        TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, member.getId())
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
 
         travelRecordRepository.delete(travelRecord);
     }
 
     @Transactional(readOnly = true)
-    public Page<TravelRecord> findAll(Long memberId, String countryCode, String provinceCode, String districtCode, int page, int size) {
+    public Page<TravelRecord> findAll(Member member, String countryCode, String provinceCode, String districtCode, int page, int size) {
         validateRegionCodeFormat(countryCode, provinceCode, districtCode);
         validateRegionFilterHierarchy(countryCode, provinceCode, districtCode);
         validatePagination(page, size);
-        validateMemberExists(memberId);
+        Long memberId = member.getId();
         Pageable pageable = createPageable(page, size);
 
         if (countryCode == null) {
@@ -204,12 +198,6 @@ public class TravelRecordService {
                     TravelRecordErrorCode.INVALID_PAGINATION,
                     "page는 0 이상이고 size는 1 이상 %d 이하여야 합니다.".formatted(MAX_PAGE_SIZE)
             );
-        }
-    }
-
-    private void validateMemberExists(Long memberId) {
-        if (!memberRepository.existsById(memberId)) {
-            throw new BusinessException(TravelRecordErrorCode.MEMBER_NOT_FOUND);
         }
     }
 

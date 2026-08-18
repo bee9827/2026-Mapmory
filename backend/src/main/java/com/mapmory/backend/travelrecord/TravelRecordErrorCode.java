@@ -23,12 +23,6 @@ public enum TravelRecordErrorCode implements ErrorCode {
             "요청 값이 올바르지 않습니다.",
             "페이지 번호 또는 페이지 크기가 올바르지 않습니다."
     ),
-    MEMBER_NOT_FOUND(
-            ErrorKind.NOT_FOUND,
-            "MEMBER_NOT_FOUND",
-            "회원을 찾을 수 없습니다.",
-            "요청한 회원 ID에 해당하는 회원이 없습니다."
-    ),
     TRAVEL_RECORD_NOT_FOUND(
             ErrorKind.NOT_FOUND,
             "TRAVEL_RECORD_NOT_FOUND",

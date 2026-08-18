@@ -13,7 +13,6 @@ import static org.mockito.Mockito.when;
 
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.Member;
-import com.mapmory.backend.member.MemberRepository;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.region.Region;
@@ -44,9 +43,6 @@ class TravelRecordServiceTest {
     private TravelRecordRepository travelRecordRepository;
 
     @Mock
-    private MemberRepository memberRepository;
-
-    @Mock
     private RegionResolver regionResolver;
 
     @Mock
@@ -55,25 +51,26 @@ class TravelRecordServiceTest {
     @InjectMocks
     private TravelRecordService travelRecordService;
 
+    private Member member;
+
     @BeforeEach
     void setUp() {
-        lenient().when(memberRepository.existsById(10L)).thenReturn(true);
+        member = mock(Member.class);
+        lenient().when(member.getId()).thenReturn(10L);
     }
 
     @Test
     void 국가_단위_여행_일지를_생성한다() {
-        Member member = mock(Member.class);
         Region japan = mock(Region.class);
         TravelRecordRequest request = new TravelRecordRequest(
                 "JP", null, null, "일본 여행", "", LocalDate.of(2026, 8, 11), null, List.of()
         );
 
-        when(memberRepository.findById(10L)).thenReturn(Optional.of(member));
         when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
         when(travelRecordRepository.save(any(TravelRecord.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        TravelRecord result = travelRecordService.create(10L, request);
+        TravelRecord result = travelRecordService.create(member, request);
 
         assertThat(result).isNotNull();
         verify(regionResolver).resolve("JP", null, null);
@@ -103,7 +100,7 @@ class TravelRecordServiceTest {
         when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
                 .thenReturn(recordMedia);
 
-        TravelRecordDetailResponse result = travelRecordService.findById(10L, 101L);
+        TravelRecordDetailResponse result = travelRecordService.findById(member, 101L);
 
         assertThat(result.id()).isEqualTo(101L);
         assertThat(result.content()).isEqualTo("제주시를 걸었다.");
@@ -133,7 +130,7 @@ class TravelRecordServiceTest {
         when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(102L))
                 .thenReturn(List.of());
 
-        TravelRecordDetailResponse result = travelRecordService.findById(10L, 102L);
+        TravelRecordDetailResponse result = travelRecordService.findById(member, 102L);
 
         assertThat(result.region().country().code()).isEqualTo("JP");
         assertThat(result.region().province()).isNull();
@@ -146,7 +143,7 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.empty());
 
-        assertError(() -> travelRecordService.findById(10L, 101L), "TRAVEL_RECORD_NOT_FOUND");
+        assertError(() -> travelRecordService.findById(member, 101L), "TRAVEL_RECORD_NOT_FOUND");
         verify(recordMediaRepository, never()).findByTravelRecordIdOrderBySortOrderAsc(101L);
     }
 
@@ -186,7 +183,7 @@ class TravelRecordServiceTest {
         when(recordMediaRepository.saveAll(anyList()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        TravelRecordDetailResponse result = travelRecordService.update(10L, 101L, request);
+        TravelRecordDetailResponse result = travelRecordService.update(member, 101L, request);
 
         assertThat(result.title()).isEqualTo("수정된 제목");
         assertThat(result.content()).isEqualTo("수정된 본문");
@@ -220,7 +217,7 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
 
-        assertError(() -> travelRecordService.update(10L, 101L, request), "INVALID_OBJECT_KEY");
+        assertError(() -> travelRecordService.update(member, 101L, request), "INVALID_OBJECT_KEY");
         verify(regionResolver, never()).resolve("JP", null, null);
     }
 
@@ -253,7 +250,7 @@ class TravelRecordServiceTest {
         when(recordMediaRepository.findByObjectKeyIn(List.of("travel-records/20/used.jpg")))
                 .thenReturn(List.of(mock(RecordMedia.class)));
 
-        assertError(() -> travelRecordService.update(10L, 101L, request), "INVALID_OBJECT_KEY");
+        assertError(() -> travelRecordService.update(member, 101L, request), "INVALID_OBJECT_KEY");
         assertThat(travelRecord.getTitle()).isEqualTo("일본 여행");
         verify(recordMediaRepository, never()).saveAll(anyList());
     }
@@ -293,7 +290,7 @@ class TravelRecordServiceTest {
         when(recordMediaRepository.saveAll(anyList()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        TravelRecordDetailResponse result = travelRecordService.update(10L, 101L, request);
+        TravelRecordDetailResponse result = travelRecordService.update(member, 101L, request);
 
         assertThat(result.objectKeys()).isEmpty();
         verify(recordMediaRepository).deleteAll(org.mockito.ArgumentMatchers.argThat(records ->
@@ -317,7 +314,7 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.empty());
 
-        assertError(() -> travelRecordService.update(10L, 101L, request), "TRAVEL_RECORD_NOT_FOUND");
+        assertError(() -> travelRecordService.update(member, 101L, request), "TRAVEL_RECORD_NOT_FOUND");
         verify(regionResolver, never()).resolve("JP", null, null);
         verify(recordMediaRepository, never()).findByTravelRecordIdOrderBySortOrderAsc(101L);
     }
@@ -328,7 +325,7 @@ class TravelRecordServiceTest {
         Page<TravelRecord> expected = new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1);
         when(travelRecordRepository.findByMemberId(eq(10L), any(Pageable.class))).thenReturn(expected);
 
-        Page<TravelRecord> result = travelRecordService.findAll(10L, null, null, null, 0, 20);
+        Page<TravelRecord> result = travelRecordService.findAll(member, null, null, null, 0, 20);
 
         assertThat(result).isEqualTo(expected);
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
@@ -344,7 +341,7 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByMemberIdAndCountryId(eq(10L), eq(1L), any(Pageable.class)))
                 .thenReturn(expected);
 
-        assertThat(travelRecordService.findAll(10L, "KR", null, null, 0, 20)).isEqualTo(expected);
+        assertThat(travelRecordService.findAll(member, "KR", null, null, 0, 20)).isEqualTo(expected);
     }
 
     @Test
@@ -356,7 +353,7 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByMemberIdAndProvinceId(eq(10L), eq(2L), any(Pageable.class)))
                 .thenReturn(expected);
 
-        assertThat(travelRecordService.findAll(10L, "KR", "49", null, 0, 20)).isEqualTo(expected);
+        assertThat(travelRecordService.findAll(member, "KR", "49", null, 0, 20)).isEqualTo(expected);
     }
 
     @Test
@@ -369,33 +366,26 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByMemberIdAndRegionId(eq(10L), eq(3L), any(Pageable.class)))
                 .thenReturn(expected);
 
-        assertThat(travelRecordService.findAll(10L, "KR", "49", "50110", 0, 20)).isEqualTo(expected);
+        assertThat(travelRecordService.findAll(member, "KR", "49", "50110", 0, 20)).isEqualTo(expected);
     }
 
     @Test
     void 잘못된_지역_필터_조합을_거부한다() {
-        assertError(() -> travelRecordService.findAll(10L, null, "49", null, 0, 20), "REGION_REQUIRED");
-        assertError(() -> travelRecordService.findAll(10L, "KR", null, "50110", 0, 20), "REGION_REQUIRED");
+        assertError(() -> travelRecordService.findAll(member, null, "49", null, 0, 20), "REGION_REQUIRED");
+        assertError(() -> travelRecordService.findAll(member, "KR", null, "50110", 0, 20), "REGION_REQUIRED");
     }
 
     @Test
     void 잘못된_지역_코드_형식을_거부한다() {
-        assertError(() -> travelRecordService.findAll(10L, "kr", null, null, 0, 20), "VALIDATION_ERROR");
-        assertError(() -> travelRecordService.findAll(10L, "KR", " ", null, 0, 20), "VALIDATION_ERROR");
+        assertError(() -> travelRecordService.findAll(member, "kr", null, null, 0, 20), "VALIDATION_ERROR");
+        assertError(() -> travelRecordService.findAll(member, "KR", " ", null, 0, 20), "VALIDATION_ERROR");
     }
 
     @Test
     void 잘못된_페이지네이션을_거부한다() {
-        assertError(() -> travelRecordService.findAll(10L, null, null, null, -1, 20), "VALIDATION_ERROR");
-        assertError(() -> travelRecordService.findAll(10L, null, null, null, 0, 0), "VALIDATION_ERROR");
-        assertError(() -> travelRecordService.findAll(10L, null, null, null, 0, 101), "VALIDATION_ERROR");
-    }
-
-    @Test
-    void 존재하지_않는_회원을_거부한다() {
-        when(memberRepository.existsById(10L)).thenReturn(false);
-
-        assertError(() -> travelRecordService.findAll(10L, null, null, null, 0, 20), "MEMBER_NOT_FOUND");
+        assertError(() -> travelRecordService.findAll(member, null, null, null, -1, 20), "VALIDATION_ERROR");
+        assertError(() -> travelRecordService.findAll(member, null, null, null, 0, 0), "VALIDATION_ERROR");
+        assertError(() -> travelRecordService.findAll(member, null, null, null, 0, 101), "VALIDATION_ERROR");
     }
 
     @Test
@@ -404,7 +394,7 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
 
-        travelRecordService.delete(10L, 101L);
+        travelRecordService.delete(member, 101L);
 
         verify(travelRecordRepository).delete(travelRecord);
     }
@@ -414,7 +404,7 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.empty());
 
-        assertError(() -> travelRecordService.delete(10L, 101L), "TRAVEL_RECORD_NOT_FOUND");
+        assertError(() -> travelRecordService.delete(member, 101L), "TRAVEL_RECORD_NOT_FOUND");
         verify(travelRecordRepository, never()).delete(any(TravelRecord.class));
     }
 

@@ -2,6 +2,7 @@ package com.mapmory.backend.upload.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.mapmory.backend.member.Member;
 import com.mapmory.backend.upload.dto.CreatePresignedUrlsRequest;
 import com.mapmory.backend.upload.dto.CreatePresignedUrlsResponse;
 import com.mapmory.backend.upload.dto.UploadFileRequest;
@@ -14,7 +15,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.unit.DataSize;
 
 class UploadServiceTest {
@@ -34,7 +37,7 @@ class UploadServiceTest {
                 new UploadFileRequest("map.webp", "image/webp", 1024L)
         ));
 
-        CreatePresignedUrlsResponse response = uploadService.createPresignedUrls(10L, request);
+        CreatePresignedUrlsResponse response = uploadService.createPresignedUrls(member(), request);
 
         assertThat(response.uploads()).hasSize(2);
         assertThat(response.uploads().getFirst().objectKey()).startsWith("travel-records/10/")
@@ -67,6 +70,12 @@ class UploadServiceTest {
                 10,
                 Duration.ofMinutes(5)
         );
+    }
+
+    private static Member member() {
+        Member member = Member.of("테스터", UUID.randomUUID());
+        ReflectionTestUtils.setField(member, "id", 10L);
+        return member;
     }
 
     private static class FakePresignedUrlProvider implements PresignedUrlProvider {

@@ -1,6 +1,7 @@
 package com.mapmory.backend.travelrecord;
 
-import com.mapmory.backend.auth.security.LoginMemberId;
+import com.mapmory.backend.auth.security.LoginMember;
+import com.mapmory.backend.member.Member;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
@@ -35,10 +36,10 @@ public class TravelRecordController {
 
     @PostMapping("/travel-records")
     public ResponseEntity<TravelRecordResponse<CreateTravelRecordResponse>> create(
-            @LoginMemberId Long memberId,
+            @LoginMember Member member,
             @Valid @RequestBody TravelRecordRequest travelRecordRequest
     ) {
-        TravelRecord travelRecord = travelRecordService.create(memberId, travelRecordRequest);
+        TravelRecord travelRecord = travelRecordService.create(member, travelRecordRequest);
         CreateTravelRecordResponse response = CreateTravelRecordResponse.from(travelRecord);
 
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -47,7 +48,7 @@ public class TravelRecordController {
 
     @GetMapping("/travel-records")
     public ResponseEntity<TravelRecordResponse<TravelRecordListResponse>> findAll(
-            @LoginMemberId Long memberId,
+            @LoginMember Member member,
             @RequestParam(required = false) String countryCode,
             @RequestParam(required = false) String provinceCode,
             @RequestParam(required = false) String districtCode,
@@ -55,7 +56,7 @@ public class TravelRecordController {
             @RequestParam(defaultValue = "20") int size
     ) {
         Page<TravelRecord> travelRecords = travelRecordService.findAll(
-                memberId,
+                member,
                 countryCode,
                 provinceCode,
                 districtCode,
@@ -69,22 +70,22 @@ public class TravelRecordController {
 
     @GetMapping("/travel-records/{travelRecordId}")
     public ResponseEntity<TravelRecordResponse<TravelRecordDetailResponse>> findById(
-            @LoginMemberId Long memberId,
+            @LoginMember Member member,
             @PathVariable @Positive Long travelRecordId
     ) {
-        TravelRecordDetailResponse response = travelRecordService.findById(memberId, travelRecordId);
+        TravelRecordDetailResponse response = travelRecordService.findById(member, travelRecordId);
 
         return ResponseEntity.ok(TravelRecordResponse.of(response));
     }
 
     @PutMapping("/travel-records/{travelRecordId}")
     public ResponseEntity<TravelRecordResponse<TravelRecordDetailResponse>> update(
-            @LoginMemberId Long memberId,
+            @LoginMember Member member,
             @PathVariable @Positive Long travelRecordId,
             @Valid @RequestBody TravelRecordRequest travelRecordRequest
     ) {
         TravelRecordDetailResponse response = travelRecordService.update(
-                memberId,
+                member,
                 travelRecordId,
                 travelRecordRequest
         );
@@ -94,10 +95,10 @@ public class TravelRecordController {
 
     @DeleteMapping("/travel-records/{travelRecordId}")
     public ResponseEntity<Void> delete(
-            @LoginMemberId Long memberId,
+            @LoginMember Member member,
             @PathVariable @Positive Long travelRecordId
     ) {
-        travelRecordService.delete(memberId, travelRecordId);
+        travelRecordService.delete(member, travelRecordId);
 
         return ResponseEntity.noContent().build();
     }

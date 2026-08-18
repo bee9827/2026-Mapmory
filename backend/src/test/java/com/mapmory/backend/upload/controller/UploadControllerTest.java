@@ -5,10 +5,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.mapmory.backend.auth.security.LoginMemberId;
+import com.mapmory.backend.auth.security.LoginMember;
 import com.mapmory.backend.common.ProblemDetailFactory;
 import com.mapmory.backend.common.handler.BusinessExceptionHandler;
 import com.mapmory.backend.common.handler.ValidationExceptionHandler;
+import com.mapmory.backend.member.Member;
 import com.mapmory.backend.upload.policy.ObjectKeyGenerator;
 import com.mapmory.backend.upload.policy.UploadPolicy;
 import com.mapmory.backend.upload.policy.UploadPolicyProperties;
@@ -17,6 +18,7 @@ import com.mapmory.backend.upload.storage.PresignedUrlProvider;
 import java.net.URI;
 import java.time.Duration;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +27,7 @@ import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.bind.support.WebDataBinderFactory;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -34,6 +37,11 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 class UploadControllerTest {
 
     private static final long MEMBER_ID = 10L;
+    private static final Member MEMBER = Member.of("테스터", UUID.randomUUID());
+
+    static {
+        ReflectionTestUtils.setField(MEMBER, "id", MEMBER_ID);
+    }
 
     private MockMvc mockMvc;
 
@@ -54,7 +62,7 @@ class UploadControllerTest {
         ProblemDetailFactory problemDetailFactory = new ProblemDetailFactory();
 
         mockMvc = MockMvcBuilders.standaloneSetup(new UploadController(uploadService))
-                .setCustomArgumentResolvers(loginMemberIdResolver())
+                .setCustomArgumentResolvers(loginMemberResolver())
                 .setControllerAdvice(
                         new BusinessExceptionHandler(problemDetailFactory),
                         new ValidationExceptionHandler(problemDetailFactory)
@@ -125,11 +133,11 @@ class UploadControllerTest {
                 """.formatted(contentType, fileSize);
     }
 
-    private static HandlerMethodArgumentResolver loginMemberIdResolver() {
+    private static HandlerMethodArgumentResolver loginMemberResolver() {
         return new HandlerMethodArgumentResolver() {
             @Override
             public boolean supportsParameter(MethodParameter parameter) {
-                return parameter.hasParameterAnnotation(LoginMemberId.class);
+                return parameter.hasParameterAnnotation(LoginMember.class);
             }
 
             @Override
@@ -139,7 +147,7 @@ class UploadControllerTest {
                     NativeWebRequest webRequest,
                     WebDataBinderFactory binderFactory
             ) {
-                return MEMBER_ID;
+                return MEMBER;
             }
         };
     }

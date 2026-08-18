@@ -6,9 +6,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * 인증된 요청의 memberId를 컨트롤러 파라미터로 주입한다.
+ * 인증된 요청의 Member를 컨트롤러 파라미터로 주입한다.
  */
 @Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface LoginMemberId {
+public @interface LoginMember {
 }

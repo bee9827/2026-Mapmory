@@ -1,7 +1,8 @@
 package com.mapmory.backend.upload.controller;
 
-import com.mapmory.backend.auth.security.LoginMemberId;
+import com.mapmory.backend.auth.security.LoginMember;
 import com.mapmory.backend.common.dto.ApiResponse;
+import com.mapmory.backend.member.Member;
 import com.mapmory.backend.upload.dto.CreatePresignedUrlsRequest;
 import com.mapmory.backend.upload.dto.CreatePresignedUrlsResponse;
 import com.mapmory.backend.upload.service.UploadService;
@@ -23,9 +24,9 @@ public class UploadController {
 
     @PostMapping("/presigned-urls")
     public ApiResponse<CreatePresignedUrlsResponse> createPresignedUrls(
-            @LoginMemberId Long memberId,
+            @LoginMember Member member,
             @Valid @RequestBody CreatePresignedUrlsRequest request
     ) {
-        return ApiResponse.from(uploadService.createPresignedUrls(memberId, request));
+        return ApiResponse.from(uploadService.createPresignedUrls(member, request));
     }
 }
