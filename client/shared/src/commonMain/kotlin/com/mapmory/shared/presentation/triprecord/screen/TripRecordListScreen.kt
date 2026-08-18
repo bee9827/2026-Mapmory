@@ -46,7 +46,7 @@ fun TripRecordListScreen(
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    TripRecordBackground(modifier = modifier) {
+    TripRecordBackground(modifier = modifier.then(rememberDismissKeyboardOnTapModifier())) {
         Column(Modifier.fillMaxSize()) {
             TripRecordTopBar(
                 title = "Mapmory",

@@ -92,6 +92,7 @@ fun TripRecordEditorScreen(
     var recommendedPhotos by remember { mutableStateOf(emptyList<SelectedPhoto>()) }
     var selectedRecommendationIds by remember { mutableStateOf(emptySet<String>()) }
     var showRecommendationSheet by remember { mutableStateOf(false) }
+    val dismissKeyboardOnTap = rememberDismissKeyboardOnTapModifier()
     val photoLibrary = rememberPhotoLibraryActions(
         onPhotosPicked = { photos ->
             photoMessage = null
@@ -118,7 +119,7 @@ fun TripRecordEditorScreen(
         }
     }
 
-    TripRecordBackground(modifier = modifier) {
+    TripRecordBackground(modifier = modifier.then(dismissKeyboardOnTap)) {
         Column(Modifier.fillMaxSize()) {
             EditorTopBar(
                 title = if (uiState.recordId == null) "기록 남기기" else "기록 수정하기",
@@ -259,6 +260,7 @@ fun TripRecordEditorScreen(
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .imePadding()
+                    .then(dismissKeyboardOnTap)
                     .padding(horizontal = 20.dp),
             ) {
                 Text(
