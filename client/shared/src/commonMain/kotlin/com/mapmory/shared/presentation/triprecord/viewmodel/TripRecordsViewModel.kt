@@ -8,6 +8,7 @@ import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.photo.MaxPhotosPerRecord
 import com.mapmory.shared.presentation.photo.SelectedPhoto
+import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEffect
 import com.mapmory.shared.presentation.triprecord.state.TripRecordFilterUiState
@@ -32,6 +33,8 @@ sealed interface TripRecordAction {
     data class StartEditing(val recordId: Long) : TripRecordAction
 
     data class LocationSelected(val location: Location) : TripRecordAction
+
+    data object LocationTouched : TripRecordAction
 
     data class TitleChanged(val title: String) : TripRecordAction
 
@@ -100,23 +103,37 @@ class TripRecordsViewModel(
             is TripRecordAction.StartCreating -> startCreating(action.selectedLocation)
             is TripRecordAction.StartEditing -> startEditing(action.recordId)
             is TripRecordAction.LocationSelected -> updateEditor {
-                copy(selectedLocation = action.location, errorMessage = null)
+                copy(
+                    selectedLocation = action.location,
+                ).revalidatedAfterChange(TripRecordEditorErrorTarget.LOCATION)
+            }
+
+            TripRecordAction.LocationTouched -> updateEditor {
+                revalidatedAfterChange(TripRecordEditorErrorTarget.LOCATION)
             }
 
             is TripRecordAction.TitleChanged -> updateEditor {
-                copy(title = action.title, errorMessage = null)
+                copy(
+                    title = action.title,
+                ).revalidatedAfterChange(TripRecordEditorErrorTarget.TITLE)
             }
 
             is TripRecordAction.ContentChanged -> updateEditor {
-                copy(content = action.content, errorMessage = null)
+                copy(
+                    content = action.content,
+                ).revalidatedAfterChange()
             }
 
             is TripRecordAction.StartDateChanged -> updateEditor {
-                copy(startDate = action.date, errorMessage = null)
+                copy(
+                    startDate = action.date,
+                ).revalidatedAfterChange(TripRecordEditorErrorTarget.START_DATE)
             }
 
             is TripRecordAction.EndDateChanged -> updateEditor {
-                copy(endDate = action.date, errorMessage = null)
+                copy(
+                    endDate = action.date,
+                ).revalidatedAfterChange(TripRecordEditorErrorTarget.END_DATE)
             }
 
             is TripRecordAction.PhotosAdded -> addPhotos(action.photos)
@@ -152,8 +169,8 @@ class TripRecordsViewModel(
                 selectedLocation = locations.firstOrNull { it.name == record.location },
                 title = record.tripRecordTitle,
                 content = record.tripRecordDescription.orEmpty(),
-                startDate = record.startTripDate.toString(),
-                endDate = record.endTripDate.toString(),
+                startDate = record.startTripDate?.toString().orEmpty(),
+                endDate = record.endTripDate?.toString().orEmpty(),
                 mediaObjectKeys = photos.map(TripRecordPhotoUiState::id),
                 selectedPhotos = photos,
             ),
@@ -174,16 +191,20 @@ class TripRecordsViewModel(
             }
         }.take(MaxPhotosPerRecord)
 
+        val updatedEditor = editor.copy(
+            selectedPhotos = merged,
+            mediaObjectKeys = merged.map(TripRecordPhotoUiState::id),
+            fieldErrors = if (merged.size < requested.size) {
+                editor.fieldErrors + mapOf(
+                    TripRecordEditorErrorTarget.PHOTOS to
+                        "사진은 최대 ${MaxPhotosPerRecord}장까지 추가할 수 있어요.",
+                )
+            } else {
+                editor.fieldErrors - TripRecordEditorErrorTarget.PHOTOS
+            },
+        ).revalidatedAfterChange()
         uiState = uiState.copy(
-            editor = editor.copy(
-                selectedPhotos = merged,
-                mediaObjectKeys = merged.map(TripRecordPhotoUiState::id),
-                errorMessage = if (merged.size < requested.size) {
-                    "사진은 최대 ${MaxPhotosPerRecord}장까지 추가할 수 있어요."
-                } else {
-                    null
-                },
-            ),
+            editor = updatedEditor,
         )
     }
 
@@ -195,28 +216,24 @@ class TripRecordsViewModel(
             copy(
                 selectedPhotos = remaining,
                 mediaObjectKeys = remaining.map(TripRecordPhotoUiState::id),
-                errorMessage = null,
-            )
+                fieldErrors = fieldErrors - TripRecordEditorErrorTarget.PHOTOS,
+            ).revalidatedAfterChange()
         }
     }
 
     private fun save() {
         val editor = uiState.editor
-        val location = editor.selectedLocation ?: return fail("장소를 선택해 주세요.")
         val title = editor.title.trim()
-        if (title.isEmpty()) return fail("제목을 입력해 주세요.")
+        val startDate = editor.startDate.takeIf(String::isNotBlank)?.toLocalDateOrNull()
+        val endDate = editor.endDate.takeIf(String::isNotBlank)?.toLocalDateOrNull()
+        val validationErrors = editor.validationErrors(startDate, endDate)
+        if (validationErrors.isNotEmpty()) return fail(validationErrors)
 
-        val startDate = editor.startDate.toLocalDateOrNull()
-            ?: return fail("올바른 시작일을 입력해 주세요.")
-        val endDate = if (editor.endDate.isBlank()) {
-            startDate
-        } else {
-            editor.endDate.toLocalDateOrNull()
-                ?: return fail("올바른 종료일을 입력해 주세요.")
-        }
-        if (startDate > endDate) return fail("종료일은 시작일보다 빠를 수 없습니다.")
+        val location = requireNotNull(editor.selectedLocation)
 
-        uiState = uiState.copy(editor = editor.copy(isSaving = true, errorMessage = null))
+        uiState = uiState.copy(
+            editor = editor.copy(isSaving = true, fieldErrors = emptyMap(), generalErrorMessage = null),
+        )
         val photos = editor.selectedPhotos.mapIndexed { index, photo -> photo.copy(sortOrder = index) }
         val imageUrl = photos.firstOrNull()?.id.orEmpty()
 
@@ -231,6 +248,8 @@ class TripRecordsViewModel(
                     editingDescription = editor.content.trim(),
                     editingStartTripDate = startDate,
                     editingEndTripDate = endDate,
+                    clearStartTripDate = editor.startDate.isBlank(),
+                    clearEndTripDate = editor.endDate.isBlank(),
                     editingLocation = location.name,
                 )
                 domainRecords.tripRecords.first { it.id == recordId }
@@ -246,14 +265,16 @@ class TripRecordsViewModel(
                 domainRecords.tripRecords.last()
             }
         }.getOrElse { error ->
-            fail(error.message ?: "여행 기록을 저장하지 못했습니다.")
+            fail(
+                generalErrorMessage = error.message ?: "여행 기록을 저장하지 못했습니다.",
+            )
             return
         }
 
         photosByRecordId = photosByRecordId + (savedRecord.id to photos)
         val wasEditing = editor.recordId != null
         publishRecords(
-            editor = editor.copy(isSaving = false, errorMessage = null),
+            editor = editor.copy(isSaving = false, fieldErrors = emptyMap(), generalErrorMessage = null),
             filter = TripRecordFilterUiState(),
             effect = if (wasEditing) {
                 TripRecordEffect.OpenDetail(savedRecord.id, replaceCurrent = true)
@@ -278,8 +299,20 @@ class TripRecordsViewModel(
         uiState = uiState.copy(editor = uiState.editor.transform())
     }
 
-    private fun fail(message: String) {
-        updateEditor { copy(isSaving = false, errorMessage = message) }
+    private fun fail(errors: Map<TripRecordEditorErrorTarget, String>) {
+        updateEditor {
+            copy(
+                isDirty = true,
+                dirtyFields = dirtyFields + errors.keys,
+                isSaving = false,
+                fieldErrors = errors,
+                generalErrorMessage = null,
+            )
+        }
+    }
+
+    private fun fail(generalErrorMessage: String) {
+        updateEditor { copy(isSaving = false, fieldErrors = emptyMap(), generalErrorMessage = generalErrorMessage) }
     }
 
     private fun emit(effect: TripRecordEffect) {
@@ -331,5 +364,61 @@ class TripRecordsViewModel(
 private fun String.toLocalDateOrNull(): LocalDate? = runCatching {
     LocalDate.parse(trim().replace(" ", "").replace('.', '-'))
 }.getOrNull()
+
+private fun TripRecordEditorUiState.revalidatedAfterChange(
+    dirtyTarget: TripRecordEditorErrorTarget? = null,
+): TripRecordEditorUiState {
+    if (dirtyTarget == null) {
+        return copy(isDirty = true, generalErrorMessage = null)
+    }
+
+    val startDateValue = startDate.takeIf(String::isNotBlank)?.toLocalDateOrNull()
+    val endDateValue = endDate.takeIf(String::isNotBlank)?.toLocalDateOrNull()
+    val updatedDirtyFields = if (dirtyTarget in dirtyFields) dirtyFields else dirtyFields + dirtyTarget
+    val nonValidationErrors = fieldErrors.filterKeys { target ->
+        target == TripRecordEditorErrorTarget.PHOTOS
+    }
+    val dateRangeErrorTarget = when (dirtyTarget) {
+        TripRecordEditorErrorTarget.START_DATE,
+        TripRecordEditorErrorTarget.END_DATE -> dirtyTarget
+
+        else -> fieldErrors.keys.firstOrNull { target ->
+            target == TripRecordEditorErrorTarget.START_DATE ||
+                target == TripRecordEditorErrorTarget.END_DATE
+        } ?: TripRecordEditorErrorTarget.END_DATE
+    }
+    return copy(
+        isDirty = true,
+        dirtyFields = updatedDirtyFields,
+        fieldErrors = nonValidationErrors + validationErrors(
+            startDateValue = startDateValue,
+            endDateValue = endDateValue,
+            dateRangeErrorTarget = dateRangeErrorTarget,
+        ).filterKeys(updatedDirtyFields::contains),
+        generalErrorMessage = null,
+    )
+}
+
+private fun TripRecordEditorUiState.validationErrors(
+    startDateValue: LocalDate?,
+    endDateValue: LocalDate?,
+    dateRangeErrorTarget: TripRecordEditorErrorTarget = TripRecordEditorErrorTarget.END_DATE,
+): Map<TripRecordEditorErrorTarget, String> = buildMap {
+    if (selectedLocation == null) {
+        put(TripRecordEditorErrorTarget.LOCATION, "장소를 선택해 주세요.")
+    }
+    if (title.isBlank()) {
+        put(TripRecordEditorErrorTarget.TITLE, "제목을 입력해 주세요.")
+    }
+    if (startDate.isNotBlank() && startDateValue == null) {
+        put(TripRecordEditorErrorTarget.START_DATE, "올바른 시작일을 입력해 주세요.")
+    }
+    if (endDate.isNotBlank() && endDateValue == null) {
+        put(TripRecordEditorErrorTarget.END_DATE, "올바른 종료일을 입력해 주세요.")
+    }
+    if (startDateValue != null && endDateValue != null && startDateValue > endDateValue) {
+        put(dateRangeErrorTarget, "종료일은 시작일보다 빠를 수 없습니다.")
+    }
+}
 
 private const val KoreaCountryId = 1L

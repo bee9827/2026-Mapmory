@@ -83,8 +83,8 @@ internal fun TripRecord.toTripRecordItemUiState(
     id = id,
     title = tripRecordTitle,
     content = tripRecordDescription.orEmpty(),
-    startDate = startTripDate.toString(),
-    endDate = endTripDate.toString(),
+    startDate = startTripDate?.toString(),
+    endDate = endTripDate?.toString(),
     locationName = location,
     photos = photos.sortedBy { it.sortOrder },
 )

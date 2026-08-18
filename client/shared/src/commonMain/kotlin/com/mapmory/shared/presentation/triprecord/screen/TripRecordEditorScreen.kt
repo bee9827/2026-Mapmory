@@ -57,6 +57,7 @@ import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.photo.MaxPhotosPerRecord
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
+import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
 
@@ -66,6 +67,7 @@ fun TripRecordEditorScreen(
     uiState: TripRecordEditorUiState,
     locations: List<Location>,
     onLocationSelected: (Location) -> Unit,
+    onLocationTouched: () -> Unit = {},
     onTitleChanged: (String) -> Unit,
     onContentChanged: (String) -> Unit,
     onStartDateChanged: (String) -> Unit,
@@ -121,6 +123,7 @@ fun TripRecordEditorScreen(
             EditorTopBar(
                 title = if (uiState.recordId == null) "기록 남기기" else "기록 수정하기",
                 onBackClick = onBackClick,
+                isDirty = uiState.isDirty,
                 isSaving = uiState.isSaving,
                 onSaveClick = onSaveClick,
             )
@@ -162,29 +165,44 @@ fun TripRecordEditorScreen(
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                         )
                     }
+                    EditorErrorMessage(
+                        message = uiState.errorMessageFor(TripRecordEditorErrorTarget.PHOTOS),
+                        modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                    )
                     EditorDivider()
                 }
 
                 item {
-                    EditorTitleField(
-                        value = uiState.title,
-                        onValueChange = onTitleChanged,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 18.dp),
-                    )
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+                        EditorTitleField(
+                            value = uiState.title,
+                            onValueChange = onTitleChanged,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        EditorErrorMessage(
+                            message = uiState.errorMessageFor(TripRecordEditorErrorTarget.TITLE),
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
                     EditorDivider(Modifier.padding(horizontal = 20.dp))
                 }
 
                 item {
-                    LocationSelector(
-                        selectedLocation = uiState.selectedLocation,
-                        locations = locations,
-                        onClick = { showLocationSheet = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 12.dp),
-                    )
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                        LocationSelector(
+                            selectedLocation = uiState.selectedLocation,
+                            locations = locations,
+                            onClick = {
+                                onLocationTouched()
+                                showLocationSheet = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        EditorErrorMessage(
+                            message = uiState.errorMessageFor(TripRecordEditorErrorTarget.LOCATION),
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
                     EditorDivider(Modifier.padding(horizontal = 20.dp))
                 }
 
@@ -192,6 +210,8 @@ fun TripRecordEditorScreen(
                     DateFields(
                         startDate = uiState.startDate,
                         endDate = uiState.endDate,
+                        startDateError = uiState.errorMessageFor(TripRecordEditorErrorTarget.START_DATE),
+                        endDateError = uiState.errorMessageFor(TripRecordEditorErrorTarget.END_DATE),
                         onStartDateChanged = onStartDateChanged,
                         onEndDateChanged = onEndDateChanged,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
@@ -215,12 +235,10 @@ fun TripRecordEditorScreen(
                     )
                 }
 
-                uiState.errorMessage?.let { message ->
+                uiState.generalErrorMessage?.takeIf { uiState.isDirty }?.let { message ->
                     item {
-                        Text(
-                            text = message,
-                            color = TripRecordPalette.danger,
-                            fontSize = 12.sp,
+                        EditorErrorMessage(
+                            message = message,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                         )
                     }
@@ -373,6 +391,7 @@ fun TripRecordEditorScreen(
 private fun EditorTopBar(
     title: String,
     onBackClick: () -> Unit,
+    isDirty: Boolean,
     isSaving: Boolean,
     onSaveClick: () -> Unit,
 ) {
@@ -406,7 +425,7 @@ private fun EditorTopBar(
             )
             TextButton(
                 onClick = onSaveClick,
-                enabled = !isSaving,
+                enabled = isDirty && !isSaving,
                 contentPadding = PaddingValues(horizontal = 12.dp),
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -414,7 +433,7 @@ private fun EditorTopBar(
             ) {
                 Text(
                     text = if (isSaving) "저장 중" else "저장",
-                    color = if (isSaving) TripRecordPalette.muted else TripRecordPalette.accent,
+                    color = if (isDirty && !isSaving) TripRecordPalette.accent else TripRecordPalette.muted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -521,6 +540,8 @@ private fun EditorTitleField(
 private fun DateFields(
     startDate: String,
     endDate: String,
+    startDateError: String?,
+    endDateError: String?,
     onStartDateChanged: (String) -> Unit,
     onEndDateChanged: (String) -> Unit,
     modifier: Modifier = Modifier,
@@ -532,12 +553,14 @@ private fun DateFields(
         DateField(
             label = "시작",
             value = startDate,
+            errorMessage = startDateError,
             onValueChange = onStartDateChanged,
             modifier = Modifier.weight(1f),
         )
         DateField(
             label = "종료",
             value = endDate,
+            errorMessage = endDateError,
             onValueChange = onEndDateChanged,
             modifier = Modifier.weight(1f),
         )
@@ -548,6 +571,7 @@ private fun DateFields(
 private fun DateField(
     label: String,
     value: String,
+    errorMessage: String?,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -594,8 +618,31 @@ private fun DateField(
                 fontSize = 10.sp,
             )
         }
+        EditorErrorMessage(
+            message = errorMessage,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
+
+@Composable
+private fun EditorErrorMessage(
+    message: String?,
+    modifier: Modifier = Modifier,
+) {
+    message ?: return
+    Text(
+        text = message,
+        color = TripRecordPalette.danger,
+        fontSize = 11.sp,
+        modifier = modifier,
+    )
+}
+
+private fun TripRecordEditorUiState.errorMessageFor(target: TripRecordEditorErrorTarget): String? =
+    fieldErrors[target]?.takeIf {
+        target == TripRecordEditorErrorTarget.PHOTOS || isFieldDirty(target)
+    }
 
 @Composable
 private fun CompanionChips(modifier: Modifier = Modifier) {

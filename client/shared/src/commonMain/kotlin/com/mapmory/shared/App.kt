@@ -204,6 +204,9 @@ fun MapmoryApp(
                 onLocationSelected = { location ->
                     recordsViewModel.onAction(TripRecordAction.LocationSelected(location))
                 },
+                onLocationTouched = {
+                    recordsViewModel.onAction(TripRecordAction.LocationTouched)
+                },
                 onTitleChanged = { title ->
                     recordsViewModel.onAction(TripRecordAction.TitleChanged(title))
                 },

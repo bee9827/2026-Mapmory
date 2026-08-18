@@ -27,7 +27,7 @@ class FakeTripRecordRepositoryTest {
             ),
         ).getOrThrow()
 
-        assertEquals("2026-08-01", created.endDate)
+        assertEquals(null, created.endDate)
         assertEquals(0, created.media.single().sortOrder)
         assertEquals(1, repository.getTripRecords(TripRecordQuery()).getOrThrow().totalElements)
 
