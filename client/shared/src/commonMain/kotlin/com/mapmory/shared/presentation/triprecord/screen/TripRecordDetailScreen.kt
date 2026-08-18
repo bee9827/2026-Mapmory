@@ -159,7 +159,7 @@ private fun TripRecordPhotoSection(
     Box(modifier = modifier) {
         if (media.isEmpty()) {
             TripPhotoImage(
-                previewBytes = null,
+                imageBytes = null,
                 contentDescription = record.title,
                 modifier = Modifier.fillMaxSize(),
                 placeholderVariant = record.id.toInt() + 1,
@@ -176,7 +176,9 @@ private fun TripRecordPhotoSection(
             ) { page ->
                 val photo = media[page]
                 TripPhotoImage(
-                    previewBytes = photo.previewBytes?.bytesForDecoding(),
+                    imageBytes = photo.originalBytes?.bytesForDecoding()
+                        ?: photo.previewBytes?.bytesForDecoding(),
+                    fallbackBytes = photo.previewBytes?.bytesForDecoding(),
                     contentDescription = "${record.title} 사진 ${page + 1}",
                     modifier = Modifier.fillMaxSize(),
                     placeholderVariant = record.id.toInt() + page + 1,

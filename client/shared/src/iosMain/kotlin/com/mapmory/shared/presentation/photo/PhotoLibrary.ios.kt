@@ -244,11 +244,13 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
                 return@loadDataRepresentationForTypeIdentifier
             }
             onMain {
+                val originalBytes = data.toByteArray()
                 completion(
                     SelectedPhoto(
                         id = result.assetIdentifier ?: "ios-${data.hash}",
                         displayName = result.itemProvider.suggestedName ?: "여행 사진",
-                        previewBytes = data.toByteArray(),
+                        previewBytes = data.toPreviewByteArray() ?: originalBytes,
+                        originalBytes = originalBytes,
                     ),
                 )
             }
@@ -283,6 +285,9 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
             val previewBytes = data
                 ?.takeIf { it.length > 0UL }
                 ?.toPreviewByteArray()
+            val originalBytes = data
+                ?.takeIf { it.length > 0UL }
+                ?.toByteArray()
             onMain {
                 // requestImageDataAndOrientationForAsset invokes its result handler once.
                 // Keep completion serialized on the main queue with the other photo paths.
@@ -297,6 +302,7 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
                             latitude = latitude,
                             longitude = longitude,
                             capturedAt = asset.creationDate?.formattedPhotoDate(),
+                            originalBytes = originalBytes,
                         )
                     },
                 )

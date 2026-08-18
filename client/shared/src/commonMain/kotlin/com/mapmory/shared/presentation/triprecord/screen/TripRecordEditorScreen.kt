@@ -123,7 +123,7 @@ fun TripRecordEditorScreen(
             EditorTopBar(
                 title = if (uiState.recordId == null) "기록 남기기" else "기록 수정하기",
                 onBackClick = onBackClick,
-                isDirty = uiState.isDirty,
+                isSaveEnabled = uiState.isSaveEnabled,
                 isSaving = uiState.isSaving,
                 onSaveClick = onSaveClick,
             )
@@ -391,7 +391,7 @@ fun TripRecordEditorScreen(
 private fun EditorTopBar(
     title: String,
     onBackClick: () -> Unit,
-    isDirty: Boolean,
+    isSaveEnabled: Boolean,
     isSaving: Boolean,
     onSaveClick: () -> Unit,
 ) {
@@ -425,7 +425,7 @@ private fun EditorTopBar(
             )
             TextButton(
                 onClick = onSaveClick,
-                enabled = isDirty && !isSaving,
+                enabled = isSaveEnabled,
                 contentPadding = PaddingValues(horizontal = 12.dp),
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -433,7 +433,7 @@ private fun EditorTopBar(
             ) {
                 Text(
                     text = if (isSaving) "저장 중" else "저장",
-                    color = if (isDirty && !isSaving) TripRecordPalette.accent else TripRecordPalette.muted,
+                    color = if (isSaveEnabled) TripRecordPalette.accent else TripRecordPalette.muted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -476,19 +476,17 @@ private fun PhotoSection(
                 contentPadding = PaddingValues(horizontal = 9.dp, vertical = 2.dp),
                 modifier = Modifier
                     .height(36.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(TripRecordPalette.photoRecommendBackground)
                     .border(
                         width = 1.dp,
-                        color = if (recommendationsAvailable) {
-                            TripRecordPalette.danger.copy(alpha = 0.7f)
-                        } else {
-                            TripRecordPalette.line
-                        },
+                        color = TripRecordPalette.photoRecommendBorder,
                         shape = RoundedCornerShape(6.dp),
                     ),
             ) {
                 Text(
                     text = "위치 기반 사진\n불러오기",
-                    color = if (recommendationsAvailable) TripRecordPalette.text else TripRecordPalette.muted,
+                    color = TripRecordPalette.photoRecommendText,
                     fontSize = 9.sp,
                     lineHeight = 11.sp,
                 )
@@ -754,8 +752,8 @@ private fun PhotoActionButton(onClick: () -> Unit) {
             .size(112.dp, 84.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .background(TripRecordPalette.accentSoft.copy(alpha = 0.6f))
-            .border(1.dp, TripRecordPalette.accent.copy(alpha = 0.45f), RoundedCornerShape(14.dp)),
+            .background(TripRecordPalette.photoGalleryBackground)
+            .border(1.dp, TripRecordPalette.photoGalleryBorder, RoundedCornerShape(14.dp)),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -813,7 +811,7 @@ private fun RecommendedPhoto(
 @Composable
 private fun PhotoPreview(photo: SelectedPhoto, modifier: Modifier = Modifier) {
     TripPhotoImage(
-        previewBytes = photo.previewBytes,
+        imageBytes = photo.previewBytes,
         contentDescription = photo.displayName,
         modifier = modifier,
         placeholderVariant = photo.id.hashCode(),
@@ -823,7 +821,7 @@ private fun PhotoPreview(photo: SelectedPhoto, modifier: Modifier = Modifier) {
 @Composable
 private fun PhotoPreview(photo: TripRecordPhotoUiState, modifier: Modifier = Modifier) {
     TripPhotoImage(
-        previewBytes = photo.previewBytes?.bytesForDecoding(),
+        imageBytes = photo.previewBytes?.bytesForDecoding(),
         contentDescription = photo.displayName,
         modifier = modifier,
         placeholderVariant = photo.id.hashCode(),

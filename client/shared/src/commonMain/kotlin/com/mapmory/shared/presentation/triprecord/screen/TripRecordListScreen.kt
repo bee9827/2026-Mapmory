@@ -231,7 +231,7 @@ private fun TripRecordCard(
     ) {
         Column {
             TripPhotoImage(
-                previewBytes = record.photos.minByOrNull { it.sortOrder }?.previewBytes?.bytesForDecoding(),
+                imageBytes = record.photos.minByOrNull { it.sortOrder }?.previewBytes?.bytesForDecoding(),
                 contentDescription = record.title,
                 modifier = Modifier
                     .fillMaxWidth()

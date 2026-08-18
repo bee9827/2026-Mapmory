@@ -51,6 +51,11 @@ internal object TripRecordPalette {
     val accent = Color(0xFF35C988)
     val accentSoft = Color(0xFF123E3A)
     val danger = Color(0xFFFF6264)
+    val photoRecommendText = Color.White
+    val photoRecommendBackground = Color(0xFF382125)
+    val photoRecommendBorder = Color(0xFF99555D)
+    val photoGalleryBackground = Color(0xFF1B2D26)
+    val photoGalleryBorder = Color(0xFF3E7960)
 }
 
 @Composable
@@ -311,14 +316,16 @@ internal fun TripPhotoPlaceholder(
 
 @Composable
 internal fun TripPhotoImage(
-    previewBytes: ByteArray?,
+    imageBytes: ByteArray?,
+    fallbackBytes: ByteArray? = null,
     contentDescription: String,
     modifier: Modifier = Modifier,
     placeholderVariant: Int = 0,
     shape: Shape = RoundedCornerShape(18.dp),
 ) {
-    val bitmap = remember(previewBytes) {
-        previewBytes?.let { bytes -> runCatching { bytes.decodeToImageBitmap() }.getOrNull() }
+    val bitmap = remember(imageBytes, fallbackBytes) {
+        imageBytes.decodeToImageBitmapOrNull()
+            ?: fallbackBytes.decodeToImageBitmapOrNull()
     }
     if (bitmap == null) {
         TripPhotoPlaceholder(modifier, placeholderVariant, shape)
@@ -331,6 +338,9 @@ internal fun TripPhotoImage(
         )
     }
 }
+
+private fun ByteArray?.decodeToImageBitmapOrNull() =
+    this?.let { bytes -> runCatching { bytes.decodeToImageBitmap() }.getOrNull() }
 
 @Composable
 fun TripMapArtwork(

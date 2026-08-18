@@ -23,6 +23,7 @@ data class TripRecordPhotoUiState(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val capturedAt: String? = null,
+    val originalBytes: PhotoPreviewBytes? = null,
 )
 
 /** ByteArray의 변경 가능성을 UI 상태 밖으로 숨기고 생성 시점에 방어적으로 복사한다. */
@@ -54,6 +55,7 @@ fun SelectedPhoto.toTripRecordPhotoUiState(sortOrder: Int): TripRecordPhotoUiSta
         latitude = latitude,
         longitude = longitude,
         capturedAt = capturedAt,
+        originalBytes = PhotoPreviewBytes.from(originalBytes),
     )
 
 fun TripRecordData.toTripRecordItemUiState(

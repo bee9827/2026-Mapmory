@@ -18,6 +18,24 @@ import kotlin.test.assertTrue
 
 class TripRecordsViewModelTest {
     @Test
+    fun `저장 버튼은 제목과 위치가 모두 입력된 수정 상태에서만 활성화된다`() {
+        val viewModel = TripRecordsViewModel(locations)
+        viewModel.onAction(TripRecordAction.StartCreating())
+        viewModel.onAction(TripRecordAction.EffectHandled)
+
+        assertFalse(viewModel.uiState.editor.isSaveEnabled)
+
+        viewModel.onAction(TripRecordAction.TitleChanged("서울 여행"))
+        assertFalse(viewModel.uiState.editor.isSaveEnabled)
+
+        viewModel.onAction(TripRecordAction.LocationSelected(gangnam))
+        assertTrue(viewModel.uiState.editor.isSaveEnabled)
+
+        viewModel.onAction(TripRecordAction.TitleChanged(" "))
+        assertFalse(viewModel.uiState.editor.isSaveEnabled)
+    }
+
+    @Test
     fun `화면 액션으로 도메인 여행 기록을 생성하고 UI 상태를 발행한다`() {
         val viewModel = TripRecordsViewModel(locations)
         val initialState = viewModel.uiState
@@ -35,6 +53,7 @@ class TripRecordsViewModelTest {
                         id = "photo-1",
                         displayName = "서울.jpg",
                         previewBytes = byteArrayOf(1, 2, 3),
+                        originalBytes = byteArrayOf(4, 5, 6, 7),
                     ),
                 ),
             ),
@@ -51,6 +70,10 @@ class TripRecordsViewModelTest {
         assertContentEquals(
             byteArrayOf(1, 2, 3),
             record.photos.single().previewBytes?.bytesForDecoding(),
+        )
+        assertContentEquals(
+            byteArrayOf(4, 5, 6, 7),
+            record.photos.single().originalBytes?.bytesForDecoding(),
         )
         assertEquals(TripRecordEffect.OpenRecords, viewModel.uiState.effect)
     }
