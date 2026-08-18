@@ -403,6 +403,26 @@ class TravelRecordServiceTest {
         assertError(() -> travelRecordService.findAll(10L, null, null, null, 0, 20), "MEMBER_NOT_FOUND");
     }
 
+    @Test
+    void 소유한_여행_일지를_삭제한다() {
+        TravelRecord travelRecord = mock(TravelRecord.class);
+        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
+                .thenReturn(Optional.of(travelRecord));
+
+        travelRecordService.delete(10L, 101L);
+
+        verify(travelRecordRepository).delete(travelRecord);
+    }
+
+    @Test
+    void 없거나_다른_회원의_여행_일지_삭제를_거부한다() {
+        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
+                .thenReturn(Optional.empty());
+
+        assertError(() -> travelRecordService.delete(10L, 101L), "TRAVEL_RECORD_NOT_FOUND");
+        verify(travelRecordRepository, never()).delete(any(TravelRecord.class));
+    }
+
     private Region region(Long id) {
         Region region = mock(Region.class);
         when(region.getId()).thenReturn(id);

@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -177,6 +178,17 @@ class TravelRecordControllerTest {
                 .andExpect(jsonPath("$.data.region.district.code").value("50110"))
                 .andExpect(jsonPath("$.data.objectKeys[0]")
                         .value("travel-records/10/b.jpg"));
+    }
+
+    @Test
+    void 여행_일지를_삭제한다() throws Exception {
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(travelRecordController).build();
+
+        mockMvc.perform(delete("/api/v1/travel-records/101")
+                        .header("X-Member-Id", 10L))
+                .andExpect(status().isNoContent());
+
+        verify(travelRecordService).delete(10L, 101L);
     }
 
     @Test
