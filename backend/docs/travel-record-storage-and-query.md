@@ -1,6 +1,6 @@
-# 여행 기록 저장 및 목록 조회 방식
+# 여행 기록 저장 및 조회 방식
 
-> 기준일: 2026-08-13 · 현재 구현된 생성 및 목록 조회 기준
+> 기준일: 2026-08-16 · 현재 구현된 생성, 목록 및 상세 조회 기준
 
 ## 1. 목적
 
@@ -222,21 +222,86 @@ PageRequest.of(
 | Entity | 테이블 매핑과 연관관계 표현 |
 | DTO | API 요청·응답 데이터 표현 |
 
-## 8. 현재 후속 작업
+## 8. 여행 기록 상세 조회
+
+상세 조회는 요청 회원이 소유한 기록만 반환한다.
+
+```http
+GET /api/v1/travel-records/{travelRecordId}
+X-Member-Id: 10
+```
+
+Repository에서 `travelRecordId`와 `memberId`를 함께 조건으로 사용한다. 기록이 없거나 다른 회원의 기록인 경우 모두 `404 TRAVEL_RECORD_NOT_FOUND`를 반환하여 기록의 존재 여부가 노출되지 않게 한다.
+
+응답에는 제목, 본문, 여행 날짜, 국가·시도·시군구 계층, 생성·수정 시각을 포함한다. 미디어는 `sort_order` 오름차순의 `objectKeys` 배열로 반환한다.
+
+```json
+{
+  "data": {
+    "id": 101,
+    "title": "제주 여행",
+    "content": "제주시를 걸었다.",
+    "region": {
+      "country": {"code": "KR", "name": "대한민국"},
+      "province": {"code": "49", "name": "제주특별자치도"},
+      "district": {"code": "50110", "name": "제주시"}
+    },
+    "startDate": "2026-08-11",
+    "endDate": "2026-08-13",
+    "objectKeys": [
+      "mapmory/travel-records/a.jpg",
+      "mapmory/travel-records/b.jpg"
+    ],
+    "createdAt": "2026-08-14T10:30:00",
+    "updatedAt": "2026-08-15T09:00:00"
+  }
+}
+```
+
+국가 단위 기록은 `province`와 `district`가 `null`이다. 현재는 S3 객체 키만 제공하며, Presigned GET URL 변환은 S3 연동 시 추가한다.
+
+## 9. 여행 기록 수정
+
+수정 API는 현재 회원이 소유한 기록을 생성 요청과 같은 본문으로 전체 수정한다.
+
+```http
+PUT /api/v1/travel-records/{travelRecordId}
+X-Member-Id: 10
+```
+
+Service는 `travelRecordId`와 `memberId`로 소유권을 확인한 후 새 Region 경로를 조회한다. 기록이 없거나 다른 회원의 기록이면 모두 `404 TRAVEL_RECORD_NOT_FOUND`를 반환한다.
+
+미디어는 전체 삭제 후 재생성하지 않고 기존 목록과 요청의 `objectKeys`를 비교한다.
+
+| 구분 | 처리 |
+| --- | --- |
+| 기존과 요청에 모두 존재 | 기존 미디어를 유지하고 `sort_order` 변경 |
+| 기존에만 존재 | `record_media` 삭제 |
+| 요청에만 존재 | 새 `record_media` 생성 |
+| 요청이 `null` 또는 빈 배열 | 기존 미디어 전체 삭제 |
+
+중복 Object Key 또는 다른 여행 기록에서 이미 사용 중인 Object Key는 `400 INVALID_OBJECT_KEY`로 거부한다. Object Key의 회원 소유권과 S3 업로드 완료 여부 검증은 후속 작업이다.
+
+수정 성공 시 변경된 여행 기록을 상세 조회와 같은 응답 구조로 반환한다. 기록과 미디어 변경은 하나의 트랜잭션에서 처리하므로 중간에 실패하면 전체 변경이 롤백된다.
+
+## 10. 현재 후속 작업
 
 | 항목 | 상태 |
 | --- | --- |
 | 여행 기록과 미디어 기본 저장 | 구현 |
 | 전체·국가·시도·시군구 목록 조회 | 구현 |
 | 생성·목록 페이징 테스트 | 구현 |
+| 여행 기록 상세 조회 및 소유권 검사 | 구현 |
+| 여행 기록 전체 수정 및 미디어 동기화 | 구현 |
 | 목록 썸네일 URL 생성 | 미구현, 현재 `null` |
+| 상세 조회 Object Key의 Presigned GET URL 변환 | 미구현 |
 | 키워드 검색 | 미구현 |
 | 날짜 범위 검증 | 미구현 |
 | Object Key 소유권·업로드 검증 | 미구현 |
 | Region 미존재 도메인 예외 | 미구현 |
 | 성공 응답 `data` 래퍼 | 구현 |
 
-## 9. 관련 문서
+## 11. 관련 문서
 
 - [API 명세](../../api.md)
 - [ERD](erd.md)

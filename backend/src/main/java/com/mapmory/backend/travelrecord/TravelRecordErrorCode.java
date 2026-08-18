@@ -28,6 +28,18 @@ public enum TravelRecordErrorCode implements ErrorCode {
             "MEMBER_NOT_FOUND",
             "회원을 찾을 수 없습니다.",
             "요청한 회원 ID에 해당하는 회원이 없습니다."
+    ),
+    TRAVEL_RECORD_NOT_FOUND(
+            ErrorKind.NOT_FOUND,
+            "TRAVEL_RECORD_NOT_FOUND",
+            "여행 일지를 찾을 수 없습니다.",
+            "요청한 여행 일지가 없거나 조회할 권한이 없습니다."
+    ),
+    INVALID_OBJECT_KEY(
+            ErrorKind.INVALID_INPUT,
+            "INVALID_OBJECT_KEY",
+            "Object Key가 올바르지 않습니다.",
+            "중복되거나 다른 여행 일지에서 사용 중인 Object Key가 포함되어 있습니다."
     );
 
     private final ErrorKind kind;
