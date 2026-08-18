@@ -40,7 +40,8 @@ public class TravelRecordService {
 
     @Transactional
     public TravelRecord create(Long memberId, TravelRecordRequest request) {
-        Member member = memberRepository.getReferenceById(memberId);
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.MEMBER_NOT_FOUND));
         Region region = resolveRegion(request);
 
         TravelRecord travelRecord = TravelRecord.of(

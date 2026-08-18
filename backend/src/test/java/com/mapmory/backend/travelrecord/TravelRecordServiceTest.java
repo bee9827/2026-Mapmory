@@ -18,6 +18,7 @@ import com.mapmory.backend.region.RegionResolver;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,7 +62,7 @@ class TravelRecordServiceTest {
                 "JP", null, null, "일본 여행", "", LocalDate.of(2026, 8, 11), null, List.of()
         );
 
-        when(memberRepository.getReferenceById(10L)).thenReturn(member);
+        when(memberRepository.findById(10L)).thenReturn(Optional.of(member));
         when(regionResolver.findCountry("JP")).thenReturn(japan);
         when(travelRecordRepository.save(any(TravelRecord.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -71,6 +72,16 @@ class TravelRecordServiceTest {
         assertThat(result).isNotNull();
         verify(regionResolver).findCountry("JP");
         verify(travelRecordRepository).save(any(TravelRecord.class));
+    }
+
+    @Test
+    void rejectsNonexistentMemberWhenCreatingRecord() {
+        TravelRecordRequest request = new TravelRecordRequest(
+                "JP", null, null, "일본 여행", "", LocalDate.of(2026, 8, 11), null, List.of()
+        );
+        when(memberRepository.findById(10L)).thenReturn(Optional.empty());
+
+        assertError(() -> travelRecordService.create(10L, request), "MEMBER_NOT_FOUND");
     }
 
     @Test
