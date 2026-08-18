@@ -41,7 +41,7 @@ class TravelRecordRepositoryTest {
     private EntityManager entityManager;
 
     @Test
-    void savesTravelRecord() {
+    void 여행_일지를_저장한다() {
         Member member = memberRepository.save(Member.of("테스터", UUID.randomUUID()));
         Region testCountry = regionRepository.save(
                 Region.of(null, null, "ZZ", "테스트 국가", RegionType.COUNTRY)
@@ -66,7 +66,7 @@ class TravelRecordRepositoryTest {
     }
 
     @Test
-    void findsTravelRecordsByMemberWithPagination() {
+    void 회원의_여행_일지를_페이지로_조회한다() {
         Member member = memberRepository.save(
                 Member.of("테스터", UUID.randomUUID())
         );
@@ -101,7 +101,7 @@ class TravelRecordRepositoryTest {
     }
 
     @Test
-    void findsOwnedTravelRecordAndMediaInSortOrder() {
+    void 소유한_일지와_정렬된_미디어를_조회한다() {
         Member owner = memberRepository.save(Member.of("작성자", UUID.randomUUID()));
         Member otherMember = memberRepository.save(Member.of("다른 회원", UUID.randomUUID()));
         Region country = regionRepository.save(
@@ -130,5 +130,45 @@ class TravelRecordRepositoryTest {
         assertThat(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(travelRecord.getId()))
                 .extracting(RecordMedia::getObjectKey)
                 .containsExactly("mapmory/detail/a.jpg", "mapmory/detail/b.jpg");
+        assertThat(recordMediaRepository.findByObjectKeyIn(
+                java.util.List.of("mapmory/detail/a.jpg")
+        ))
+                .extracting(RecordMedia::getObjectKey)
+                .containsExactly("mapmory/detail/a.jpg");
+    }
+
+    @Test
+    void 여행_일지를_삭제하면_연결된_미디어도_삭제한다() {
+        Member member = memberRepository.save(Member.of("삭제 테스트 회원", UUID.randomUUID()));
+        Region country = regionRepository.save(
+                Region.of(null, null, "XD", "삭제 테스트 국가", RegionType.COUNTRY)
+        );
+        TravelRecord travelRecord = travelRecordRepository.save(
+                TravelRecord.of(
+                        member,
+                        country,
+                        "삭제할 기록",
+                        "본문",
+                        LocalDate.of(2026, 8, 16),
+                        null
+                )
+        );
+        RecordMedia recordMedia = recordMediaRepository.save(
+                RecordMedia.of(travelRecord, "mapmory/delete/a.jpg", null, 0)
+        );
+        entityManager.flush();
+        entityManager.clear();
+
+        Long travelRecordId = travelRecord.getId();
+        Long recordMediaId = recordMedia.getId();
+        TravelRecord foundTravelRecord = travelRecordRepository.findById(travelRecordId)
+                .orElseThrow();
+
+        travelRecordRepository.delete(foundTravelRecord);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(travelRecordRepository.findById(travelRecordId)).isEmpty();
+        assertThat(recordMediaRepository.findById(recordMediaId)).isEmpty();
     }
 }

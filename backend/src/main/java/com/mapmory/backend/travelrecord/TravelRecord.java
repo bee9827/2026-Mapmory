@@ -69,6 +69,20 @@ public class TravelRecord extends BaseEntity {
         return new TravelRecord(member, region, title, content, startDate, endDate);
     }
 
+    public void update(
+            Region region,
+            String title,
+            String content,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        this.region = region;
+        this.title = title;
+        this.content = content;
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
+
     public Long getId() {
         return id;
     }

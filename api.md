@@ -340,10 +340,50 @@ GET /api/v1/travel-records?countryCode=KR&provinceCode=49&districtCode=50110
 
 `objectKeys`는 `record_media.sort_order` 오름차순으로 반환하며 미디어가 없으면 빈 배열이다. 국가 단위 기록은 `province`와 `district`가 `null`이다. Presigned GET URL 변환은 S3 조회 연동 시 추가한다.
 
-### 여행 기록 수정 및 삭제
+### 여행 기록 수정
 
-- `PUT /api/v1/travel-records/{travelRecordId}`: 생성과 같은 요청 본문으로 전체 수정한다.
-- `DELETE /api/v1/travel-records/{travelRecordId}`: 기록을 삭제한다. 연결된 `record_media` 행은 CASCADE 삭제한다. S3 객체 삭제는 별도 처리한다.
+`PUT /api/v1/travel-records/{travelRecordId}`
+
+현재 회원이 소유한 여행 기록을 생성 요청과 같은 본문으로 전체 수정한다. `objectKeys`는 수정 후 유지할 전체 미디어 목록이며 배열 순서가 노출 순서가 된다.
+
+- 기존 Object Key가 요청에도 있으면 미디어를 유지하고 순서만 변경한다.
+- 요청에서 빠진 기존 Object Key는 `record_media` 연결을 삭제한다.
+- 새 Object Key는 미디어로 추가한다.
+- `objectKeys`가 `null`이거나 빈 배열이면 모든 미디어 연결을 삭제한다.
+- S3 실제 객체 삭제와 Presigned URL 변환은 후속 작업으로 처리한다.
+
+#### Response `200 OK`
+
+수정된 여행 기록을 상세 조회와 같은 응답 구조로 반환한다.
+
+#### 오류 응답
+
+| 상태 | `code` | 조건 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | 회원 ID, 여행 기록 ID 또는 요청 본문이 올바르지 않음 |
+| `400` | `INVALID_OBJECT_KEY` | Object Key가 중복되거나 다른 기록에서 사용 중임 |
+| `404` | `TRAVEL_RECORD_NOT_FOUND` | 기록이 없거나 현재 회원의 기록이 아님 |
+
+Region 관련 오류는 생성 API와 동일하게 처리한다.
+
+### 여행 기록 삭제
+
+`DELETE /api/v1/travel-records/{travelRecordId}`
+
+현재 회원이 소유한 여행 기록을 삭제한다. 기록이 없거나 다른 회원의 기록이면 존재 여부를 숨기기 위해 동일하게 `404 TRAVEL_RECORD_NOT_FOUND`를 반환한다.
+
+연결된 `record_media` 행은 DB의 `ON DELETE CASCADE`로 함께 삭제한다. S3 실제 객체 삭제는 후속 작업으로 처리한다.
+
+#### Response `204 No Content`
+
+응답 본문은 없다.
+
+#### 오류 응답
+
+| 상태 | `code` | 조건 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | 회원 ID 또는 여행 기록 ID가 양의 정수가 아님 |
+| `404` | `TRAVEL_RECORD_NOT_FOUND` | 기록이 없거나 현재 회원의 기록이 아님 |
 
 ## 5. 지역별 여행 기록 통계 API
 
