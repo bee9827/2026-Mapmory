@@ -57,4 +57,24 @@ public class Region extends BaseEntity {
     public Long getId() {
         return id;
     }
+
+    public String getName() {
+        return name;
+    }
+
+    public Region getParent() {
+        return parent;
+    }
+
+    public Region getRoot() {
+        return root;
+    }
+
+    public String getRegionCode() {
+        return regionCode;
+    }
+
+    public RegionType getRegionType() {
+        return regionType;
+    }
 }
