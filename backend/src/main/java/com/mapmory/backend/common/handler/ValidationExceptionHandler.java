@@ -95,12 +95,12 @@ public class ValidationExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<ProblemDetail> handleRequestValueTypeMismatch(
+    public ResponseEntity<ProblemDetail> handleArgumentTypeMismatch(
             MethodArgumentTypeMismatchException exception,
             HttpServletRequest request
     ) {
         return problemDetailFactory.validation(
-                List.of(new FieldErrorDetail(exception.getName(), "값의 형식이 올바르지 않습니다.")),
+                List.of(new FieldErrorDetail(exception.getName(), "올바른 형식의 값이어야 합니다.")),
                 request
         );
     }

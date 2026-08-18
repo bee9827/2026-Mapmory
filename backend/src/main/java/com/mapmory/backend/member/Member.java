@@ -3,6 +3,8 @@ package com.mapmory.backend.member;
 import com.mapmory.backend.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -26,19 +28,50 @@ public class Member extends BaseEntity {
     @Column(nullable = false, unique = true, length = 36)
     private UUID uuid;
 
+    // 소셜 로그인 정보. 기존 임시 회원(V11)은 값이 없을 수 있어 nullable 이며,
+    // 신규 소셜 회원은 ofOAuth 로 항상 provider/providerId 를 채운다.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "provider", length = 20)
+    private AuthProvider provider;
+
+    @Column(name = "provider_id")
+    private String providerId;
+
     protected Member() {
     }
 
-    private Member(String name, UUID uuid) {
+    private Member(AuthProvider provider, String providerId, String name, UUID uuid) {
+        this.provider = provider;
+        this.providerId = providerId;
         this.name = name;
         this.uuid = uuid;
     }
 
     public static Member of(String name, UUID uuid) {
-        return new Member(name, uuid);
+        return new Member(null, null, name, uuid);
+    }
+
+    public static Member ofOAuth(AuthProvider provider, String providerId, String name, UUID uuid) {
+        return new Member(provider, providerId, name, uuid);
     }
 
     public Long getId() {
         return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public UUID getUuid() {
+        return uuid;
+    }
+
+    public AuthProvider getProvider() {
+        return provider;
+    }
+
+    public String getProviderId() {
+        return providerId;
     }
 }
