@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.time.Duration;
 import java.util.Set;
+import org.hibernate.validator.constraints.time.DurationMax;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.convert.DataSizeUnit;
 import org.springframework.util.unit.DataSize;
@@ -22,6 +24,9 @@ public record UploadPolicyProperties(
 
         @Positive int maxFilesPerRequest,
 
-        @NotNull Duration presignedUrlExpiration
+        @NotNull
+        @DurationMin(seconds = 1)
+        @DurationMax(seconds = 604_800)
+        Duration presignedUrlExpiration
 ) {
 }
