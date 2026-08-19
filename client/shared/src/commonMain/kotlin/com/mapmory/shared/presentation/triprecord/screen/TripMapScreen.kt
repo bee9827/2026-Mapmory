@@ -153,7 +153,7 @@ private fun MapHeaderOverlay(
             visitedCount = visitedCount,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(14.dp))
         MapTagFilter(modifier = Modifier.padding(horizontal = 18.dp))
     }
 }
