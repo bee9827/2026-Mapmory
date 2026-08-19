@@ -1,17 +1,18 @@
 package com.mapmory.backend.travelrecord.mapsummary.controller;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.mapmory.backend.IntegrationTest;
+import com.mapmory.backend.auth.jwt.JwtConfig;
 import com.mapmory.backend.auth.jwt.JwtProvider;
+import com.mapmory.backend.common.ProblemDetailFactory;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
@@ -21,20 +22,23 @@ import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
 import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
 import com.mapmory.backend.travelrecord.mapsummary.service.RegionMapSummaryService;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@AutoConfigureMockMvc
+@WebMvcTest(RegionMapSummaryController.class)
+@Import({JwtConfig.class, JwtProvider.class, ProblemDetailFactory.class})
 @DisplayName("Region 지도 요약 API")
-class RegionMapSummaryControllerTest extends IntegrationTest {
+class RegionMapSummaryControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -42,18 +46,20 @@ class RegionMapSummaryControllerTest extends IntegrationTest {
     @Autowired
     private JwtProvider jwtProvider;
 
-    @Autowired
+    @MockitoBean
     private MemberRepository memberRepository;
 
     @MockitoBean
     private RegionMapSummaryService regionMapSummaryService;
 
     private Long memberId;
+    private Member member;
 
     @BeforeEach
     void setUpMember() {
-        Member member = memberRepository.save(Member.of("지도 요약 테스트 회원", UUID.randomUUID()));
-        memberId = member.getId();
+        memberId = 10L;
+        member = Member.of("지도 요약 테스트 회원", UUID.randomUUID());
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
     }
 
     private String bearer(Long memberId) {
@@ -89,7 +95,7 @@ class RegionMapSummaryControllerTest extends IntegrationTest {
                     .andExpect(jsonPath("$.data[0].level").value("MEDIUM"));
 
             verify(regionMapSummaryService).getSummaries(
-                    argThat(member -> member.getId().equals(memberId)),
+                    same(member),
                     isNull()
             );
         }
@@ -140,7 +146,7 @@ class RegionMapSummaryControllerTest extends IntegrationTest {
                     .andExpect(jsonPath("$.data[0].level").value("MEDIUM"));
 
             verify(regionMapSummaryService).getSummaries(
-                    argThat(member -> member.getId().equals(memberId)),
+                    same(member),
                     eq(1L)
             );
         }
