@@ -448,27 +448,6 @@ private val appLocations = buildList {
             type = LocationType.PROVINCE,
         ),
     )
-    add(
-        Location(
-            id = 2L,
-            countryId = 1L,
-            parentId = 1L,
-            regionCode = "11680",
-            name = "강남구",
-            type = LocationType.DISTRICT,
-        ),
-    )
-    add(
-        Location(
-            id = 3L,
-            countryId = 1L,
-            parentId = 1L,
-            regionCode = "11650",
-            name = "서초구",
-            type = LocationType.DISTRICT,
-        ),
-    )
-
     listOf(
         4L to ("KR-26" to "부산광역시"),
         5L to ("KR-27" to "대구광역시"),

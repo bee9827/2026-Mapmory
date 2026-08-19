@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +53,16 @@ fun KoreaMapArtwork(
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val currentOnRegionClick by rememberUpdatedState(onRegionClick)
     val textMeasurer = rememberTextMeasurer()
+    val labelStyle = TextStyle(
+        color = Color(0xFF7085A8),
+        fontSize = when {
+            regions.size >= 35 -> 7.sp
+            regions.size >= 25 -> 8.sp
+            else -> 10.sp
+        },
+        fontWeight = FontWeight.Bold,
+    )
+    val labelHitPadding = with(LocalDensity.current) { 12.dp.toPx() }
     val projection = remember(bounds, viewportSize) {
         KoreaProjection.from(bounds, viewportSize)
     }
@@ -76,9 +87,26 @@ fun KoreaMapArtwork(
             .pointerInput(viewportSize, projection, zoom, pan) {
                 detectTapGestures { position ->
                     val transform = currentTransform.value
-                    val tappedRegion = regions.regionAt(
-                        projection.unproject(position, transform, viewportSize),
-                    )
+                    val mapPoint = projection.unproject(position, transform, viewportSize)
+                    val labelRegion = if (showRegionLabels) {
+                        regions.mapNotNull { region ->
+                            val labelPoint = region.labelPoint() ?: return@mapNotNull null
+                            val labelCenter = projection.project(labelPoint, transform, viewportSize)
+                            val layout = textMeasurer.measure(region.name, labelStyle)
+                            val horizontalDistance = abs(position.x - labelCenter.x)
+                            val verticalDistance = abs(position.y - labelCenter.y)
+                            if (horizontalDistance <= layout.size.width / 2f + labelHitPadding &&
+                                verticalDistance <= layout.size.height / 2f + labelHitPadding
+                            ) {
+                                region to (horizontalDistance * horizontalDistance + verticalDistance * verticalDistance)
+                            } else {
+                                null
+                            }
+                        }.minByOrNull { it.second }?.first
+                    } else {
+                        null
+                    }
+                    val tappedRegion = labelRegion ?: regions.regionAt(mapPoint)
                     tappedRegion?.let { currentOnRegionClick(it.code) }
                 }
             },
@@ -122,15 +150,6 @@ fun KoreaMapArtwork(
         // Prototype detail screens keep the map readable by showing the
         // selected province's district names directly on the boundaries.
         if (showRegionLabels) {
-            val labelStyle = TextStyle(
-                color = Color(0xFF7085A8),
-                fontSize = when {
-                    regions.size >= 35 -> 7.sp
-                    regions.size >= 25 -> 8.sp
-                    else -> 10.sp
-                },
-                fontWeight = FontWeight.Bold,
-            )
             regions.forEach { region ->
                 val labelPoint = region.labelPoint() ?: return@forEach
                 val layout = textMeasurer.measure(region.name, labelStyle)
