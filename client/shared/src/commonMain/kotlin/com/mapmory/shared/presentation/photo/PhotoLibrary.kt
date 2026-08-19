@@ -64,29 +64,43 @@ internal fun PhotoAdministrativeArea.matches(
     }
     if (!countryCode.isNullOrBlank() && !countryCode.equals("KR", ignoreCase = true)) return false
 
-    val provinceMatches = parentName == null || areaText(
+    // Geocoder providers do not always put the same administrative level in
+    // the same field. Search all returned address levels instead of relying
+    // on one fixed Android/iOS field mapping.
+    val parentMatches = parentName == null || areaText(
         administrativeArea,
         locality,
+        subAdministrativeArea,
+        subLocality,
     ).contains(normalizeAreaName(parentName))
-    if (!provinceMatches) return false
+    if (!parentMatches) return false
 
     return when (target.type) {
-        LocationType.PROVINCE -> areaText(
-            administrativeArea,
-            locality,
-        ).contains(normalizeAreaName(target.name))
+        LocationType.PROVINCE -> geocodedArea(target.name)
         LocationType.DISTRICT -> {
             val normalizedTarget = normalizeAreaName(target.name)
             val normalizedParent = parentName?.let(::normalizeAreaName).orEmpty()
             val districtName = normalizedTarget
                 .removePrefix(normalizedParent)
                 .ifBlank { normalizedTarget }
-            areaText(
-                subAdministrativeArea,
-                locality,
-                subLocality,
-            ).contains(districtName)
+            areaNameCandidates(districtName).any { candidate -> geocodedArea(candidate) }
         }
+    }
+}
+
+private fun PhotoAdministrativeArea.geocodedArea(targetName: String): Boolean = areaText(
+    administrativeArea,
+    subAdministrativeArea,
+    locality,
+    subLocality,
+).contains(normalizeAreaName(targetName))
+
+private fun areaNameCandidates(value: String): Set<String> {
+    val normalized = normalizeAreaName(value)
+    return buildSet {
+        add(normalized)
+        val withoutDistrictSuffix = normalized.removeSuffix("구")
+        if (withoutDistrictSuffix.length >= 2) add(withoutDistrictSuffix)
     }
 }
 

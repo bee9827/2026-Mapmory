@@ -75,6 +75,52 @@ class PhotoLibraryTest {
         assertEquals("경기도 수원시장안구 대한민국", district.recommendationSearchText("경기도"))
     }
 
+    @Test
+    fun koreanDistrictMatchesWhenGeocoderPutsDistrictInAnyAddressField() {
+        val district = Location(
+            id = 4,
+            countryId = 1,
+            parentId = 1,
+            regionCode = "11620",
+            name = "서울특별시 관악구",
+            type = LocationType.DISTRICT,
+        )
+
+        assertEquals(
+            true,
+            PhotoAdministrativeArea(
+                countryCode = "KR",
+                administrativeArea = "서울특별시 관악구",
+                subAdministrativeArea = null,
+                locality = null,
+                subLocality = "신림동",
+            ).matches(district, "서울특별시"),
+        )
+    }
+
+    @Test
+    fun koreanDistrictAllowsMissingDistrictSuffixInGeocoderResult() {
+        val district = Location(
+            id = 5,
+            countryId = 1,
+            parentId = 1,
+            regionCode = "11680",
+            name = "강남구",
+            type = LocationType.DISTRICT,
+        )
+
+        assertEquals(
+            true,
+            PhotoAdministrativeArea(
+                countryCode = "KR",
+                administrativeArea = "서울특별시",
+                subAdministrativeArea = null,
+                locality = null,
+                subLocality = "강남",
+            ).matches(district, "서울특별시"),
+        )
+    }
+
     private fun photo(id: String) = SelectedPhoto(
         id = id,
         displayName = "$id.jpg",
