@@ -201,7 +201,9 @@ fun MapmoryApp(
 
         composable<CreateRoute> {
             TripRecordEditorScreen(
-                modifier = Modifier.windowInsetsPadding(contentWindowInsets),
+                modifier = Modifier.windowInsetsPadding(
+                    contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                ),
                 uiState = recordsUiState.editor,
                 locations = appLocations,
                 onLocationSelected = { location ->
