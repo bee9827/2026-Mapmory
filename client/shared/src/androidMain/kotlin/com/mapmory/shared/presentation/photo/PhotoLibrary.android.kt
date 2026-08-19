@@ -8,6 +8,7 @@ import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
+import android.graphics.Matrix
 import android.location.Geocoder
 import android.location.Address
 import android.net.Uri
@@ -32,6 +33,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.mapmory.shared.data.local.photo.PhotoMetadataDatabase
 import com.mapmory.shared.data.local.photo.PhotoMetadataEntity
 import com.mapmory.shared.domain.model.Location
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
@@ -460,9 +462,12 @@ private fun Context.readPhoto(
     val coordinates = knownCoordinates ?: traceSection("photo.read.exif") {
         readCoordinates(uri)
     }
-    val originalBytes = traceSection("photo.read.original") {
+    val encodedBytes = traceSection("photo.read.original") {
         contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
     }?.takeIf(ByteArray::isNotEmpty) ?: return null
+    val originalBytes = traceSection("photo.read.orientation") {
+        encodedBytes.normalizeOrientation()
+    }
     val previewBytes = traceSection("photo.read.preview") {
         originalBytes.toPreviewByteArray() ?: originalBytes
     }
@@ -476,6 +481,63 @@ private fun Context.readPhoto(
         originalBytes = originalBytes,
     )
 }.getOrNull()
+
+private fun ByteArray.normalizeOrientation(): ByteArray {
+    val orientation = runCatching {
+        ExifInterface(ByteArrayInputStream(this)).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL,
+        )
+    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    if (orientation == ExifInterface.ORIENTATION_NORMAL ||
+        orientation == ExifInterface.ORIENTATION_UNDEFINED
+    ) {
+        return this
+    }
+
+    val matrix = Matrix().apply {
+        when (orientation) {
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> setScale(-1f, 1f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> setRotate(180f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> {
+                setRotate(180f)
+                postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                setRotate(90f)
+                postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_90 -> setRotate(90f)
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                setRotate(-90f)
+                postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_270 -> setRotate(-90f)
+            else -> return this@normalizeOrientation
+        }
+    }
+    val bitmap = BitmapFactory.decodeByteArray(this, 0, size) ?: return this
+    val normalizedBitmap = Bitmap.createBitmap(
+        bitmap,
+        0,
+        0,
+        bitmap.width,
+        bitmap.height,
+        matrix,
+        true,
+    )
+    return try {
+        ByteArrayOutputStream().use { output ->
+            if (!normalizedBitmap.compress(Bitmap.CompressFormat.JPEG, OriginalJpegQuality, output)) {
+                return@use this
+            }
+            output.toByteArray()
+        }
+    } finally {
+        if (normalizedBitmap !== bitmap) normalizedBitmap.recycle()
+        bitmap.recycle()
+    }
+}
 
 private fun ByteArray.toPreviewByteArray(): ByteArray? {
     val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -593,7 +655,7 @@ private fun formatDate(epochMillis: Long?): String? = epochMillis?.let {
 
 private const val PreviewSizePx = 960
 private const val PreviewJpegQuality = 84
-private const val MaxReverseGeocodeCandidates = 80
+private const val OriginalJpegQuality = 100
 private const val MaxRecommendedPhotos = 12
 private const val PhotoPerformanceTag = "MapmoryPhotoPerf"
 private const val FullGalleryAccessMessage =
