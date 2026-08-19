@@ -108,6 +108,7 @@ fun TripMapScreen(
                 selectedIconColor = MapPrimary,
                 selectedLabelColor = MapBottomBarSelectedLabel,
                 unselectedColor = MapBottomBarUnselected,
+                contentTopPadding = 6.dp,
             )
         }
     }
@@ -281,7 +282,7 @@ private fun MapSummaryCard(
     }
     val safeVisitedCount = visitedCount.coerceIn(0, total)
     val completionPercent = (safeVisitedCount.toFloat() / total * 100f).roundToInt()
-    val cardShape = RoundedCornerShape(14.dp)
+    val cardShape = RoundedCornerShape(20.dp)
 
     Column(
         modifier = modifier
@@ -295,7 +296,12 @@ private fun MapSummaryCard(
                 color = MapDashboardBorder,
                 shape = cardShape,
             )
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+            .padding(
+                start = 18.dp,
+                top = 15.dp,
+                end = 18.dp,
+                bottom = 14.dp,
+            ),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -303,12 +309,17 @@ private fun MapSummaryCard(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column {
-                Text(title, color = MapDashboardTitle, fontSize = 10.sp)
+                Text(
+                    text = title,
+                    color = MapDashboardTitle,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                )
                 Row(
                     modifier = Modifier.padding(top = 3.dp),
                     verticalAlignment = Alignment.Bottom,
                 ) {
-                    Text(safeVisitedCount.toString(), color = MapPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(safeVisitedCount.toString(), color = MapPrimary, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Text(" / $total", color = MapDashboardText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
@@ -317,8 +328,8 @@ private fun MapSummaryCard(
                 color = MapDashboardBadgeText,
                 fontSize = 10.sp,
                 modifier = Modifier
-                    .background(MapDashboardBadgeBackground, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 5.dp),
+                    .background(MapDashboardBadgeBackground, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
             )
         }
     }
