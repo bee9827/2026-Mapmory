@@ -11,7 +11,10 @@ import android.location.Geocoder
 import android.location.Address
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
+import android.os.Trace
 import android.provider.MediaStore
+import android.util.Log
 import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -80,7 +83,21 @@ actual fun rememberPhotoLibraryActions(
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         scope.launch {
             val photos = withContext(Dispatchers.IO) {
-                uris.mapNotNull { uri -> context.readPhoto(uri) }
+                Trace.beginAsyncSection("photo.pick.total", TraceCookie.Pick)
+                val startedAt = SystemClock.elapsedRealtime()
+                try {
+                    val result = traceSection("photo.pick.read") {
+                        uris.mapNotNull { uri -> context.readPhoto(uri) }
+                    }
+                    logPhotoPickPerformance(
+                        totalMillis = SystemClock.elapsedRealtime() - startedAt,
+                        requestedPhotoCount = uris.size,
+                        loadedPhotoCount = result.size,
+                    )
+                    result
+                } finally {
+                    Trace.endAsyncSection("photo.pick.total", TraceCookie.Pick)
+                }
             }
             if (photos.isEmpty()) {
                 latestMessage("선택한 사진을 읽지 못했어요.")
@@ -153,65 +170,108 @@ private data class GalleryEntry(
     val distanceMeters: Float,
 )
 
+private data class PhotoMetadataSyncResult(
+    val photos: List<PhotoMetadataEntity>,
+    val exifReadCount: Int,
+    val reusedCoordinateCount: Int,
+    val previousPhotoCount: Int,
+)
+
 @Suppress("DEPRECATION")
 private suspend fun Context.recommendPhotos(
     target: Location,
     parentName: String?,
 ): List<SelectedPhoto> {
-    val geocoder = Geocoder(this, Locale.KOREA)
-    val targetAddress = geocoder
-        .getFromLocationName(target.recommendationSearchText(parentName), 1)
-        ?.firstOrNull()
-        ?: return emptyList()
-    val targetLatitude = targetAddress.latitude
-    val targetLongitude = targetAddress.longitude
-    val radius = target.recommendationRadiusMeters()
-    val photos = syncPhotoMetadata()
-    val entries = photos.mapNotNull { photo ->
-        val latitude = photo.latitude ?: return@mapNotNull null
-        val longitude = photo.longitude ?: return@mapNotNull null
-        val distance = FloatArray(1)
-        android.location.Location.distanceBetween(
-            targetLatitude,
-            targetLongitude,
-            latitude,
-            longitude,
-            distance,
+    Trace.beginAsyncSection("photo.recommend.total", TraceCookie.Recommend)
+    val totalStartedAt = SystemClock.elapsedRealtime()
+    try {
+        val geocoder = Geocoder(this, Locale.KOREA)
+        val geocodeStartedAt = SystemClock.elapsedRealtime()
+        val targetAddress = traceSection("photo.recommend.target_geocode") {
+            geocoder
+                .getFromLocationName(target.recommendationSearchText(parentName), 1)
+                ?.firstOrNull()
+        }
+        val geocodeMillis = SystemClock.elapsedRealtime() - geocodeStartedAt
+        if (targetAddress == null) return emptyList()
+
+        val targetLatitude = targetAddress.latitude
+        val targetLongitude = targetAddress.longitude
+        val radius = target.recommendationRadiusMeters()
+        val syncStartedAt = SystemClock.elapsedRealtime()
+        val syncResult = syncPhotoMetadata()
+        val syncMillis = SystemClock.elapsedRealtime() - syncStartedAt
+        val entries = traceSection("photo.recommend.distance_filter") {
+            syncResult.photos.mapNotNull { photo ->
+                val latitude = photo.latitude ?: return@mapNotNull null
+                val longitude = photo.longitude ?: return@mapNotNull null
+                val distance = FloatArray(1)
+                android.location.Location.distanceBetween(
+                    targetLatitude,
+                    targetLongitude,
+                    latitude,
+                    longitude,
+                    distance,
+                )
+                if (distance[0] > radius) return@mapNotNull null
+                GalleryEntry(photo, latitude, longitude, distance[0])
+            }
+        }
+
+        if (!Geocoder.isPresent()) {
+            error("이 기기에서는 사진 위치의 행정구역을 확인할 수 없어요.")
+        }
+
+        val reverseGeocodeStartedAt = SystemClock.elapsedRealtime()
+        val matchedEntries = traceSection("photo.recommend.reverse_geocode") {
+            entries
+                .sortedBy(GalleryEntry::distanceMeters)
+                .take(MaxReverseGeocodeCandidates)
+                .filter { entry ->
+                    runCatching {
+                        geocoder
+                            .getFromLocation(entry.latitude, entry.longitude, 1)
+                            ?.firstOrNull()
+                            ?.toAdministrativeArea()
+                            ?.matches(target, parentName) == true
+                    }.getOrDefault(false)
+                }
+                .take(MaxRecommendedPhotos)
+        }
+        val reverseGeocodeMillis = SystemClock.elapsedRealtime() - reverseGeocodeStartedAt
+        val previewStartedAt = SystemClock.elapsedRealtime()
+        val result = traceSection("photo.recommend.preview") {
+            matchedEntries.mapNotNull { entry ->
+                readPhoto(
+                    uri = Uri.parse(entry.photo.contentUri),
+                    knownName = entry.photo.displayName,
+                    knownCoordinates = entry.latitude to entry.longitude,
+                    knownCapturedAtMillis = entry.photo.capturedAtMillis,
+                )
+            }
+        }
+        val previewMillis = SystemClock.elapsedRealtime() - previewStartedAt
+        logPerformance(
+            totalMillis = SystemClock.elapsedRealtime() - totalStartedAt,
+            geocodeMillis = geocodeMillis,
+            syncMillis = syncMillis,
+            reverseGeocodeMillis = reverseGeocodeMillis,
+            previewMillis = previewMillis,
+            syncResult = syncResult,
+            recommendedPhotoCount = result.size,
         )
-        if (distance[0] > radius) return@mapNotNull null
-        GalleryEntry(photo, latitude, longitude, distance[0])
+        return result
+    } finally {
+        Trace.endAsyncSection("photo.recommend.total", TraceCookie.Recommend)
     }
-
-    if (!Geocoder.isPresent()) {
-        error("이 기기에서는 사진 위치의 행정구역을 확인할 수 없어요.")
-    }
-
-    return entries
-        .sortedBy(GalleryEntry::distanceMeters)
-        .take(MaxReverseGeocodeCandidates)
-        .filter { entry ->
-            runCatching {
-                geocoder
-                    .getFromLocation(entry.latitude, entry.longitude, 1)
-                    ?.firstOrNull()
-                    ?.toAdministrativeArea()
-                    ?.matches(target, parentName) == true
-            }.getOrDefault(false)
-        }
-        .take(MaxRecommendedPhotos)
-        .mapNotNull { entry ->
-            readPhoto(
-                uri = Uri.parse(entry.photo.contentUri),
-                knownName = entry.photo.displayName,
-                knownCoordinates = entry.latitude to entry.longitude,
-                knownCapturedAtMillis = entry.photo.capturedAtMillis,
-            )
-        }
 }
 
-private suspend fun Context.syncPhotoMetadata(): List<PhotoMetadataEntity> {
+private suspend fun Context.syncPhotoMetadata(): PhotoMetadataSyncResult {
     val dao = PhotoMetadataDatabase.getInstance(this).photoMetadataDao()
-    val previousById = dao.getAll().associateBy(PhotoMetadataEntity::mediaId)
+    val previousPhotos = traceSuspendSection("photo.sync.room.read", TraceCookie.RoomRead) {
+        dao.getAll()
+    }
+    val previousById = previousPhotos.associateBy(PhotoMetadataEntity::mediaId)
     val scanId = System.currentTimeMillis()
     val projection = arrayOf(
         MediaStore.Images.Media._ID,
@@ -223,57 +283,136 @@ private suspend fun Context.syncPhotoMetadata(): List<PhotoMetadataEntity> {
         MediaStore.Images.Media.WIDTH,
         MediaStore.Images.Media.HEIGHT,
     )
-    val photos = contentResolver.query(
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-        projection,
-        null,
-        null,
-        "${MediaStore.Images.Media.DATE_TAKEN} DESC",
-    )?.use { cursor ->
-        val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-        buildList<PhotoMetadataEntity> {
-            while (cursor.moveToNext()) {
-                val mediaId = cursor.getLong(idColumn)
-                val uri = ContentUris.withAppendedId(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                    mediaId,
-                )
-                val modifiedAtSeconds = cursor.getLongOrNull(MediaStore.Images.Media.DATE_MODIFIED) ?: 0L
-                val previous = previousById[mediaId]
-                val coordinates = if (
-                    previous != null &&
-                    previous.modifiedAtSeconds == modifiedAtSeconds &&
-                    previous.latitude != null &&
-                    previous.longitude != null
-                ) {
-                    requireNotNull(previous.latitude) to requireNotNull(previous.longitude)
-                } else {
-                    readCoordinates(uri)
+    var exifReadCount = 0
+    var reusedCoordinateCount = 0
+    val photos = traceSection("photo.sync.mediastore") {
+        contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            null,
+            null,
+            "${MediaStore.Images.Media.DATE_TAKEN} DESC",
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            buildList<PhotoMetadataEntity> {
+                while (cursor.moveToNext()) {
+                    val mediaId = cursor.getLong(idColumn)
+                    val uri = ContentUris.withAppendedId(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        mediaId,
+                    )
+                    val modifiedAtSeconds = cursor.getLongOrNull(MediaStore.Images.Media.DATE_MODIFIED) ?: 0L
+                    val previous = previousById[mediaId]
+                    val coordinates = if (
+                        previous != null &&
+                        previous.modifiedAtSeconds == modifiedAtSeconds &&
+                        previous.latitude != null &&
+                        previous.longitude != null
+                    ) {
+                        reusedCoordinateCount++
+                        requireNotNull(previous.latitude) to requireNotNull(previous.longitude)
+                    } else {
+                        exifReadCount++
+                        readCoordinates(uri)
+                    }
+                    add(
+                        PhotoMetadataEntity(
+                            mediaId = mediaId,
+                            contentUri = uri.toString(),
+                            displayName = cursor.getStringOrNull(MediaStore.Images.Media.DISPLAY_NAME)
+                                ?: "여행 사진",
+                            capturedAtMillis = cursor.getLongOrNull(MediaStore.Images.Media.DATE_TAKEN)
+                                ?.takeIf { it > 0L },
+                            modifiedAtSeconds = modifiedAtSeconds,
+                            latitude = coordinates?.first,
+                            longitude = coordinates?.second,
+                            mimeType = cursor.getStringOrNull(MediaStore.Images.Media.MIME_TYPE),
+                            sizeBytes = cursor.getLongOrNull(MediaStore.Images.Media.SIZE) ?: 0L,
+                            width = cursor.getIntOrNull(MediaStore.Images.Media.WIDTH) ?: 0,
+                            height = cursor.getIntOrNull(MediaStore.Images.Media.HEIGHT) ?: 0,
+                            scanId = scanId,
+                        ),
+                    )
                 }
-                add(
-                    PhotoMetadataEntity(
-                        mediaId = mediaId,
-                        contentUri = uri.toString(),
-                        displayName = cursor.getStringOrNull(MediaStore.Images.Media.DISPLAY_NAME)
-                            ?: "여행 사진",
-                        capturedAtMillis = cursor.getLongOrNull(MediaStore.Images.Media.DATE_TAKEN)
-                            ?.takeIf { it > 0L },
-                        modifiedAtSeconds = modifiedAtSeconds,
-                        latitude = coordinates?.first,
-                        longitude = coordinates?.second,
-                        mimeType = cursor.getStringOrNull(MediaStore.Images.Media.MIME_TYPE),
-                        sizeBytes = cursor.getLongOrNull(MediaStore.Images.Media.SIZE) ?: 0L,
-                        width = cursor.getIntOrNull(MediaStore.Images.Media.WIDTH) ?: 0,
-                        height = cursor.getIntOrNull(MediaStore.Images.Media.HEIGHT) ?: 0,
-                        scanId = scanId,
-                    ),
-                )
             }
         }
-    } ?: return emptyList()
+    } ?: return PhotoMetadataSyncResult(
+        photos = emptyList(),
+        exifReadCount = exifReadCount,
+        reusedCoordinateCount = reusedCoordinateCount,
+        previousPhotoCount = previousPhotos.size,
+    )
 
-    dao.replaceSnapshot(photos, scanId)
-    return photos
+    traceSuspendSection("photo.sync.room.write", TraceCookie.RoomWrite) {
+        dao.replaceSnapshot(photos, scanId)
+    }
+    return PhotoMetadataSyncResult(
+        photos = photos,
+        exifReadCount = exifReadCount,
+        reusedCoordinateCount = reusedCoordinateCount,
+        previousPhotoCount = previousPhotos.size,
+    )
+}
+
+private inline fun <T> traceSection(name: String, block: () -> T): T {
+    Trace.beginSection(name)
+    return try {
+        block()
+    } finally {
+        Trace.endSection()
+    }
+}
+
+private suspend inline fun <T> traceSuspendSection(
+    name: String,
+    cookie: Int,
+    crossinline block: suspend () -> T,
+): T {
+    Trace.beginAsyncSection(name, cookie)
+    return try {
+        block()
+    } finally {
+        Trace.endAsyncSection(name, cookie)
+    }
+}
+
+private fun logPerformance(
+    totalMillis: Long,
+    geocodeMillis: Long,
+    syncMillis: Long,
+    reverseGeocodeMillis: Long,
+    previewMillis: Long,
+    syncResult: PhotoMetadataSyncResult,
+    recommendedPhotoCount: Int,
+) {
+    if (!Log.isLoggable(PhotoPerformanceTag, Log.DEBUG)) return
+    Log.d(
+        PhotoPerformanceTag,
+        "recommend_total_ms=$totalMillis " +
+            "target_geocode_ms=$geocodeMillis " +
+            "metadata_sync_ms=$syncMillis " +
+            "reverse_geocode_ms=$reverseGeocodeMillis " +
+            "preview_ms=$previewMillis " +
+            "previous_photos=${syncResult.previousPhotoCount} " +
+            "media_store_photos=${syncResult.photos.size} " +
+            "exif_reads=${syncResult.exifReadCount} " +
+            "reused_coordinates=${syncResult.reusedCoordinateCount} " +
+            "recommended_photos=$recommendedPhotoCount",
+    )
+}
+
+private fun logPhotoPickPerformance(
+    totalMillis: Long,
+    requestedPhotoCount: Int,
+    loadedPhotoCount: Int,
+) {
+    if (!Log.isLoggable(PhotoPerformanceTag, Log.DEBUG)) return
+    Log.d(
+        PhotoPerformanceTag,
+        "pick_total_ms=$totalMillis " +
+            "requested_photos=$requestedPhotoCount " +
+            "loaded_photos=$loadedPhotoCount",
+    )
 }
 
 private fun Address.toAdministrativeArea(): PhotoAdministrativeArea = PhotoAdministrativeArea(
@@ -290,20 +429,26 @@ private fun Context.readPhoto(
     knownCoordinates: Pair<Double, Double>? = null,
     knownCapturedAtMillis: Long? = null,
 ): SelectedPhoto? = runCatching {
-    val metadata = if (knownName == null && knownCapturedAtMillis == null) {
-        queryPhotoMetadata(uri)
-    } else {
-        null to null
+    val metadata = traceSection("photo.read.metadata") {
+        if (knownName == null && knownCapturedAtMillis == null) {
+            queryPhotoMetadata(uri)
+        } else {
+            null to null
+        }
     }
-    val coordinates = knownCoordinates ?: readCoordinates(uri)
-    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        contentResolver.loadThumbnail(uri, Size(PreviewSizePx, PreviewSizePx), null)
-    } else {
-        contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
-    } ?: return null
-    val bytes = ByteArrayOutputStream().use { output ->
-        bitmap.compress(Bitmap.CompressFormat.JPEG, PreviewJpegQuality, output)
-        output.toByteArray()
+    val coordinates = knownCoordinates ?: traceSection("photo.read.exif") {
+        readCoordinates(uri)
+    }
+    val bytes = traceSection("photo.read.preview") {
+        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            contentResolver.loadThumbnail(uri, Size(PreviewSizePx, PreviewSizePx), null)
+        } else {
+            contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
+        } ?: return null
+        ByteArrayOutputStream().use { output ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, PreviewJpegQuality, output)
+            output.toByteArray()
+        }
     }
     SelectedPhoto(
         id = uri.toString(),
@@ -367,3 +512,11 @@ private const val PreviewSizePx = 960
 private const val PreviewJpegQuality = 84
 private const val MaxReverseGeocodeCandidates = 80
 private const val MaxRecommendedPhotos = 12
+private const val PhotoPerformanceTag = "MapmoryPhotoPerf"
+
+private object TraceCookie {
+    const val Recommend = 1
+    const val RoomRead = 2
+    const val RoomWrite = 3
+    const val Pick = 4
+}
