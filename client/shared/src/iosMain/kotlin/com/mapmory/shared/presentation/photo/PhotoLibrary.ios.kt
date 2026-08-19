@@ -83,7 +83,7 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
         }
         val configuration = PHPickerConfiguration(PHPhotoLibrary.sharedPhotoLibrary()).apply {
             filter = PHPickerFilter.imagesFilter
-            selectionLimit = MaxPhotosPerRecord.toLong()
+            selectionLimit = 0
         }
         val picker = PHPickerViewController(configuration)
         picker.delegate = this

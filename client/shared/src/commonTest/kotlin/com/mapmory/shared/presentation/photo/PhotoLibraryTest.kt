@@ -7,13 +7,13 @@ import kotlin.test.assertEquals
 
 class PhotoLibraryTest {
     @Test
-    fun selectedPhotosAreDeduplicatedAndLimited() {
+    fun selectedPhotosAreDeduplicatedWithoutAnApplicationLimit() {
         val existing = listOf(photo("same"), photo("existing"))
         val incoming = listOf(photo("same")) + (1..20).map { photo("new-$it") }
 
         val merged = mergeSelectedPhotos(existing, incoming)
 
-        assertEquals(MaxPhotosPerRecord, merged.size)
+        assertEquals(22, merged.size)
         assertEquals(1, merged.count { it.id == "same" })
         assertEquals(listOf("same", "existing"), merged.take(2).map(SelectedPhoto::id))
     }

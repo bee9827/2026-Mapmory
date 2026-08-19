@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
 import android.location.Geocoder
 import android.location.Address
 import android.net.Uri
@@ -15,7 +16,6 @@ import android.os.SystemClock
 import android.os.Trace
 import android.provider.MediaStore
 import android.util.Log
-import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -33,6 +33,7 @@ import com.mapmory.shared.data.local.photo.PhotoMetadataDatabase
 import com.mapmory.shared.data.local.photo.PhotoMetadataEntity
 import com.mapmory.shared.domain.model.Location
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -82,7 +83,7 @@ actual fun rememberPhotoLibraryActions(
     }
 
     val galleryPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(MaxPhotosPerRecord),
+        contract = ActivityResultContracts.PickMultipleVisualMedia(),
     ) { uris ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         scope.launch {
@@ -457,26 +458,88 @@ private fun Context.readPhoto(
     val coordinates = knownCoordinates ?: traceSection("photo.read.exif") {
         readCoordinates(uri)
     }
-    val bytes = traceSection("photo.read.preview") {
-        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            contentResolver.loadThumbnail(uri, Size(PreviewSizePx, PreviewSizePx), null)
-        } else {
-            contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
-        } ?: return null
-        ByteArrayOutputStream().use { output ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, PreviewJpegQuality, output)
-            output.toByteArray()
-        }
+    val originalBytes = traceSection("photo.read.original") {
+        contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
+    }?.takeIf(ByteArray::isNotEmpty) ?: return null
+    val previewBytes = traceSection("photo.read.preview") {
+        originalBytes.toPreviewByteArray() ?: originalBytes
     }
     SelectedPhoto(
         id = uri.toString(),
         displayName = knownName ?: metadata.first ?: "여행 사진",
-        previewBytes = bytes,
+        previewBytes = previewBytes,
         latitude = coordinates?.first,
         longitude = coordinates?.second,
         capturedAt = formatDate(knownCapturedAtMillis ?: metadata.second),
+        originalBytes = originalBytes,
     )
 }.getOrNull()
+
+private fun ByteArray.toPreviewByteArray(): ByteArray? {
+    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        decodeWithImageDecoder()
+    } else {
+        decodeWithBitmapFactory()
+    } ?: return null
+
+    val maxDimension = maxOf(bitmap.width, bitmap.height)
+    val previewBitmap = if (maxDimension > PreviewSizePx) {
+        val scale = PreviewSizePx.toFloat() / maxDimension
+        Bitmap.createScaledBitmap(
+            bitmap,
+            (bitmap.width * scale).toInt().coerceAtLeast(1),
+            (bitmap.height * scale).toInt().coerceAtLeast(1),
+            true,
+        )
+    } else {
+        bitmap
+    }
+
+    return try {
+        ByteArrayOutputStream().use { output ->
+            previewBitmap.compress(Bitmap.CompressFormat.JPEG, PreviewJpegQuality, output)
+            output.toByteArray()
+        }
+    } finally {
+        if (previewBitmap !== bitmap) previewBitmap.recycle()
+        bitmap.recycle()
+    }
+}
+
+private fun ByteArray.decodeWithImageDecoder(): Bitmap? {
+    val source = ImageDecoder.createSource(ByteBuffer.wrap(this))
+    return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        val maxDimension = maxOf(info.size.width, info.size.height)
+        if (maxDimension > PreviewSizePx) {
+            val scale = PreviewSizePx.toFloat() / maxDimension
+            decoder.setTargetSize(
+                (info.size.width * scale).toInt().coerceAtLeast(1),
+                (info.size.height * scale).toInt().coerceAtLeast(1),
+            )
+        }
+    }
+}
+
+private fun ByteArray.decodeWithBitmapFactory(): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(this, 0, size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = calculatePreviewSampleSize(bounds.outWidth, bounds.outHeight)
+    }
+    return BitmapFactory.decodeByteArray(this, 0, size, options)
+}
+
+private fun calculatePreviewSampleSize(width: Int, height: Int): Int {
+    val maxDimension = maxOf(width, height)
+    var sampleSize = 1
+    while (maxDimension / sampleSize > PreviewSizePx * 2) {
+        sampleSize *= 2
+    }
+    return sampleSize
+}
 
 private fun Context.queryPhotoMetadata(uri: Uri): Pair<String?, Long?> {
     val projection = arrayOf(

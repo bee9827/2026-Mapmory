@@ -4,8 +4,6 @@ import androidx.compose.runtime.Composable
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 
-const val MaxPhotosPerRecord = 10
-
 data class SelectedPhoto(
     val id: String,
     val displayName: String,
@@ -116,6 +114,4 @@ private fun normalizeAreaName(value: String): String = value
 internal fun mergeSelectedPhotos(
     existing: List<SelectedPhoto>,
     incoming: List<SelectedPhoto>,
-): List<SelectedPhoto> = (existing + incoming)
-    .distinctBy(SelectedPhoto::id)
-    .take(MaxPhotosPerRecord)
+): List<SelectedPhoto> = (existing + incoming).distinctBy(SelectedPhoto::id)

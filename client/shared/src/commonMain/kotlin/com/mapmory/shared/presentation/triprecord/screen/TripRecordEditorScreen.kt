@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.presentation.photo.MaxPhotosPerRecord
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
 import com.mapmory.shared.presentation.date.PlatformDatePicker
@@ -772,9 +771,7 @@ private fun PhotoEditor(
             .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (photos.size < MaxPhotosPerRecord) {
-            PhotoActionButton(onClick = onAddClick)
-        }
+        PhotoActionButton(onClick = onAddClick)
         photos.forEach { photo ->
             Box {
                 PhotoPreview(photo = photo, modifier = Modifier.size(112.dp, 84.dp))
