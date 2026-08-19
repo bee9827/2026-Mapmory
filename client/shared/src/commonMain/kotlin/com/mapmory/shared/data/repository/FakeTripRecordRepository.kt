@@ -56,7 +56,7 @@ class FakeTripRecordRepository(
             title = draft.title,
             content = draft.content,
             startDate = draft.startDate,
-            endDate = draft.endDate ?: draft.startDate,
+            endDate = draft.endDate,
             media = createMedia(draft.mediaObjectKeys),
             createdAt = timestamp,
             updatedAt = timestamp,
@@ -75,7 +75,7 @@ class FakeTripRecordRepository(
             title = draft.title,
             content = draft.content,
             startDate = draft.startDate,
-            endDate = draft.endDate ?: draft.startDate,
+            endDate = draft.endDate,
             media = createMedia(draft.mediaObjectKeys),
             updatedAt = now(),
         )

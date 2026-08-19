@@ -44,6 +44,7 @@ android {
 dependencies {
     implementation(project(":shared"))
     implementation("androidx.activity:activity-compose:1.11.0")
+    implementation("androidx.activity:activity-ktx:1.11.0")
     implementation(libs.androidx.compose.foundation)
     implementation("org.jetbrains.compose.material3:material3:1.9.0")
     implementation("androidx.compose.ui:ui-tooling-preview:${libs.versions.androidxCompose.get()}")

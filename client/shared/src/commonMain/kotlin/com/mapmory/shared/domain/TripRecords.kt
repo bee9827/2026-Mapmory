@@ -15,8 +15,8 @@ class TripRecords(
         tripRecordTitle: String,
         tripRecordDescription: String?,
         tripLocation: String,
-        startTripDate: LocalDate,
-        endTripDate: LocalDate,
+        startTripDate: LocalDate?,
+        endTripDate: LocalDate?,
     ): TripRecords {
         val newRecord = TripRecord(
             imageUrl = imageUri,
@@ -45,6 +45,8 @@ class TripRecords(
         editingStartTripDate: LocalDate?,
         editingEndTripDate: LocalDate?,
         editingLocation: String?,
+        clearStartTripDate: Boolean = false,
+        clearEndTripDate: Boolean = false,
     ): TripRecords {
         val record = findTripRecordId(editingRecord.id)
             ?: throw IllegalArgumentException("해당 id를 찾을 수 없습니다")
@@ -53,8 +55,8 @@ class TripRecords(
             imageUrl = editingImage ?: record.imageUrl,
             tripRecordTitle = editingTitle ?: record.tripRecordTitle,
             tripRecordDescription = editingDescription ?: record.tripRecordDescription,
-            startTripDate = editingStartTripDate ?: record.startTripDate,
-            endTripDate = editingEndTripDate ?: record.endTripDate,
+            startTripDate = if (clearStartTripDate) null else editingStartTripDate ?: record.startTripDate,
+            endTripDate = if (clearEndTripDate) null else editingEndTripDate ?: record.endTripDate,
             location = editingLocation ?: record.location,
         )
 

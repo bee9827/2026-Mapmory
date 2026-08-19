@@ -54,11 +54,14 @@ private data class DetailRoute(
 
 @Composable
 fun MapmoryApp(
+    providedRecordsViewModel: TripRecordsViewModel? = null,
     navigation: MapmoryNavigation? = null,
     contentWindowInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
 ) {
     val navController = rememberNavController()
-    val recordsViewModel = remember { TripRecordsViewModel(appLocations) }
+    val recordsViewModel = remember(providedRecordsViewModel) {
+        providedRecordsViewModel ?: TripRecordsViewModel(appLocations)
+    }
     val recordsUiState = recordsViewModel.uiState
 
     fun navigateBack(): Boolean {
@@ -204,6 +207,9 @@ fun MapmoryApp(
                 onLocationSelected = { location ->
                     recordsViewModel.onAction(TripRecordAction.LocationSelected(location))
                 },
+                onLocationTouched = {
+                    recordsViewModel.onAction(TripRecordAction.LocationTouched)
+                },
                 onTitleChanged = { title ->
                     recordsViewModel.onAction(TripRecordAction.TitleChanged(title))
                 },
@@ -270,6 +276,8 @@ fun MapmoryApp(
         }
     }
 }
+
+fun createTripRecordsViewModel(): TripRecordsViewModel = TripRecordsViewModel(appLocations)
 
 private val appLocations = buildList {
     add(

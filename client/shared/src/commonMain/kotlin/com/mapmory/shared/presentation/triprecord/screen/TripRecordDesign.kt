@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +33,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,6 +55,23 @@ internal object TripRecordPalette {
     val accent = Color(0xFF35C988)
     val accentSoft = Color(0xFF123E3A)
     val danger = Color(0xFFFF6264)
+    val photoRecommendText = Color.White
+    val photoRecommendBackground = Color(0xFF382125)
+    val photoRecommendBorder = Color(0xFF99555D)
+    val photoGalleryBackground = Color(0xFF1B2D26)
+    val photoGalleryBorder = Color(0xFF3E7960)
+}
+
+@Composable
+internal fun rememberDismissKeyboardOnTapModifier(): Modifier {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    return Modifier.pointerInput(focusManager, keyboardController) {
+        detectTapGestures {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        }
+    }
 }
 
 @Composable
@@ -311,14 +332,16 @@ internal fun TripPhotoPlaceholder(
 
 @Composable
 internal fun TripPhotoImage(
-    previewBytes: ByteArray?,
+    imageBytes: ByteArray?,
+    fallbackBytes: ByteArray? = null,
     contentDescription: String,
     modifier: Modifier = Modifier,
     placeholderVariant: Int = 0,
     shape: Shape = RoundedCornerShape(18.dp),
 ) {
-    val bitmap = remember(previewBytes) {
-        previewBytes?.let { bytes -> runCatching { bytes.decodeToImageBitmap() }.getOrNull() }
+    val bitmap = remember(imageBytes, fallbackBytes) {
+        imageBytes.decodeToImageBitmapOrNull()
+            ?: fallbackBytes.decodeToImageBitmapOrNull()
     }
     if (bitmap == null) {
         TripPhotoPlaceholder(modifier, placeholderVariant, shape)
@@ -331,6 +354,9 @@ internal fun TripPhotoImage(
         )
     }
 }
+
+private fun ByteArray?.decodeToImageBitmapOrNull() =
+    this?.let { bytes -> runCatching { bytes.decodeToImageBitmap() }.getOrNull() }
 
 @Composable
 fun TripMapArtwork(

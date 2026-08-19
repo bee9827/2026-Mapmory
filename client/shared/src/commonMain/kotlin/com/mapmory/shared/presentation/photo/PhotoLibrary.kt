@@ -13,6 +13,7 @@ data class SelectedPhoto(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val capturedAt: String? = null,
+    val originalBytes: ByteArray? = null,
 )
 
 data class PhotoLibraryActions(
