@@ -67,13 +67,17 @@ actual fun rememberPhotoLibraryActions(
     val galleryPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) {
-        val canRead = context.canRecommendPhotos()
+        val hasGalleryAccess = context.canReadGallery()
+        val canRecommend = context.canRecommendPhotos()
         val target = pendingRecommendation
         pendingRecommendation = null
-        if (canRead && target != null) {
-            loadRecommendations(target.first, target.second)
-        } else {
-            latestMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
+        when {
+            target == null -> Unit
+            !context.hasFullGalleryAccess() && hasGalleryAccess -> {
+                latestMessage(FullGalleryAccessMessage)
+            }
+            canRecommend -> loadRecommendations(target.first, target.second)
+            else -> latestMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
         }
     }
 
@@ -115,7 +119,9 @@ actual fun rememberPhotoLibraryActions(
                 )
             },
             recommendForLocation = { location, parentName ->
-                if (context.canRecommendPhotos()) {
+                if (!context.hasFullGalleryAccess() && context.canReadGallery()) {
+                    latestMessage(FullGalleryAccessMessage)
+                } else if (context.canRecommendPhotos()) {
                     loadRecommendations(location, parentName)
                 } else {
                     pendingRecommendation = location to parentName
@@ -138,6 +144,19 @@ private fun Context.canReadGallery(): Boolean {
     return permissions.any { permission ->
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
+}
+
+private fun Context.hasFullGalleryAccess(): Boolean = when {
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.READ_MEDIA_IMAGES,
+        ) == PackageManager.PERMISSION_GRANTED
+
+    else -> ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.READ_EXTERNAL_STORAGE,
+    ) == PackageManager.PERMISSION_GRANTED
 }
 
 private fun Context.canRecommendPhotos(): Boolean =
@@ -512,6 +531,8 @@ private const val PreviewJpegQuality = 84
 private const val MaxReverseGeocodeCandidates = 80
 private const val MaxRecommendedPhotos = 12
 private const val PhotoPerformanceTag = "MapmoryPhotoPerf"
+private const val FullGalleryAccessMessage =
+    "위치 기반 사진 추천을 사용하려면 전체 갤러리 접근 권한을 허용해 주세요."
 
 private object TraceCookie {
     const val Recommend = 1

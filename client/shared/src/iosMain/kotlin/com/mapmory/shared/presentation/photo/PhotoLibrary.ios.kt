@@ -116,16 +116,17 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
     fun recommend(location: Location, parentName: String?) {
         val status = PHPhotoLibrary.authorizationStatusForAccessLevel(PHAccessLevelReadWrite)
         when (status) {
-            PHAuthorizationStatusAuthorized, PHAuthorizationStatusLimited -> {
+            PHAuthorizationStatusAuthorized -> {
                 findRecommendations(location, parentName)
             }
+            PHAuthorizationStatusLimited -> onMessage(FullGalleryAccessMessage)
             PHAuthorizationStatusNotDetermined -> {
                 PHPhotoLibrary.requestAuthorizationForAccessLevel(PHAccessLevelReadWrite) { newStatus ->
                     onMain {
-                        if (newStatus == PHAuthorizationStatusAuthorized || newStatus == PHAuthorizationStatusLimited) {
-                            findRecommendations(location, parentName)
-                        } else {
-                            onMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
+                        when (newStatus) {
+                            PHAuthorizationStatusAuthorized -> findRecommendations(location, parentName)
+                            PHAuthorizationStatusLimited -> onMessage(FullGalleryAccessMessage)
+                            else -> onMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
                         }
                     }
                 }
@@ -389,3 +390,5 @@ private const val MaxReverseGeocodeCandidates = 60
 private const val MaxRecommendedPhotos = 12
 private const val PreviewSizePx = 960
 private const val PreviewJpegQuality = 0.84
+private const val FullGalleryAccessMessage =
+    "위치 기반 사진 추천을 사용하려면 전체 갤러리 접근 권한을 허용해 주세요."
