@@ -20,9 +20,14 @@ import com.mapmory.shared.domain.model.KoreanCountryNames
 import com.mapmory.shared.domain.model.KoreanDistrictCodes
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.data.remote.createHttpClient
+import com.mapmory.shared.presentation.map.data.KoreaMapRemoteDataSource
 import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
 import com.mapmory.shared.presentation.map.domain.MapScope
+import com.mapmory.shared.presentation.map.domain.serverProvinceCodeForGeoJson
+import com.mapmory.shared.presentation.map.state.KoreaMapUiState
 import com.mapmory.shared.presentation.map.ui.MapArtwork
+import com.mapmory.shared.presentation.map.ui.KoreaMapStatusMessage
 import com.mapmory.shared.presentation.triprecord.screen.TripMapScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripProfileScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordDetailScreen
@@ -86,7 +91,28 @@ fun MapmoryApp(
     }
 
     var mapScope by remember { mutableStateOf(MapScope.WORLD) }
+    var selectedProvinceCode by remember { mutableStateOf<String?>(null) }
+    var koreaMapRetryKey by remember { mutableStateOf(0) }
+    var koreaMapUiState by remember { mutableStateOf<KoreaMapUiState>(KoreaMapUiState.Idle) }
+    val mapHttpClient = remember { createHttpClient() }
+    val koreaMapDataSource = remember(mapHttpClient) { KoreaMapRemoteDataSource(mapHttpClient) }
     val locationsById = remember { appLocations.associateBy(Location::id) }
+
+    DisposableEffect(mapHttpClient) {
+        onDispose { mapHttpClient.close() }
+    }
+
+    LaunchedEffect(mapScope, koreaMapRetryKey) {
+        if (mapScope != MapScope.KOREA) return@LaunchedEffect
+        koreaMapUiState = KoreaMapUiState.Loading
+        koreaMapUiState = koreaMapDataSource.load()
+            .fold(
+                onSuccess = KoreaMapUiState::Success,
+                onFailure = { error ->
+                    KoreaMapUiState.Error(error.message ?: "대한민국 지도를 불러오지 못했습니다.")
+                },
+            )
+    }
 
     fun navigateToTab(route: Any) {
         navController.navigate(route) {
@@ -145,22 +171,73 @@ fun MapmoryApp(
                 } else {
                     visitedRegionCodes.size
                 },
-                onMapScopeChange = { mapScope = it },
+                onMapScopeChange = {
+                    mapScope = it
+                    selectedProvinceCode = null
+                },
                 mapContent = {
-                    // Map taps are resolved to a location and routed to records or the editor.
-                    MapArtwork(
-                        scope = mapScope,
-                        visitedCountryCodes = visitedCountryCodes,
-                        visitedRegionCodes = visitedRegionCodes,
-                        onCountryClick = { countryCode ->
-                            handleMapLocationClick(countryCode)
-                        },
-                        onRegionClick = { regionCode ->
-                            handleMapLocationClick(regionCode)
-                        },
-                    )
+                    when (mapScope) {
+                        MapScope.WORLD -> MapArtwork(
+                            scope = MapScope.WORLD,
+                            visitedCountryCodes = visitedCountryCodes,
+                            onCountryClick = ::handleMapLocationClick,
+                        )
+
+                        MapScope.KOREA -> when (val state = koreaMapUiState) {
+                            KoreaMapUiState.Idle,
+                            KoreaMapUiState.Loading,
+                            -> KoreaMapStatusMessage("대한민국 지도를 불러오는 중...")
+
+                            is KoreaMapUiState.Error -> KoreaMapStatusMessage(
+                                message = state.message,
+                                actionLabel = "다시 시도",
+                                onAction = { koreaMapRetryKey++ },
+                            )
+
+                            is KoreaMapUiState.Success -> {
+                                val regions = selectedProvinceCode
+                                    ?.let(state.data::districtsFor)
+                                    ?: state.data.provinces
+                                val selectedServerProvinceCode = selectedProvinceCode
+                                    ?.let(::serverProvinceCodeForGeoJson)
+                                    ?.let { "KR-$it" }
+                                val visitedCodes = if (selectedServerProvinceCode == null) {
+                                    visitedRegionCodes
+                                } else {
+                                    visitedLocations
+                                        .filter { location ->
+                                            location.type == LocationType.DISTRICT &&
+                                                locationsById[location.parentId]?.regionCode == selectedServerProvinceCode
+                                        }
+                                        .map { it.regionCode }
+                                        .toSet()
+                                }
+
+                                MapArtwork(
+                                    scope = MapScope.KOREA,
+                                    visitedRegionCodes = visitedCodes,
+                                    koreaRegions = regions,
+                                    onRegionClick = { regionCode ->
+                                        if (selectedProvinceCode == null) {
+                                            selectedProvinceCode = regionCode
+                                        } else {
+                                            handleMapLocationClick(regionCode)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
                 },
                 onBackClick = {},
+                mapDetailTitle = selectedProvinceCode?.let { code ->
+                    (koreaMapUiState as? KoreaMapUiState.Success)
+                        ?.data
+                        ?.provinces
+                        ?.firstOrNull { it.code == code }
+                        ?.name
+                },
+                onMapDetailBackClick = { selectedProvinceCode = null },
                 onRecordClick = { navigateToTab(RecordsRoute) },
                 onCreateClick = {
                     recordsViewModel.onAction(TripRecordAction.StartCreating())
