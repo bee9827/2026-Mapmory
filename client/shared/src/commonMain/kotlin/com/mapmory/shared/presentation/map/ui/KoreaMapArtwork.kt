@@ -3,7 +3,13 @@ package com.mapmory.shared.presentation.map.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.GeoPoint
 import com.mapmory.shared.presentation.map.domain.ProvincePolygon
@@ -28,12 +35,12 @@ import kotlin.math.min
 
 @Composable
 fun KoreaMapArtwork(
+    regions: List<ProvincePolygon> = GeneratedKoreaMapData.provinces,
     visitedRegionCodes: Set<String> = emptySet(),
     onRegionClick: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val provinces = remember { GeneratedKoreaMapData.provinces }
-    val bounds = remember(provinces) { KoreaBounds.from(provinces) }
+    val bounds = remember(regions) { KoreaBounds.from(regions) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val currentOnRegionClick by rememberUpdatedState(onRegionClick)
     val projection = remember(bounds, viewportSize) {
@@ -47,8 +54,8 @@ fun KoreaMapArtwork(
             .onSizeChanged { viewportSize = it }
             .pointerInput(projection) {
                 detectTapGestures { position ->
-                    provinces.firstOrNull { province ->
-                        province.rings.any { ring ->
+                    regions.firstOrNull { region ->
+                        region.rings.any { ring ->
                             pointInScreenRing(
                                 point = position,
                                 ring = ring.map(projection::project),
@@ -61,12 +68,12 @@ fun KoreaMapArtwork(
         if (!projection.isValid) return@Canvas
         val outlineWidth = max(0.8f, size.minDimension * 0.0035f)
 
-        provinces.forEach { province ->
-            val isVisited = province.code in visitedRegionCodes
+        regions.forEach { region ->
+            val isVisited = region.code in visitedRegionCodes
             val fillColor = if (isVisited) Color(0xFF55D5A0) else Color(0xFF303B4D)
             val outlineColor = if (isVisited) Color(0xFF9AF0C5) else Color(0xFF7B879B)
 
-            province.rings.forEach { ring ->
+            region.rings.forEach { ring ->
                 if (ring.size < 3) return@forEach
                 val path = Path().apply {
                     ring.forEachIndexed { index, point ->
@@ -81,6 +88,32 @@ fun KoreaMapArtwork(
                     color = outlineColor,
                     style = Stroke(width = outlineWidth),
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun KoreaMapStatusMessage(
+    message: String,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {},
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(Color(0xFF111518)),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(text = message, color = Color(0xFFEAF7F1))
+            actionLabel?.let {
+                Button(onClick = onAction) { Text(it) }
             }
         }
     }

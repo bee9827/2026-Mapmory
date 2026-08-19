@@ -33,6 +33,8 @@ fun TripMapScreen(
     visitedCount: Int = 0,
     onMapScopeChange: (MapScope) -> Unit = {},
     onBackClick: () -> Unit,
+    mapDetailTitle: String? = null,
+    onMapDetailBackClick: () -> Unit = {},
     onRecordClick: () -> Unit = onBackClick,
     onCreateClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -62,6 +64,17 @@ fun TripMapScreen(
                     selected = mapScope,
                     onSelected = onMapScopeChange,
                 )
+                mapDetailTitle?.let { title ->
+                    Text(
+                        text = "‹ $title",
+                        color = TripRecordPalette.text,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .clickable(onClick = onMapDetailBackClick),
+                    )
+                }
             }
 
             Box(
