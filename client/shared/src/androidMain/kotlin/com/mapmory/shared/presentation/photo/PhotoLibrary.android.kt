@@ -244,18 +244,20 @@ private suspend fun Context.recommendPhotos(
         val reverseGeocodeStartedAt = SystemClock.elapsedRealtime()
         val matchedEntries = traceSection("photo.recommend.reverse_geocode") {
             entries
+                .asSequence()
                 .sortedByDescending { it.photo.capturedAtMillis ?: 0L }
-                .take(MaxReverseGeocodeCandidates)
-                .filter { entry ->
-                    runCatching {
+                .mapNotNull { entry ->
+                    val matches = runCatching {
                         geocoder
                             .getFromLocation(entry.latitude, entry.longitude, 1)
                             ?.firstOrNull()
                             ?.toAdministrativeArea()
                             ?.matches(target, parentName) == true
                     }.getOrDefault(false)
+                    entry.takeIf { matches }
                 }
                 .take(MaxRecommendedPhotos)
+                .toList()
         }
         val reverseGeocodeMillis = SystemClock.elapsedRealtime() - reverseGeocodeStartedAt
         val previewStartedAt = SystemClock.elapsedRealtime()

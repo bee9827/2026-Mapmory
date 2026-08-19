@@ -174,7 +174,6 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
                 if (distance <= radiusMeters) add(asset)
             }
         }
-            .take(MaxReverseGeocodeCandidates)
 
         if (candidates.isEmpty()) {
             onPhotosRecommended(emptyList())
@@ -386,7 +385,6 @@ private fun onMain(block: () -> Unit) {
     dispatch_async(dispatch_get_main_queue(), block)
 }
 
-private const val MaxReverseGeocodeCandidates = 60
 private const val MaxRecommendedPhotos = 12
 private const val PreviewSizePx = 960
 private const val PreviewJpegQuality = 0.84
