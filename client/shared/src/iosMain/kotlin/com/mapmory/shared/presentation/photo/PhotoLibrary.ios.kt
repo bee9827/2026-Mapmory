@@ -170,12 +170,10 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
                 val asset = result.objectAtIndex(index.toULong()) as? PHAsset ?: continue
                 val assetLocation = asset.location ?: continue
                 val distance = assetLocation.distanceFromLocation(targetLocation)
-                if (distance <= radiusMeters) add(asset to distance)
+                if (distance <= radiusMeters) add(asset)
             }
         }
-            .sortedBy { it.second }
             .take(MaxReverseGeocodeCandidates)
-            .map { it.first }
 
         if (candidates.isEmpty()) {
             onPhotosRecommended(emptyList())

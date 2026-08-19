@@ -167,7 +167,6 @@ private data class GalleryEntry(
     val photo: PhotoMetadataEntity,
     val latitude: Double,
     val longitude: Double,
-    val distanceMeters: Float,
 )
 
 private data class PhotoMetadataSyncResult(
@@ -214,7 +213,7 @@ private suspend fun Context.recommendPhotos(
                     distance,
                 )
                 if (distance[0] > radius) return@mapNotNull null
-                GalleryEntry(photo, latitude, longitude, distance[0])
+                GalleryEntry(photo, latitude, longitude)
             }
         }
 
@@ -225,7 +224,7 @@ private suspend fun Context.recommendPhotos(
         val reverseGeocodeStartedAt = SystemClock.elapsedRealtime()
         val matchedEntries = traceSection("photo.recommend.reverse_geocode") {
             entries
-                .sortedBy(GalleryEntry::distanceMeters)
+                .sortedByDescending { it.photo.capturedAtMillis ?: 0L }
                 .take(MaxReverseGeocodeCandidates)
                 .filter { entry ->
                     runCatching {
