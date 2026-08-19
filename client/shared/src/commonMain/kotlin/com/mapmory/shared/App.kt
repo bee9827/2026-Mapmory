@@ -90,7 +90,7 @@ fun MapmoryApp(
         onDispose { navigation?.unbindBackHandler() }
     }
 
-    var mapScope by remember { mutableStateOf(MapScope.WORLD) }
+    var mapScope by remember { mutableStateOf(MapScope.KOREA) }
     var selectedProvinceCode by remember { mutableStateOf<String?>(null) }
     var koreaMapRetryKey by remember { mutableStateOf(0) }
     var koreaMapUiState by remember { mutableStateOf<KoreaMapUiState>(KoreaMapUiState.Idle) }
@@ -157,6 +157,15 @@ fun MapmoryApp(
             else -> locationsById[location.parentId]?.regionCode
         }
     }.toSet()
+    val selectedProvinceAppCode = selectedProvinceCode
+        ?.let(::serverProvinceCodeForGeoJson)
+        ?.let { "KR-$it" }
+    val selectedProvinceVisitedCount = selectedProvinceAppCode?.let { provinceCode ->
+        visitedLocations.count { location ->
+            location.type == LocationType.DISTRICT &&
+                locationsById[location.parentId]?.regionCode == provinceCode
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -166,10 +175,10 @@ fun MapmoryApp(
             TripMapScreen(
                 modifier = Modifier.windowInsetsPadding(contentWindowInsets),
                 mapScope = mapScope,
-                visitedCount = if (mapScope == MapScope.WORLD) {
-                    visitedCountryCodes.size
-                } else {
-                    visitedRegionCodes.size
+                visitedCount = when {
+                    mapScope == MapScope.WORLD -> visitedCountryCodes.size
+                    selectedProvinceVisitedCount != null -> selectedProvinceVisitedCount
+                    else -> visitedRegionCodes.size
                 },
                 onMapScopeChange = {
                     mapScope = it
@@ -217,6 +226,7 @@ fun MapmoryApp(
                                     scope = MapScope.KOREA,
                                     visitedRegionCodes = visitedCodes,
                                     koreaRegions = regions,
+                                    showRegionLabels = selectedProvinceCode != null,
                                     onRegionClick = { regionCode ->
                                         if (selectedProvinceCode == null) {
                                             selectedProvinceCode = regionCode
@@ -236,6 +246,12 @@ fun MapmoryApp(
                         ?.provinces
                         ?.firstOrNull { it.code == code }
                         ?.name
+                },
+                mapDetailTotal = selectedProvinceCode?.let { code ->
+                    (koreaMapUiState as? KoreaMapUiState.Success)
+                        ?.data
+                        ?.districtsFor(code)
+                        ?.size
                 },
                 onMapDetailBackClick = { selectedProvinceCode = null },
                 onRecordClick = { navigateToTab(RecordsRoute) },

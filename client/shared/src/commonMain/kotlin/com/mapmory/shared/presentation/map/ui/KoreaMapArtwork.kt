@@ -23,8 +23,13 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.GeoPoint
 import com.mapmory.shared.presentation.map.domain.ProvincePolygon
@@ -37,12 +42,14 @@ import kotlin.math.min
 fun KoreaMapArtwork(
     regions: List<ProvincePolygon> = GeneratedKoreaMapData.provinces,
     visitedRegionCodes: Set<String> = emptySet(),
+    showRegionLabels: Boolean = false,
     onRegionClick: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val bounds = remember(regions) { KoreaBounds.from(regions) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val currentOnRegionClick by rememberUpdatedState(onRegionClick)
+    val textMeasurer = rememberTextMeasurer()
     val projection = remember(bounds, viewportSize) {
         KoreaProjection.from(bounds, viewportSize)
     }
@@ -87,6 +94,25 @@ fun KoreaMapArtwork(
                     path = path,
                     color = outlineColor,
                     style = Stroke(width = outlineWidth),
+                )
+            }
+        }
+
+        // Prototype detail screens keep the map readable by showing the
+        // selected province's district names directly on the boundaries.
+        if (showRegionLabels) {
+            val labelStyle = TextStyle(
+                color = Color(0xFF7085A8),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            regions.forEach { region ->
+                val labelPoint = region.labelPoint() ?: return@forEach
+                val layout = textMeasurer.measure(region.name, labelStyle)
+                val center = projection.project(labelPoint)
+                drawText(
+                    textLayoutResult = layout,
+                    topLeft = center - Offset(layout.size.width / 2f, layout.size.height / 2f),
                 )
             }
         }
@@ -201,4 +227,13 @@ private data class KoreaBounds(
             )
         }
     }
+}
+
+private fun ProvincePolygon.labelPoint(): GeoPoint? {
+    val ring = rings.maxByOrNull { it.size } ?: return null
+    if (ring.isEmpty()) return null
+    return GeoPoint(
+        longitude = ring.sumOf { it.longitude.toDouble() }.toFloat() / ring.size,
+        latitude = ring.sumOf { it.latitude.toDouble() }.toFloat() / ring.size,
+    )
 }
