@@ -7,11 +7,11 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.getValue
@@ -24,9 +24,11 @@ import androidx.compose.ui.graphics.toArgb
 import com.mapmory.shared.MapmoryApp
 import com.mapmory.shared.MapmoryNavigation
 
-private val SystemBarColor = Color(0xFF07171B)
+private val SystemBarColor = Color(0xFF111518)
 
 class MainActivity : ComponentActivity() {
+    private val appViewModel: MapmoryAppViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(
@@ -40,14 +42,16 @@ class MainActivity : ComponentActivity() {
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 containerColor = SystemBarColor,
-                contentWindowInsets = WindowInsets.safeDrawing,
-            ) { contentPadding ->
+                contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            ) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(contentPadding),
+                    modifier = Modifier.fillMaxSize(),
                 ) {
-                    MapmoryApp(navigation = navigation)
+                    MapmoryApp(
+                        providedRecordsViewModel = appViewModel.recordsViewModel,
+                        navigation = navigation,
+                        contentWindowInsets = WindowInsets.safeDrawing,
+                    )
                     BackHandler {
                         if (navigation.popBackStack()) {
                             lastBackPressedAt = 0L

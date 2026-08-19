@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,11 +18,13 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -39,16 +42,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.presentation.photo.MaxPhotosPerRecord
+import com.mapmory.shared.presentation.photo.SelectedPhoto
+import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
+import com.mapmory.shared.presentation.date.PlatformDatePicker
+import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
+import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+
+private const val StartDatePickerTarget = "start"
+private const val EndDatePickerTarget = "end"
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -56,10 +71,13 @@ fun TripRecordEditorScreen(
     uiState: TripRecordEditorUiState,
     locations: List<Location>,
     onLocationSelected: (Location) -> Unit,
+    onLocationTouched: () -> Unit = {},
     onTitleChanged: (String) -> Unit,
     onContentChanged: (String) -> Unit,
     onStartDateChanged: (String) -> Unit,
     onEndDateChanged: (String) -> Unit,
+    onPhotosAdded: (List<SelectedPhoto>) -> Unit = {},
+    onPhotoRemoved: (String) -> Unit = {},
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
     onMapClick: () -> Unit = {},
@@ -74,6 +92,29 @@ fun TripRecordEditorScreen(
     }
     var showLocationSheet by remember { mutableStateOf(false) }
     var locationSearchQuery by rememberSaveable { mutableStateOf("") }
+    var photoMessage by remember { mutableStateOf<String?>(null) }
+    var recommendedPhotos by remember { mutableStateOf(emptyList<SelectedPhoto>()) }
+    var selectedRecommendationIds by remember { mutableStateOf(emptySet<String>()) }
+    var showRecommendationSheet by remember { mutableStateOf(false) }
+    var datePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
+    val dismissKeyboardOnTap = rememberDismissKeyboardOnTapModifier()
+    val photoLibrary = rememberPhotoLibraryActions(
+        onPhotosPicked = { photos ->
+            photoMessage = null
+            onPhotosAdded(photos)
+        },
+        onPhotosRecommended = { photos ->
+            recommendedPhotos = photos
+            selectedRecommendationIds = photos.map(SelectedPhoto::id).toSet()
+            showRecommendationSheet = photos.isNotEmpty()
+            photoMessage = if (photos.isEmpty()) {
+                "선택한 지역에서 촬영된 GPS 사진을 찾지 못했어요."
+            } else {
+                null
+            }
+        },
+        onMessage = { photoMessage = it },
+    )
     val locationResultsListState = rememberLazyListState()
     val filteredLocations = remember(locationSearchQuery, selectableLocations) {
         selectableLocations.filter { location ->
@@ -83,133 +124,132 @@ fun TripRecordEditorScreen(
         }
     }
 
-    TripRecordBackground(modifier = modifier) {
+    TripRecordBackground(modifier = modifier.then(dismissKeyboardOnTap)) {
         Column(Modifier.fillMaxSize()) {
-            TripRecordTopBar(
-                title = if (uiState.recordId == null) "새 기록 작성" else "기록 수정",
+            EditorTopBar(
+                title = if (uiState.recordId == null) "기록 남기기" else "기록 수정하기",
                 onBackClick = onBackClick,
-                trailing = {
-                    TextButton(
-                        onClick = onSaveClick,
-                        enabled = !uiState.isSaving,
-                    ) {
-                        Text(
-                            text = if (uiState.isSaving) "저장 중" else "완료",
-                            color = if (uiState.isSaving) TripRecordPalette.muted else TripRecordPalette.accent,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                },
+                isSaveEnabled = uiState.isSaveEnabled,
+                isSaving = uiState.isSaving,
+                onSaveClick = onSaveClick,
             )
 
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                contentPadding = PaddingValues(bottom = 32.dp),
             ) {
                 item {
-                    EditorSectionLabel("제목")
-                    OutlinedTextField(
-                        value = uiState.title,
-                        onValueChange = onTitleChanged,
-                        placeholder = { Text("여행의 제목을 입력해 주세요") },
-                        singleLine = true,
+                    PhotoSection(
+                        locationName = uiState.selectedLocation?.name ?: "여행 장소",
+                        photos = uiState.selectedPhotos,
+                        onAddClick = photoLibrary.pickFromGallery,
+                        onRecommendClick = {
+                            val selectedLocation = uiState.selectedLocation
+                            if (selectedLocation == null) {
+                                photoMessage = "사진을 추천받으려면 장소를 먼저 선택해 주세요."
+                            } else {
+                                photoMessage = "${selectedLocation.name}에서 촬영된 사진을 찾고 있어요."
+                                val parentName = locations
+                                    .firstOrNull { it.id == selectedLocation.parentId }
+                                    ?.name
+                                photoLibrary.recommendForLocation(selectedLocation, parentName)
+                            }
+                        },
+                        onRemoveClick = onPhotoRemoved,
+                        recommendationsAvailable = photoLibrary.recommendationsAvailable,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp),
+                            .padding(top = 18.dp),
+                    )
+                    photoMessage?.let { message ->
+                        Text(
+                            text = message,
+                            color = TripRecordPalette.muted,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        )
+                    }
+                    EditorErrorMessage(
+                        message = uiState.errorMessageFor(TripRecordEditorErrorTarget.PHOTOS),
+                        modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
+                    )
+                    EditorDivider()
+                }
+
+                item {
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
+                        EditorTitleField(
+                            value = uiState.title,
+                            onValueChange = onTitleChanged,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        EditorErrorMessage(
+                            message = uiState.errorMessageFor(TripRecordEditorErrorTarget.TITLE),
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    EditorDivider(Modifier.padding(horizontal = 20.dp))
+                }
+
+                item {
+                    Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                        LocationSelector(
+                            selectedLocation = uiState.selectedLocation,
+                            locations = locations,
+                            onClick = {
+                                onLocationTouched()
+                                showLocationSheet = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        EditorErrorMessage(
+                            message = uiState.errorMessageFor(TripRecordEditorErrorTarget.LOCATION),
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    EditorDivider(Modifier.padding(horizontal = 20.dp))
+                }
+
+                item {
+                    DateFields(
+                        startDate = uiState.startDate,
+                        endDate = uiState.endDate,
+                        startDateError = uiState.errorMessageFor(TripRecordEditorErrorTarget.START_DATE),
+                        endDateError = uiState.errorMessageFor(TripRecordEditorErrorTarget.END_DATE),
+                        onStartDateClick = { datePickerTarget = StartDatePickerTarget },
+                        onEndDateClick = { datePickerTarget = EndDatePickerTarget },
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    )
+                    EditorDivider(Modifier.padding(horizontal = 20.dp))
+                }
+
+                item {
+                    CompanionChips(
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                     )
                 }
 
                 item {
-                    EditorSectionLabel("여행 사진")
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState())
-                            .padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        TripPhotoPlaceholder(Modifier.size(112.dp, 84.dp), variant = 0)
-                        TripPhotoPlaceholder(Modifier.size(112.dp, 84.dp), variant = 1)
-                        TripPhotoPlaceholder(Modifier.size(112.dp, 84.dp), variant = 2)
-                        Column(
-                            modifier = Modifier
-                                .size(84.dp)
-                                .background(TripRecordPalette.surface, RoundedCornerShape(16.dp)),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-                        ) {
-                            Text("＋", color = TripRecordPalette.accent, fontSize = 28.sp)
-                            Text("사진 추가", color = TripRecordPalette.muted, fontSize = 10.sp)
-                        }
-                    }
-                }
-
-                item {
-                    EditorSectionLabel("장소")
-                    LocationSelector(
-                        selectedLocation = uiState.selectedLocation,
-                        locations = locations,
-                        onClick = { showLocationSheet = true },
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-
-                item {
-                    EditorSectionLabel("여행 날짜")
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        OutlinedTextField(
-                            value = uiState.startDate,
-                            onValueChange = onStartDateChanged,
-                            placeholder = { Text("YYYY.MM.DD") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                        OutlinedTextField(
-                            value = uiState.endDate,
-                            onValueChange = onEndDateChanged,
-                            placeholder = { Text("종료일") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                }
-
-                item {
-                    EditorSectionLabel("기록")
-                    OutlinedTextField(
+                    EditorContentField(
                         value = uiState.content,
                         onValueChange = onContentChanged,
-                        placeholder = { Text("여행에서 느낀 점을 기록해 보세요") },
-                        minLines = 4,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp),
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
                     )
                 }
 
-                uiState.errorMessage?.let { message ->
+                uiState.generalErrorMessage?.takeIf { uiState.isDirty }?.let { message ->
                     item {
-                        Text(message, color = TripRecordPalette.danger, fontSize = 12.sp)
+                        EditorErrorMessage(
+                            message = message,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                        )
                     }
                 }
-
-                item { Spacer(Modifier.height(18.dp)) }
             }
-
-            TripBottomBar(
-                selected = TripBottomTab.CREATE,
-                onMapClick = onMapClick,
-                onRecordClick = onRecordClick,
-                onProfileClick = onProfileClick,
-            )
         }
     }
 
@@ -225,6 +265,7 @@ fun TripRecordEditorScreen(
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .imePadding()
+                    .then(dismissKeyboardOnTap)
                     .padding(horizontal = 20.dp),
             ) {
                 Text(
@@ -291,17 +332,532 @@ fun TripRecordEditorScreen(
             }
         }
     }
-}
-@Composable
-private fun EditorSectionLabel(text: String) {
-    Text(
-        text = text,
-        color = TripRecordPalette.muted,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.SemiBold,
+
+    if (showRecommendationSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showRecommendationSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = TripRecordPalette.background,
+            contentColor = TripRecordPalette.text,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+            ) {
+                Text("이 장소에서 찍은 사진", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "사진의 EXIF GPS가 선택한 행정구역과 일치하는 결과예요.",
+                    color = TripRecordPalette.muted,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(vertical = 18.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    recommendedPhotos.forEach { photo ->
+                        val selected = photo.id in selectedRecommendationIds
+                        RecommendedPhoto(
+                            photo = photo,
+                            selected = selected,
+                            onClick = {
+                                selectedRecommendationIds = if (selected) {
+                                    selectedRecommendationIds - photo.id
+                                } else {
+                                    selectedRecommendationIds + photo.id
+                                }
+                            },
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        onPhotosAdded(
+                            recommendedPhotos.filter { it.id in selectedRecommendationIds },
+                        )
+                        showRecommendationSheet = false
+                        photoMessage = null
+                    },
+                    enabled = selectedRecommendationIds.isNotEmpty(),
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text("선택한 사진 추가", color = TripRecordPalette.accent, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+
+    val activeDatePickerTarget = datePickerTarget
+    val isStartDatePicker = activeDatePickerTarget == StartDatePickerTarget
+    PlatformDatePicker(
+        visible = activeDatePickerTarget != null,
+        initialDate = when {
+            isStartDatePicker -> uiState.startDate
+            activeDatePickerTarget == EndDatePickerTarget -> uiState.endDate
+            else -> null
+        },
+        minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
+            uiState.startDate
+        } else {
+            null
+        },
+        onDateSelected = { date ->
+            if (isStartDatePicker) {
+                onStartDateChanged(date)
+            } else if (activeDatePickerTarget == EndDatePickerTarget) {
+                onEndDateChanged(date)
+            }
+            datePickerTarget = null
+        },
+        onDismiss = { datePickerTarget = null },
     )
 }
 
+@Composable
+private fun EditorTopBar(
+    title: String,
+    onBackClick: () -> Unit,
+    isSaveEnabled: Boolean,
+    isSaving: Boolean,
+    onSaveClick: () -> Unit,
+) {
+    Column {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp),
+        ) {
+            TextButton(
+                onClick = onBackClick,
+                contentPadding = PaddingValues(0.dp),
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 8.dp)
+                    .size(48.dp),
+            ) {
+                Text(
+                    text = "←",
+                    color = TripRecordPalette.text,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Light,
+                )
+            }
+            Text(
+                text = title,
+                color = TripRecordPalette.text,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.align(Alignment.Center),
+            )
+            TextButton(
+                onClick = onSaveClick,
+                enabled = isSaveEnabled,
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 8.dp),
+            ) {
+                Text(
+                    text = if (isSaving) "저장 중" else "저장",
+                    color = if (isSaveEnabled) TripRecordPalette.accent else TripRecordPalette.muted,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+        EditorDivider()
+    }
+}
+
+@Composable
+private fun PhotoSection(
+    locationName: String,
+    photos: List<TripRecordPhotoUiState>,
+    onAddClick: () -> Unit,
+    onRecommendClick: () -> Unit,
+    onRemoveClick: (String) -> Unit,
+    recommendationsAvailable: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "$locationName · 여행 일정과 가까운 사진",
+                color = TripRecordPalette.text,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(10.dp))
+            TextButton(
+                onClick = onRecommendClick,
+                enabled = recommendationsAvailable,
+                contentPadding = PaddingValues(horizontal = 9.dp, vertical = 2.dp),
+                modifier = Modifier
+                    .height(36.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(TripRecordPalette.photoRecommendBackground)
+                    .border(
+                        width = 1.dp,
+                        color = TripRecordPalette.photoRecommendBorder,
+                        shape = RoundedCornerShape(6.dp),
+                    ),
+            ) {
+                Text(
+                    text = "위치 기반 사진\n불러오기",
+                    color = TripRecordPalette.photoRecommendText,
+                    fontSize = 9.sp,
+                    lineHeight = 11.sp,
+                )
+            }
+        }
+        PhotoEditor(
+            photos = photos,
+            onAddClick = onAddClick,
+            onRemoveClick = onRemoveClick,
+            modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
+        )
+    }
+}
+
+@Composable
+private fun EditorTitleField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        textStyle = TextStyle(
+            color = TripRecordPalette.text,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+        ),
+        cursorBrush = SolidColor(TripRecordPalette.accent),
+        decorationBox = { innerTextField ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isBlank()) {
+                    Text(
+                        text = "여행의 제목을 적어주세요",
+                        color = TripRecordPalette.muted,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                innerTextField()
+            }
+        },
+        modifier = modifier.height(34.dp),
+    )
+}
+
+@Composable
+private fun DateFields(
+    startDate: String,
+    endDate: String,
+    startDateError: String?,
+    endDateError: String?,
+    onStartDateClick: () -> Unit,
+    onEndDateClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        DateField(
+            label = "시작",
+            value = startDate,
+            errorMessage = startDateError,
+            onClick = onStartDateClick,
+            modifier = Modifier.weight(1f),
+        )
+        DateField(
+            label = "종료",
+            value = endDate,
+            errorMessage = endDateError,
+            onClick = onEndDateClick,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun DateField(
+    label: String,
+    value: String,
+    errorMessage: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text(
+            text = label,
+            color = TripRecordPalette.muted,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                Text(
+                    text = value.ifBlank { "연도. 월. 일." },
+                    color = if (value.isBlank()) TripRecordPalette.muted else TripRecordPalette.text,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onClick),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "▦",
+                    color = TripRecordPalette.muted,
+                    fontSize = 16.sp,
+                )
+            }
+        }
+        EditorErrorMessage(
+            message = errorMessage,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun EditorErrorMessage(
+    message: String?,
+    modifier: Modifier = Modifier,
+) {
+    message ?: return
+    Text(
+        text = message,
+        color = TripRecordPalette.danger,
+        fontSize = 11.sp,
+        modifier = modifier,
+    )
+}
+
+private fun TripRecordEditorUiState.errorMessageFor(target: TripRecordEditorErrorTarget): String? =
+    fieldErrors[target]?.takeIf {
+        target == TripRecordEditorErrorTarget.PHOTOS || isFieldDirty(target)
+    }
+
+@Composable
+private fun CompanionChips(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        listOf("가족", "애인", "친구", "혼자").forEach { companion ->
+            Text(
+                text = companion,
+                color = TripRecordPalette.text,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50.dp))
+                    .background(TripRecordPalette.surface)
+                    .border(1.dp, TripRecordPalette.line, RoundedCornerShape(50.dp))
+                    .padding(horizontal = 11.dp, vertical = 7.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditorContentField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        textStyle = TextStyle(
+            color = TripRecordPalette.text,
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
+        ),
+        cursorBrush = SolidColor(TripRecordPalette.accent),
+        decorationBox = { innerTextField ->
+            Box {
+                if (value.isBlank()) {
+                    Text(
+                        text = "이곳에서의 추억을 자유롭게 남겨보세요. (선택)",
+                        color = TripRecordPalette.muted,
+                        fontSize = 12.sp,
+                    )
+                }
+                innerTextField()
+            }
+        },
+        modifier = modifier.heightIn(min = 150.dp),
+    )
+}
+
+@Composable
+private fun EditorDivider(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(TripRecordPalette.line.copy(alpha = 0.55f)),
+    )
+}
+
+@Composable
+private fun PhotoEditor(
+    photos: List<TripRecordPhotoUiState>,
+    onAddClick: () -> Unit,
+    onRemoveClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (photos.size < MaxPhotosPerRecord) {
+            PhotoActionButton(onClick = onAddClick)
+        }
+        photos.forEach { photo ->
+            Box {
+                PhotoPreview(photo = photo, modifier = Modifier.size(112.dp, 84.dp))
+                Text(
+                    text = "×",
+                    color = TripRecordPalette.text,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(5.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onRemoveClick(photo.id) }
+                        .background(TripRecordPalette.background.copy(alpha = 0.8f))
+                        .padding(horizontal = 7.dp, vertical = 1.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhotoActionButton(onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .size(112.dp, 84.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .background(TripRecordPalette.photoGalleryBackground)
+            .border(1.dp, TripRecordPalette.photoGalleryBorder, RoundedCornerShape(14.dp)),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "사진첩",
+            color = TripRecordPalette.text,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = "전체 보기",
+            color = TripRecordPalette.muted,
+            fontSize = 9.sp,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
+}
+
+@Composable
+private fun RecommendedPhoto(
+    photo: SelectedPhoto,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(modifier = Modifier.width(132.dp)) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp))
+                .clickable(onClick = onClick),
+        ) {
+            PhotoPreview(photo, Modifier.size(132.dp, 100.dp))
+            if (selected) {
+                Text(
+                    "✓",
+                    color = TripRecordPalette.text,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(7.dp)
+                        .background(TripRecordPalette.accent, RoundedCornerShape(20.dp))
+                        .padding(horizontal = 7.dp, vertical = 3.dp),
+                )
+            }
+        }
+        Text(
+            text = photo.capturedAt ?: photo.displayName,
+            color = TripRecordPalette.muted,
+            fontSize = 10.sp,
+            maxLines = 1,
+            modifier = Modifier.padding(top = 5.dp),
+        )
+    }
+}
+
+@Composable
+private fun PhotoPreview(photo: SelectedPhoto, modifier: Modifier = Modifier) {
+    TripPhotoImage(
+        imageBytes = photo.previewBytes,
+        contentDescription = photo.displayName,
+        modifier = modifier,
+        placeholderVariant = photo.id.hashCode(),
+    )
+}
+
+@Composable
+private fun PhotoPreview(photo: TripRecordPhotoUiState, modifier: Modifier = Modifier) {
+    TripPhotoImage(
+        imageBytes = photo.previewBytes?.bytesForDecoding(),
+        contentDescription = photo.displayName,
+        modifier = modifier,
+        placeholderVariant = photo.id.hashCode(),
+    )
+}
 @Composable
 private fun LocationSelector(
     selectedLocation: Location?,
@@ -309,39 +865,55 @@ private fun LocationSelector(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .background(TripRecordPalette.surface)
-            .border(1.dp, TripRecordPalette.line, RoundedCornerShape(16.dp))
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clickable(onClick = onClick),
     ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = selectedLocation?.name ?: "여행 장소를 선택해 주세요",
-                color = if (selectedLocation == null) TripRecordPalette.muted else TripRecordPalette.text,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = selectedLocation?.let {
-                    "${locationTypeLabel(it)} · ${locationContext(it, locations)}"
-                } ?: "국가, 시·도, 시·군·구 검색",
-                color = TripRecordPalette.muted,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 5.dp),
-            )
-        }
         Text(
-            text = if (selectedLocation == null) "선택" else "변경",
+            text = if (selectedLocation == null) {
+                "여행 장소"
+            } else if (selectedLocation.countryId == KoreaCountryId) {
+                "국내 여행"
+            } else {
+                "해외 여행"
+            },
             color = TripRecordPalette.accent,
-            fontSize = 12.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
         )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "⊙",
+                color = TripRecordPalette.muted,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = selectedLocation?.displayName(locations) ?: "여행 장소를 선택해 주세요",
+                color = if (selectedLocation == null) TripRecordPalette.muted else TripRecordPalette.text,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "⌄",
+                color = TripRecordPalette.muted,
+                fontSize = 14.sp,
+            )
+        }
     }
+}
+
+private fun Location.displayName(locations: List<Location>): String {
+    if (type != LocationType.DISTRICT) return name
+    val parentName = locations.firstOrNull { it.id == parentId }?.name ?: return name
+    return "$parentName $name"
 }
 
 @Composable

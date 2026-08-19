@@ -1,0 +1,393 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
+package com.mapmory.shared.presentation.photo
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import com.mapmory.shared.domain.model.Location
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.useContents
+import kotlinx.cinterop.usePinned
+import platform.CoreFoundation.CFRelease
+import platform.CoreGraphics.CGImageRelease
+import platform.CoreLocation.CLGeocoder
+import platform.CoreLocation.CLPlacemark
+import platform.CoreLocation.CLLocation
+import platform.Foundation.CFBridgingRetain
+import platform.Foundation.NSData
+import platform.Foundation.NSDate
+import platform.Foundation.NSDateFormatter
+import platform.Foundation.getBytes
+import platform.Foundation.NSSortDescriptor
+import platform.ImageIO.CGImageSourceCreateThumbnailAtIndex
+import platform.ImageIO.CGImageSourceCreateWithData
+import platform.ImageIO.kCGImageSourceCreateThumbnailFromImageAlways
+import platform.ImageIO.kCGImageSourceCreateThumbnailWithTransform
+import platform.ImageIO.kCGImageSourceThumbnailMaxPixelSize
+import platform.Photos.PHAccessLevelReadWrite
+import platform.Photos.PHAsset
+import platform.Photos.PHAssetMediaTypeImage
+import platform.Photos.PHAssetResource
+import platform.Photos.PHAuthorizationStatusAuthorized
+import platform.Photos.PHAuthorizationStatusLimited
+import platform.Photos.PHAuthorizationStatusNotDetermined
+import platform.Photos.PHFetchOptions
+import platform.Photos.PHImageManager
+import platform.Photos.PHImageRequestOptions
+import platform.Photos.PHImageRequestOptionsVersionCurrent
+import platform.Photos.PHPhotoLibrary
+import platform.PhotosUI.PHPickerConfiguration
+import platform.PhotosUI.PHPickerFilter
+import platform.PhotosUI.PHPickerResult
+import platform.PhotosUI.PHPickerViewController
+import platform.PhotosUI.PHPickerViewControllerDelegateProtocol
+import platform.UIKit.UIApplication
+import platform.UIKit.UIImage
+import platform.UIKit.UIImageJPEGRepresentation
+import platform.UIKit.UIViewController
+import platform.UIKit.UIWindow
+import platform.darwin.NSObject
+import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
+
+@Composable
+actual fun rememberPhotoLibraryActions(
+    onPhotosPicked: (List<SelectedPhoto>) -> Unit,
+    onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
+    onMessage: (String) -> Unit,
+): PhotoLibraryActions {
+    val controller = remember { IosPhotoLibraryController() }
+    controller.onPhotosPicked = onPhotosPicked
+    controller.onPhotosRecommended = onPhotosRecommended
+    controller.onMessage = onMessage
+
+    return remember(controller) {
+        PhotoLibraryActions(
+            pickFromGallery = controller::presentPicker,
+            recommendForLocation = controller::recommend,
+        )
+    }
+}
+
+private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDelegateProtocol {
+    var onPhotosPicked: (List<SelectedPhoto>) -> Unit = {}
+    var onPhotosRecommended: (List<SelectedPhoto>) -> Unit = {}
+    var onMessage: (String) -> Unit = {}
+    private var geocoder: CLGeocoder? = null
+
+    fun presentPicker() {
+        val presenter = topViewController() ?: run {
+            onMessage("사진 선택 화면을 열지 못했어요.")
+            return
+        }
+        val configuration = PHPickerConfiguration(PHPhotoLibrary.sharedPhotoLibrary()).apply {
+            filter = PHPickerFilter.imagesFilter
+            selectionLimit = MaxPhotosPerRecord.toLong()
+        }
+        val picker = PHPickerViewController(configuration)
+        picker.delegate = this
+        presenter.presentViewController(picker, animated = true, completion = null)
+    }
+
+    override fun picker(picker: PHPickerViewController, didFinishPicking: List<*>) {
+        picker.dismissViewControllerAnimated(true, completion = null)
+        val results = didFinishPicking.filterIsInstance<PHPickerResult>()
+        if (results.isEmpty()) return
+
+        val loaded = MutableList<SelectedPhoto?>(results.size) { null }
+        var remaining = results.size
+        results.forEachIndexed { index, result ->
+            loadPickerResult(result) { photo ->
+                loaded[index] = photo
+                remaining -= 1
+                if (remaining == 0) {
+                    val photos = loaded.filterNotNull()
+                    if (photos.isEmpty()) {
+                        onMessage("선택한 사진을 읽지 못했어요.")
+                    } else {
+                        onPhotosPicked(photos)
+                    }
+                }
+            }
+        }
+    }
+
+    fun recommend(location: Location, parentName: String?) {
+        val status = PHPhotoLibrary.authorizationStatusForAccessLevel(PHAccessLevelReadWrite)
+        when (status) {
+            PHAuthorizationStatusAuthorized, PHAuthorizationStatusLimited -> {
+                findRecommendations(location, parentName)
+            }
+            PHAuthorizationStatusNotDetermined -> {
+                PHPhotoLibrary.requestAuthorizationForAccessLevel(PHAccessLevelReadWrite) { newStatus ->
+                    onMain {
+                        if (newStatus == PHAuthorizationStatusAuthorized || newStatus == PHAuthorizationStatusLimited) {
+                            findRecommendations(location, parentName)
+                        } else {
+                            onMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
+                        }
+                    }
+                }
+            }
+            else -> onMessage("장소 기반 추천을 사용하려면 설정에서 사진 접근을 허용해 주세요.")
+        }
+    }
+
+    private fun findRecommendations(location: Location, parentName: String?) {
+        geocoder?.cancelGeocode()
+        geocoder = CLGeocoder().also { activeGeocoder ->
+            activeGeocoder.geocodeAddressString(
+                location.recommendationSearchText(parentName),
+            ) { placemarks, _ ->
+                val targetLocation = (placemarks?.firstOrNull() as? CLPlacemark)?.location
+                if (targetLocation == null) {
+                    onMessage("선택한 장소의 위치를 확인하지 못했어요.")
+                    return@geocodeAddressString
+                }
+                findNearbyAssets(
+                    targetLocation = targetLocation,
+                    radiusMeters = location.recommendationRadiusMeters(),
+                    target = location,
+                    parentName = parentName,
+                )
+            }
+        }
+    }
+
+    private fun findNearbyAssets(
+        targetLocation: CLLocation,
+        radiusMeters: Double,
+        target: Location,
+        parentName: String?,
+    ) {
+        val options = PHFetchOptions().apply {
+            sortDescriptors = listOf(NSSortDescriptor("creationDate", ascending = false))
+        }
+        val result = PHAsset.fetchAssetsWithMediaType(PHAssetMediaTypeImage, options)
+        val candidates = buildList {
+            for (index in 0 until result.count.toInt()) {
+                val asset = result.objectAtIndex(index.toULong()) as? PHAsset ?: continue
+                val assetLocation = asset.location ?: continue
+                val distance = assetLocation.distanceFromLocation(targetLocation)
+                if (distance <= radiusMeters) add(asset to distance)
+            }
+        }
+            .sortedBy { it.second }
+            .take(MaxReverseGeocodeCandidates)
+            .map { it.first }
+
+        if (candidates.isEmpty()) {
+            onPhotosRecommended(emptyList())
+            return
+        }
+        filterAssetsBySelectedRegion(
+            assets = candidates,
+            target = target,
+            parentName = parentName,
+        ) { matchingAssets ->
+            if (matchingAssets.isEmpty()) {
+                onPhotosRecommended(emptyList())
+            } else {
+                loadAssets(matchingAssets, onPhotosRecommended)
+            }
+        }
+    }
+
+    private fun filterAssetsBySelectedRegion(
+        assets: List<PHAsset>,
+        target: Location,
+        parentName: String?,
+        index: Int = 0,
+        matches: List<PHAsset> = emptyList(),
+        completion: (List<PHAsset>) -> Unit,
+    ) {
+        if (index >= assets.size || matches.size >= MaxRecommendedPhotos) {
+            completion(matches.take(MaxRecommendedPhotos))
+            return
+        }
+        val asset = assets[index]
+        val assetLocation = asset.location
+        if (assetLocation == null) {
+            filterAssetsBySelectedRegion(assets, target, parentName, index + 1, matches, completion)
+            return
+        }
+        val activeGeocoder = geocoder ?: CLGeocoder().also { geocoder = it }
+        activeGeocoder.reverseGeocodeLocation(assetLocation) { placemarks, _ ->
+            val administrativeArea = (placemarks?.firstOrNull() as? CLPlacemark)
+                ?.toAdministrativeArea()
+            val nextMatches = if (administrativeArea?.matches(target, parentName) == true) {
+                matches + asset
+            } else {
+                matches
+            }
+            filterAssetsBySelectedRegion(
+                assets = assets,
+                target = target,
+                parentName = parentName,
+                index = index + 1,
+                matches = nextMatches,
+                completion = completion,
+            )
+        }
+    }
+
+    private fun loadPickerResult(result: PHPickerResult, completion: (SelectedPhoto?) -> Unit) {
+        val asset = result.assetIdentifier?.let(::assetForIdentifier)
+        if (asset != null) {
+            loadAsset(asset, completion)
+            return
+        }
+        result.itemProvider.loadDataRepresentationForTypeIdentifier("public.image") { data, _ ->
+            if (data == null || data.length == 0UL) {
+                onMain { completion(null) }
+                return@loadDataRepresentationForTypeIdentifier
+            }
+            onMain {
+                val originalBytes = data.toByteArray()
+                completion(
+                    SelectedPhoto(
+                        id = result.assetIdentifier ?: "ios-${data.hash}",
+                        displayName = result.itemProvider.suggestedName ?: "여행 사진",
+                        previewBytes = data.toPreviewByteArray() ?: originalBytes,
+                        originalBytes = originalBytes,
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun loadAssets(assets: List<PHAsset>, completion: (List<SelectedPhoto>) -> Unit) {
+        val loaded = MutableList<SelectedPhoto?>(assets.size) { null }
+        var remaining = assets.size
+        assets.forEachIndexed { index, asset ->
+            loadAsset(asset) { photo ->
+                loaded[index] = photo
+                remaining -= 1
+                if (remaining == 0) completion(loaded.filterNotNull())
+            }
+        }
+    }
+
+    private fun loadAsset(asset: PHAsset, completion: (SelectedPhoto?) -> Unit) {
+        val options = PHImageRequestOptions().apply {
+            version = PHImageRequestOptionsVersionCurrent
+            networkAccessAllowed = true
+        }
+        var didComplete = false
+        PHImageManager.defaultManager().requestImageDataAndOrientationForAsset(
+            asset = asset,
+            options = options,
+        ) { data, _, _, _ ->
+            val coordinate = asset.location?.coordinate
+            val latitude = coordinate?.useContents { latitude }
+            val longitude = coordinate?.useContents { longitude }
+            val previewBytes = data
+                ?.takeIf { it.length > 0UL }
+                ?.toPreviewByteArray()
+            val originalBytes = data
+                ?.takeIf { it.length > 0UL }
+                ?.toByteArray()
+            onMain {
+                // requestImageDataAndOrientationForAsset invokes its result handler once.
+                // Keep completion serialized on the main queue with the other photo paths.
+                if (didComplete) return@onMain
+                didComplete = true
+                completion(
+                    data?.takeIf { it.length > 0UL }?.let {
+                        SelectedPhoto(
+                            id = asset.localIdentifier,
+                            displayName = asset.displayName(),
+                            previewBytes = previewBytes,
+                            latitude = latitude,
+                            longitude = longitude,
+                            capturedAt = asset.creationDate?.formattedPhotoDate(),
+                            originalBytes = originalBytes,
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    private fun assetForIdentifier(identifier: String): PHAsset? =
+        PHAsset.fetchAssetsWithLocalIdentifiers(listOf(identifier), null).firstObject as? PHAsset
+}
+
+private fun PHAsset.displayName(): String =
+    (PHAssetResource.assetResourcesForAsset(this).firstOrNull() as? PHAssetResource)
+        ?.originalFilename
+        ?: "여행 사진"
+
+private fun CLPlacemark.toAdministrativeArea(): PhotoAdministrativeArea = PhotoAdministrativeArea(
+    countryCode = ISOcountryCode,
+    administrativeArea = administrativeArea,
+    subAdministrativeArea = subAdministrativeArea,
+    locality = locality,
+    subLocality = subLocality,
+)
+
+private fun NSDate.formattedPhotoDate(): String = NSDateFormatter().run {
+    dateFormat = "yyyy.MM.dd"
+    stringFromDate(this@formattedPhotoDate)
+}
+
+private fun NSData.toByteArray(): ByteArray {
+    if (length == 0UL) return ByteArray(0)
+    return ByteArray(length.toInt()).also { bytes ->
+        bytes.usePinned { pinned -> getBytes(pinned.addressOf(0), length) }
+    }
+}
+
+private fun NSData.toPreviewByteArray(): ByteArray? {
+    val retainedData = CFBridgingRetain(this) ?: return null
+    val imageSource = CGImageSourceCreateWithData(retainedData.reinterpret(), null)
+    CFRelease(retainedData)
+    if (imageSource == null) return null
+
+    val thumbnailOptions = mapOf(
+        kCGImageSourceCreateThumbnailFromImageAlways to true,
+        kCGImageSourceCreateThumbnailWithTransform to true,
+        kCGImageSourceThumbnailMaxPixelSize to PreviewSizePx,
+    )
+    val retainedOptions = CFBridgingRetain(thumbnailOptions) ?: run {
+        CFRelease(imageSource.reinterpret())
+        return null
+    }
+    val thumbnail = CGImageSourceCreateThumbnailAtIndex(
+        imageSource,
+        0UL,
+        retainedOptions.reinterpret(),
+    )
+    CFRelease(retainedOptions)
+    CFRelease(imageSource.reinterpret())
+    if (thumbnail == null) return null
+
+    val previewImage = UIImage.imageWithCGImage(thumbnail)
+    CGImageRelease(thumbnail)
+    val previewData = UIImageJPEGRepresentation(
+        previewImage,
+        PreviewJpegQuality,
+    ) ?: return null
+    return previewData.toByteArray()
+}
+
+private fun topViewController(): UIViewController? {
+    val application = UIApplication.sharedApplication
+    val window = application.keyWindow
+        ?: application.windows.filterIsInstance<UIWindow>().firstOrNull { it.isKeyWindow() }
+    var controller = window?.rootViewController
+    while (controller?.presentedViewController != null) {
+        controller = controller.presentedViewController
+    }
+    return controller
+}
+
+private fun onMain(block: () -> Unit) {
+    dispatch_async(dispatch_get_main_queue(), block)
+}
+
+private const val MaxReverseGeocodeCandidates = 60
+private const val MaxRecommendedPhotos = 12
+private const val PreviewSizePx = 960
+private const val PreviewJpegQuality = 0.84

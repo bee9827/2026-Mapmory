@@ -11,7 +11,6 @@ import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordMedia
-import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.presentation.triprecord.screen.TripMapArtwork
 import com.mapmory.shared.presentation.triprecord.screen.TripMapScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordDetailScreen
@@ -19,7 +18,9 @@ import com.mapmory.shared.presentation.triprecord.screen.TripRecordEditorScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordListScreen
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
+import com.mapmory.shared.presentation.triprecord.state.TripRecordFilterUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
+import com.mapmory.shared.presentation.triprecord.state.toTripRecordItemUiState
 
 @Preview(
     name = "지도",
@@ -43,11 +44,11 @@ fun TripRecordListScreenPreview() {
     PreviewTheme {
         TripRecordListScreen(
             uiState = TripRecordListUiState.Success(
-                records = previewRecords,
+                records = previewUiRecords,
                 page = 0,
                 totalPages = 3,
             ),
-            query = TripRecordQuery(),
+            filter = TripRecordFilterUiState(),
             locations = previewLocations,
             onKeywordChanged = {},
             onLocationChanged = {},
@@ -65,14 +66,13 @@ fun TripRecordListScreenPreview() {
     name = "여행 기록 상세",
     showBackground = true,
     widthDp = 412,
-    heightDp = 760,
+    heightDp = 900,
 )
 @Composable
 fun TripRecordDetailScreenPreview() {
     PreviewTheme {
         TripRecordDetailScreen(
-            uiState = TripRecordDetailUiState.Success(previewRecords.first()),
-            locations = previewLocations,
+            uiState = TripRecordDetailUiState.Success(previewUiRecords.first()),
             onBackClick = {},
             onEditClick = {},
             onDeleteClick = {},
@@ -198,3 +198,9 @@ private val previewRecords = listOf(
         thumbnailUrl = null,
     ),
 )
+
+private val previewUiRecords = previewRecords.map { record ->
+    record.toTripRecordItemUiState(
+        locationName = previewLocations.firstOrNull { it.id == record.locationId }?.name ?: "여행지",
+    )
+}

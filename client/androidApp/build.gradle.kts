@@ -20,8 +20,8 @@ android {
         applicationId = "com.mapmory.android"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.compileSdk.get().toInt()
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         resValue(
             type = "string",
             name = "mapmory_api_base_url",
@@ -44,6 +44,7 @@ android {
 dependencies {
     implementation(project(":shared"))
     implementation("androidx.activity:activity-compose:1.11.0")
+    implementation("androidx.activity:activity-ktx:1.11.0")
     implementation(libs.androidx.compose.foundation)
     implementation("org.jetbrains.compose.material3:material3:1.9.0")
     implementation("androidx.compose.ui:ui-tooling-preview:${libs.versions.androidxCompose.get()}")

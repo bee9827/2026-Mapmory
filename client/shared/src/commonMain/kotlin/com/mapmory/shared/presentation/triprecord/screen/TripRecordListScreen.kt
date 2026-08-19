@@ -26,14 +26,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.domain.model.TripRecordData
-import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.presentation.triprecord.state.TripRecordFilterUiState
+import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
 
 @Composable
 fun TripRecordListScreen(
     uiState: TripRecordListUiState,
-    query: TripRecordQuery,
+    filter: TripRecordFilterUiState,
     locations: List<Location>,
     onKeywordChanged: (String) -> Unit,
     onLocationChanged: (Long?) -> Unit,
@@ -46,7 +46,7 @@ fun TripRecordListScreen(
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    TripRecordBackground(modifier = modifier) {
+    TripRecordBackground(modifier = modifier.then(rememberDismissKeyboardOnTapModifier())) {
         Column(Modifier.fillMaxSize()) {
             TripRecordTopBar(
                 title = "Mapmory",
@@ -79,7 +79,7 @@ fun TripRecordListScreen(
                 )
                 Spacer(Modifier.height(20.dp))
                 LocationFilters(
-                    query = query,
+                    filter = filter,
                     locations = locations,
                     onLocationChanged = onLocationChanged,
                     onSearchClick = onSearchClick,
@@ -103,13 +103,12 @@ fun TripRecordListScreen(
                     is TripRecordListUiState.Success -> {
                         if (uiState.records.isEmpty()) {
                             EmptyTripRecords(
-                                hasFilter = query.keyword != null || query.locationId != null,
+                                hasFilter = filter.keyword.isNotBlank() || filter.locationId != null,
                                 modifier = Modifier.weight(1f),
                             )
                         } else {
                             TripRecordList(
                                 records = uiState.records,
-                                locations = locations,
                                 onRecordClick = onRecordClick,
                                 modifier = Modifier.weight(1f),
                             )
@@ -138,7 +137,7 @@ fun TripRecordListScreen(
 
 @Composable
 private fun LocationFilters(
-    query: TripRecordQuery,
+    filter: TripRecordFilterUiState,
     locations: List<Location>,
     onLocationChanged: (Long?) -> Unit,
     onSearchClick: () -> Unit,
@@ -151,7 +150,7 @@ private fun LocationFilters(
     ) {
         TripFilterChip(
             text = "전체",
-            selected = query.locationId == null,
+            selected = filter.locationId == null,
             onClick = {
                 onLocationChanged(null)
                 onSearchClick()
@@ -163,7 +162,7 @@ private fun LocationFilters(
             .forEach { location ->
                 TripFilterChip(
                     text = location.name,
-                    selected = query.locationId == location.id,
+                    selected = filter.locationId == location.id,
                     onClick = {
                         onLocationChanged(location.id)
                         onSearchClick()
@@ -200,8 +199,7 @@ private fun TripFilterChip(
 
 @Composable
 private fun TripRecordList(
-    records: List<TripRecordData>,
-    locations: List<Location>,
+    records: List<TripRecordItemUiState>,
     onRecordClick: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -210,10 +208,9 @@ private fun TripRecordList(
         verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 18.dp),
     ) {
-        items(records, key = TripRecordData::id) { record ->
+        items(records, key = TripRecordItemUiState::id) { record ->
             TripRecordCard(
                 record = record,
-                location = locations.firstOrNull { it.id == record.locationId },
                 onClick = { onRecordClick(record.id) },
             )
         }
@@ -222,8 +219,7 @@ private fun TripRecordList(
 
 @Composable
 private fun TripRecordCard(
-    record: TripRecordData,
-    location: Location?,
+    record: TripRecordItemUiState,
     onClick: () -> Unit,
 ) {
     Card(
@@ -234,11 +230,13 @@ private fun TripRecordCard(
         colors = CardDefaults.cardColors(containerColor = TripRecordPalette.surface),
     ) {
         Column {
-            TripPhotoPlaceholder(
+            TripPhotoImage(
+                imageBytes = record.photos.minByOrNull { it.sortOrder }?.previewBytes?.bytesForDecoding(),
+                contentDescription = record.title,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(222.dp),
-                variant = record.id.toInt(),
+                placeholderVariant = record.id.toInt(),
             )
             Column(Modifier.padding(18.dp)) {
                 Text(
@@ -259,7 +257,7 @@ private fun TripRecordCard(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        text = "대한민국 · ${location?.name ?: "여행지"}",
+                        text = record.locationName,
                         color = TripRecordPalette.accent,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,

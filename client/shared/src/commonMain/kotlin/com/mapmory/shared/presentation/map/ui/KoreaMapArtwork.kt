@@ -43,7 +43,7 @@ fun KoreaMapArtwork(
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF07171B))
+            .background(Color(0xFF111518))
             .onSizeChanged { viewportSize = it }
             .pointerInput(projection) {
                 detectTapGestures { position ->

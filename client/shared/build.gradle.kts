@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -41,6 +42,9 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.androidx.room.runtime)
+            implementation("androidx.activity:activity-compose:1.11.0")
+            implementation("androidx.exifinterface:exifinterface:1.4.1")
         }
 
         jvmMain.dependencies {
@@ -56,4 +60,12 @@ kotlin {
             implementation(libs.ktor.client.mock)
         }
     }
+}
+
+ksp {
+    arg("room.generateKotlin", "true")
+}
+
+dependencies {
+    add("kspAndroid", libs.androidx.room.compiler)
 }

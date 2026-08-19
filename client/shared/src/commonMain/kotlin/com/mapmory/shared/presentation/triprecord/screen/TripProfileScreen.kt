@@ -1,6 +1,7 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,9 +14,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mapmory.shared.PrivacyPolicy
 
 @Composable
 fun TripProfileScreen(
@@ -25,6 +28,8 @@ fun TripProfileScreen(
     onProfileClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val uriHandler = LocalUriHandler.current
+
     TripRecordBackground(modifier = modifier) {
         Column(Modifier.fillMaxSize()) {
             TripRecordTopBar(
@@ -87,6 +92,16 @@ fun TripProfileScreen(
                         ProfileStat(label = "여행 기록", value = "0")
                         ProfileStat(label = "방문 지역", value = "0")
                     }
+                }
+                if (PrivacyPolicy.URL.isNotBlank()) {
+                    Text(
+                        text = "개인정보 처리방침",
+                        color = TripRecordPalette.muted,
+                        fontSize = 10.sp,
+                        modifier = Modifier
+                            .padding(top = 14.dp)
+                            .clickable { uriHandler.openUri(PrivacyPolicy.URL) },
+                    )
                 }
             }
 

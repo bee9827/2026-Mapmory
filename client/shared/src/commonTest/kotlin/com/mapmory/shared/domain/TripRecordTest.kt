@@ -39,7 +39,22 @@ class TripRecordTest {
             endTripDate = LocalDate(2027, 1, 1),
         )
 
-        assertTrue(record.startTripDate < record.endTripDate)
+        assertTrue(requireNotNull(record.startTripDate) < requireNotNull(record.endTripDate))
+    }
+
+    @Test
+    fun `시작일과 종료일 없이 여행 기록을 생성할 수 있다`() {
+        val record = TripRecord(
+            imageUrl = "",
+            tripRecordTitle = "날짜 없는 여행",
+            tripRecordDescription = null,
+            startTripDate = null,
+            endTripDate = null,
+            location = "서울",
+        )
+
+        assertEquals(null, record.startTripDate)
+        assertEquals(null, record.endTripDate)
     }
 
     @Test

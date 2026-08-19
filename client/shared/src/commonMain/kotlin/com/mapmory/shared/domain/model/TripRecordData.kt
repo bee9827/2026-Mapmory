@@ -26,10 +26,9 @@ data class TripRecordDraft(
 )
 
 fun TripRecordDraft.dateValidationError(): String? = when {
-    endDate != null && startDate == null -> "종료일만 입력할 수 없습니다."
     startDate != null && !startDate.isValidIsoDate() -> "올바른 시작일을 입력해 주세요."
     endDate != null && !endDate.isValidIsoDate() -> "올바른 종료일을 입력해 주세요."
-    endDate != null && endDate < startDate!! -> "종료일은 시작일보다 빠를 수 없습니다."
+    startDate != null && endDate != null && endDate < startDate -> "종료일은 시작일보다 빠를 수 없습니다."
     else -> null
 }
 

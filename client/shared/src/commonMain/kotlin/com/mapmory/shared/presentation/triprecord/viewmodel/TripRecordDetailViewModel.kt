@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import com.mapmory.shared.domain.usecase.DeleteTripRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTripRecordUseCase
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
+import com.mapmory.shared.presentation.triprecord.state.toTripRecordItemUiState
 
 class TripRecordDetailViewModel(
     private val getTripRecord: GetTripRecordUseCase,
@@ -17,7 +18,9 @@ class TripRecordDetailViewModel(
     suspend fun load(id: Long) {
         uiState = TripRecordDetailUiState.Loading
         uiState = getTripRecord(id).fold(
-            onSuccess = TripRecordDetailUiState::Success,
+            onSuccess = { record ->
+                TripRecordDetailUiState.Success(record.toTripRecordItemUiState())
+            },
             onFailure = { error ->
                 TripRecordDetailUiState.Error(error.message ?: "여행 기록을 불러오지 못했습니다.")
             },

@@ -1,8 +1,10 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,21 +31,47 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
+import org.jetbrains.compose.resources.decodeToImageBitmap
 
 internal object TripRecordPalette {
-    val background = Color(0xFF07171B)
-    val surface = Color(0xFF0C2026)
+    val background = Color(0xFF111518)
+    val surface = Color(0xFF1A1E22)
     val surfaceElevated = Color(0xFF102A32)
     val line = Color(0xFF1B363E)
     val text = Color(0xFFE9F4F2)
     val muted = Color(0xFF81999E)
-    val accent = Color(0xFF19E5A2)
+    val accent = Color(0xFF35C988)
     val accentSoft = Color(0xFF123E3A)
     val danger = Color(0xFFFF6264)
+    val photoRecommendText = Color.White
+    val photoRecommendBackground = Color(0xFF382125)
+    val photoRecommendBorder = Color(0xFF99555D)
+    val photoGalleryBackground = Color(0xFF1B2D26)
+    val photoGalleryBorder = Color(0xFF3E7960)
+}
+
+@Composable
+internal fun rememberDismissKeyboardOnTapModifier(): Modifier {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    return Modifier.pointerInput(focusManager, keyboardController) {
+        detectTapGestures {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        }
+    }
 }
 
 @Composable
@@ -72,10 +101,15 @@ internal fun TripRecordBackground(
 ) {
     TripRecordTheme {
         Surface(
-            modifier = modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             color = TripRecordPalette.background,
-            content = content,
-        )
+        ) {
+            Box(
+                modifier = modifier.fillMaxSize(),
+            ) {
+                content()
+            }
+        }
     }
 }
 
@@ -96,6 +130,7 @@ internal fun TripRecordTopBar(
         if (onBackClick != null) {
             TripIconButton(
                 label = "←",
+                contentDescription = "뒤로가기",
                 onClick = onBackClick,
             )
             Spacer(Modifier.width(14.dp))
@@ -116,20 +151,27 @@ internal fun TripRecordTopBar(
 @Composable
 internal fun TripIconButton(
     label: String,
+    contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    containerColor: Color = TripRecordPalette.surface,
+    contentColor: Color = TripRecordPalette.text,
 ) {
     Box(
         modifier = modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(TripRecordPalette.surface)
-            .clickable(onClick = onClick),
+            .background(containerColor)
+            .semantics { this.contentDescription = contentDescription }
+            .clickable(
+                role = Role.Button,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,
-            color = TripRecordPalette.text,
+            color = contentColor,
             fontSize = if (label == "•••") 20.sp else 28.sp,
             fontWeight = FontWeight.Light,
         )
@@ -235,6 +277,7 @@ private fun TripBottomItem(
 internal fun TripPhotoPlaceholder(
     modifier: Modifier = Modifier,
     variant: Int = 0,
+    shape: Shape = RoundedCornerShape(18.dp),
 ) {
     val skyColors = when (variant % 3) {
         0 -> listOf(Color(0xFFEEA16C), Color(0xFFE56A66), Color(0xFF305C6B))
@@ -243,7 +286,7 @@ internal fun TripPhotoPlaceholder(
     }
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(18.dp))
+            .clip(shape)
             .background(Brush.verticalGradient(skyColors)),
     ) {
         Canvas(Modifier.fillMaxSize()) {
@@ -286,6 +329,34 @@ internal fun TripPhotoPlaceholder(
         }
     }
 }
+
+@Composable
+internal fun TripPhotoImage(
+    imageBytes: ByteArray?,
+    fallbackBytes: ByteArray? = null,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    placeholderVariant: Int = 0,
+    shape: Shape = RoundedCornerShape(18.dp),
+) {
+    val bitmap = remember(imageBytes, fallbackBytes) {
+        imageBytes.decodeToImageBitmapOrNull()
+            ?: fallbackBytes.decodeToImageBitmapOrNull()
+    }
+    if (bitmap == null) {
+        TripPhotoPlaceholder(modifier, placeholderVariant, shape)
+    } else {
+        Image(
+            bitmap = bitmap,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.clip(shape),
+        )
+    }
+}
+
+private fun ByteArray?.decodeToImageBitmapOrNull() =
+    this?.let { bytes -> runCatching { bytes.decodeToImageBitmap() }.getOrNull() }
 
 @Composable
 fun TripMapArtwork(
