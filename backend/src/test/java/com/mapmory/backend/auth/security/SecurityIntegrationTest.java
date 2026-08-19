@@ -9,7 +9,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.auth.jwt.JwtProperties;
 import com.mapmory.backend.auth.jwt.JwtProvider;
+import com.mapmory.backend.member.Member;
+import com.mapmory.backend.member.MemberRepository;
 import java.time.Duration;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,6 +34,9 @@ class SecurityIntegrationTest extends IntegrationTest {
     @Autowired
     private JwtProvider jwtProvider;
 
+    @Autowired
+    private MemberRepository memberRepository;
+
     @Value("${jwt.secret}")
     private String secret;
 
@@ -43,12 +49,13 @@ class SecurityIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    void 유효한_토큰이면_보호된_API에_접근하고_memberId가_주입된다() throws Exception {
-        String token = jwtProvider.issueAccessToken(7L);
+    void 유효한_토큰이면_보호된_API에_접근하고_Member가_주입된다() throws Exception {
+        Member member = memberRepository.save(Member.of("인증 테스트 회원", UUID.randomUUID()));
+        String token = jwtProvider.issueAccessToken(member.getId());
 
         mockMvc.perform(get("/test/secured").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(content().string("7"));
+                .andExpect(content().string(member.getId().toString()));
     }
 
     @Test
@@ -89,8 +96,8 @@ class SecurityIntegrationTest extends IntegrationTest {
     static class SecuredTestController {
 
         @GetMapping("/test/secured")
-        Long secured(@LoginMemberId Long memberId) {
-            return memberId;
+        Long secured(@LoginMember Member member) {
+            return member.getId();
         }
     }
 }
