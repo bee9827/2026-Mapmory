@@ -9,7 +9,7 @@ import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionRepository;
 import com.mapmory.backend.region.RegionType;
-import com.mapmory.backend.support.MySqlTestContainerConfig;
+import com.mapmory.backend.support.MySqlTestContainerSupport;
 import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -17,14 +17,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
 @DataJpaTest
-@Import(MySqlTestContainerConfig.class)
-class TravelRecordRepositoryTest {
+class TravelRecordRepositoryTest extends MySqlTestContainerSupport {
 
     @Autowired
     private TravelRecordRepository travelRecordRepository;
