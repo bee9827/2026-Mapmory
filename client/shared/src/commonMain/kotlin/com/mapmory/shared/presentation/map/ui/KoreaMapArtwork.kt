@@ -3,6 +3,7 @@ package com.mapmory.shared.presentation.map.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +35,7 @@ import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.GeoPoint
 import com.mapmory.shared.presentation.map.domain.ProvincePolygon
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
@@ -53,26 +55,36 @@ fun KoreaMapArtwork(
     val projection = remember(bounds, viewportSize) {
         KoreaProjection.from(bounds, viewportSize)
     }
+    var zoom by remember(regions) { mutableStateOf(1f) }
+    var pan by remember(regions) { mutableStateOf(Offset.Zero) }
+    val currentTransform = rememberUpdatedState(MapTransform(zoom, pan))
 
     Canvas(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xFF111518))
             .onSizeChanged { viewportSize = it }
-            .pointerInput(projection) {
+            .pointerInput(viewportSize, projection) {
+                detectTransformGestures(
+                    panZoomLock = true,
+                ) { _, panChange, zoomChange, _ ->
+                    val transform = currentTransform.value
+                    zoom = (transform.zoom * zoomChange).coerceIn(MinZoom, MaxZoom)
+                    pan = transform.pan + panChange
+                }
+            }
+            .pointerInput(viewportSize, projection, zoom, pan) {
                 detectTapGestures { position ->
-                    regions.firstOrNull { region ->
-                        region.rings.any { ring ->
-                            pointInScreenRing(
-                                point = position,
-                                ring = ring.map(projection::project),
-                            )
-                        }
-                    }?.let { currentOnRegionClick(it.code) }
+                    val transform = currentTransform.value
+                    val tappedRegion = regions.regionAt(
+                        projection.unproject(position, transform, viewportSize),
+                    )
+                    tappedRegion?.let { currentOnRegionClick(it.code) }
                 }
             },
     ) {
         if (!projection.isValid) return@Canvas
+        val transform = MapTransform(zoom, pan)
         val outlineWidth = max(0.8f, size.minDimension * 0.0035f)
 
         regions.forEach { region ->
@@ -84,18 +96,27 @@ fun KoreaMapArtwork(
                 if (ring.size < 3) return@forEach
                 val path = Path().apply {
                     ring.forEachIndexed { index, point ->
-                        val screen = projection.project(point)
+                        val screen = projection.project(point, transform, viewportSize)
                         if (index == 0) moveTo(screen.x, screen.y) else lineTo(screen.x, screen.y)
                     }
                     close()
                 }
                 drawPath(path = path, color = fillColor)
-                drawPath(
-                    path = path,
-                    color = outlineColor,
-                    style = Stroke(width = outlineWidth),
-                )
             }
+
+            val outline = Path().apply {
+                region.outerEdges().forEach { edge ->
+                    val start = projection.project(edge.start, transform, viewportSize)
+                    val end = projection.project(edge.end, transform, viewportSize)
+                    moveTo(start.x, start.y)
+                    lineTo(end.x, end.y)
+                }
+            }
+            drawPath(
+                path = outline,
+                color = outlineColor,
+                style = Stroke(width = outlineWidth),
+            )
         }
 
         // Prototype detail screens keep the map readable by showing the
@@ -103,13 +124,17 @@ fun KoreaMapArtwork(
         if (showRegionLabels) {
             val labelStyle = TextStyle(
                 color = Color(0xFF7085A8),
-                fontSize = 10.sp,
+                fontSize = when {
+                    regions.size >= 35 -> 7.sp
+                    regions.size >= 25 -> 8.sp
+                    else -> 10.sp
+                },
                 fontWeight = FontWeight.Bold,
             )
             regions.forEach { region ->
                 val labelPoint = region.labelPoint() ?: return@forEach
                 val layout = textMeasurer.measure(region.name, labelStyle)
-                val center = projection.project(labelPoint)
+                val center = projection.project(labelPoint, transform, viewportSize)
                 drawText(
                     textLayoutResult = layout,
                     topLeft = center - Offset(layout.size.width / 2f, layout.size.height / 2f),
@@ -118,6 +143,14 @@ fun KoreaMapArtwork(
         }
     }
 }
+
+private data class MapTransform(
+    val zoom: Float,
+    val pan: Offset,
+)
+
+private const val MinZoom = 1f
+private const val MaxZoom = 4f
 
 @Composable
 fun KoreaMapStatusMessage(
@@ -158,6 +191,24 @@ private data class KoreaProjection(
         y = top + (bounds.maxLatitude - point.latitude) * scale,
     )
 
+    fun project(point: GeoPoint, transform: MapTransform, viewportSize: IntSize): Offset {
+        val base = project(point)
+        val center = Offset(viewportSize.width / 2f, viewportSize.height / 2f)
+        return center + Offset(
+            x = (base.x - center.x) * transform.zoom + transform.pan.x,
+            y = (base.y - center.y) * transform.zoom + transform.pan.y,
+        )
+    }
+
+    fun unproject(point: Offset, transform: MapTransform, viewportSize: IntSize): GeoPoint {
+        val center = Offset(viewportSize.width / 2f, viewportSize.height / 2f)
+        val base = center + (point - center - transform.pan) / transform.zoom
+        return GeoPoint(
+            longitude = bounds.minLongitude + (base.x - left) / (longitudeFactor * scale),
+            latitude = bounds.maxLatitude - (base.y - top) / scale,
+        )
+    }
+
     companion object {
         fun from(bounds: KoreaBounds, viewportSize: IntSize): KoreaProjection {
             val longitudeSpan = bounds.maxLongitude - bounds.minLongitude
@@ -191,19 +242,23 @@ private data class KoreaProjection(
     }
 }
 
-private fun pointInScreenRing(point: Offset, ring: List<Offset>): Boolean {
+internal fun List<ProvincePolygon>.regionAt(point: GeoPoint): ProvincePolygon? =
+    filter { region -> region.rings.any { pointInRing(point, it) } }
+        .minByOrNull(ProvincePolygon::area)
+
+private fun pointInRing(point: GeoPoint, ring: List<GeoPoint>): Boolean {
     if (ring.size < 3) return false
 
     var inside = false
     var previous = ring.last()
     ring.forEach { current ->
-        val crossesY = (current.y > point.y) != (previous.y > point.y)
+        val crossesY = (current.latitude > point.latitude) != (previous.latitude > point.latitude)
         if (crossesY) {
-            val intersectionX =
-                (previous.x - current.x) *
-                    (point.y - current.y) /
-                    (previous.y - current.y) + current.x
-            if (point.x < intersectionX) inside = !inside
+            val intersectionLongitude =
+                (previous.longitude - current.longitude) *
+                    (point.latitude - current.latitude) /
+                    (previous.latitude - current.latitude) + current.longitude
+            if (point.longitude < intersectionLongitude) inside = !inside
         }
         previous = current
     }
@@ -230,10 +285,74 @@ private data class KoreaBounds(
 }
 
 private fun ProvincePolygon.labelPoint(): GeoPoint? {
-    val ring = rings.maxByOrNull { it.size } ?: return null
-    if (ring.isEmpty()) return null
+    val centroids = rings.mapNotNull(List<GeoPoint>::areaAndCentroid)
+    val totalArea = centroids.sumOf { it.first }
+    if (totalArea == 0.0) return rings.flatten().takeIf(List<GeoPoint>::isNotEmpty)?.let { points ->
+        GeoPoint(
+            longitude = points.sumOf { it.longitude.toDouble() }.toFloat() / points.size,
+            latitude = points.sumOf { it.latitude.toDouble() }.toFloat() / points.size,
+        )
+    }
     return GeoPoint(
-        longitude = ring.sumOf { it.longitude.toDouble() }.toFloat() / ring.size,
-        latitude = ring.sumOf { it.latitude.toDouble() }.toFloat() / ring.size,
+        longitude = (centroids.sumOf { it.first * it.second } / totalArea).toFloat(),
+        latitude = (centroids.sumOf { it.first * it.third } / totalArea).toFloat(),
     )
+}
+
+private fun ProvincePolygon.area(): Double = rings.sumOf { abs(it.signedAreaTwice()) }
+
+private fun List<GeoPoint>.areaAndCentroid(): Triple<Double, Double, Double>? {
+    val signedArea = signedAreaTwice()
+    if (abs(signedArea) < 0.000001) return null
+
+    var longitude = 0.0
+    var latitude = 0.0
+    forEachIndexed { index, point ->
+        val next = this[(index + 1) % size]
+        val cross = point.longitude.toDouble() * next.latitude -
+            next.longitude.toDouble() * point.latitude
+        longitude += (point.longitude + next.longitude) * cross
+        latitude += (point.latitude + next.latitude) * cross
+    }
+    return Triple(
+        abs(signedArea),
+        longitude / (3.0 * signedArea),
+        latitude / (3.0 * signedArea),
+    )
+}
+
+private fun List<GeoPoint>.signedAreaTwice(): Double {
+    if (size < 3) return 0.0
+    return indices.sumOf { index ->
+        val point = this[index]
+        val next = this[(index + 1) % size]
+        point.longitude.toDouble() * next.latitude - next.longitude.toDouble() * point.latitude
+    }
+}
+
+private data class GeoEdge(
+    val start: GeoPoint,
+    val end: GeoPoint,
+)
+
+private fun ProvincePolygon.outerEdges(): List<GeoEdge> {
+    val counts = mutableMapOf<GeoEdge, Int>()
+    rings.forEach { ring ->
+        val edges = ring.zipWithNext { start, end -> GeoEdge(start, end) }.toMutableList()
+        if (ring.size > 2 && ring.first() != ring.last()) edges += GeoEdge(ring.last(), ring.first())
+        edges.filter { it.start != it.end }.forEach { edge ->
+            val normalized = edge.normalized()
+            counts[normalized] = (counts[normalized] ?: 0) + 1
+        }
+    }
+    return counts.filterValues { it == 1 }.keys.toList()
+}
+
+private fun GeoEdge.normalized(): GeoEdge = if (
+    start.longitude < end.longitude ||
+    (start.longitude == end.longitude && start.latitude <= end.latitude)
+) {
+    this
+} else {
+    GeoEdge(end, start)
 }
