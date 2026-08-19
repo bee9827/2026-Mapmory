@@ -1,7 +1,9 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,14 +14,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.map.domain.MapScope
@@ -38,31 +48,23 @@ fun TripMapScreen(
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    TripRecordBackground(modifier = modifier) {
-        Column(Modifier.fillMaxSize()) {
-            Column(
+    TripRecordBackground(
+        modifier = modifier,
+        backgroundColor = MapPageBackground,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MapPageBackground),
+        ) {
+            MapHeaderOverlay(
+                mapScope = mapScope,
+                visitedCount = visitedCount,
+                onMapScopeChange = onMapScopeChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp),
-            ) {
-                TripRecordTopBar(
-                    title = "Mapmory",
-                    trailing = {
-                        Text(
-                            text = "나의 여행으로 채우는 지도",
-                            color = TripRecordPalette.muted,
-                            fontSize = 10.sp,
-                        )
-                    },
-                )
-                Spacer(Modifier.height(4.dp))
-                MapSummaryCard(mapScope = mapScope, visitedCount = visitedCount)
-                Spacer(Modifier.height(10.dp))
-                MapScopeToggle(
-                    selected = mapScope,
-                    onSelected = onMapScopeChange,
-                )
-            }
+                    .padding(top = 14.dp),
+            )
 
             Box(
                 modifier = Modifier
@@ -70,7 +72,7 @@ fun TripMapScreen(
                     .weight(1f),
             ) {
                 // Keep zoomed map pixels inside a dedicated viewport so they cannot
-                // paint over the header or the bottom app navigation.
+                // paint over the bottom app navigation.
                 MapViewport(
                     modifier = Modifier.fillMaxSize(),
                     content = mapContent,
@@ -79,17 +81,17 @@ fun TripMapScreen(
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = 18.dp, bottom = 18.dp)
-                        .size(66.dp)
+                        .padding(end = 28.dp, bottom = 33.dp)
+                        .size(44.dp)
                         .clip(CircleShape)
-                        .background(TripRecordPalette.accent)
+                        .background(MapPrimary)
                         .clickable(onClick = onCreateClick),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         "＋",
-                        color = TripRecordPalette.background,
-                        fontSize = 39.sp,
+                        color = MapOnPrimary,
+                        fontSize = 27.sp,
                         fontWeight = FontWeight.Light,
                     )
                 }
@@ -101,8 +103,58 @@ fun TripMapScreen(
                 onRecordClick = onRecordClick,
                 onCreateClick = onCreateClick,
                 onProfileClick = onProfileClick,
+                backgroundColor = MapBottomBarBackground,
+                dividerColor = MapBottomBarDivider,
+                selectedIconColor = MapPrimary,
+                selectedLabelColor = MapBottomBarSelectedLabel,
+                unselectedColor = MapBottomBarUnselected,
             )
         }
+    }
+}
+
+@Composable
+private fun MapHeaderOverlay(
+    mapScope: MapScope,
+    visitedCount: Int,
+    onMapScopeChange: (MapScope) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row {
+                Text(
+                    text = "Map",
+                    color = MapLogoText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = "mory",
+                    color = MapLogoAccent,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            MapScopeToggle(
+                selected = mapScope,
+                onSelected = onMapScopeChange,
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        MapSummaryCard(
+            mapScope = mapScope,
+            visitedCount = visitedCount,
+            modifier = Modifier.padding(horizontal = 12.dp),
+        )
+        Spacer(Modifier.height(10.dp))
+        MapTagFilter(modifier = Modifier.padding(horizontal = 18.dp))
     }
 }
 
@@ -112,28 +164,27 @@ private fun MapScopeToggle(
     onSelected: (MapScope) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
+        modifier = Modifier
+            .width(174.dp)
+            .background(
+                color = MapScopeBackground,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .border(1.dp, MapScopeBorder, RoundedCornerShape(12.dp))
+            .padding(3.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .background(
-                    color = TripRecordPalette.background.copy(alpha = 0.96f),
-                    shape = RoundedCornerShape(50),
-                )
-                .padding(4.dp),
-        ) {
-            MapScopeChip(
-                label = "대한민국",
-                selected = selected == MapScope.KOREA,
-                onClick = { onSelected(MapScope.KOREA) },
-            )
-            MapScopeChip(
-                label = "전세계",
-                selected = selected == MapScope.WORLD,
-                onClick = { onSelected(MapScope.WORLD) },
-            )
-        }
+        MapScopeChip(
+            label = "⌖ 대한민국",
+            selected = selected == MapScope.KOREA,
+            onClick = { onSelected(MapScope.KOREA) },
+            modifier = Modifier.weight(1f),
+        )
+        MapScopeChip(
+            label = "◎ 전세계",
+            selected = selected == MapScope.WORLD,
+            onClick = { onSelected(MapScope.WORLD) },
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -142,26 +193,83 @@ private fun MapScopeChip(
     label: String,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Text(
         text = label,
-        color = if (selected) TripRecordPalette.background else TripRecordPalette.muted,
+        color = if (selected) MapScopeSelectedText else MapScopeUnselectedText,
         fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
+        textAlign = TextAlign.Center,
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
             .background(
-                if (selected) TripRecordPalette.accent else TripRecordPalette.surface,
+                if (selected) MapScopeSelectedBackground else MapScopeBackground,
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 8.dp),
+            .padding(vertical = 6.dp),
     )
 }
+
+@Composable
+private fun MapTagFilter(modifier: Modifier = Modifier) {
+    val tags = remember { listOf("전체", "가족", "애인", "친구", "혼자") }
+    var selectedTag by remember { mutableStateOf(tags.first()) }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        tags.forEach { tag ->
+            val selected = selectedTag == tag
+            Text(
+                text = tag,
+                color = if (selected) MapTagSelectedText else MapTagText,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (selected) MapPrimary else MapTagBackground,
+                    )
+                    .clickable { selectedTag = tag }
+                    .padding(horizontal = 11.dp, vertical = 4.dp),
+            )
+        }
+    }
+}
+
+private val MapPageBackground = Color(0xFF121518)
+private val MapBottomBarBackground = Color(0xFF121518)
+private val MapBottomBarDivider = Color(0xFF2C3431)
+private val MapBottomBarUnselected = Color(0xFF77827D)
+private val MapBottomBarSelectedLabel = Color(0xFFA2ADA7)
+private val MapLogoText = Color(0xFFF4F8F5)
+private val MapLogoAccent = Color(0xFF67D9A2)
+private val MapPrimary = Color(0xFF35C987)
+private val MapOnPrimary = Color(0xFF071B12)
+private val MapScopeBackground = Color(0xFF151C19)
+private val MapScopeBorder = Color(0xFF2D3A34)
+private val MapScopeSelectedBackground = Color(0xFF2A3832)
+private val MapScopeSelectedText = Color(0xFFEEF7F1)
+private val MapScopeUnselectedText = Color(0xFF92A09A)
+private val MapTagBackground = Color(0xFF1A2421)
+private val MapTagText = Color(0xFFBDC8C2)
+private val MapTagSelectedText = Color(0xFF072118)
+private val MapDashboardBackground = Color(0xFF121518)
+private val MapDashboardBorder = Color(0xFF2B3135)
+private val MapDashboardTitle = Color(0xFF89938F)
+private val MapDashboardText = Color(0xFFF1F5F3)
+private val MapDashboardBadgeBackground = Color(0xFF173B2D)
+private val MapDashboardBadgeText = Color(0xFF9CE6BF)
 
 @Composable
 private fun MapSummaryCard(
     mapScope: MapScope,
     visitedCount: Int,
+    modifier: Modifier = Modifier,
 ) {
     val title = when (mapScope) {
         MapScope.WORLD -> "나의 세계 지도"
@@ -173,15 +281,21 @@ private fun MapSummaryCard(
     }
     val safeVisitedCount = visitedCount.coerceIn(0, total)
     val completionPercent = (safeVisitedCount.toFloat() / total * 100f).roundToInt()
+    val cardShape = RoundedCornerShape(14.dp)
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(
-                color = TripRecordPalette.background.copy(alpha = 0.96f),
-                shape = RoundedCornerShape(18.dp),
+                color = MapDashboardBackground,
+                shape = cardShape,
             )
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .border(
+                width = 1.dp,
+                color = MapDashboardBorder,
+                shape = cardShape,
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -189,22 +303,22 @@ private fun MapSummaryCard(
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Column {
-                Text(title, color = TripRecordPalette.muted, fontSize = 11.sp)
+                Text(title, color = MapDashboardTitle, fontSize = 10.sp)
                 Row(
                     modifier = Modifier.padding(top = 3.dp),
                     verticalAlignment = Alignment.Bottom,
                 ) {
-                    Text(safeVisitedCount.toString(), color = TripRecordPalette.accent, fontSize = 23.sp, fontWeight = FontWeight.Bold)
-                    Text(" / $total", color = TripRecordPalette.text, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text(safeVisitedCount.toString(), color = MapPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Text(" / $total", color = MapDashboardText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Text(
                 text = "$completionPercent% 채움",
-                color = TripRecordPalette.accent,
-                fontSize = 11.sp,
+                color = MapDashboardBadgeText,
+                fontSize = 10.sp,
                 modifier = Modifier
-                    .background(TripRecordPalette.accentSoft, RoundedCornerShape(50))
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                    .background(MapDashboardBadgeBackground, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
             )
         }
     }

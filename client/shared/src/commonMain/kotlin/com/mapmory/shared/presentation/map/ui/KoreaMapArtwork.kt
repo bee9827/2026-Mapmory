@@ -43,7 +43,7 @@ fun KoreaMapArtwork(
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF111518))
+            .background(Color(0xFF121518))
             .onSizeChanged { viewportSize = it }
             .pointerInput(projection) {
                 detectTapGestures { position ->
@@ -59,12 +59,16 @@ fun KoreaMapArtwork(
             },
     ) {
         if (!projection.isValid) return@Canvas
-        val outlineWidth = max(0.8f, size.minDimension * 0.0035f)
+        val outlineWidth = max(0.7f, size.minDimension * 0.0028f)
 
         provinces.forEach { province ->
             val isVisited = province.code in visitedRegionCodes
-            val fillColor = if (isVisited) Color(0xFF55D5A0) else Color(0xFF303B4D)
-            val outlineColor = if (isVisited) Color(0xFF9AF0C5) else Color(0xFF7B879B)
+            val fillColor = if (isVisited) Color(0xFF35C987) else Color(0xFF1B2536)
+            val outlineColor = if (isVisited) {
+                Color(0xFF8AEBC1).copy(alpha = 0.82f)
+            } else {
+                Color(0xFF4B5870)
+            }
 
             province.rings.forEach { ring ->
                 if (ring.size < 3) return@forEach

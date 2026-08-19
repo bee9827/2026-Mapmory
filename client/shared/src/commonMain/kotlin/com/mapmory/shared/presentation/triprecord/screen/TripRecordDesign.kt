@@ -102,12 +102,13 @@ internal fun TripRecordTheme(content: @Composable () -> Unit) {
 @Composable
 internal fun TripRecordBackground(
     modifier: Modifier = Modifier,
+    backgroundColor: Color = TripRecordPalette.background,
     content: @Composable () -> Unit,
 ) {
     TripRecordTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = TripRecordPalette.background,
+            color = backgroundColor,
         ) {
             Box(
                 modifier = modifier.fillMaxSize(),
@@ -204,16 +205,21 @@ internal fun TripBottomBar(
     onMapClick: () -> Unit = {},
     onCreateClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    backgroundColor: Color = TripRecordPalette.background,
+    dividerColor: Color = TripRecordPalette.line,
+    selectedIconColor: Color = TripRecordPalette.accent,
+    selectedLabelColor: Color = TripRecordPalette.accent,
+    unselectedColor: Color = TripRecordPalette.muted,
     modifier: Modifier = Modifier,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(64.dp)
-            .background(TripRecordPalette.background)
+            .background(backgroundColor)
             .drawBehind {
                 drawLine(
-                    color = TripRecordPalette.line,
+                    color = dividerColor,
                     start = Offset.Zero,
                     end = Offset(size.width, 0f),
                     strokeWidth = 1.dp.toPx(),
@@ -225,18 +231,27 @@ internal fun TripBottomBar(
             tab = TripBottomTab.MAP,
             selected = selected == TripBottomTab.MAP,
             onClick = onMapClick,
+            selectedIconColor = selectedIconColor,
+            selectedLabelColor = selectedLabelColor,
+            unselectedColor = unselectedColor,
             modifier = Modifier.weight(1f),
         )
         TripBottomItem(
             tab = TripBottomTab.RECORD,
             selected = selected == TripBottomTab.RECORD,
             onClick = onRecordClick,
+            selectedIconColor = selectedIconColor,
+            selectedLabelColor = selectedLabelColor,
+            unselectedColor = unselectedColor,
             modifier = Modifier.weight(1f),
         )
         TripBottomItem(
             tab = TripBottomTab.PROFILE,
             selected = selected == TripBottomTab.PROFILE,
             onClick = onProfileClick,
+            selectedIconColor = selectedIconColor,
+            selectedLabelColor = selectedLabelColor,
+            unselectedColor = unselectedColor,
             modifier = Modifier.weight(1f),
         )
     }
@@ -253,9 +268,13 @@ private fun TripBottomItem(
     tab: TripBottomTab,
     selected: Boolean,
     onClick: () -> Unit,
+    selectedIconColor: Color,
+    selectedLabelColor: Color,
+    unselectedColor: Color,
     modifier: Modifier = Modifier,
 ) {
-    val contentColor = if (selected) TripRecordPalette.accent else TripRecordPalette.muted
+    val iconColor = if (selected) selectedIconColor else unselectedColor
+    val labelColor = if (selected) selectedLabelColor else unselectedColor
     Column(
         modifier = modifier
             .height(64.dp)
@@ -265,14 +284,14 @@ private fun TripBottomItem(
     ) {
         TripBottomIcon(
             tab = tab,
-            color = contentColor,
-            modifier = Modifier.size(23.dp),
+            color = iconColor,
+            modifier = Modifier.size(25.dp),
         )
         Spacer(Modifier.height(4.dp))
         Text(
             text = tab.label,
-            color = contentColor,
-            fontSize = 10.sp,
+            color = labelColor,
+            fontSize = 11.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
         )
     }
