@@ -83,7 +83,7 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
         }
         val configuration = PHPickerConfiguration(PHPhotoLibrary.sharedPhotoLibrary()).apply {
             filter = PHPickerFilter.imagesFilter
-            selectionLimit = MaxPhotosPerRecord.toLong()
+            selectionLimit = 0
         }
         val picker = PHPickerViewController(configuration)
         picker.delegate = this
@@ -116,16 +116,17 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
     fun recommend(location: Location, parentName: String?) {
         val status = PHPhotoLibrary.authorizationStatusForAccessLevel(PHAccessLevelReadWrite)
         when (status) {
-            PHAuthorizationStatusAuthorized, PHAuthorizationStatusLimited -> {
+            PHAuthorizationStatusAuthorized -> {
                 findRecommendations(location, parentName)
             }
+            PHAuthorizationStatusLimited -> onMessage(FullGalleryAccessMessage)
             PHAuthorizationStatusNotDetermined -> {
                 PHPhotoLibrary.requestAuthorizationForAccessLevel(PHAccessLevelReadWrite) { newStatus ->
                     onMain {
-                        if (newStatus == PHAuthorizationStatusAuthorized || newStatus == PHAuthorizationStatusLimited) {
-                            findRecommendations(location, parentName)
-                        } else {
-                            onMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
+                        when (newStatus) {
+                            PHAuthorizationStatusAuthorized -> findRecommendations(location, parentName)
+                            PHAuthorizationStatusLimited -> onMessage(FullGalleryAccessMessage)
+                            else -> onMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
                         }
                     }
                 }
@@ -170,12 +171,9 @@ private class IosPhotoLibraryController : NSObject(), PHPickerViewControllerDele
                 val asset = result.objectAtIndex(index.toULong()) as? PHAsset ?: continue
                 val assetLocation = asset.location ?: continue
                 val distance = assetLocation.distanceFromLocation(targetLocation)
-                if (distance <= radiusMeters) add(asset to distance)
+                if (distance <= radiusMeters) add(asset)
             }
         }
-            .sortedBy { it.second }
-            .take(MaxReverseGeocodeCandidates)
-            .map { it.first }
 
         if (candidates.isEmpty()) {
             onPhotosRecommended(emptyList())
@@ -387,7 +385,8 @@ private fun onMain(block: () -> Unit) {
     dispatch_async(dispatch_get_main_queue(), block)
 }
 
-private const val MaxReverseGeocodeCandidates = 60
 private const val MaxRecommendedPhotos = 12
 private const val PreviewSizePx = 960
 private const val PreviewJpegQuality = 0.84
+private const val FullGalleryAccessMessage =
+    "위치 기반 사진 추천을 사용하려면 전체 갤러리 접근 권한을 허용해 주세요."

@@ -7,13 +7,13 @@ import kotlin.test.assertEquals
 
 class PhotoLibraryTest {
     @Test
-    fun selectedPhotosAreDeduplicatedAndLimited() {
+    fun selectedPhotosAreDeduplicatedWithoutAnApplicationLimit() {
         val existing = listOf(photo("same"), photo("existing"))
         val incoming = listOf(photo("same")) + (1..20).map { photo("new-$it") }
 
         val merged = mergeSelectedPhotos(existing, incoming)
 
-        assertEquals(MaxPhotosPerRecord, merged.size)
+        assertEquals(22, merged.size)
         assertEquals(1, merged.count { it.id == "same" })
         assertEquals(listOf("same", "existing"), merged.take(2).map(SelectedPhoto::id))
     }
@@ -73,6 +73,52 @@ class PhotoLibraryTest {
 
         assertEquals(true, photoArea.matches(district, "경기도"))
         assertEquals("경기도 수원시장안구 대한민국", district.recommendationSearchText("경기도"))
+    }
+
+    @Test
+    fun koreanDistrictMatchesWhenGeocoderPutsDistrictInAnyAddressField() {
+        val district = Location(
+            id = 4,
+            countryId = 1,
+            parentId = 1,
+            regionCode = "11620",
+            name = "서울특별시 관악구",
+            type = LocationType.DISTRICT,
+        )
+
+        assertEquals(
+            true,
+            PhotoAdministrativeArea(
+                countryCode = "KR",
+                administrativeArea = "서울특별시 관악구",
+                subAdministrativeArea = null,
+                locality = null,
+                subLocality = "신림동",
+            ).matches(district, "서울특별시"),
+        )
+    }
+
+    @Test
+    fun koreanDistrictAllowsMissingDistrictSuffixInGeocoderResult() {
+        val district = Location(
+            id = 5,
+            countryId = 1,
+            parentId = 1,
+            regionCode = "11680",
+            name = "강남구",
+            type = LocationType.DISTRICT,
+        )
+
+        assertEquals(
+            true,
+            PhotoAdministrativeArea(
+                countryCode = "KR",
+                administrativeArea = "서울특별시",
+                subAdministrativeArea = null,
+                locality = null,
+                subLocality = "강남",
+            ).matches(district, "서울특별시"),
+        )
     }
 
     private fun photo(id: String) = SelectedPhoto(

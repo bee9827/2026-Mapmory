@@ -7,6 +7,8 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.graphics.Matrix
 import android.location.Geocoder
 import android.location.Address
 import android.net.Uri
@@ -15,7 +17,6 @@ import android.os.SystemClock
 import android.os.Trace
 import android.provider.MediaStore
 import android.util.Log
-import android.util.Size
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,7 +33,9 @@ import androidx.exifinterface.media.ExifInterface
 import com.mapmory.shared.data.local.photo.PhotoMetadataDatabase
 import com.mapmory.shared.data.local.photo.PhotoMetadataEntity
 import com.mapmory.shared.domain.model.Location
+import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,18 +70,22 @@ actual fun rememberPhotoLibraryActions(
     val galleryPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) {
-        val canRead = context.canRecommendPhotos()
+        val hasGalleryAccess = context.canReadGallery()
+        val canRecommend = context.canRecommendPhotos()
         val target = pendingRecommendation
         pendingRecommendation = null
-        if (canRead && target != null) {
-            loadRecommendations(target.first, target.second)
-        } else {
-            latestMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
+        when {
+            target == null -> Unit
+            !context.hasFullGalleryAccess() && hasGalleryAccess -> {
+                latestMessage(FullGalleryAccessMessage)
+            }
+            canRecommend -> loadRecommendations(target.first, target.second)
+            else -> latestMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
         }
     }
 
     val galleryPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(MaxPhotosPerRecord),
+        contract = ActivityResultContracts.PickMultipleVisualMedia(),
     ) { uris ->
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
         scope.launch {
@@ -115,7 +122,9 @@ actual fun rememberPhotoLibraryActions(
                 )
             },
             recommendForLocation = { location, parentName ->
-                if (context.canRecommendPhotos()) {
+                if (!context.hasFullGalleryAccess() && context.canReadGallery()) {
+                    latestMessage(FullGalleryAccessMessage)
+                } else if (context.canRecommendPhotos()) {
                     loadRecommendations(location, parentName)
                 } else {
                     pendingRecommendation = location to parentName
@@ -138,6 +147,19 @@ private fun Context.canReadGallery(): Boolean {
     return permissions.any { permission ->
         ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
+}
+
+private fun Context.hasFullGalleryAccess(): Boolean = when {
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.READ_MEDIA_IMAGES,
+        ) == PackageManager.PERMISSION_GRANTED
+
+    else -> ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.READ_EXTERNAL_STORAGE,
+    ) == PackageManager.PERMISSION_GRANTED
 }
 
 private fun Context.canRecommendPhotos(): Boolean =
@@ -167,7 +189,6 @@ private data class GalleryEntry(
     val photo: PhotoMetadataEntity,
     val latitude: Double,
     val longitude: Double,
-    val distanceMeters: Float,
 )
 
 private data class PhotoMetadataSyncResult(
@@ -214,7 +235,7 @@ private suspend fun Context.recommendPhotos(
                     distance,
                 )
                 if (distance[0] > radius) return@mapNotNull null
-                GalleryEntry(photo, latitude, longitude, distance[0])
+                GalleryEntry(photo, latitude, longitude)
             }
         }
 
@@ -225,18 +246,20 @@ private suspend fun Context.recommendPhotos(
         val reverseGeocodeStartedAt = SystemClock.elapsedRealtime()
         val matchedEntries = traceSection("photo.recommend.reverse_geocode") {
             entries
-                .sortedBy(GalleryEntry::distanceMeters)
-                .take(MaxReverseGeocodeCandidates)
-                .filter { entry ->
-                    runCatching {
+                .asSequence()
+                .sortedByDescending { it.photo.capturedAtMillis ?: 0L }
+                .mapNotNull { entry ->
+                    val matches = runCatching {
                         geocoder
                             .getFromLocation(entry.latitude, entry.longitude, 1)
                             ?.firstOrNull()
                             ?.toAdministrativeArea()
                             ?.matches(target, parentName) == true
                     }.getOrDefault(false)
+                    entry.takeIf { matches }
                 }
                 .take(MaxRecommendedPhotos)
+                .toList()
         }
         val reverseGeocodeMillis = SystemClock.elapsedRealtime() - reverseGeocodeStartedAt
         val previewStartedAt = SystemClock.elapsedRealtime()
@@ -439,26 +462,148 @@ private fun Context.readPhoto(
     val coordinates = knownCoordinates ?: traceSection("photo.read.exif") {
         readCoordinates(uri)
     }
-    val bytes = traceSection("photo.read.preview") {
-        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            contentResolver.loadThumbnail(uri, Size(PreviewSizePx, PreviewSizePx), null)
-        } else {
-            contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
-        } ?: return null
-        ByteArrayOutputStream().use { output ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, PreviewJpegQuality, output)
-            output.toByteArray()
-        }
+    val encodedBytes = traceSection("photo.read.original") {
+        contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
+    }?.takeIf(ByteArray::isNotEmpty) ?: return null
+    val originalBytes = traceSection("photo.read.orientation") {
+        encodedBytes.normalizeOrientation()
+    }
+    val previewBytes = traceSection("photo.read.preview") {
+        originalBytes.toPreviewByteArray() ?: originalBytes
     }
     SelectedPhoto(
         id = uri.toString(),
         displayName = knownName ?: metadata.first ?: "여행 사진",
-        previewBytes = bytes,
+        previewBytes = previewBytes,
         latitude = coordinates?.first,
         longitude = coordinates?.second,
         capturedAt = formatDate(knownCapturedAtMillis ?: metadata.second),
+        originalBytes = originalBytes,
     )
 }.getOrNull()
+
+private fun ByteArray.normalizeOrientation(): ByteArray {
+    val orientation = runCatching {
+        ExifInterface(ByteArrayInputStream(this)).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL,
+        )
+    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    if (orientation == ExifInterface.ORIENTATION_NORMAL ||
+        orientation == ExifInterface.ORIENTATION_UNDEFINED
+    ) {
+        return this
+    }
+
+    val matrix = Matrix().apply {
+        when (orientation) {
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> setScale(-1f, 1f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> setRotate(180f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> {
+                setRotate(180f)
+                postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                setRotate(90f)
+                postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_90 -> setRotate(90f)
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                setRotate(-90f)
+                postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_ROTATE_270 -> setRotate(-90f)
+            else -> return this@normalizeOrientation
+        }
+    }
+    val bitmap = BitmapFactory.decodeByteArray(this, 0, size) ?: return this
+    val normalizedBitmap = Bitmap.createBitmap(
+        bitmap,
+        0,
+        0,
+        bitmap.width,
+        bitmap.height,
+        matrix,
+        true,
+    )
+    return try {
+        ByteArrayOutputStream().use { output ->
+            if (!normalizedBitmap.compress(Bitmap.CompressFormat.JPEG, OriginalJpegQuality, output)) {
+                return@use this
+            }
+            output.toByteArray()
+        }
+    } finally {
+        if (normalizedBitmap !== bitmap) normalizedBitmap.recycle()
+        bitmap.recycle()
+    }
+}
+
+private fun ByteArray.toPreviewByteArray(): ByteArray? {
+    val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        decodeWithImageDecoder()
+    } else {
+        decodeWithBitmapFactory()
+    } ?: return null
+
+    val maxDimension = maxOf(bitmap.width, bitmap.height)
+    val previewBitmap = if (maxDimension > PreviewSizePx) {
+        val scale = PreviewSizePx.toFloat() / maxDimension
+        Bitmap.createScaledBitmap(
+            bitmap,
+            (bitmap.width * scale).toInt().coerceAtLeast(1),
+            (bitmap.height * scale).toInt().coerceAtLeast(1),
+            true,
+        )
+    } else {
+        bitmap
+    }
+
+    return try {
+        ByteArrayOutputStream().use { output ->
+            previewBitmap.compress(Bitmap.CompressFormat.JPEG, PreviewJpegQuality, output)
+            output.toByteArray()
+        }
+    } finally {
+        if (previewBitmap !== bitmap) previewBitmap.recycle()
+        bitmap.recycle()
+    }
+}
+
+private fun ByteArray.decodeWithImageDecoder(): Bitmap? {
+    val source = ImageDecoder.createSource(ByteBuffer.wrap(this))
+    return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        val maxDimension = maxOf(info.size.width, info.size.height)
+        if (maxDimension > PreviewSizePx) {
+            val scale = PreviewSizePx.toFloat() / maxDimension
+            decoder.setTargetSize(
+                (info.size.width * scale).toInt().coerceAtLeast(1),
+                (info.size.height * scale).toInt().coerceAtLeast(1),
+            )
+        }
+    }
+}
+
+private fun ByteArray.decodeWithBitmapFactory(): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(this, 0, size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    val options = BitmapFactory.Options().apply {
+        inSampleSize = calculatePreviewSampleSize(bounds.outWidth, bounds.outHeight)
+    }
+    return BitmapFactory.decodeByteArray(this, 0, size, options)
+}
+
+private fun calculatePreviewSampleSize(width: Int, height: Int): Int {
+    val maxDimension = maxOf(width, height)
+    var sampleSize = 1
+    while (maxDimension / sampleSize > PreviewSizePx * 2) {
+        sampleSize *= 2
+    }
+    return sampleSize
+}
 
 private fun Context.queryPhotoMetadata(uri: Uri): Pair<String?, Long?> {
     val projection = arrayOf(
@@ -510,9 +655,11 @@ private fun formatDate(epochMillis: Long?): String? = epochMillis?.let {
 
 private const val PreviewSizePx = 960
 private const val PreviewJpegQuality = 84
-private const val MaxReverseGeocodeCandidates = 80
+private const val OriginalJpegQuality = 100
 private const val MaxRecommendedPhotos = 12
 private const val PhotoPerformanceTag = "MapmoryPhotoPerf"
+private const val FullGalleryAccessMessage =
+    "위치 기반 사진 추천을 사용하려면 전체 갤러리 접근 권한을 허용해 주세요."
 
 private object TraceCookie {
     const val Recommend = 1
