@@ -29,3 +29,4 @@ Windows에서는 `./gradlew` 대신 `./gradlew.bat`을 사용합니다.
 
 - [ADR 0006: API 오류 응답에 Problem Details를 사용한다](docs/adr/0006-use-problem-details-for-api-errors.md)
 - [여행 기록 저장 및 목록 조회 방식](docs/travel-record-storage-and-query.md)
+- [Testcontainers 테스트 성능 개선](docs/testcontainers-performance.md)
