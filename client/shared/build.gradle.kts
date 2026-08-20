@@ -15,6 +15,9 @@ kotlin {
 
         withHostTest {}
     }
+    androidLibrary {
+        androidResources.enable = true
+    }
     jvm()
     listOf(
         iosArm64(),
