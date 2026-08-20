@@ -31,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,7 +58,7 @@ fun TripRecordListScreen(
 ) {
     TripRecordBackground(
         modifier = modifier.then(rememberDismissKeyboardOnTapModifier()),
-        backgroundColor = JournalBackground,
+        backgroundColor = TripRecordPalette.pageBackground,
     ) {
         Column(Modifier.fillMaxSize()) {
             JournalHeader(
@@ -119,11 +118,11 @@ fun TripRecordListScreen(
                 onMapClick = onMapClick,
                 onCreateClick = onCreateClick,
                 onProfileClick = onProfileClick,
-                backgroundColor = JournalBackground,
-                dividerColor = JournalNavigationDivider,
-                selectedIconColor = JournalPrimary,
-                selectedLabelColor = JournalNavigationSelectedLabel,
-                unselectedColor = JournalNavigationUnselected,
+                backgroundColor = TripRecordPalette.pageBackground,
+                dividerColor = TripRecordPalette.navigationDivider,
+                selectedIconColor = TripRecordPalette.primary,
+                selectedLabelColor = TripRecordPalette.navigationSelectedLabel,
+                unselectedColor = TripRecordPalette.navigationUnselected,
             )
         }
     }
@@ -134,7 +133,7 @@ private fun JournalHeader(recordCount: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(JournalBackground)
+            .background(TripRecordPalette.pageBackground)
             .padding(horizontal = 20.dp, vertical = 18.dp),
         verticalAlignment = Alignment.Bottom,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -142,14 +141,14 @@ private fun JournalHeader(recordCount: Int) {
         Column {
             Text(
                 text = "TRAVEL ARCHIVE",
-                color = JournalPrimary,
+                color = TripRecordPalette.primary,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 1.2.sp,
             )
             Text(
                 text = "모든 여행 기록",
-                color = JournalText,
+                color = TripRecordPalette.headingText,
                 fontSize = 25.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 4.dp),
@@ -158,12 +157,12 @@ private fun JournalHeader(recordCount: Int) {
         Box(
             modifier = Modifier
                 .size(35.dp)
-                .background(JournalPrimarySoft, CircleShape),
+                .background(TripRecordPalette.primarySoft, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = recordCount.toString(),
-                color = JournalPrimary,
+                color = TripRecordPalette.primary,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
@@ -200,12 +199,12 @@ private fun TripFilterChip(
 ) {
     Text(
         text = text,
-        color = if (selected) JournalPrimary else JournalMuted,
+        color = if (selected) TripRecordPalette.primary else TripRecordPalette.secondaryText,
         fontSize = 12.sp,
         fontWeight = FontWeight.Bold,
         modifier = Modifier
             .clip(RoundedCornerShape(9.dp))
-            .background(if (selected) JournalPrimarySoft else JournalSoft)
+            .background(if (selected) TripRecordPalette.primarySoft else TripRecordPalette.softSurface)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     )
@@ -241,8 +240,8 @@ private fun TripRecordCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = JournalCardBackground),
-        border = BorderStroke(1.dp, JournalLine),
+        colors = CardDefaults.cardColors(containerColor = TripRecordPalette.surface),
+        border = BorderStroke(1.dp, TripRecordPalette.border),
     ) {
         Column {
             Box {
@@ -274,20 +273,20 @@ private fun TripRecordCard(
                 formattedDate(record)?.let { date ->
                     Text(
                         text = date,
-                        color = JournalMuted,
+                        color = TripRecordPalette.secondaryText,
                         fontSize = 11.sp,
                     )
                 }
                 Text(
                     text = record.title,
-                    color = JournalText,
+                    color = TripRecordPalette.headingText,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 7.dp),
                 )
                 Text(
                     text = record.content,
-                    color = JournalBody,
+                    color = TripRecordPalette.bodyText,
                     fontSize = 13.sp,
                     lineHeight = 20.sp,
                     maxLines = 2,
@@ -306,11 +305,11 @@ private fun JournalImageBadge(
 ) {
     Text(
         text = text,
-        color = Color.White,
+        color = TripRecordPalette.contentOnMedia,
         fontSize = 11.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = modifier
-            .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(10.dp))
+            .background(TripRecordPalette.mediaScrim, RoundedCornerShape(10.dp))
             .padding(horizontal = 10.dp, vertical = 7.dp),
     )
 }
@@ -351,19 +350,6 @@ private fun EmptyTripRecords(
     }
 }
 
-private val JournalBackground = Color(0xFF121518)
-private val JournalCardBackground = Color(0xFF1A1E22)
-private val JournalSoft = Color(0xFF1C2124)
-private val JournalLine = Color(0xFF2B3135)
-private val JournalPrimary = Color(0xFF35C987)
-private val JournalPrimarySoft = Color(0xFF173B2D)
-private val JournalText = Color(0xFFF1F5F3)
-private val JournalBody = Color(0xFFBDC6C2)
-private val JournalMuted = Color(0xFF89938F)
-private val JournalNavigationDivider = Color(0xFF2C3431)
-private val JournalNavigationUnselected = Color(0xFF77827D)
-private val JournalNavigationSelectedLabel = Color(0xFFA2ADA7)
-
 @Composable
 private fun PageControls(
     page: Int,
@@ -384,7 +370,7 @@ private fun PageControls(
         )
         Text(
             text = "${page + 1} / $totalPages",
-            color = Color.White,
+            color = TripRecordPalette.contentOnMedia,
             fontSize = 12.sp,
         )
         Text(

@@ -66,6 +66,44 @@ internal object TripRecordPalette {
     val photoRecommendBorder = Color(0xFF99555D)
     val photoGalleryBackground = Color(0xFF1B2D26)
     val photoGalleryBorder = Color(0xFF3E7960)
+
+    // Shared tokens used by the map, journal, and statistics dashboards.
+    val pageBackground = Color(0xFF121518)
+    val softSurface = Color(0xFF1C2124)
+    val border = Color(0xFF2B3135)
+    val primary = Color(0xFF35C987)
+    val primarySoft = Color(0xFF173B2D)
+    val secondaryAccent = Color(0xFF67D9A2)
+    val onPrimary = Color(0xFF071B12)
+    val headingText = Color(0xFFF1F5F3)
+    val bodyText = Color(0xFFBDC6C2)
+    val secondaryText = Color(0xFF89938F)
+    val navigationDivider = Color(0xFF2C3431)
+    val navigationUnselected = Color(0xFF77827D)
+    val navigationSelectedLabel = Color(0xFFA2ADA7)
+    val contentOnMedia = Color.White
+    val mediaScrim = Color.Black.copy(alpha = 0.62f)
+    val metadataDateBackground = Color(0xFF24292D)
+}
+
+internal object TripMapPalette {
+    val logoText = Color(0xFFF4F8F5)
+    val scopeBackground = Color(0xFF151C19)
+    val scopeBorder = Color(0xFF2D3A34)
+    val scopeSelectedBackground = Color(0xFF2A3832)
+    val scopeSelectedText = Color(0xFFEEF7F1)
+    val scopeUnselectedText = Color(0xFF92A09A)
+    val tagBackground = Color(0xFF1A2421)
+    val tagText = Color(0xFFBDC8C2)
+    val tagSelectedText = Color(0xFF072118)
+    val dashboardBadgeText = Color(0xFF9CE6BF)
+}
+
+internal object TripStatisticsPalette {
+    val divider = Color(0xFF30363A)
+    val mapBorder = Color(0xFF343B40)
+    val mapLand = Color(0xFF293039)
+    val mapOutline = Color(0xFF424B53)
 }
 
 @Composable
