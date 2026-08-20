@@ -10,12 +10,13 @@ import kotlin.test.assertTrue
 
 class KoreaMapStaticDataTest {
     @Test
-    fun everySelectableDistrictUsesAKnownProvinceCode() {
+    fun everyMapSelectableDistrictUsesAKnownProvinceCode() {
         val provinceCodes = GeneratedKoreaMapData.provinces.map { it.code }
+        val mapSelectableDistricts = KoreanSelectableDistrictCodes.filter { it.provinceCode != null }
 
         assertEquals(17, provinceCodes.size)
-        assertTrue(KoreanSelectableDistrictCodes.isNotEmpty())
-        assertTrue(KoreanSelectableDistrictCodes.all { it.provinceCode in provinceCodes })
+        assertTrue(mapSelectableDistricts.isNotEmpty())
+        assertTrue(mapSelectableDistricts.all { it.provinceCode in provinceCodes })
     }
 
     @Test

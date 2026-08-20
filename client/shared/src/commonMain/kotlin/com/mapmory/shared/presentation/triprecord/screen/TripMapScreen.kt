@@ -64,6 +64,9 @@ fun TripMapScreen(
                 mapScope = mapScope,
                 visitedCount = visitedCount,
                 onMapScopeChange = onMapScopeChange,
+                mapDetailTitle = mapDetailTitle,
+                mapDetailTotal = mapDetailTotal,
+                onMapDetailBackClick = onMapDetailBackClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 14.dp),
@@ -122,6 +125,9 @@ private fun MapHeaderOverlay(
     mapScope: MapScope,
     visitedCount: Int,
     onMapScopeChange: (MapScope) -> Unit,
+    mapDetailTitle: String?,
+    mapDetailTotal: Int?,
+    onMapDetailBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
@@ -155,6 +161,9 @@ private fun MapHeaderOverlay(
         MapSummaryCard(
             mapScope = mapScope,
             visitedCount = visitedCount,
+            mapDetailTitle = mapDetailTitle,
+            mapDetailTotal = mapDetailTotal,
+            onMapDetailBackClick = onMapDetailBackClick,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
         Spacer(Modifier.height(14.dp))
@@ -273,6 +282,9 @@ private val MapDashboardBadgeText = Color(0xFF9CE6BF)
 private fun MapSummaryCard(
     mapScope: MapScope,
     visitedCount: Int,
+    mapDetailTitle: String?,
+    mapDetailTotal: Int?,
+    onMapDetailBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = when (mapScope) {
