@@ -14,7 +14,6 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -33,7 +32,7 @@ class UploadServiceTest {
                 properties
         );
         CreatePresignedUrlsRequest request = new CreatePresignedUrlsRequest(List.of(
-                new UploadFileRequest("jeju-trip.jpg", "image/jpeg", 3_145_728L),
+                new UploadFileRequest("jeju-trip", "IMAGE/JPEG", 3_145_728L),
                 new UploadFileRequest("map.webp", "image/webp", 1024L)
         ));
 
@@ -65,7 +64,6 @@ class UploadServiceTest {
 
     private static UploadPolicyProperties properties() {
         return new UploadPolicyProperties(
-                Set.of("image/jpeg", "image/png", "image/webp", "image/heic"),
                 DataSize.ofMegabytes(10),
                 10,
                 Duration.ofMinutes(5)

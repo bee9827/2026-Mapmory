@@ -1,16 +1,15 @@
 package com.mapmory.backend.upload.policy;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.upload.UploadErrorCode;
 import java.time.Duration;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.util.unit.DataSize;
 
 class UploadPolicyTest {
@@ -25,14 +24,26 @@ class UploadPolicyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"jpg", "jpeg", "png", "webp", "heic"})
-    void 허용된_이미지_형식을_검증한다(String extension) {
-        String contentType = extension.equals("jpg") || extension.equals("jpeg")
-                ? "image/jpeg"
-                : "image/" + extension;
+    @CsvSource({
+            "photo.jpg, image/jpeg, JPEG",
+            "photo.jpeg, image/jpeg, JPEG",
+            "photo.png, image/png, PNG",
+            "photo.webp, image/webp, WEBP",
+            "photo.heic, image/heic, HEIC"
+    })
+    void 허용된_이미지_형식을_검증한다(
+            String fileName,
+            String contentType,
+            UploadFileType expected
+    ) {
+        assertThat(uploadPolicy.validateFile(fileName, contentType, TEN_MEGABYTES))
+                .isEqualTo(expected);
+    }
 
-        assertThatCode(() -> uploadPolicy.validateFile("photo." + extension, contentType, TEN_MEGABYTES))
-                .doesNotThrowAnyException();
+    @Test
+    void 확장자가_없어도_Content_Type으로_이미지_형식을_검증한다() {
+        assertThat(uploadPolicy.validateFile("IMG_1234", "image/jpeg", TEN_MEGABYTES))
+                .isEqualTo(UploadFileType.JPEG);
     }
 
     @Test
@@ -70,7 +81,6 @@ class UploadPolicyTest {
 
     private static UploadPolicyProperties properties() {
         return new UploadPolicyProperties(
-                Set.of("image/jpeg", "image/png", "image/webp", "image/heic"),
                 DataSize.ofMegabytes(10),
                 10,
                 Duration.ofMinutes(5)

@@ -16,7 +16,6 @@ class UploadPolicyPropertiesTest {
             .withConfiguration(AutoConfigurations.of(ValidationAutoConfiguration.class))
             .withUserConfiguration(UploadPolicyConfig.class)
             .withPropertyValues(
-                    "upload.policy.allowed-content-types[0]=image/jpeg",
                     "upload.policy.max-file-size=10MB",
                     "upload.policy.max-files-per-request=10"
             );

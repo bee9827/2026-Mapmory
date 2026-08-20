@@ -17,7 +17,6 @@ import com.mapmory.backend.upload.service.UploadService;
 import com.mapmory.backend.upload.storage.PresignedUrlProvider;
 import java.net.URI;
 import java.time.Duration;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -48,7 +47,6 @@ class UploadControllerTest {
     @BeforeEach
     void setUp() {
         UploadPolicyProperties properties = new UploadPolicyProperties(
-                Set.of("image/jpeg", "image/png", "image/webp", "image/heic"),
                 DataSize.ofMegabytes(10),
                 10,
                 Duration.ofMinutes(5)

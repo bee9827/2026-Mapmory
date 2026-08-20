@@ -31,11 +31,6 @@ kakao:
 
 upload:
   policy:
-    allowed-content-types:
-      - image/jpeg
-      - image/png
-      - image/webp
-      - image/heic
     max-file-size: 10MB
     max-files-per-request: 10
     presigned-url-expiration: PT5M
