@@ -81,6 +81,22 @@ class GenerateKoreaMapTest(unittest.TestCase):
         self.assertEqual(10, merged[0][2][0][0][0])
         self.assertEqual(base[1], merged[1])
 
+    def test_overview_override_uses_one_source_for_every_province(self):
+        self.assertEqual(
+            frozenset(MODULE.PROVINCE_NAMES),
+            MODULE.PROVINCE_OVERRIDE_CODES,
+        )
+
+    def test_province_parts_are_split_by_coordinate_count(self):
+        feature = lambda code, count: (code, code, [[[index, 0] for index in range(count)]])
+
+        parts = MODULE.partition_province_features(
+            [feature("A", 4), feature("B", 3), feature("C", 5)],
+            max_points=7,
+        )
+
+        self.assertEqual([["A", "B"], ["C"]], [[feature[0] for feature in part] for part in parts])
+
     def test_canonicalizes_legacy_pyeongchang_code_to_app_code(self):
         feature = {
             "type": "Feature",

@@ -62,6 +62,20 @@ class KoreaMapStaticDataTest {
         )
     }
 
+    @Test
+    fun adjacentProvinceBoundariesShareCoordinatesWithoutVisibleGaps() {
+        assertTrue(sharedBoundaryEdgeCount("KR-31", "KR-48") > 0, "울산과 경남 경계가 분리되어 있습니다")
+        assertTrue(sharedBoundaryEdgeCount("KR-50", "KR-44") > 0, "세종과 충남 경계가 분리되어 있습니다")
+    }
+
+    private fun sharedBoundaryEdgeCount(firstCode: String, secondCode: String): Int {
+        val regions = GeneratedKoreaMapData.provinces.associateBy { it.code }
+        fun edges(code: String): Set<Set<GeoPoint>> = regions.getValue(code).rings
+            .flatMap { ring -> ring.zipWithNext { start, end -> setOf(start, end) } }
+            .toSet()
+        return edges(firstCode).intersect(edges(secondCode)).size
+    }
+
     private fun square(
         code: String,
         name: String,
