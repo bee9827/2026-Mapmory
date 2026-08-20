@@ -41,6 +41,25 @@ class MapLocationSelectionTest {
         assertNull(findMapDistrictLocation("금정구", listOf(district)))
     }
 
+    @Test
+    fun resolvesDistrictByCanonicalCodeAndProvince() {
+        val province = Location(
+            id = 4L,
+            countryId = 1L,
+            parentId = null,
+            regionCode = "KR-26",
+            name = "부산광역시",
+            type = LocationType.PROVINCE,
+        )
+        val district = location(code = "26410", name = "금정구")
+
+        assertEquals(
+            district,
+            findMapDistrictLocation("26410", "KR-26", listOf(province, district)),
+        )
+        assertNull(findMapDistrictLocation("26410", "KR-27", listOf(province, district)))
+    }
+
     private fun location(code: String, name: String): Location = Location(
         id = code.toLong(),
         countryId = 1L,
