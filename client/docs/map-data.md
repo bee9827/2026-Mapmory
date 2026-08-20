@@ -18,13 +18,28 @@ python3 tools/map/generate_world_map.py /tmp/ne_110m_admin_0_countries.geojson
 
 ## 대한민국 시·도 데이터
 
-대한민국 지도는 [geoBoundaries KOR ADM1](https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM1/)의 2021년 간소화 경계를 사용합니다. 17개 시·도와 섬을 포함하며 원본 GeoJSON은 앱에 포함하지 않습니다. 시·도 코드는 ISO 3166-2(`KR-11` 등)를 사용하고, 시·군·구 코드는 행정표준코드(`11680` 등)를 사용합니다.
+대한민국 지도는 [geoBoundaries KOR ADM1](https://www.geoboundaries.org/api/current/gbOpen/KOR/ADM1/)의 2021년 간소화 경계를 기본으로 사용합니다. 17개 시·도와 섬을 포함하며 원본 GeoJSON은 앱에 포함하지 않습니다. 시·도 코드는 ISO 3166-2(`KR-11` 등)를 사용하고, 시·군·구 코드는 행정표준코드(`11680` 등)를 사용합니다.
+
+초기 시·도 개요에서 형태가 작게 뭉개지는 서울·부산·대구·인천·광주·대전·울산·세종은 [southkorea/southkorea-maps의 KOSTAT 2018 시·도 경계](https://github.com/southkorea/southkorea-maps/blob/fe65e05e549d04083e52f380a7e9166a8ea0a01e/kostat/2018/json/skorea-provinces-2018-geo.json)를 개발 시점에만 읽고, 외곽 링을 RDP tolerance `0.002`도로 단순화해 대체합니다. 나머지 9개 시·도는 geoBoundaries 간소화 데이터를 그대로 사용합니다. 이 보정은 초기 개요 geometry에만 적용하며 상세 지도와 서버 Location 코드는 변경하지 않습니다.
 
 ```bash
 curl -L --fail -o /tmp/geoBoundaries-KOR-ADM1_simplified.geojson \
   https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/KOR/ADM1/geoBoundaries-KOR-ADM1_simplified.geojson
 python3 tools/map/generate_korea_map.py /tmp/geoBoundaries-KOR-ADM1_simplified.geojson
 ```
+
+주요 지역 보정 geometry까지 재생성하려면 다음을 사용합니다.
+
+```bash
+curl -L --fail -o /tmp/skorea-provinces-2018-geo.json \
+  https://raw.githubusercontent.com/southkorea/southkorea-maps/fe65e05e549d04083e52f380a7e9166a8ea0a01e/kostat/2018/json/skorea-provinces-2018-geo.json
+python3 tools/map/generate_korea_map.py \
+  /tmp/geoBoundaries-KOR-ADM1_simplified.geojson \
+  --province-override-source /tmp/skorea-provinces-2018-geo.json \
+  --province-override-tolerance 0.002
+```
+
+RDP tolerance는 경도·위도 단위이며, 낮출수록 형태는 정밀해지고 생성 데이터와 Canvas 렌더링 비용이 커집니다. 현재 값은 초기 개요에서 8개 지역의 실루엣을 보존하면서 원본 전체 좌표를 그대로 포함하지 않기 위한 기준값입니다.
 
 ## 대한민국 시·군·구 데이터
 

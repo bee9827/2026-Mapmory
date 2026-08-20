@@ -44,6 +44,8 @@ PROVINCE_NAMES = {
 METROPOLITAN_PROVINCES = {
     "KR-11", "KR-26", "KR-27", "KR-28", "KR-29", "KR-30", "KR-31", "KR-50",
 }
+MAJOR_PROVINCE_CODES = frozenset(METROPOLITAN_PROVINCES)
+DEFAULT_PROVINCE_OVERRIDE_TOLERANCE = 0.002
 PROVINCE_PREFIXES = tuple(PROVINCE_NAMES.values()) + ("강원도", "전라북도")
 CITY_DISTRICT_PATTERN = re.compile(r"^(.+시).+구$")
 LOCATION_PATTERN = re.compile(
@@ -92,7 +94,53 @@ def outer_rings(geometry: dict[str, Any]) -> list[list[list[float]]]:
     return [ring for ring in candidates if len(ring) >= 3]
 
 
-def read_province_features(source: Path) -> list[tuple[str, str, list[list[list[float]]]]]:
+def _squared_segment_distance(point: tuple[float, float], start: tuple[float, float], end: tuple[float, float]) -> float:
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    if dx == 0 and dy == 0:
+        return (point[0] - start[0]) ** 2 + (point[1] - start[1]) ** 2
+    ratio = ((point[0] - start[0]) * dx + (point[1] - start[1]) * dy) / (dx * dx + dy * dy)
+    ratio = max(0.0, min(1.0, ratio))
+    projected = (start[0] + ratio * dx, start[1] + ratio * dy)
+    return (point[0] - projected[0]) ** 2 + (point[1] - projected[1]) ** 2
+
+
+def _rdp(points: list[tuple[float, float]], tolerance: float) -> list[tuple[float, float]]:
+    if len(points) <= 2:
+        return points
+    farthest_index = 0
+    farthest_distance = 0.0
+    for index in range(1, len(points) - 1):
+        distance = _squared_segment_distance(points[index], points[0], points[-1])
+        if distance > farthest_distance:
+            farthest_index = index
+            farthest_distance = distance
+    if farthest_distance <= tolerance * tolerance:
+        return [points[0], points[-1]]
+    left = _rdp(points[:farthest_index + 1], tolerance)
+    right = _rdp(points[farthest_index:], tolerance)
+    return left[:-1] + right
+
+
+def simplify_ring(ring: list[list[float]], tolerance: float) -> list[list[float]]:
+    """Simplify a closed ring while preserving its first/last point."""
+    if tolerance <= 0 or len(ring) < 4:
+        return ring
+    points = [(float(longitude), float(latitude)) for longitude, latitude in ring]
+    if points[0] == points[-1]:
+        points.pop()
+    if len(points) < 3:
+        return ring
+    simplified = _rdp(points + [points[0]], tolerance)
+    if simplified[-1] != simplified[0]:
+        simplified.append(simplified[0])
+    return [[longitude, latitude] for longitude, latitude in simplified]
+
+
+def read_province_features(
+    source: Path,
+    simplify_tolerance: float = 0.0,
+) -> list[tuple[str, str, list[list[list[float]]]]]:
     features = []
     for feature in json.loads(source.read_text())["features"]:
         properties = feature.get("properties", {})
@@ -106,9 +154,27 @@ def read_province_features(source: Path) -> list[tuple[str, str, list[list[list[
         if code is None:
             continue
         rings = outer_rings(feature.get("geometry", {}))
+        if simplify_tolerance > 0:
+            rings = [simplify_ring(ring, simplify_tolerance) for ring in rings]
         if rings:
             features.append((code, PROVINCE_NAMES.get(code, properties.get("name", code)), rings))
     return features
+
+
+def merge_province_features(
+    base: list[tuple[str, str, list[list[list[float]]]]],
+    overrides: list[tuple[str, str, list[list[list[float]]]]],
+    override_codes: frozenset[str],
+) -> list[tuple[str, str, list[list[list[float]]]]]:
+    override_by_code = {feature[0]: feature for feature in overrides}
+    base_codes = {code for code, *_ in base}
+    missing = override_codes - override_by_code.keys()
+    if missing:
+        raise ValueError(f"province override source is missing codes: {sorted(missing)}")
+    if not override_codes <= base_codes:
+        missing_base = override_codes - base_codes
+        raise ValueError(f"base province source is missing codes: {sorted(missing_base)}")
+    return [override_by_code[feature[0]] if feature[0] in override_codes else feature for feature in base]
 
 
 def read_locations(source: Path) -> list[Location]:
@@ -200,10 +266,18 @@ def write_province_part(output: Path, index: int, features) -> str:
     return object_name
 
 
-def write_provinces(output: Path, source: Path) -> None:
+def write_provinces(
+    output: Path,
+    source: Path,
+    override_source: Path | None = None,
+    override_tolerance: float = DEFAULT_PROVINCE_OVERRIDE_TOLERANCE,
+) -> None:
     for old in output.glob("GeneratedKoreaMapDataPart*.kt"):
         old.unlink()
     features = read_province_features(source)
+    if override_source:
+        override_features = read_province_features(override_source, override_tolerance)
+        features = merge_province_features(features, override_features, MAJOR_PROVINCE_CODES)
     chunk_size = math.ceil(len(features) / PART_COUNT)
     names = [
         write_province_part(output, index, features[index * chunk_size:(index + 1) * chunk_size])
@@ -266,6 +340,13 @@ def write_districts(resource_output: Path, source: Path, locations_source: Path)
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("province_source", nargs="?", type=Path)
+    parser.add_argument("--province-override-source", type=Path)
+    parser.add_argument(
+        "--province-override-tolerance",
+        type=float,
+        default=DEFAULT_PROVINCE_OVERRIDE_TOLERANCE,
+        help="RDP tolerance in degrees for the eight metropolitan/Sejong province overrides.",
+    )
     parser.add_argument("--district-source", type=Path)
     parser.add_argument("--locations-source", type=Path)
     parser.add_argument("--resource-output", type=Path, default=Path("shared/src/commonMain/composeResources/files"))
@@ -277,7 +358,12 @@ def main() -> None:
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     if args.province_source:
-        write_provinces(args.output, args.province_source)
+        write_provinces(
+            args.output,
+            args.province_source,
+            args.province_override_source,
+            args.province_override_tolerance,
+        )
     if args.district_source:
         if not args.locations_source:
             parser.error("--locations-source is required with --district-source")

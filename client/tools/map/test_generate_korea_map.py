@@ -58,6 +58,29 @@ class GenerateKoreaMapTest(unittest.TestCase):
 
         self.assertEqual(2, len(MODULE.outer_rings(geometry)))
 
+    def test_simplify_ring_preserves_closed_ring(self):
+        ring = [[0, 0], [1, 0.001], [2, 0], [2, 2], [0, 2], [0, 0]]
+
+        simplified = MODULE.simplify_ring(ring, 0.01)
+
+        self.assertEqual(simplified[0], simplified[-1])
+        self.assertLess(len(simplified), len(ring))
+        self.assertIn([2, 2], simplified)
+
+    def test_major_province_override_replaces_only_target_codes(self):
+        base = [
+            ("KR-11", "서울특별시", [[[0, 0], [1, 0], [0, 1]]]),
+            ("KR-41", "경기도", [[[2, 2], [3, 2], [2, 3]]]),
+        ]
+        overrides = [
+            ("KR-11", "서울특별시", [[[10, 10], [11, 10], [10, 11]]]),
+        ]
+
+        merged = MODULE.merge_province_features(base, overrides, frozenset({"KR-11"}))
+
+        self.assertEqual(10, merged[0][2][0][0][0])
+        self.assertEqual(base[1], merged[1])
+
     def test_canonicalizes_legacy_pyeongchang_code_to_app_code(self):
         feature = {
             "type": "Feature",
