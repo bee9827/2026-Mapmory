@@ -33,6 +33,9 @@ fun TripMapScreen(
     visitedCount: Int = 0,
     onMapScopeChange: (MapScope) -> Unit = {},
     onBackClick: () -> Unit,
+    mapDetailTitle: String? = null,
+    mapDetailTotal: Int? = null,
+    onMapDetailBackClick: () -> Unit = {},
     onRecordClick: () -> Unit = onBackClick,
     onCreateClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
@@ -56,7 +59,13 @@ fun TripMapScreen(
                     },
                 )
                 Spacer(Modifier.height(4.dp))
-                MapSummaryCard(mapScope = mapScope, visitedCount = visitedCount)
+                MapSummaryCard(
+                    mapScope = mapScope,
+                    visitedCount = visitedCount,
+                    mapDetailTitle = mapDetailTitle,
+                    mapDetailTotal = mapDetailTotal,
+                    onMapDetailBackClick = onMapDetailBackClick,
+                )
                 Spacer(Modifier.height(10.dp))
                 MapScopeToggle(
                     selected = mapScope,
@@ -162,12 +171,15 @@ private fun MapScopeChip(
 private fun MapSummaryCard(
     mapScope: MapScope,
     visitedCount: Int,
+    mapDetailTitle: String?,
+    mapDetailTotal: Int?,
+    onMapDetailBackClick: () -> Unit,
 ) {
     val title = when (mapScope) {
         MapScope.WORLD -> "나의 세계 지도"
         MapScope.KOREA -> "나의 대한민국 지도"
     }
-    val total = when (mapScope) {
+    val total = mapDetailTotal ?: when (mapScope) {
         MapScope.WORLD -> 195
         MapScope.KOREA -> 17
     }
@@ -183,6 +195,21 @@ private fun MapSummaryCard(
             )
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
+        mapDetailTitle?.let { title ->
+            Text(
+                text = "← $title 전체에서 나가기",
+                color = TripRecordPalette.accent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(TripRecordPalette.accentSoft)
+                    .clickable(onClick = onMapDetailBackClick)
+                    .padding(horizontal = 10.dp, vertical = 7.dp),
+            )
+            Spacer(Modifier.height(10.dp))
+        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
