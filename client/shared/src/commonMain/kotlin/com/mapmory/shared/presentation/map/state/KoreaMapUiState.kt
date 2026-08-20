@@ -1,13 +1,19 @@
 package com.mapmory.shared.presentation.map.state
 
-import com.mapmory.shared.presentation.map.domain.MapBoundaryData
+import com.mapmory.shared.presentation.map.domain.ProvincePolygon
 
 sealed interface KoreaMapUiState {
-    data object Idle : KoreaMapUiState
+    data object ProvinceOverview : KoreaMapUiState
 
-    data object Loading : KoreaMapUiState
+    data class DistrictLoading(val provinceCode: String) : KoreaMapUiState
 
-    data class Success(val data: MapBoundaryData) : KoreaMapUiState
+    data class DistrictDetail(
+        val provinceCode: String,
+        val regions: List<ProvincePolygon>,
+    ) : KoreaMapUiState
 
-    data class Error(val message: String) : KoreaMapUiState
+    data class Error(
+        val provinceCode: String,
+        val message: String,
+    ) : KoreaMapUiState
 }

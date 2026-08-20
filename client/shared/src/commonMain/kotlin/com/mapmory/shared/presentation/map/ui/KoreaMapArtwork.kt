@@ -304,18 +304,25 @@ private data class KoreaBounds(
 }
 
 private fun ProvincePolygon.labelPoint(): GeoPoint? {
-    val centroids = rings.mapNotNull(List<GeoPoint>::areaAndCentroid)
-    val totalArea = centroids.sumOf { it.first }
-    if (totalArea == 0.0) return rings.flatten().takeIf(List<GeoPoint>::isNotEmpty)?.let { points ->
-        GeoPoint(
-            longitude = points.sumOf { it.longitude.toDouble() }.toFloat() / points.size,
-            latitude = points.sumOf { it.latitude.toDouble() }.toFloat() / points.size,
-        )
+    val largestRing = rings.maxByOrNull { abs(it.signedAreaTwice()) } ?: return null
+    val centroid = largestRing.areaAndCentroid()?.let { (_, longitude, latitude) ->
+        GeoPoint(longitude.toFloat(), latitude.toFloat())
     }
-    return GeoPoint(
-        longitude = (centroids.sumOf { it.first * it.second } / totalArea).toFloat(),
-        latitude = (centroids.sumOf { it.first * it.third } / totalArea).toFloat(),
+    if (centroid != null && pointInRing(centroid, largestRing)) return centroid
+
+    val minLongitude = largestRing.minOf(GeoPoint::longitude)
+    val maxLongitude = largestRing.maxOf(GeoPoint::longitude)
+    val minLatitude = largestRing.minOf(GeoPoint::latitude)
+    val maxLatitude = largestRing.maxOf(GeoPoint::latitude)
+    val boundsCenter = GeoPoint(
+        longitude = (minLongitude + maxLongitude) / 2f,
+        latitude = (minLatitude + maxLatitude) / 2f,
     )
+    if (pointInRing(boundsCenter, largestRing)) return boundsCenter
+
+    // Concave regions can reject both common representatives. Keep the label on the
+    // largest boundary rather than placing it in a different island or in the sea.
+    return largestRing.firstOrNull()
 }
 
 private fun ProvincePolygon.area(): Double = rings.sumOf { abs(it.signedAreaTwice()) }

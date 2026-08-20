@@ -20,14 +20,10 @@ import com.mapmory.shared.domain.model.KoreanCountryNames
 import com.mapmory.shared.domain.model.KoreanSelectableDistrictCodes
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.data.remote.createHttpClient
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
-import com.mapmory.shared.presentation.map.data.KoreaMapRemoteDataSource
+import com.mapmory.shared.presentation.map.data.GeneratedKoreaDistrictMapData
 import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
 import com.mapmory.shared.presentation.map.domain.MapScope
-import com.mapmory.shared.presentation.map.domain.ProvincePolygon
-import com.mapmory.shared.presentation.map.domain.geoJsonProvinceCodeForServer
-import com.mapmory.shared.presentation.map.domain.serverProvinceCodeForGeoJson
 import com.mapmory.shared.presentation.map.state.KoreaMapUiState
 import com.mapmory.shared.presentation.map.ui.MapArtwork
 import com.mapmory.shared.presentation.map.ui.KoreaMapStatusMessage
@@ -71,8 +67,15 @@ fun MapmoryApp(
         providedRecordsViewModel ?: TripRecordsViewModel(appLocations)
     }
     val recordsUiState = recordsViewModel.uiState
+    var mapScope by remember { mutableStateOf(MapScope.KOREA) }
+    var koreaMapUiState by remember { mutableStateOf<KoreaMapUiState>(KoreaMapUiState.ProvinceOverview) }
+    val locationsById = remember { appLocations.associateBy(Location::id) }
 
     fun navigateBack(): Boolean {
+        if (mapScope == MapScope.KOREA && koreaMapUiState is KoreaMapUiState.DistrictDetail) {
+            koreaMapUiState = KoreaMapUiState.ProvinceOverview
+            return true
+        }
         if (navController.currentDestination?.id == navController.graph.startDestinationId) {
             return false
         }
@@ -93,28 +96,21 @@ fun MapmoryApp(
         onDispose { navigation?.unbindBackHandler() }
     }
 
-    var mapScope by remember { mutableStateOf(MapScope.KOREA) }
-    var selectedProvinceCode by remember { mutableStateOf<String?>(null) }
-    var koreaMapRetryKey by remember { mutableStateOf(0) }
-    var koreaMapUiState by remember { mutableStateOf<KoreaMapUiState>(KoreaMapUiState.Idle) }
-    val mapHttpClient = remember { createHttpClient() }
-    val koreaMapDataSource = remember(mapHttpClient) { KoreaMapRemoteDataSource(mapHttpClient) }
-    val locationsById = remember { appLocations.associateBy(Location::id) }
-
-    DisposableEffect(mapHttpClient) {
-        onDispose { mapHttpClient.close() }
-    }
-
-    LaunchedEffect(mapScope, koreaMapRetryKey) {
-        if (mapScope != MapScope.KOREA) return@LaunchedEffect
-        koreaMapUiState = KoreaMapUiState.Loading
-        koreaMapUiState = koreaMapDataSource.load()
-            .fold(
-                onSuccess = KoreaMapUiState::Success,
-                onFailure = { error ->
-                    KoreaMapUiState.Error(error.message ?: "대한민국 지도를 불러오지 못했습니다.")
-                },
-            )
+    LaunchedEffect(koreaMapUiState) {
+        val loading = koreaMapUiState as? KoreaMapUiState.DistrictLoading ?: return@LaunchedEffect
+        koreaMapUiState = runCatching {
+            GeneratedKoreaDistrictMapData.forProvince(loading.provinceCode)
+        }.fold(
+            onSuccess = { regions ->
+                KoreaMapUiState.DistrictDetail(loading.provinceCode, regions)
+            },
+            onFailure = { error ->
+                KoreaMapUiState.Error(
+                    provinceCode = loading.provinceCode,
+                    message = error.message ?: "시·군·구 지도를 불러오지 못했습니다.",
+                )
+            },
+        )
     }
 
     fun navigateToTab(route: Any) {
@@ -131,18 +127,8 @@ fun MapmoryApp(
         recordsViewModel.onAction(TripRecordAction.MapLocationSelected(location))
     }
 
-    fun handleMapDistrictClick(
-        regionCode: String,
-        regions: List<ProvincePolygon>,
-        provinceCode: String?,
-    ) {
-        val districtLocations = appLocations.filter { location ->
-            location.type == LocationType.DISTRICT &&
-                locationsById[location.parentId]?.regionCode == provinceCode
-        }
-        val regionName = regions.firstOrNull { it.code == regionCode }?.name ?: return
-        val location = findMapDistrictLocation(regionName, districtLocations)
-
+    fun handleMapDistrictClick(regionCode: String, provinceCode: String) {
+        val location = findMapDistrictLocation(regionCode, provinceCode, appLocations)
         location?.let { recordsViewModel.onAction(TripRecordAction.MapLocationSelected(it)) }
     }
 
@@ -175,9 +161,12 @@ fun MapmoryApp(
             else -> locationsById[location.parentId]?.regionCode
         }
     }.toSet()
-    val selectedProvinceAppCode = selectedProvinceCode
-        ?.let(::serverProvinceCodeForGeoJson)
-        ?.let { "KR-$it" }
+    val selectedProvinceAppCode = when (val state = koreaMapUiState) {
+        is KoreaMapUiState.DistrictLoading -> state.provinceCode
+        is KoreaMapUiState.DistrictDetail -> state.provinceCode
+        is KoreaMapUiState.Error -> state.provinceCode
+        KoreaMapUiState.ProvinceOverview -> null
+    }
     val selectedProvinceVisitedCount = selectedProvinceAppCode?.let { provinceCode ->
         visitedLocations.count { location ->
             location.type == LocationType.DISTRICT &&
@@ -200,7 +189,7 @@ fun MapmoryApp(
                 },
                 onMapScopeChange = {
                     mapScope = it
-                    selectedProvinceCode = null
+                    koreaMapUiState = KoreaMapUiState.ProvinceOverview
                 },
                 mapContent = {
                     when (mapScope) {
@@ -211,29 +200,35 @@ fun MapmoryApp(
                         )
 
                         MapScope.KOREA -> when (val state = koreaMapUiState) {
-                            KoreaMapUiState.Idle,
-                            KoreaMapUiState.Loading,
-                            -> KoreaMapStatusMessage("대한민국 지도를 불러오는 중...")
+                            KoreaMapUiState.ProvinceOverview -> MapArtwork(
+                                scope = MapScope.KOREA,
+                                visitedRegionCodes = visitedRegionCodes,
+                                koreaRegions = GeneratedKoreaMapData.provinces,
+                                onRegionClick = { provinceCode ->
+                                    koreaMapUiState = KoreaMapUiState.DistrictLoading(provinceCode)
+                                },
+                            )
+
+                            is KoreaMapUiState.DistrictLoading -> KoreaMapStatusMessage(
+                                "${state.provinceCode} 시·군·구 지도를 불러오는 중...",
+                            )
 
                             is KoreaMapUiState.Error -> KoreaMapStatusMessage(
                                 message = state.message,
                                 actionLabel = "다시 시도",
-                                onAction = { koreaMapRetryKey++ },
+                                onAction = {
+                                    koreaMapUiState = KoreaMapUiState.DistrictLoading(state.provinceCode)
+                                },
                             )
 
-                            is KoreaMapUiState.Success -> {
-                                val selectedServerProvinceCode = selectedProvinceCode
-                                    ?.let(::serverProvinceCodeForGeoJson)
-                                    ?.let { "KR-$it" }
-                                val regions = selectedServerProvinceCode?.let(state.data::displayDistrictsFor)
-                                    ?: GeneratedKoreaMapData.provinces
-                                val visitedCodes = if (selectedServerProvinceCode == null) {
+                            is KoreaMapUiState.DistrictDetail -> {
+                                val visitedCodes = if (selectedProvinceAppCode == null) {
                                     visitedRegionCodes
                                 } else {
                                     visitedLocations
                                         .filter { location ->
                                             location.type == LocationType.DISTRICT &&
-                                                locationsById[location.parentId]?.regionCode == selectedServerProvinceCode
+                                                locationsById[location.parentId]?.regionCode == selectedProvinceAppCode
                                         }
                                         .map { it.regionCode }
                                         .toSet()
@@ -242,22 +237,10 @@ fun MapmoryApp(
                                 MapArtwork(
                                     scope = MapScope.KOREA,
                                     visitedRegionCodes = visitedCodes,
-                                    koreaRegions = regions,
-                                    showRegionLabels = selectedProvinceCode != null,
+                                    koreaRegions = state.regions,
+                                    showRegionLabels = true,
                                     onRegionClick = { regionCode ->
-                                        if (selectedProvinceCode == null) {
-                                            selectedProvinceCode = if (regionCode.startsWith("KR-")) {
-                                                geoJsonProvinceCodeForServer(regionCode)
-                                            } else {
-                                                regionCode
-                                            }
-                                        } else {
-                                            handleMapDistrictClick(
-                                                regionCode = regionCode,
-                                                regions = regions,
-                                                provinceCode = selectedServerProvinceCode,
-                                            )
-                                        }
+                                        handleMapDistrictClick(regionCode, state.provinceCode)
                                     },
                                 )
                             }
@@ -265,20 +248,11 @@ fun MapmoryApp(
                     }
                 },
                 onBackClick = {},
-                mapDetailTitle = selectedProvinceCode?.let { code ->
-                    (koreaMapUiState as? KoreaMapUiState.Success)
-                        ?.data
-                        ?.provinces
-                        ?.firstOrNull { it.code == code }
-                        ?.name
+                mapDetailTitle = selectedProvinceAppCode?.let { code ->
+                    GeneratedKoreaMapData.provinces.firstOrNull { it.code == code }?.name
                 },
-                mapDetailTotal = selectedProvinceCode?.let { code ->
-                    (koreaMapUiState as? KoreaMapUiState.Success)
-                        ?.data
-                        ?.displayDistrictsFor("KR-${serverProvinceCodeForGeoJson(code)}")
-                        ?.size
-                },
-                onMapDetailBackClick = { selectedProvinceCode = null },
+                mapDetailTotal = (koreaMapUiState as? KoreaMapUiState.DistrictDetail)?.regions?.size,
+                onMapDetailBackClick = { koreaMapUiState = KoreaMapUiState.ProvinceOverview },
                 onRecordClick = { navigateToTab(RecordsRoute) },
                 onCreateClick = {
                     recordsViewModel.onAction(TripRecordAction.StartCreating())
@@ -398,6 +372,19 @@ fun MapmoryApp(
 }
 
 fun createTripRecordsViewModel(): TripRecordsViewModel = TripRecordsViewModel(appLocations)
+
+internal fun findMapDistrictLocation(
+    regionCode: String,
+    provinceCode: String,
+    locations: List<Location>,
+): Location? {
+    val locationsById = locations.associateBy(Location::id)
+    return locations.firstOrNull { location ->
+        location.type == LocationType.DISTRICT &&
+            location.regionCode == regionCode &&
+            locationsById[location.parentId]?.regionCode == provinceCode
+    }
+}
 
 internal fun findMapDistrictLocation(
     mapRegionName: String,
