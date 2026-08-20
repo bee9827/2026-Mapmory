@@ -15,14 +15,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import re
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-PART_COUNT = 4
+MAX_PROVINCE_POINTS_PER_PART = 3_000
 DISTRICT_SOURCE_PROVINCE_CODES = {
     "11": "KR-11", "21": "KR-26", "22": "KR-27", "23": "KR-28",
     "24": "KR-29", "25": "KR-30", "26": "KR-31", "29": "KR-50",
@@ -44,7 +43,10 @@ PROVINCE_NAMES = {
 METROPOLITAN_PROVINCES = {
     "KR-11", "KR-26", "KR-27", "KR-28", "KR-29", "KR-30", "KR-31", "KR-50",
 }
-MAJOR_PROVINCE_CODES = frozenset(METROPOLITAN_PROVINCES)
+# Never mix province boundaries from different sources in one overview map.
+# Adjacent polygons must use the same coordinate set or narrow gaps can appear
+# between them after projection (for example Ulsan/Gyeongnam and Sejong/Chungnam).
+PROVINCE_OVERRIDE_CODES = frozenset(PROVINCE_NAMES)
 DEFAULT_PROVINCE_OVERRIDE_TOLERANCE = 0.002
 PROVINCE_PREFIXES = tuple(PROVINCE_NAMES.values()) + ("강원도", "전라북도")
 CITY_DISTRICT_PATTERN = re.compile(r"^(.+시).+구$")
@@ -266,6 +268,24 @@ def write_province_part(output: Path, index: int, features) -> str:
     return object_name
 
 
+def partition_province_features(features, max_points: int = MAX_PROVINCE_POINTS_PER_PART):
+    """Keep generated JVM static initializers below the method-size limit."""
+    parts = []
+    current = []
+    current_points = 0
+    for feature in features:
+        feature_points = sum(len(ring) for ring in feature[2])
+        if current and current_points + feature_points > max_points:
+            parts.append(current)
+            current = []
+            current_points = 0
+        current.append(feature)
+        current_points += feature_points
+    if current:
+        parts.append(current)
+    return parts
+
+
 def write_provinces(
     output: Path,
     source: Path,
@@ -277,12 +297,11 @@ def write_provinces(
     features = read_province_features(source)
     if override_source:
         override_features = read_province_features(override_source, override_tolerance)
-        features = merge_province_features(features, override_features, MAJOR_PROVINCE_CODES)
-    chunk_size = math.ceil(len(features) / PART_COUNT)
+        features = merge_province_features(features, override_features, PROVINCE_OVERRIDE_CODES)
+    feature_parts = partition_province_features(features)
     names = [
-        write_province_part(output, index, features[index * chunk_size:(index + 1) * chunk_size])
-        for index in range(PART_COUNT)
-        if features[index * chunk_size:(index + 1) * chunk_size]
+        write_province_part(output, index, part)
+        for index, part in enumerate(feature_parts)
     ]
     parts = ",\n".join(f"        {name}.provinces" for name in names)
     aggregator = f"""package com.mapmory.shared.presentation.map.data
@@ -345,7 +364,7 @@ def main() -> None:
         "--province-override-tolerance",
         type=float,
         default=DEFAULT_PROVINCE_OVERRIDE_TOLERANCE,
-        help="RDP tolerance in degrees for the eight metropolitan/Sejong province overrides.",
+        help="RDP tolerance in degrees for the topology-compatible province overrides.",
     )
     parser.add_argument("--district-source", type=Path)
     parser.add_argument("--locations-source", type=Path)

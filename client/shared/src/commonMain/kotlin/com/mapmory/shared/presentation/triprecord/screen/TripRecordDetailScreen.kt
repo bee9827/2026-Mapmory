@@ -270,7 +270,7 @@ private fun DetailBackButton(
         contentDescription = "뒤로가기",
         onClick = onClick,
         containerColor = TripRecordPalette.surface.copy(alpha = 0.5f),
-        contentColor = Color.White,
+        contentColor = TripRecordPalette.contentOnMedia,
         modifier = modifier,
     )
 }
@@ -289,7 +289,7 @@ private fun DetailMoreButton(
             contentDescription = "더보기",
             onClick = { expanded = true },
             containerColor = TripRecordPalette.surface.copy(alpha = 0.5f),
-            contentColor = Color.White,
+            contentColor = TripRecordPalette.contentOnMedia,
         )
         DropdownMenu(
             expanded = expanded,
@@ -350,7 +350,7 @@ private fun TripRecordBottomCard(
                 RecordMetadataChip(
                     text = it,
                     icon = RecordMetadataIcon.Date,
-                    containerColor = TripRecordMetadataDateBackground,
+                    containerColor = TripRecordPalette.metadataDateBackground,
                     contentColor = TripRecordPalette.text,
                 )
             }
@@ -484,7 +484,6 @@ private enum class RecordMetadataIcon {
     Date,
 }
 
-private val TripRecordMetadataDateBackground = Color(0xFF24292D)
 
 private fun Modifier.overlapPhoto(overlap: Dp): Modifier = layout { measurable, constraints ->
     val overlapPx = overlap.roundToPx()

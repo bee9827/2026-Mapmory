@@ -10,12 +10,13 @@ import kotlin.test.assertTrue
 
 class KoreaMapStaticDataTest {
     @Test
-    fun everySelectableDistrictUsesAKnownProvinceCode() {
+    fun everyMapSelectableDistrictUsesAKnownProvinceCode() {
         val provinceCodes = GeneratedKoreaMapData.provinces.map { it.code }
+        val mapSelectableDistricts = KoreanSelectableDistrictCodes.filter { it.provinceCode != null }
 
         assertEquals(17, provinceCodes.size)
-        assertTrue(KoreanSelectableDistrictCodes.isNotEmpty())
-        assertTrue(KoreanSelectableDistrictCodes.all { it.provinceCode in provinceCodes })
+        assertTrue(mapSelectableDistricts.isNotEmpty())
+        assertTrue(mapSelectableDistricts.all { it.provinceCode in provinceCodes })
     }
 
     @Test
@@ -59,6 +60,20 @@ class KoreaMapStaticDataTest {
             "KR-41",
             GeneratedKoreaMapData.provinces.regionAt(GeoPoint(127.20f, 37.40f))?.code,
         )
+    }
+
+    @Test
+    fun adjacentProvinceBoundariesShareCoordinatesWithoutVisibleGaps() {
+        assertTrue(sharedBoundaryEdgeCount("KR-31", "KR-48") > 0, "울산과 경남 경계가 분리되어 있습니다")
+        assertTrue(sharedBoundaryEdgeCount("KR-50", "KR-44") > 0, "세종과 충남 경계가 분리되어 있습니다")
+    }
+
+    private fun sharedBoundaryEdgeCount(firstCode: String, secondCode: String): Int {
+        val regions = GeneratedKoreaMapData.provinces.associateBy { it.code }
+        fun edges(code: String): Set<Set<GeoPoint>> = regions.getValue(code).rings
+            .flatMap { ring -> ring.zipWithNext { start, end -> setOf(start, end) } }
+            .toSet()
+        return edges(firstCode).intersect(edges(secondCode)).size
     }
 
     private fun square(

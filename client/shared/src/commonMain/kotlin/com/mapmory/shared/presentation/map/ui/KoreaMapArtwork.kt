@@ -112,10 +112,11 @@ fun KoreaMapArtwork(
             },
     ) {
         if (!projection.isValid) return@Canvas
+        val transform = MapTransform(zoom, pan)
         val outlineWidth = max(0.7f, size.minDimension * 0.0028f)
 
-        provinces.forEach { province ->
-            val isVisited = province.code in visitedRegionCodes
+        regions.forEach { region ->
+            val isVisited = region.code in visitedRegionCodes
             val fillColor = if (isVisited) Color(0xFF35C987) else Color(0xFF1B2536)
             val outlineColor = if (isVisited) {
                 Color(0xFF8AEBC1).copy(alpha = 0.82f)

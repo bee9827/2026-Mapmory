@@ -35,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalUriHandler
@@ -61,8 +60,8 @@ fun TripProfileScreen(
     var showSettings by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
 
-    TripRecordBackground(modifier = modifier, backgroundColor = StatsBackground) {
-        Column(Modifier.fillMaxSize().background(StatsBackground)) {
+    TripRecordBackground(modifier = modifier, backgroundColor = TripRecordPalette.pageBackground) {
+        Column(Modifier.fillMaxSize().background(TripRecordPalette.pageBackground)) {
             StatisticsHeader(onSettingsClick = { showSettings = true })
 
             when (statisticsUiState) {
@@ -70,14 +69,14 @@ fun TripProfileScreen(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(color = StatsPrimary)
+                    CircularProgressIndicator(color = TripRecordPalette.primary)
                 }
 
                 is TripStatisticsUiState.Error -> Box(
                     modifier = Modifier.fillMaxWidth().weight(1f).padding(24.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(statisticsUiState.message, color = StatsMuted, fontSize = 13.sp)
+                    Text(statisticsUiState.message, color = TripRecordPalette.secondaryText, fontSize = 13.sp)
                 }
 
                 is TripStatisticsUiState.Success -> StatisticsContent(
@@ -92,11 +91,11 @@ fun TripProfileScreen(
                 onRecordClick = onRecordClick,
                 onCreateClick = onCreateClick,
                 onProfileClick = onProfileClick,
-                backgroundColor = StatsBackground,
-                dividerColor = StatsNavigationDivider,
-                selectedIconColor = StatsPrimary,
-                selectedLabelColor = StatsNavigationSelectedLabel,
-                unselectedColor = StatsNavigationUnselected,
+                backgroundColor = TripRecordPalette.pageBackground,
+                dividerColor = TripRecordPalette.navigationDivider,
+                selectedIconColor = TripRecordPalette.primary,
+                selectedLabelColor = TripRecordPalette.navigationSelectedLabel,
+                unselectedColor = TripRecordPalette.navigationUnselected,
                 contentTopPadding = 6.dp,
             )
         }
@@ -105,19 +104,19 @@ fun TripProfileScreen(
     if (showSettings) {
         AlertDialog(
             onDismissRequest = { showSettings = false },
-            containerColor = StatsCardBackground,
-            title = { Text("설정", color = StatsText) },
-            text = { Text("Mapmory의 서비스 정책을 확인할 수 있어요.", color = StatsBody) },
+            containerColor = TripRecordPalette.surface,
+            title = { Text("설정", color = TripRecordPalette.headingText) },
+            text = { Text("Mapmory의 서비스 정책을 확인할 수 있어요.", color = TripRecordPalette.bodyText) },
             confirmButton = {
                 if (PrivacyPolicy.URL.isNotBlank()) {
                     TextButton(onClick = { uriHandler.openUri(PrivacyPolicy.URL) }) {
-                        Text("개인정보 처리방침", color = StatsPrimary)
+                        Text("개인정보 처리방침", color = TripRecordPalette.primary)
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSettings = false }) {
-                    Text("닫기", color = StatsMuted)
+                    Text("닫기", color = TripRecordPalette.secondaryText)
                 }
             },
         )
@@ -134,14 +133,14 @@ private fun StatisticsHeader(onSettingsClick: () -> Unit) {
         Column {
             Text(
                 text = "MY TRAVEL DATA",
-                color = StatsPrimary,
+                color = TripRecordPalette.primary,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 1.2.sp,
             )
             Text(
                 text = "여행 통계",
-                color = StatsText,
+                color = TripRecordPalette.headingText,
                 fontSize = 25.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(top = 4.dp),
@@ -149,7 +148,7 @@ private fun StatisticsHeader(onSettingsClick: () -> Unit) {
         }
         Text(
             text = "⚙",
-            color = StatsMuted,
+            color = TripRecordPalette.secondaryText,
             fontSize = 21.sp,
             modifier = Modifier.clickable(onClick = onSettingsClick).padding(7.dp),
         )
@@ -177,8 +176,8 @@ private fun PassportCard(statistics: TripStatisticsUiModel) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, StatsLine),
-        colors = CardDefaults.cardColors(containerColor = StatsCardBackground),
+        border = BorderStroke(1.dp, TripRecordPalette.border),
+        colors = CardDefaults.cardColors(containerColor = TripRecordPalette.surface),
     ) {
         Column(Modifier.padding(start = 14.dp, top = 18.dp, end = 14.dp, bottom = 13.dp)) {
             Row(
@@ -188,14 +187,14 @@ private fun PassportCard(statistics: TripStatisticsUiModel) {
             ) {
                 Text(
                     text = "MAPMORY PASSPORT",
-                    color = StatsAccent,
+                    color = TripRecordPalette.secondaryAccent,
                     fontSize = 8.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 0.8.sp,
                 )
                 Text(
                     text = "${statistics.travelerName}의 방문 지도",
-                    color = StatsText,
+                    color = TripRecordPalette.headingText,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -209,11 +208,11 @@ private fun PassportCard(statistics: TripStatisticsUiModel) {
                 modifier = Modifier.padding(start = 4.dp, top = 11.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.size(10.dp).background(StatsPrimary, RoundedCornerShape(3.dp)))
+                Box(Modifier.size(10.dp).background(TripRecordPalette.primary, RoundedCornerShape(3.dp)))
                 Spacer(Modifier.width(7.dp))
                 Text(
                     text = "색칠된 국가는 여행 일지가 있는 곳이에요",
-                    color = StatsMuted,
+                    color = TripRecordPalette.secondaryText,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -232,8 +231,8 @@ private fun PassportWorldMap(
     Canvas(
         modifier = modifier
             .clip(mapShape)
-            .background(StatsBackground)
-            .border(1.dp, StatsMapBorder, mapShape),
+            .background(TripRecordPalette.pageBackground)
+            .border(1.dp, TripStatisticsPalette.mapBorder, mapShape),
     ) {
         countries.filterNot { it.code == "AQ" }.forEach { country ->
             country.rings.forEach { ring ->
@@ -262,10 +261,10 @@ private fun PassportWorldMap(
                         close()
                     }
                     val visited = country.code in visitedCountryCodes
-                    drawPath(path, color = if (visited) StatsPrimary else StatsMapLand)
+                    drawPath(path, color = if (visited) TripRecordPalette.primary else TripStatisticsPalette.mapLand)
                     drawPath(
                         path,
-                        color = if (visited) StatsAccent.copy(alpha = 0.75f) else StatsMapOutline,
+                        color = if (visited) TripRecordPalette.secondaryAccent.copy(alpha = 0.75f) else TripStatisticsPalette.mapOutline,
                         style = Stroke(width = 0.7.dp.toPx()),
                     )
                 }
@@ -279,11 +278,11 @@ private fun VisitProgressCard(statistics: TripStatisticsUiModel) {
     StatsCard {
         VisitProgress("전세계 방문률", statistics.worldVisitedCount, 195, "개국")
         Spacer(Modifier.height(21.dp))
-        Spacer(Modifier.fillMaxWidth().height(1.dp).background(StatsDivider))
+        Spacer(Modifier.fillMaxWidth().height(1.dp).background(TripStatisticsPalette.divider))
         Spacer(Modifier.height(18.dp))
         VisitProgress("대한민국 방문률", statistics.koreaVisitedCount, 17, "지역")
         Spacer(Modifier.height(20.dp))
-        Spacer(Modifier.fillMaxWidth().height(1.dp).background(StatsDivider))
+        Spacer(Modifier.fillMaxWidth().height(1.dp).background(TripStatisticsPalette.divider))
         Row(modifier = Modifier.fillMaxWidth().padding(top = 17.dp)) {
             SummaryValue("여행 기록", statistics.recordCount, Modifier.weight(1f))
             SummaryValue("사진", statistics.photoCount, Modifier.weight(1f))
@@ -293,25 +292,25 @@ private fun VisitProgressCard(statistics: TripStatisticsUiModel) {
 
 @Composable
 private fun VisitProgress(label: String, value: Int, total: Int, unit: String) {
-    Text(label, color = StatsBody, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    Text(label, color = TripRecordPalette.bodyText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     Row(
         modifier = Modifier.padding(top = 9.dp, bottom = 12.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
-        Text(value.toString(), color = StatsText, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-        Text(unit, color = StatsAccent, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp, bottom = 3.dp))
+        Text(value.toString(), color = TripRecordPalette.headingText, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Text(unit, color = TripRecordPalette.secondaryAccent, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp, bottom = 3.dp))
     }
     ProgressBar(progress = value.toFloat() / total)
 }
 
 @Composable
 private fun ProgressBar(progress: Float) {
-    Box(modifier = Modifier.fillMaxWidth().height(10.dp).background(StatsSoft, CircleShape)) {
+    Box(modifier = Modifier.fillMaxWidth().height(10.dp).background(TripRecordPalette.softSurface, CircleShape)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(progress.coerceIn(0f, 1f))
                 .height(10.dp)
-                .background(StatsPrimary, CircleShape),
+                .background(TripRecordPalette.primary, CircleShape),
         )
     }
 }
@@ -319,10 +318,10 @@ private fun ProgressBar(progress: Float) {
 @Composable
 private fun SummaryValue(label: String, value: Int, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(label, color = StatsMuted, fontSize = 11.sp)
+        Text(label, color = TripRecordPalette.secondaryText, fontSize = 11.sp)
         Text(
             text = value.toString(),
-            color = StatsText,
+            color = TripRecordPalette.headingText,
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 4.dp),
@@ -333,11 +332,11 @@ private fun SummaryValue(label: String, value: Int, modifier: Modifier = Modifie
 @Composable
 private fun RankingCard(topLocations: List<TopLocationUiModel>) {
     StatsCard {
-        Text("가장 많이 방문한 곳", color = StatsText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text("가장 많이 방문한 곳", color = TripRecordPalette.headingText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         if (topLocations.isEmpty()) {
             Text(
                 text = "아직 집계할 여행 기록이 없어요",
-                color = StatsMuted,
+                color = TripRecordPalette.secondaryText,
                 fontSize = 12.sp,
                 modifier = Modifier.padding(top = 17.dp, bottom = 4.dp),
             )
@@ -362,28 +361,28 @@ private fun RankingRow(index: Int, location: TopLocationUiModel) {
     ) {
         Box(
             modifier = Modifier.size(26.dp).background(
-                color = if (index == 0) StatsPrimary else StatsSoft,
+                color = if (index == 0) TripRecordPalette.primary else TripRecordPalette.softSurface,
                 shape = CircleShape,
             ),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = (index + 1).toString(),
-                color = if (index == 0) StatsOnPrimary else StatsMuted,
+                color = if (index == 0) TripRecordPalette.onPrimary else TripRecordPalette.secondaryText,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
         Text(
             text = location.locationName,
-            color = StatsText,
+            color = TripRecordPalette.headingText,
             fontSize = 13.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 10.dp).weight(1f),
         )
         Text(
             text = "${location.visitCount}회",
-            color = StatsAccent,
+            color = TripRecordPalette.secondaryAccent,
             fontSize = 12.sp,
             fontWeight = FontWeight.ExtraBold,
         )
@@ -395,27 +394,9 @@ private fun StatsCard(content: @Composable () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
-        border = BorderStroke(1.dp, StatsLine),
-        colors = CardDefaults.cardColors(containerColor = StatsCardBackground),
+        border = BorderStroke(1.dp, TripRecordPalette.border),
+        colors = CardDefaults.cardColors(containerColor = TripRecordPalette.surface),
     ) {
         Column(Modifier.padding(21.dp)) { content() }
     }
 }
-
-private val StatsBackground = Color(0xFF121518)
-private val StatsCardBackground = Color(0xFF1A1E22)
-private val StatsLine = Color(0xFF2B3135)
-private val StatsDivider = Color(0xFF30363A)
-private val StatsSoft = Color(0xFF1C2124)
-private val StatsPrimary = Color(0xFF35C987)
-private val StatsAccent = Color(0xFF67D9A2)
-private val StatsOnPrimary = Color(0xFF071B12)
-private val StatsText = Color(0xFFF1F5F3)
-private val StatsBody = Color(0xFFBDC6C2)
-private val StatsMuted = Color(0xFF89938F)
-private val StatsMapBorder = Color(0xFF343B40)
-private val StatsMapLand = Color(0xFF293039)
-private val StatsMapOutline = Color(0xFF424B53)
-private val StatsNavigationDivider = Color(0xFF2C3431)
-private val StatsNavigationUnselected = Color(0xFF77827D)
-private val StatsNavigationSelectedLabel = Color(0xFFA2ADA7)

@@ -9,5 +9,6 @@ internal object GeneratedKoreaMapData {
         GeneratedKoreaMapDataPart01.provinces,
         GeneratedKoreaMapDataPart02.provinces,
         GeneratedKoreaMapDataPart03.provinces,
+        GeneratedKoreaMapDataPart04.provinces,
     ).flatten()
 }
