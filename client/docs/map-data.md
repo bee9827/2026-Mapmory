@@ -25,3 +25,22 @@ curl -L --fail -o /tmp/geoBoundaries-KOR-ADM1_simplified.geojson \
   https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/KOR/ADM1/geoBoundaries-KOR-ADM1_simplified.geojson
 python3 tools/map/generate_korea_map.py /tmp/geoBoundaries-KOR-ADM1_simplified.geojson
 ```
+
+## 대한민국 시·군·구 데이터
+
+시·군·구 경계 원본은 개발 시점에만 [southkorea/southkorea-maps의 KOSTAT 2018 데이터](https://github.com/southkorea/southkorea-maps/tree/master/kostat/2018/json)를 사용합니다. 앱 실행 중에는 GitHub Raw나 다른 외부 주소를 호출하지 않습니다.
+
+생성기는 `KoreanDistrictCode.kt`의 앱 코드와 원본의 2018 통계청 코드를 매칭해, 최종 리소스에 행정표준코드만 기록합니다. 예를 들어 원본 평창군 `32340`은 앱 코드 `51760`, 원본 강원도 `32`는 앱 코드 `KR-42`로 변환됩니다. 오래된 코드 prefix를 앱에서 임의 변환하지 않으므로, 지도 클릭 결과와 `Location.regionCode`가 같은 값을 사용합니다.
+
+프로토타입의 표시 단위에 맞춰 광역시·특별시는 구 단위로, 일반 도는 시·군 단위로 생성합니다. `Polygon`과 `MultiPolygon`의 외곽 링만 저장하며, 내부 링은 hole이므로 저장·채우기 대상에서 제외합니다. 좌표는 소수점 5자리로 정규화하고 시·도별 JSON 리소스를 분리해 시·도 선택 뒤 해당 파일 하나만 지연 파싱합니다.
+
+```bash
+python3 tools/map/generate_korea_map.py \
+  --district-source /tmp/skorea-municipalities.json \
+  --locations-source shared/src/commonMain/kotlin/com/mapmory/shared/domain/model/KoreanDistrictCode.kt \
+  --resource-output shared/src/commonMain/composeResources/files
+```
+
+현재 생성 결과는 17개 시·도, 225개 표시 경계입니다. 2018년 원본에만 존재하는 인천의 과거 구역 4개는 현재 앱의 canonical `Location`과 대응하지 않아 생성에서 제외했습니다. 행정구역 데이터가 갱신되면 새 원본과 `KoreanDistrictCode.kt`를 함께 검토한 뒤 생성해야 합니다.
+
+경계 원본의 이용 조건과 출처 표기는 [원본 저장소 안내](https://github.com/southkorea/southkorea-maps)를 따릅니다. 경계 데이터는 앱 기능을 위한 정적 리소스이고 여행 기록·Location ID 같은 비즈니스 데이터의 소유자가 아닙니다.
