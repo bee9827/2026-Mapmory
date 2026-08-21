@@ -178,7 +178,8 @@ private data class MapTransform(
 )
 
 private const val MinZoom = 1f
-private const val MaxZoom = 4f
+private const val MaxZoom = 6f
+private const val PanSlackFraction = 0.1f
 
 @Composable
 fun KoreaMapStatusMessage(
@@ -306,12 +307,14 @@ internal fun clampKoreaMapPan(
             leading = transformedLeft,
             trailing = transformedRight,
             viewportSize = viewportSize.width.toFloat(),
+            slack = viewportSize.width * PanSlackFraction,
         ),
         y = clampMapAxis(
             value = pan.y,
             leading = transformedTop,
             trailing = transformedBottom,
             viewportSize = viewportSize.height.toFloat(),
+            slack = viewportSize.height * PanSlackFraction,
         ),
     )
 }
@@ -321,9 +324,10 @@ private fun clampMapAxis(
     leading: Float,
     trailing: Float,
     viewportSize: Float,
+    slack: Float,
 ): Float {
-    if (trailing - leading <= viewportSize) return 0f
-    return value.coerceIn(viewportSize - trailing, -leading)
+    if (trailing - leading <= viewportSize) return value.coerceIn(-slack, slack)
+    return value.coerceIn(viewportSize - trailing - slack, -leading + slack)
 }
 
 internal fun List<ProvincePolygon>.regionAt(point: GeoPoint): ProvincePolygon? =

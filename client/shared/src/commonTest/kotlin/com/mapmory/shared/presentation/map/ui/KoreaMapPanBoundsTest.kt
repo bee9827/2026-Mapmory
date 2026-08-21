@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 
 class KoreaMapPanBoundsTest {
     @Test
-    fun `map smaller than viewport stays at its initial position`() {
+    fun `map smaller than viewport can move within the slack boundary`() {
         val result = clampKoreaMapPan(
             pan = Offset(500f, -500f),
             zoom = 1f,
@@ -18,8 +18,8 @@ class KoreaMapPanBoundsTest {
             mapHeight = 600f,
         )
 
-        assertEquals(0f, result.x, 0.001f)
-        assertEquals(0f, result.y, 0.001f)
+        assertEquals(100f, result.x, 0.001f)
+        assertEquals(-80f, result.y, 0.001f)
     }
 
     @Test
@@ -34,7 +34,7 @@ class KoreaMapPanBoundsTest {
             mapHeight = 600f,
         )
 
-        assertEquals(300f, result.x, 0.001f)
-        assertEquals(-200f, result.y, 0.001f)
+        assertEquals(400f, result.x, 0.001f)
+        assertEquals(-280f, result.y, 0.001f)
     }
 }
