@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.presentation.photo.PhotoLibraryActionsFactory
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
 import com.mapmory.shared.presentation.date.PlatformDatePicker
@@ -104,6 +105,9 @@ fun TripRecordEditorScreen(
     onMapClick: () -> Unit = {},
     onRecordClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
+    photoLibraryActionsFactory: PhotoLibraryActionsFactory = { onPicked, onRecommended, onMessage ->
+        rememberPhotoLibraryActions(onPicked, onRecommended, onMessage)
+    },
     modifier: Modifier = Modifier,
 ) {
     val selectableLocations = remember(locations) {
@@ -116,17 +120,23 @@ fun TripRecordEditorScreen(
     var photoMessage by remember { mutableStateOf<String?>(null) }
     var recommendedPhotos by remember { mutableStateOf(emptyList<SelectedPhoto>()) }
     var selectedRecommendationIds by remember { mutableStateOf(emptySet<String>()) }
+    var knownRecommendationIds by remember { mutableStateOf(emptySet<String>()) }
     var showRecommendationSheet by remember { mutableStateOf(false) }
+    var isPreparingRecommendationPhotos by remember { mutableStateOf(false) }
     var datePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
     val dismissKeyboardOnTap = rememberDismissKeyboardOnTapModifier()
-    val photoLibrary = rememberPhotoLibraryActions(
-        onPhotosPicked = { photos ->
+    val photoLibrary = photoLibraryActionsFactory(
+        { photos ->
             photoMessage = null
             onPhotosAdded(photos)
         },
-        onPhotosRecommended = { photos ->
+        { photos ->
+            val incomingIds = photos.map(SelectedPhoto::id).toSet()
+            val newlyLoadedIds = incomingIds - knownRecommendationIds
             recommendedPhotos = photos
-            selectedRecommendationIds = photos.map(SelectedPhoto::id).toSet()
+            selectedRecommendationIds =
+                (selectedRecommendationIds intersect incomingIds) + newlyLoadedIds
+            knownRecommendationIds = incomingIds
             showRecommendationSheet = photos.isNotEmpty()
             photoMessage = if (photos.isEmpty()) {
                 "선택한 지역에서 촬영된 GPS 사진을 찾지 못했어요."
@@ -134,7 +144,7 @@ fun TripRecordEditorScreen(
                 null
             }
         },
-        onMessage = { photoMessage = it },
+        { photoMessage = it },
     )
     val locationResultsListState = rememberLazyListState()
     val filteredLocations = remember(locationSearchQuery, selectableLocations) {
@@ -181,6 +191,10 @@ fun TripRecordEditorScreen(
                                     photoMessage = "사진을 추천받으려면 장소를 먼저 선택해 주세요."
                                 } else {
                                     photoMessage = "${selectedLocation.name}에서 촬영된 사진을 찾고 있어요."
+                                    recommendedPhotos = emptyList()
+                                    selectedRecommendationIds = emptySet()
+                                    knownRecommendationIds = emptySet()
+                                    showRecommendationSheet = false
                                     val parentName = locations
                                         .firstOrNull { it.id == selectedLocation.parentId }
                                         ?.name
@@ -396,16 +410,33 @@ fun TripRecordEditorScreen(
                 }
                 TextButton(
                     onClick = {
-                        onPhotosAdded(
-                            recommendedPhotos.filter { it.id in selectedRecommendationIds },
-                        )
-                        showRecommendationSheet = false
-                        photoMessage = null
+                        val selectedPhotos = recommendedPhotos
+                            .filter { it.id in selectedRecommendationIds }
+                        isPreparingRecommendationPhotos = true
+                        photoLibrary.prepareForAdding(selectedPhotos) { preparedPhotos ->
+                            isPreparingRecommendationPhotos = false
+                            if (preparedPhotos.isEmpty()) {
+                                photoMessage = "선택한 사진의 원본을 읽지 못했어요."
+                            } else {
+                                onPhotosAdded(preparedPhotos)
+                                showRecommendationSheet = false
+                                photoMessage = null
+                            }
+                        }
                     },
-                    enabled = selectedRecommendationIds.isNotEmpty(),
+                    enabled = selectedRecommendationIds.isNotEmpty() &&
+                        !isPreparingRecommendationPhotos,
                     modifier = Modifier.align(Alignment.End),
                 ) {
-                    Text("선택한 사진 추가", color = TripRecordPalette.accent, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isPreparingRecommendationPhotos) {
+                            "원본 불러오는 중…"
+                        } else {
+                            "선택한 사진 추가"
+                        },
+                        color = TripRecordPalette.accent,
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
                 Spacer(Modifier.height(12.dp))
             }
