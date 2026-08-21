@@ -193,7 +193,7 @@ private val InitialLongitude = -127f * PI.toFloat() / 180f
 private const val RotationSensitivity = 1.35f
 private const val MaxTilt = 1.3f
 private const val MinZoom = 0.75f
-private const val MaxZoom = 6f
+private const val MaxZoom = 8f
 
 
 private fun countryAtScreenPoint(
