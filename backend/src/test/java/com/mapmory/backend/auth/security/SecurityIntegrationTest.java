@@ -1,5 +1,6 @@
 package com.mapmory.backend.auth.security;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -81,6 +82,21 @@ class SecurityIntegrationTest extends IntegrationTest {
         // ERROR 디스패치가 permitAll이 아니면 이 응답이 401로 덮인다.
         mockMvc.perform(post("/api/v1/auth/no-such-endpoint"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void Actuator_health는_토큰_없이_접근할_수_있다() throws Exception{
+        mockMvc.perform(get ("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
+    void Prometheus_Metric은_토큰_없이_조회할_수_있다() throws Exception {
+        mockMvc.perform(get ("/actuator/prometheus"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("# HELP")))
+                .andExpect(content().string(containsString("jvm_memory_used_bytes")));
     }
 
     @TestConfiguration

@@ -14,3 +14,33 @@ spring:
 jwt:
   # 로컬 개발 전용 키. 운영에는 절대 사용하지 말 것. (HS256: 최소 32바이트)
   secret: local-development-only-secret-key-change-me-0123456789
+
+
+management:
+  endpoints:
+    access:
+      default: none
+    web:
+      exposure:
+        include:
+          - health
+          - prometheus
+        discovery:
+          enabled: false
+
+  endpoint:
+    health:
+      access: read-only
+      show-details: never
+    prometheus:
+      access: read-only
+
+  metrics:
+    tags:
+      service: ${spring.application.name}
+      environment: local
+      version: ${APP_VERSION:local}
+
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
