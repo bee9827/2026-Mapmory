@@ -75,7 +75,7 @@ erDiagram
         bigint id PK
         bigint member_id FK
         varchar name
-        varchar normalized_name
+        varchar name_key
         datetime created_at
         datetime updated_at
     }
@@ -207,44 +207,45 @@ erDiagram
 | `id` | `BIGINT` | PK, AUTO_INCREMENT | 태그 식별자 |
 | `member_id` | `BIGINT` | NOT NULL, FK → `member.id` | 태그 소유 회원 |
 | `name` | `VARCHAR(30)` | NOT NULL | 화면에 표시할 이름, `#` 제외 |
-| `normalized_name` | `VARCHAR(30)` | NOT NULL | 중복 판단용 정규화 이름 |
+| `name_key` | `VARCHAR(30)` | NOT NULL | 이름 중복 판단용 키 |
 | `created_at` | `DATETIME` | NOT NULL | 생성 시각 |
 | `updated_at` | `DATETIME` | NOT NULL | 마지막 수정 시각 |
 
-권장 제약조건과 인덱스:
+권장 제약조건:
 
 ```sql
 CONSTRAINT fk_tag_member
     FOREIGN KEY (member_id) REFERENCES member (id),
-CONSTRAINT uk_tag_member_normalized_name
-    UNIQUE (member_id, normalized_name),
-INDEX idx_tag_member_created (member_id, created_at, id)
+CONSTRAINT uk_tag_member_name_key
+    UNIQUE (member_id, name_key)
 ```
 
-`normalized_name`은 앞뒤 공백 제거, 연속 공백 축약, Unicode NFC, 소문자 변환을 적용한다. 같은 회원 안에서만 유일하며 다른 회원은 같은 이름을 사용할 수 있다.
+`name`은 앞뒤 공백 제거, 연속 공백 축약, Unicode NFC를 적용하되 사용자가 입력한 대소문자는 보존한다. `name_key`는 `name`을 소문자로 변환한 이름 중복 판단용 키다. 같은 회원 안에서만 유일하며 다른 회원은 같은 이름을 사용할 수 있다. 회원별 태그는 임시로 최대 10개이므로 `created_at` 정렬 전용 인덱스는 두지 않고, 조회 시 데이터베이스가 최대 10개 행을 정렬하도록 한다.
 
 ### `travel_record_tag`
 
 | 컬럼 | 타입 | 제약조건 | 설명 |
 | --- | --- | --- | --- |
-| `travel_record_id` | `BIGINT` | PK, FK → `travel_record.id` | 여행 기록 식별자 |
-| `tag_id` | `BIGINT` | PK, FK → `tag.id` | 태그 식별자 |
+| `id` | `BIGINT` | PK, AUTO_INCREMENT | 여행 기록-태그 연결 식별자 |
+| `travel_record_id` | `BIGINT` | NOT NULL, FK → `travel_record.id` | 여행 기록 식별자 |
+| `tag_id` | `BIGINT` | NOT NULL, FK → `tag.id` | 태그 식별자 |
 | `created_at` | `DATETIME` | NOT NULL | 연결 생성 시각 |
 
-권장 제약조건과 인덱스:
+권장 제약조건:
 
 ```sql
-PRIMARY KEY (travel_record_id, tag_id),
+PRIMARY KEY (id),
+CONSTRAINT uk_travel_record_tag_tag_record
+    UNIQUE (tag_id, travel_record_id),
 CONSTRAINT fk_travel_record_tag_record
     FOREIGN KEY (travel_record_id) REFERENCES travel_record (id)
     ON DELETE CASCADE,
 CONSTRAINT fk_travel_record_tag_tag
     FOREIGN KEY (tag_id) REFERENCES tag (id)
-    ON DELETE CASCADE,
-INDEX idx_travel_record_tag_tag_record (tag_id, travel_record_id)
+    ON DELETE CASCADE
 ```
 
-복합 PK는 같은 기록에 동일한 태그가 중복 연결되는 것을 차단한다. `tag_id` 선두 인덱스는 태그별 기록 목록과 지도 집계에 사용한다.
+단일 PK는 JPA 엔티티 식별을 단순하게 유지한다. `(tag_id, travel_record_id)` UNIQUE 제약조건은 같은 기록에 동일한 태그가 중복 연결되는 것을 차단하며, 태그별 기록 목록과 지도 집계에서는 커버링 인덱스로 활용할 수 있다. MySQL InnoDB는 `travel_record_id`로 시작하는 인덱스가 없으므로 해당 외래 키를 위한 인덱스를 자동 생성한다.
 
 데이터베이스 외래 키만으로는 기록과 태그가 같은 회원 소유인지 보장하지 못한다. 서비스는 연결 전에 요청한 모든 태그를 `member_id`로 한 번에 조회하고, 조회된 고유 ID 수가 요청 ID 수와 같은지 검증해야 한다. 검증과 연결 저장은 여행 기록 생성·수정 트랜잭션 안에서 수행한다.
 
