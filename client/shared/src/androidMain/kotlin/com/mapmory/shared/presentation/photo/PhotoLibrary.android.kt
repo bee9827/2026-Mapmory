@@ -191,13 +191,6 @@ private data class GalleryEntry(
     val longitude: Double,
 )
 
-private data class PhotoMetadataSyncResult(
-    val photos: List<PhotoMetadataEntity>,
-    val exifReadCount: Int,
-    val reusedCoordinateCount: Int,
-    val previousPhotoCount: Int,
-)
-
 @Suppress("DEPRECATION")
 private suspend fun Context.recommendPhotos(
     target: Location,
@@ -291,11 +284,23 @@ private suspend fun Context.recommendPhotos(
 
 private suspend fun Context.syncPhotoMetadata(): PhotoMetadataSyncResult {
     val dao = PhotoMetadataDatabase.getInstance(this).photoMetadataDao()
-    val previousPhotos = traceSuspendSection("photo.sync.room.read", TraceCookie.RoomRead) {
-        dao.getAll()
-    }
-    val previousById = previousPhotos.associateBy(PhotoMetadataEntity::mediaId)
-    val scanId = System.currentTimeMillis()
+    return PhotoMetadataSync(
+        readPrevious = {
+            traceSuspendSection("photo.sync.room.read", TraceCookie.RoomRead) {
+                dao.getAll()
+            }
+        },
+        readCurrent = { queryPhotoMetadataSnapshot() },
+        readCoordinates = { contentUri -> readCoordinates(Uri.parse(contentUri)) },
+        writeSnapshot = { photos, scanId ->
+            traceSuspendSection("photo.sync.room.write", TraceCookie.RoomWrite) {
+                dao.replaceSnapshot(photos, scanId)
+            }
+        },
+    ).sync()
+}
+
+private fun Context.queryPhotoMetadataSnapshot(): List<PhotoMetadataCandidate>? {
     val projection = arrayOf(
         MediaStore.Images.Media._ID,
         MediaStore.Images.Media.DISPLAY_NAME,
@@ -306,9 +311,7 @@ private suspend fun Context.syncPhotoMetadata(): PhotoMetadataSyncResult {
         MediaStore.Images.Media.WIDTH,
         MediaStore.Images.Media.HEIGHT,
     )
-    var exifReadCount = 0
-    var reusedCoordinateCount = 0
-    val photos = traceSection("photo.sync.mediastore") {
+    return traceSection("photo.sync.mediastore") {
         contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             projection,
@@ -317,64 +320,32 @@ private suspend fun Context.syncPhotoMetadata(): PhotoMetadataSyncResult {
             "${MediaStore.Images.Media.DATE_TAKEN} DESC",
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-            buildList<PhotoMetadataEntity> {
+            buildList {
                 while (cursor.moveToNext()) {
                     val mediaId = cursor.getLong(idColumn)
                     val uri = ContentUris.withAppendedId(
                         MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
                         mediaId,
                     )
-                    val modifiedAtSeconds = cursor.getLongOrNull(MediaStore.Images.Media.DATE_MODIFIED) ?: 0L
-                    val previous = previousById[mediaId]
-                    val coordinates = if (
-                        previous != null &&
-                        previous.modifiedAtSeconds == modifiedAtSeconds &&
-                        previous.latitude != null &&
-                        previous.longitude != null
-                    ) {
-                        reusedCoordinateCount++
-                        requireNotNull(previous.latitude) to requireNotNull(previous.longitude)
-                    } else {
-                        exifReadCount++
-                        readCoordinates(uri)
-                    }
                     add(
-                        PhotoMetadataEntity(
+                        PhotoMetadataCandidate(
                             mediaId = mediaId,
                             contentUri = uri.toString(),
                             displayName = cursor.getStringOrNull(MediaStore.Images.Media.DISPLAY_NAME)
                                 ?: "여행 사진",
                             capturedAtMillis = cursor.getLongOrNull(MediaStore.Images.Media.DATE_TAKEN)
                                 ?.takeIf { it > 0L },
-                            modifiedAtSeconds = modifiedAtSeconds,
-                            latitude = coordinates?.first,
-                            longitude = coordinates?.second,
+                            modifiedAtSeconds = cursor.getLongOrNull(MediaStore.Images.Media.DATE_MODIFIED) ?: 0L,
                             mimeType = cursor.getStringOrNull(MediaStore.Images.Media.MIME_TYPE),
                             sizeBytes = cursor.getLongOrNull(MediaStore.Images.Media.SIZE) ?: 0L,
                             width = cursor.getIntOrNull(MediaStore.Images.Media.WIDTH) ?: 0,
                             height = cursor.getIntOrNull(MediaStore.Images.Media.HEIGHT) ?: 0,
-                            scanId = scanId,
                         ),
                     )
                 }
             }
         }
-    } ?: return PhotoMetadataSyncResult(
-        photos = emptyList(),
-        exifReadCount = exifReadCount,
-        reusedCoordinateCount = reusedCoordinateCount,
-        previousPhotoCount = previousPhotos.size,
-    )
-
-    traceSuspendSection("photo.sync.room.write", TraceCookie.RoomWrite) {
-        dao.replaceSnapshot(photos, scanId)
     }
-    return PhotoMetadataSyncResult(
-        photos = photos,
-        exifReadCount = exifReadCount,
-        reusedCoordinateCount = reusedCoordinateCount,
-        previousPhotoCount = previousPhotos.size,
-    )
 }
 
 private inline fun <T> traceSection(name: String, block: () -> T): T {
