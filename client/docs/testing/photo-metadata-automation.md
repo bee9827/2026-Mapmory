@@ -10,7 +10,9 @@
 
 ## 실행
 
-`client` 디렉터리에서 실행한다.
+`client` 디렉터리에서 실행한다. 운영체제에 따라 Gradle Wrapper 실행 명령이 다르다.
+
+### macOS/Linux
 
 ```bash
 # 공통 캐시 규칙과 기존 공통 테스트
@@ -24,6 +26,17 @@
 
 # 앱 전체 Android 컴파일
 ./gradlew :androidApp:assembleDebug
+```
+
+### Windows
+
+Windows에서는 `./gradlew` 대신 `gradlew.bat`을 사용한다.
+
+```bat
+gradlew.bat :shared:jvmTest
+gradlew.bat :shared:testAndroidHostTest
+gradlew.bat :shared:androidConnectedCheck
+gradlew.bat :androidApp:assembleDebug
 ```
 
 `androidConnectedCheck`는 연결된 모든 기기에서 실행된다. 특정 기기만 사용할 때는 다른 기기를 종료하거나 Gradle의 device 선택 옵션을 사용한다.
