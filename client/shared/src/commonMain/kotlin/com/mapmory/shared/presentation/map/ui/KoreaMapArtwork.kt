@@ -80,8 +80,13 @@ fun KoreaMapArtwork(
                     panZoomLock = true,
                 ) { _, panChange, zoomChange, _ ->
                     val transform = currentTransform.value
-                    zoom = (transform.zoom * zoomChange).coerceIn(MinZoom, MaxZoom)
-                    pan = transform.pan + panChange
+                    val nextZoom = (transform.zoom * zoomChange).coerceIn(MinZoom, MaxZoom)
+                    zoom = nextZoom
+                    pan = projection.clampPan(
+                        pan = transform.pan + panChange,
+                        zoom = nextZoom,
+                        viewportSize = viewportSize,
+                    )
                 }
             }
             .pointerInput(viewportSize, projection, zoom, pan) {
@@ -173,7 +178,8 @@ private data class MapTransform(
 )
 
 private const val MinZoom = 1f
-private const val MaxZoom = 4f
+private const val MaxZoom = 6f
+private const val PanSlackFraction = 0.1f
 
 @Composable
 fun KoreaMapStatusMessage(
@@ -207,6 +213,8 @@ private data class KoreaProjection(
     private val scale: Float,
     private val left: Float,
     private val top: Float,
+    private val mapWidth: Float,
+    private val mapHeight: Float,
     val isValid: Boolean,
 ) {
     fun project(point: GeoPoint): Offset = Offset(
@@ -232,12 +240,22 @@ private data class KoreaProjection(
         )
     }
 
+    fun clampPan(pan: Offset, zoom: Float, viewportSize: IntSize): Offset = clampKoreaMapPan(
+        pan = pan,
+        zoom = zoom,
+        viewportSize = viewportSize,
+        mapLeft = left,
+        mapTop = top,
+        mapWidth = mapWidth,
+        mapHeight = mapHeight,
+    )
+
     companion object {
         fun from(bounds: KoreaBounds, viewportSize: IntSize): KoreaProjection {
             val longitudeSpan = bounds.maxLongitude - bounds.minLongitude
             val latitudeSpan = bounds.maxLatitude - bounds.minLatitude
             if (viewportSize.width <= 0 || viewportSize.height <= 0 || longitudeSpan <= 0f || latitudeSpan <= 0f) {
-                return KoreaProjection(bounds, 1f, 0f, 0f, 0f, false)
+                return KoreaProjection(bounds, 1f, 0f, 0f, 0f, 0f, 0f, false)
             }
 
             // Longitude degrees are physically shorter than latitude degrees in Korea.
@@ -260,9 +278,56 @@ private data class KoreaProjection(
             val left = (width - mapWidth) / 2f
             val top = ((height - mapHeight) / 2f - height * 0.07f)
                 .coerceAtLeast(verticalPadding)
-            return KoreaProjection(bounds, longitudeFactor, scale, left, top, true)
+            return KoreaProjection(bounds, longitudeFactor, scale, left, top, mapWidth, mapHeight, true)
         }
     }
+}
+
+internal fun clampKoreaMapPan(
+    pan: Offset,
+    zoom: Float,
+    viewportSize: IntSize,
+    mapLeft: Float,
+    mapTop: Float,
+    mapWidth: Float,
+    mapHeight: Float,
+): Offset {
+    if (viewportSize.width <= 0 || viewportSize.height <= 0 || zoom <= 0f) return pan
+
+    val centerX = viewportSize.width / 2f
+    val centerY = viewportSize.height / 2f
+    val transformedLeft = centerX + (mapLeft - centerX) * zoom
+    val transformedRight = centerX + (mapLeft + mapWidth - centerX) * zoom
+    val transformedTop = centerY + (mapTop - centerY) * zoom
+    val transformedBottom = centerY + (mapTop + mapHeight - centerY) * zoom
+
+    return Offset(
+        x = clampMapAxis(
+            value = pan.x,
+            leading = transformedLeft,
+            trailing = transformedRight,
+            viewportSize = viewportSize.width.toFloat(),
+            slack = viewportSize.width * PanSlackFraction,
+        ),
+        y = clampMapAxis(
+            value = pan.y,
+            leading = transformedTop,
+            trailing = transformedBottom,
+            viewportSize = viewportSize.height.toFloat(),
+            slack = viewportSize.height * PanSlackFraction,
+        ),
+    )
+}
+
+private fun clampMapAxis(
+    value: Float,
+    leading: Float,
+    trailing: Float,
+    viewportSize: Float,
+    slack: Float,
+): Float {
+    if (trailing - leading <= viewportSize) return value.coerceIn(-slack, slack)
+    return value.coerceIn(viewportSize - trailing - slack, -leading + slack)
 }
 
 internal fun List<ProvincePolygon>.regionAt(point: GeoPoint): ProvincePolygon? =

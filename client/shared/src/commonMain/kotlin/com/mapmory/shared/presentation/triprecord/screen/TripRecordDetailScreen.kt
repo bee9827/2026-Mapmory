@@ -176,9 +176,12 @@ private fun TripRecordPhotoSection(
             ) { page ->
                 val photo = media[page]
                 TripPhotoImage(
-                    imageBytes = photo.originalBytes?.bytesForDecoding()
-                        ?: photo.previewBytes?.bytesForDecoding(),
-                    fallbackBytes = photo.previewBytes?.bytesForDecoding(),
+                    // Preview bytes are orientation-normalized display data. Original bytes stay
+                    // untouched for persistence/upload and may carry EXIF orientation that the
+                    // common Skia decoder does not apply consistently across platforms.
+                    imageBytes = photo.previewBytes?.bytesForDecoding()
+                        ?: photo.originalBytes?.bytesForDecoding(),
+                    fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                     contentDescription = "${record.title} 사진 ${page + 1}",
                     modifier = Modifier.fillMaxSize(),
                     placeholderVariant = record.id.toInt() + page + 1,
