@@ -11,10 +11,11 @@ record TagName(
         @Column(name = "name", nullable = false, length = 30)
         String displayName,
 
-        @Column(name = "name_key", nullable = false, length = 30)
+        @Column(name = "name_key", nullable = false, length = 60)
         String nameKey
 ) {
-    private static final int MAX_LENGTH = 30;
+    private static final int MAX_DISPLAY_NAME_LENGTH = 30;
+    private static final int MAX_NAME_KEY_LENGTH = 60;
     private static final String FORBIDDEN_CHARACTERS = "#";
 
     TagName {
@@ -25,20 +26,30 @@ record TagName(
         validateNotNull(rawName);
 
         String displayName = normalizeDisplayName(rawName);
-        validateLength(displayName);
-        validateForbiddenCharacters(displayName);
-
         return new TagName(displayName, createNameKey(displayName));
     }
 
     private static void validatePersistedState(String displayName, String nameKey) {
-        validateNotNull(displayName);
-        validateLength(displayName);
-        validateForbiddenCharacters(displayName);
+        validateDisplayName(displayName);
+        validateNameKey(displayName, nameKey);
+    }
 
+    private static void validateDisplayName(String displayName) {
+        validateNotNull(displayName);
+        validateDisplayNameLength(displayName);
+        validateForbiddenCharacters(displayName);
         boolean isNormalizedDisplayName = displayName.equals(normalizeDisplayName(displayName));
+        if (!isNormalizedDisplayName) {
+            throwInvalidTagName();
+        }
+    }
+
+    private static void validateNameKey(String displayName, String nameKey) {
+        validateNotNull(nameKey);
+        validateNameKeyLength(nameKey);
+
         boolean hasMatchingNameKey = createNameKey(displayName).equals(nameKey);
-        if (!isNormalizedDisplayName || !hasMatchingNameKey) {
+        if (!hasMatchingNameKey) {
             throwInvalidTagName();
         }
     }
@@ -63,9 +74,16 @@ record TagName(
         return Normalizer.normalize(name, Normalizer.Form.NFC);
     }
 
-    private static void validateLength(String name) {
+    private static void validateDisplayNameLength(String name) {
         int length = name.codePointCount(0, name.length());
-        if (length < 1 || length > MAX_LENGTH) {
+        if (length < 1 || length > MAX_DISPLAY_NAME_LENGTH) {
+            throwInvalidTagName();
+        }
+    }
+
+    private static void validateNameKeyLength(String nameKey) {
+        int length = nameKey.codePointCount(0, nameKey.length());
+        if (length > MAX_NAME_KEY_LENGTH) {
             throwInvalidTagName();
         }
     }

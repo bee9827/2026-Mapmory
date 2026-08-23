@@ -53,4 +53,14 @@ class TagRepositoryTest extends MySqlTestContainerSupport {
                 tag.getId()
         )).isFalse();
     }
+
+    @Test
+    void 소문자_변환으로_늘어난_비교_키를_저장한다() {
+        Member member = memberRepository.save(Member.of("확장 태그 키 회원", UUID.randomUUID()));
+        String displayName = "İ".repeat(30);
+
+        Tag tag = tagRepository.saveAndFlush(Tag.of(member, displayName));
+
+        assertThat(tag.getName()).isEqualTo(displayName);
+    }
 }

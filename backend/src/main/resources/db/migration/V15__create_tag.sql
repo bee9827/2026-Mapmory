@@ -2,7 +2,7 @@ CREATE TABLE tag (
     id              BIGINT      AUTO_INCREMENT PRIMARY KEY,
     member_id       BIGINT      NOT NULL,
     name            VARCHAR(30) NOT NULL,
-    name_key        VARCHAR(30) COLLATE utf8mb4_0900_bin NOT NULL,
+    name_key        VARCHAR(60) COLLATE utf8mb4_0900_bin NOT NULL,
     created_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_tag_member FOREIGN KEY (member_id) REFERENCES member (id),

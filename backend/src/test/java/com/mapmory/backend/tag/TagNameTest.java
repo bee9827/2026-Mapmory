@@ -24,6 +24,14 @@ class TagNameTest {
     }
 
     @Test
+    void 소문자_변환으로_비교_키가_늘어나도_30자_표시_이름을_허용한다() {
+        TagName tagName = TagName.from("İ".repeat(30));
+
+        assertThat(tagName.displayName()).hasSize(30);
+        assertThat(tagName.nameKey().codePointCount(0, tagName.nameKey().length())).isEqualTo(60);
+    }
+
+    @Test
     void 유효하지_않은_이름을_거부한다() {
         assertInvalidName("   ");
         assertInvalidName("#연인");
