@@ -44,6 +44,7 @@ test("falls back to index.html for an unknown app route", async () => {
 test("does not turn missing API or write requests into the app shell", async () => {
   for (const request of [
     new Request("https://example.test/api/missing", { headers: { accept: "application/json" } }),
+    new Request("https://example.test/api/missing", { headers: { accept: "text/html" } }),
     new Request("https://example.test/flow", { method: "POST", headers: { accept: "text/html" } }),
   ]) {
     let calls = 0;

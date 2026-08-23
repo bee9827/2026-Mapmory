@@ -14,7 +14,7 @@ import {
   Sun,
 } from "@phosphor-icons/react";
 
-const DOWNLOAD_URL = "#download";
+const GOOGLE_PLAY_URL = import.meta.env.VITE_GOOGLE_PLAY_URL?.trim();
 const Globe = lazy(() => import("react-globe.gl"));
 
 const memories = [
@@ -123,7 +123,11 @@ function ThemeToggle({ theme, onChange }) {
 }
 
 function DownloadButton({ className = "" }) {
-  return <a className={`button button-primary ${className}`} href={DOWNLOAD_URL}><ArrowDown size={19} weight="bold" />Mapmory 다운로드</a>;
+  if (GOOGLE_PLAY_URL) {
+    return <a className={`button button-primary ${className}`} href={GOOGLE_PLAY_URL} target="_blank" rel="noreferrer"><ArrowDown size={19} weight="bold" />Mapmory 다운로드</a>;
+  }
+
+  return <a className={`button button-primary ${className}`} href="#download"><ArrowRight size={19} weight="bold" />출시 소식 확인하기</a>;
 }
 
 function InteractiveGlobe({ selected, onSelect, theme }) {
@@ -208,7 +212,7 @@ function MemoryCard({ memory }) {
   return (
     <article className="memory-card" aria-live="polite">
       <header><MapPin size={18} weight="fill" /><span>{memory.location}</span><small>{memory.country}</small></header>
-      <div className="memory-image-wrap"><img key={memory.image} src={memory.image} alt={`${memory.location}에서 남긴 실제 여행 장면`} /></div>
+      <div className="memory-image-wrap"><img key={memory.image} src={memory.image} alt={`${memory.location}에서 남긴 실제 여행 장면`} loading="lazy" decoding="async" /></div>
       <div className="memory-card-body">
         <span className="memory-kind">실제 사진으로 열린 기억</span>
         <h2>{memory.title}</h2>
@@ -280,10 +284,10 @@ function KoreaMap({ selected, onSelect, theme }) {
 
   return (
     <div className="korea-map-shell" ref={shellRef}>
-      <canvas ref={canvasRef} aria-label="대한민국 17개 시도 상세 지도" />
+      <canvas ref={canvasRef} role="img" aria-label="대한민국 17개 시도 상세 지도. 지도 위의 대전, 합정, 여수 버튼으로 장소 기억을 선택할 수 있습니다." />
       {koreaMemories.map((memory) => {
         const [x, y] = projectPoint(memory.lng, memory.lat, dimensions.width, dimensions.height);
-        return <button key={memory.key} type="button" className={`map-hotspot ${selected.key === memory.key ? "is-active" : ""}`} style={{ left: x, top: y }} onClick={() => onSelect(memory)} aria-label={`${memory.location} 기억 보기`}><span className="hotspot-dot"><MapPin size={15} weight="fill" /></span><span className="hotspot-label">{memory.location.split(" · ")[0]}<small>{memory.category}</small></span></button>;
+        return <button key={memory.key} type="button" className={`map-hotspot ${selected.key === memory.key ? "is-active" : ""}`} style={{ left: x, top: y }} onClick={() => onSelect(memory)} aria-label={`${memory.location} 기억 보기`} aria-pressed={selected.key === memory.key}><span className="hotspot-dot"><MapPin size={15} weight="fill" /></span><span className="hotspot-label">{memory.location.split(" · ")[0]}<small>{memory.category}</small></span></button>;
       })}
       <div className="map-legend"><i />기억이 있는 지역 <span>{koreaMemories.length}곳</span></div>
     </div>
@@ -305,7 +309,7 @@ function KoreaDetailExperience({ theme }) {
           <div><span className="app-kicker">MY TRIP MAP</span><h3>나의 대한민국 지도</h3></div>
           <div className="map-progress"><strong>3</strong><span>/ 17</span><small>18% 채움</small></div>
         </header>
-        <div className="scope-toggle" role="group" aria-label="지도 범위"><button type="button" className="is-active"><MapTrifold size={17} weight="fill" />대한민국</button><a href="#experience"><GlobeHemisphereEast size={17} weight="duotone" />전세계</a></div>
+        <div className="scope-toggle" role="group" aria-label="지도 범위"><button type="button" className="is-active" aria-pressed="true"><MapTrifold size={17} weight="fill" />대한민국</button><a href="#experience"><GlobeHemisphereEast size={17} weight="duotone" />전세계</a></div>
         <div className="region-shortcuts" role="group" aria-label="상세 지역 기억 선택">
           <span><b>2단계</b> 지역을 눌러 기억을 여세요</span>
           <div>{koreaMemories.map((memory) => <button key={memory.key} type="button" className={selected.key === memory.key ? "is-active" : ""} onClick={() => setSelected(memory)} aria-pressed={selected.key === memory.key}>{memory.location}</button>)}</div>
@@ -313,7 +317,7 @@ function KoreaDetailExperience({ theme }) {
         <div className="detail-stage">
           <KoreaMap selected={selected} onSelect={setSelected} theme={theme} />
           <article className="region-memory-card" aria-live="polite">
-            <div className="region-photo"><img key={selected.image} src={selected.image} alt={`${selected.location}의 실제 사진`} /><span>{selected.category}</span></div>
+            <div className="region-photo"><img key={selected.image} src={selected.image} alt={`${selected.location}의 실제 사진`} loading="lazy" decoding="async" /><span>{selected.category}</span></div>
             <div className="region-memory-body">
               <p className="region-location"><NavigationArrow size={17} weight="fill" />{selected.location}<small>{selected.province}</small></p>
               <h3>{selected.title}</h3>
