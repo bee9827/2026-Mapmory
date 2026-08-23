@@ -5,6 +5,7 @@ import com.mapmory.backend.member.Member;
 import com.mapmory.backend.tag.dto.TagRequest;
 import com.mapmory.backend.tag.dto.TagResponse;
 import java.util.List;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TagService {
     private static final int MAX_TAGS_PER_MEMBER = 10;
+    private static final String TAG_NAME_UNIQUE_CONSTRAINT = "uk_tag_member_name_key";
     private final TagRepository tagRepository;
 
     public TagService(TagRepository tagRepository) {
@@ -20,9 +22,9 @@ public class TagService {
 
     @Transactional
     public TagResponse create(Member member, TagRequest request) {
-        validateTagLimit(member.getId());
-
         Tag tag = Tag.of(member, request.name());
+
+        validateTagLimit(member.getId());
         validateUniqueNameForCreate(member.getId(), tag.getNameKey());
 
         return TagResponse.from(saveTag(tag));
@@ -88,7 +90,7 @@ public class TagService {
         try {
             return tagRepository.saveAndFlush(tag);
         } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(TagErrorCode.TAG_NAME_CONFLICT);
+            throw translateIntegrityViolation(exception);
         }
     }
 
@@ -96,7 +98,26 @@ public class TagService {
         try {
             tagRepository.flush();
         } catch (DataIntegrityViolationException exception) {
-            throw new BusinessException(TagErrorCode.TAG_NAME_CONFLICT);
+            throw translateIntegrityViolation(exception);
         }
+    }
+
+    private RuntimeException translateIntegrityViolation(DataIntegrityViolationException exception) {
+        if (isTagNameUniqueConstraintViolation(exception)) {
+            return new BusinessException(TagErrorCode.TAG_NAME_CONFLICT);
+        }
+        return exception;
+    }
+
+    private boolean isTagNameUniqueConstraintViolation(Throwable exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException constraintViolation
+                    && TAG_NAME_UNIQUE_CONSTRAINT.equalsIgnoreCase(constraintViolation.getConstraintName())) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 }
