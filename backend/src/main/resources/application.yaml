@@ -49,6 +49,8 @@ server:
     context-path: /
 
 logging:
+  pattern:
+    level: "%5p [requestId:%X{requestId:-}]"
   level:
     org.hibernate.SQL: debug
     org.flywaydb: debug
