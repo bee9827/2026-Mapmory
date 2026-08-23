@@ -93,10 +93,18 @@ class SecurityIntegrationTest extends IntegrationTest {
 
     @Test
     void Prometheus_Metric은_토큰_없이_조회할_수_있다() throws Exception {
+        // HTTP 서버 요청 메트릭이 생성되도록 일반 엔드포인트를 먼저 호출한다.
+        mockMvc.perform(get("/health"))
+                .andExpect(status().isOk());
+
         mockMvc.perform(get ("/actuator/prometheus"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("# HELP")))
-                .andExpect(content().string(containsString("jvm_memory_used_bytes")));
+                .andExpect(content().string(containsString("jvm_memory_used_bytes")))
+                .andExpect(content().string(containsString("hikaricp_connections")))
+                .andExpect(content().string(containsString("http_server_requests_seconds_count")))
+                .andExpect(content().string(containsString("service=\"mapmory-backend\"")))
+                .andExpect(content().string(containsString("environment=\"local\"")));
     }
 
     @TestConfiguration

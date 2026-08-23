@@ -15,6 +15,10 @@ spring:
           time_zone: UTC
         format_sql: true
     open-in-view: false
+  http:
+    clients:
+      connect-timeout: 2s
+      read-timeout: 3s
 
   flyway:
     enabled: true
@@ -49,3 +53,31 @@ logging:
     org.hibernate.SQL: debug
     org.flywaydb: debug
     org.springframework.boot.autoconfigure: debug
+
+management:
+  endpoints:
+    access:
+      default: none
+    web:
+      exposure:
+        include:
+          - health
+          - prometheus
+      discovery:
+        enabled: false
+
+  endpoint:
+    health:
+      access: read-only
+      show-details: never
+    prometheus:
+      access: read-only
+
+  metrics:
+    tags:
+      service: ${spring.application.name}
+      version: ${APP_VERSION:unknown}
+
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true

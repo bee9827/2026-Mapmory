@@ -14,3 +14,14 @@ jwt:
 logging:
   level:
     org.hibernate.SQL: warn
+    org.flywaydb: info
+    org.springframework.boot.autoconfigure: info
+
+management:
+  server:
+    port: 8081
+    address: 127.0.0.1
+
+  metrics:
+    tags:
+      environment: prod
