@@ -40,4 +40,17 @@ class TagRepositoryTest extends MySqlTestContainerSupport {
                 .extracting(Tag::getName)
                 .containsExactly("cafe", "café");
     }
+
+    @Test
+    void 임베디드_이름의_비교_키로_중복을_조회한다() {
+        Member member = memberRepository.save(Member.of("태그 중복 조회 회원", UUID.randomUUID()));
+        Tag tag = tagRepository.saveAndFlush(Tag.of(member, "Cafe"));
+
+        assertThat(tagRepository.existsByMemberIdAndNameKey(member.getId(), "cafe")).isTrue();
+        assertThat(tagRepository.existsByMemberIdAndNameKeyAndIdNot(
+                member.getId(),
+                "cafe",
+                tag.getId()
+        )).isFalse();
+    }
 }

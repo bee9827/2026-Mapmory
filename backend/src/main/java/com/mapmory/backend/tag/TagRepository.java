@@ -4,13 +4,35 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface TagRepository extends JpaRepository<Tag, Long> {
     long countByMemberId(Long memberId);
 
-    boolean existsByMemberIdAndNameKey(Long memberId, String nameKey);
+    @Query("""
+            SELECT CASE WHEN COUNT(t) > 0 THEN TRUE ELSE FALSE END
+            FROM Tag t
+            WHERE t.member.id = :memberId
+              AND t.tagName.nameKey = :nameKey
+            """)
+    boolean existsByMemberIdAndNameKey(
+            @Param("memberId") Long memberId,
+            @Param("nameKey") String nameKey
+    );
 
-    boolean existsByMemberIdAndNameKeyAndIdNot(Long memberId, String nameKey, Long id);
+    @Query("""
+            SELECT CASE WHEN COUNT(t) > 0 THEN TRUE ELSE FALSE END
+            FROM Tag t
+            WHERE t.member.id = :memberId
+              AND t.tagName.nameKey = :nameKey
+              AND t.id <> :id
+            """)
+    boolean existsByMemberIdAndNameKeyAndIdNot(
+            @Param("memberId") Long memberId,
+            @Param("nameKey") String nameKey,
+            @Param("id") Long id
+    );
 
     Optional<Tag> findByIdAndMemberId(Long id, Long memberId);
 
