@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.PrivacyPolicy
@@ -46,6 +47,8 @@ import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
 import com.mapmory.shared.presentation.triprecord.state.TopLocationUiModel
 import com.mapmory.shared.presentation.triprecord.state.TripStatisticsUiModel
 import com.mapmory.shared.presentation.triprecord.state.TripStatisticsUiState
+import com.mapmory.shared.preview.PreviewSurface
+import com.mapmory.shared.preview.previewStatistics
 import kotlin.math.abs
 
 @Composable
@@ -398,5 +401,62 @@ private fun StatsCard(content: @Composable () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = TripRecordPalette.surface),
     ) {
         Column(Modifier.padding(21.dp)) { content() }
+    }
+}
+
+@Preview(
+    name = "여행 통계",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun TripProfileScreenPreview() {
+    PreviewSurface {
+        TripProfileScreen(
+            statisticsUiState = TripStatisticsUiState.Success(previewStatistics),
+            onMapClick = {},
+            onRecordClick = {},
+            onCreateClick = {},
+            onProfileClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 통계 로딩",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun LoadingTripProfileScreenPreview() {
+    PreviewSurface {
+        TripProfileScreen(
+            statisticsUiState = TripStatisticsUiState.Loading,
+            onMapClick = {},
+            onRecordClick = {},
+            onCreateClick = {},
+            onProfileClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 통계 오류",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun ErrorTripProfileScreenPreview() {
+    PreviewSurface {
+        TripProfileScreen(
+            statisticsUiState = TripStatisticsUiState.Error("여행 통계를 불러오지 못했어요."),
+            onMapClick = {},
+            onRecordClick = {},
+            onCreateClick = {},
+            onProfileClick = {},
+        )
     }
 }

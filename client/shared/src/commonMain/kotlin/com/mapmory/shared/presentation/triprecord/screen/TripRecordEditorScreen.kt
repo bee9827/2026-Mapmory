@@ -55,6 +55,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,6 +68,8 @@ import com.mapmory.shared.presentation.date.PlatformDatePicker
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+import com.mapmory.shared.preview.PreviewSurface
+import com.mapmory.shared.preview.previewLocations
 
 private const val StartDatePickerTarget = "start"
 private const val EndDatePickerTarget = "end"
@@ -1002,6 +1005,90 @@ private fun LocationSearchResult(
                 fontWeight = FontWeight.Bold,
             )
         }
+    }
+}
+
+@Preview(
+    name = "여행 기록 작성",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun TripRecordEditorScreenPreview() {
+    PreviewSurface {
+        TripRecordEditorScreen(
+            uiState = TripRecordEditorUiState(
+                selectedLocation = previewLocations[1],
+                title = "봄날의 서울",
+                content = "천천히 걸으며 발견한 서울의 새로운 모습",
+                startDate = "2026-04-12",
+                endDate = "2026-04-14",
+            ),
+            locations = previewLocations,
+            onLocationSelected = {},
+            onTitleChanged = {},
+            onContentChanged = {},
+            onStartDateChanged = {},
+            onEndDateChanged = {},
+            onSaveClick = {},
+            onBackClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 작성 빈 상태",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun EmptyTripRecordEditorScreenPreview() {
+    PreviewSurface {
+        TripRecordEditorScreen(
+            uiState = TripRecordEditorUiState(),
+            locations = previewLocations,
+            onLocationSelected = {},
+            onTitleChanged = {},
+            onContentChanged = {},
+            onStartDateChanged = {},
+            onEndDateChanged = {},
+            onSaveClick = {},
+            onBackClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 작성 오류",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun ErrorTripRecordEditorScreenPreview() {
+    PreviewSurface {
+        TripRecordEditorScreen(
+            uiState = TripRecordEditorUiState(
+                dirtyFields = setOf(
+                    TripRecordEditorErrorTarget.LOCATION,
+                    TripRecordEditorErrorTarget.TITLE,
+                ),
+                fieldErrors = mapOf(
+                    TripRecordEditorErrorTarget.LOCATION to "여행 장소를 선택해 주세요.",
+                    TripRecordEditorErrorTarget.TITLE to "제목을 입력해 주세요.",
+                ),
+            ),
+            locations = previewLocations,
+            onLocationSelected = {},
+            onTitleChanged = {},
+            onContentChanged = {},
+            onStartDateChanged = {},
+            onEndDateChanged = {},
+            onSaveClick = {},
+            onBackClick = {},
+        )
     }
 }
 

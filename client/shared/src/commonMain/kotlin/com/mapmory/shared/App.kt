@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -37,6 +38,7 @@ import com.mapmory.shared.presentation.triprecord.state.TripRecordEffect
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordAction
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordsViewModel
+import com.mapmory.shared.preview.PreviewSurface
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -500,4 +502,15 @@ private val appLocations = buildList {
             ),
         )
     }
+}
+
+@Preview(
+    name = "앱 지도",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun MapmoryAppPreview() {
+    PreviewSurface { MapmoryApp() }
 }

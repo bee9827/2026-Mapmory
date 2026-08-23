@@ -45,10 +45,12 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
+import com.mapmory.shared.preview.PreviewSurface
 import org.jetbrains.compose.resources.decodeToImageBitmap
 
 internal object TripRecordPalette {
@@ -518,4 +520,15 @@ fun TripMapArtwork(
     modifier: Modifier = Modifier,
 ) {
     KoreaMapArtwork(modifier = modifier)
+}
+
+@Preview(
+    name = "여행 지도 아트워크",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 500,
+)
+@Composable
+fun TripMapArtworkPreview() {
+    PreviewSurface { TripMapArtwork() }
 }
