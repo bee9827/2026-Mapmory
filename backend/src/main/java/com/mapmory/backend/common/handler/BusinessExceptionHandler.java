@@ -2,6 +2,7 @@ package com.mapmory.backend.common.handler;
 
 import com.mapmory.backend.common.ProblemDetailFactory;
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.common.exception.ErrorCode;
 import com.mapmory.backend.common.exception.ErrorKind;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -33,11 +34,7 @@ public class BusinessExceptionHandler {
     ) {
         HttpStatus status = toHttpStatus(exception.getErrorCode().kind());
 
-        log.debug("Business exception: code={}, status={}, method={}, uri={}",
-                exception.getErrorCode().code(),
-                status.value(),
-                request.getMethod(),
-                request.getRequestURI());
+        log(exception, status, request);
 
         return problemDetailFactory.from(
                 status,
@@ -45,6 +42,30 @@ public class BusinessExceptionHandler {
                 exception.getDetail(),
                 request
         );
+    }
+
+    private static void log(
+            BusinessException exception,
+            HttpStatus status,
+            HttpServletRequest request
+    ) {
+        ErrorCode errorCode = exception.getErrorCode();
+        // TODO: SERVICE_UNAVAILABLE 전체를 ERROR로 기록할지, KAKAO_UNAVAILABLE만 대상으로 할지 논의 필요
+        if (errorCode.kind() == ErrorKind.SERVICE_UNAVAILABLE) {
+            log.error("Business exception: code={}, status={}, method={}, uri={}",
+                    errorCode.code(),
+                    status.value(),
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    exception);
+            return;
+        }
+
+        log.debug("Business exception: code={}, status={}, method={}, uri={}",
+                errorCode.code(),
+                status.value(),
+                request.getMethod(),
+                request.getRequestURI());
     }
 
     private static HttpStatus toHttpStatus(ErrorKind kind) {
