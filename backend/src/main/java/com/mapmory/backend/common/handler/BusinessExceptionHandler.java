@@ -7,6 +7,7 @@ import com.mapmory.backend.common.exception.ErrorKind;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.spi.LoggingEventBuilder;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -51,17 +52,19 @@ public class BusinessExceptionHandler {
     ) {
         ErrorCode errorCode = exception.getErrorCode();
         // TODO: SERVICE_UNAVAILABLE 전체를 ERROR로 기록할지, KAKAO_UNAVAILABLE만 대상으로 할지 논의 필요
-        if (errorCode.kind() == ErrorKind.SERVICE_UNAVAILABLE) {
-            log.error("Business exception: code={}, status={}, method={}, uri={}",
-                    errorCode.code(),
-                    status.value(),
-                    request.getMethod(),
-                    request.getRequestURI(),
-                    exception);
-            return;
+        boolean serviceUnavailable = errorCode.kind() == ErrorKind.SERVICE_UNAVAILABLE;
+        LoggingEventBuilder event = serviceUnavailable ? log.atError() : log.atDebug();
+
+        event.addKeyValue("event", "BUSINESS_EXCEPTION")
+                .addKeyValue("errorCode", errorCode.code())
+                .addKeyValue("status", status.value())
+                .addKeyValue("httpMethod", request.getMethod())
+                .addKeyValue("uri", request.getRequestURI());
+        if (serviceUnavailable) {
+            event.setCause(exception);
         }
 
-        log.debug("Business exception: code={}, status={}, method={}, uri={}",
+        event.log("Business exception: code={}, status={}, method={}, uri={}",
                 errorCode.code(),
                 status.value(),
                 request.getMethod(),

@@ -6,13 +6,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.mapmory.backend.common.ProblemDetailFactory;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.common.exception.ErrorCode;
 import com.mapmory.backend.common.exception.ErrorKind;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.MediaType;
@@ -49,13 +55,33 @@ class BusinessExceptionHandlerTest {
 
     @Test
     void 서비스_불가_예외는_ERROR와_원인을_기록한다(CapturedOutput output) throws Exception {
-        mockMvc.perform(get("/test/service-unavailable"))
-                .andExpect(status().isServiceUnavailable());
+        Logger logger = (Logger) LoggerFactory.getLogger(BusinessExceptionHandler.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+
+        try {
+            mockMvc.perform(get("/test/service-unavailable"))
+                    .andExpect(status().isServiceUnavailable());
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
 
         assertThat(output)
                 .contains("ERROR")
                 .contains("code=SERVICE_UNAVAILABLE")
                 .contains("upstream failure");
+
+        ILoggingEvent logEvent = appender.list.getFirst();
+        Map<String, Object> fields = logEvent.getKeyValuePairs().stream()
+                .collect(Collectors.toMap(pair -> pair.key, pair -> pair.value));
+        assertThat(fields)
+                .containsEntry("event", "BUSINESS_EXCEPTION")
+                .containsEntry("errorCode", "SERVICE_UNAVAILABLE")
+                .containsEntry("status", 503)
+                .containsEntry("httpMethod", "GET")
+                .containsEntry("uri", "/test/service-unavailable");
     }
 
     @RestController

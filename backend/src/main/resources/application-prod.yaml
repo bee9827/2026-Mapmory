@@ -12,6 +12,14 @@ jwt:
   secret: ${JWT_SECRET}
 
 logging:
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: ${spring.application.name}
+        environment: prod
+        version: ${APP_VERSION:unknown}
   level:
     org.hibernate.SQL: warn
     org.flywaydb: info
