@@ -1,7 +1,7 @@
 package com.mapmory.backend.travelrecord.dto;
 
+import com.mapmory.backend.tag.Tag;
 import com.mapmory.backend.travelrecord.TravelRecord;
-import com.mapmory.backend.tag.dto.TagSummaryResponse;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
@@ -16,7 +16,7 @@ public record TravelRecordListResponse(
 ) {
     public static TravelRecordListResponse from(
             Page<TravelRecord> travelRecords,
-            Map<Long, List<TagSummaryResponse>> tagsByTravelRecordId
+            Map<Long, List<Tag>> tagsByTravelRecordId
     ) {
         return new TravelRecordListResponse(
                 travelRecords.getContent().stream()

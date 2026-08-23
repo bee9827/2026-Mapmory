@@ -5,10 +5,8 @@ import com.mapmory.backend.member.Member;
 import com.mapmory.backend.tag.Tag;
 import com.mapmory.backend.tag.TagErrorCode;
 import com.mapmory.backend.tag.TagRepository;
-import com.mapmory.backend.tag.dto.TagSummaryResponse;
 import com.mapmory.backend.travelrecord.TravelRecord;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -22,9 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TravelRecordTagService {
     private static final int MAX_TAGS_PER_RECORD = 5;
-    private static final Comparator<Tag> TAG_ORDER = Comparator
-            .comparing(Tag::getCreatedAt)
-            .thenComparingLong(Tag::getId);
 
     private final TagRepository tagRepository;
     private final TravelRecordTagRepository travelRecordTagRepository;
@@ -38,32 +33,30 @@ public class TravelRecordTagService {
     }
 
     @Transactional
-    public List<TagSummaryResponse> replace(Member member, TravelRecord travelRecord, List<Long> requestedTagIds) {
+    public List<Tag> replace(Member member, TravelRecord travelRecord, List<Long> requestedTagIds) {
         Set<Long> tagIds = validateAndCollectTagIds(requestedTagIds);
         List<Tag> tags = findOwnedTags(member.getId(), tagIds);
 
         replaceAssociations(travelRecord, tags);
 
-        return toTagSummaryResponses(tags);
+        return tags;
     }
 
     @Transactional(readOnly = true)
-    public List<TagSummaryResponse> findByTravelRecordId(Long travelRecordId) {
-        return travelRecordTagRepository.findTagsByTravelRecordId(travelRecordId).stream()
-                .map(TagSummaryResponse::from)
-                .toList();
+    public List<Tag> findByTravelRecordId(Long travelRecordId) {
+        return travelRecordTagRepository.findTagsByTravelRecordId(travelRecordId);
     }
 
     @Transactional(readOnly = true)
-    public Map<Long, List<TagSummaryResponse>> findByTravelRecordIds(Collection<Long> travelRecordIds) {
+    public Map<Long, List<Tag>> findByTravelRecordIds(Collection<Long> travelRecordIds) {
         if (travelRecordIds.isEmpty()) {
             return Map.of();
         }
 
-        Map<Long, List<TagSummaryResponse>> result = initializeEmptyResults(travelRecordIds);
+        Map<Long, List<Tag>> result = initializeEmptyResults(travelRecordIds);
         List<TravelRecordTag> associations =
                 travelRecordTagRepository.findAllWithTagByTravelRecordIdIn(travelRecordIds);
-        result.putAll(groupTagResponsesByTravelRecordId(associations));
+        result.putAll(groupTagsByTravelRecordId(associations));
 
         return result;
     }
@@ -91,7 +84,7 @@ public class TravelRecordTagService {
     }
 
     private List<Tag> findOwnedTags(Long memberId, Set<Long> tagIds) {
-        List<Tag> tags = tagRepository.findAllByMemberIdAndIdIn(memberId, tagIds);
+        List<Tag> tags = tagRepository.findAllByMemberIdAndIdInOrderByCreatedAtAscIdAsc(memberId, tagIds);
         if (tags.size() != tagIds.size()) {
             throw new BusinessException(TagErrorCode.TAG_NOT_FOUND);
         }
@@ -99,8 +92,7 @@ public class TravelRecordTagService {
     }
 
     private void replaceAssociations(TravelRecord travelRecord, List<Tag> tags) {
-        travelRecordTagRepository.deleteByTravelRecordId(travelRecord.getId());
-        travelRecordTagRepository.flush();
+        travelRecordTagRepository.deleteAllByTravelRecordIdInBulk(travelRecord.getId());
         travelRecordTagRepository.saveAll(createAssociations(travelRecord, tags));
     }
 
@@ -110,20 +102,13 @@ public class TravelRecordTagService {
                 .toList();
     }
 
-    private List<TagSummaryResponse> toTagSummaryResponses(List<Tag> tags) {
-        return tags.stream()
-                .sorted(TAG_ORDER)
-                .map(TagSummaryResponse::from)
-                .toList();
-    }
-
-    private Map<Long, List<TagSummaryResponse>> initializeEmptyResults(Collection<Long> travelRecordIds) {
-        Map<Long, List<TagSummaryResponse>> result = new HashMap<>();
+    private Map<Long, List<Tag>> initializeEmptyResults(Collection<Long> travelRecordIds) {
+        Map<Long, List<Tag>> result = new HashMap<>();
         travelRecordIds.forEach(id -> result.put(id, List.of()));
         return result;
     }
 
-    private Map<Long, List<TagSummaryResponse>> groupTagResponsesByTravelRecordId(
+    private Map<Long, List<Tag>> groupTagsByTravelRecordId(
             List<TravelRecordTag> associations
     ) {
         return associations.stream()
@@ -131,7 +116,7 @@ public class TravelRecordTagService {
                         TravelRecordTag::getTravelRecordId,
                         LinkedHashMap::new,
                         Collectors.mapping(
-                                association -> TagSummaryResponse.from(association.getTag()),
+                                TravelRecordTag::getTag,
                                 Collectors.toList()
                         )
                 ));

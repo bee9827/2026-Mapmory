@@ -38,5 +38,5 @@ public interface TagRepository extends JpaRepository<Tag, Long> {
 
     List<Tag> findAllByMemberIdOrderByCreatedAtAscIdAsc(Long memberId);
 
-    List<Tag> findAllByMemberIdAndIdIn(Long memberId, Collection<Long> ids);
+    List<Tag> findAllByMemberIdAndIdInOrderByCreatedAtAscIdAsc(Long memberId, Collection<Long> ids);
 }

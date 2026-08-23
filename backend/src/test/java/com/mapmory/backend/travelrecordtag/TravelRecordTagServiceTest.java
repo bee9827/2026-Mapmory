@@ -12,7 +12,6 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.tag.Tag;
 import com.mapmory.backend.tag.TagRepository;
-import com.mapmory.backend.tag.dto.TagSummaryResponse;
 import com.mapmory.backend.travelrecord.TravelRecord;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -53,7 +52,8 @@ class TravelRecordTagServiceTest {
                 "TOO_MANY_TAGS"
         );
 
-        verify(tagRepository, never()).findAllByMemberIdAndIdIn(org.mockito.ArgumentMatchers.anyLong(), anyList());
+        verify(tagRepository, never()).findAllByMemberIdAndIdInOrderByCreatedAtAscIdAsc(
+                org.mockito.ArgumentMatchers.anyLong(), anyList());
     }
 
     @Test
@@ -63,12 +63,13 @@ class TravelRecordTagServiceTest {
 
     @Test
     void 회원이_소유하지_않은_태그를_거부한다() {
-        when(tagRepository.findAllByMemberIdAndIdIn(10L, java.util.Set.of(1L, 2L)))
+        when(tagRepository.findAllByMemberIdAndIdInOrderByCreatedAtAscIdAsc(10L, java.util.Set.of(1L, 2L)))
                 .thenReturn(List.of(tag(1L, "연인", LocalDateTime.now())));
 
         assertError(() -> service.replace(member, travelRecord, List.of(1L, 2L)), "TAG_NOT_FOUND");
 
-        verify(travelRecordTagRepository, never()).deleteByTravelRecordId(org.mockito.ArgumentMatchers.anyLong());
+        verify(travelRecordTagRepository, never())
+                .deleteAllByTravelRecordIdInBulk(org.mockito.ArgumentMatchers.anyLong());
     }
 
     @Test
@@ -77,14 +78,13 @@ class TravelRecordTagServiceTest {
         Tag later = tag(2L, "라멘맛집", now.plusSeconds(1));
         Tag earlier = tag(1L, "연인", now);
         when(travelRecord.getId()).thenReturn(100L);
-        when(tagRepository.findAllByMemberIdAndIdIn(10L, java.util.Set.of(1L, 2L)))
-                .thenReturn(List.of(later, earlier));
+        when(tagRepository.findAllByMemberIdAndIdInOrderByCreatedAtAscIdAsc(10L, java.util.Set.of(1L, 2L)))
+                .thenReturn(List.of(earlier, later));
 
-        List<TagSummaryResponse> responses = service.replace(member, travelRecord, List.of(2L, 1L));
+        List<Tag> tags = service.replace(member, travelRecord, List.of(2L, 1L));
 
-        assertThat(responses).extracting(TagSummaryResponse::id).containsExactly(1L, 2L);
-        verify(travelRecordTagRepository).deleteByTravelRecordId(100L);
-        verify(travelRecordTagRepository).flush();
+        assertThat(tags).extracting(Tag::getId).containsExactly(1L, 2L);
+        verify(travelRecordTagRepository).deleteAllByTravelRecordIdInBulk(100L);
         verify(travelRecordTagRepository).saveAll(anyList());
     }
 

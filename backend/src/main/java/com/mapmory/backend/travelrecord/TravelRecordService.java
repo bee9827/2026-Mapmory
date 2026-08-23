@@ -6,8 +6,8 @@ import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
+import com.mapmory.backend.tag.Tag;
 import com.mapmory.backend.tag.TagService;
-import com.mapmory.backend.tag.dto.TagSummaryResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
@@ -126,7 +126,7 @@ public class TravelRecordService {
                 request.endDate()
         );
         List<RecordMedia> updatedMedia = synchronizeMedia(travelRecord, existingMedia, objectKeys);
-        List<TagSummaryResponse> tags = travelRecordTagService.replace(member, travelRecord, request.tagIds());
+        List<Tag> tags = travelRecordTagService.replace(member, travelRecord, request.tagIds());
 
         travelRecordRepository.flush();
 
@@ -190,7 +190,7 @@ public class TravelRecordService {
             }
         }
 
-        Map<Long, List<TagSummaryResponse>> tagsByTravelRecordId =
+        Map<Long, List<Tag>> tagsByTravelRecordId =
                 travelRecordTagService.findByTravelRecordIds(
                         travelRecords.getContent().stream().map(TravelRecord::getId).toList()
                 );

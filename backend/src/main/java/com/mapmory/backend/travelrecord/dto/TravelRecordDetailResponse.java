@@ -1,6 +1,7 @@
 package com.mapmory.backend.travelrecord.dto;
 
 import com.mapmory.backend.recordmedia.RecordMedia;
+import com.mapmory.backend.tag.Tag;
 import com.mapmory.backend.tag.dto.TagSummaryResponse;
 import com.mapmory.backend.travelrecord.TravelRecord;
 import java.time.LocalDate;
@@ -36,7 +37,7 @@ public record TravelRecordDetailResponse(
     public static TravelRecordDetailResponse from(
             TravelRecord travelRecord,
             List<RecordMedia> recordMedia,
-            List<TagSummaryResponse> tags
+            List<Tag> tags
     ) {
         return new TravelRecordDetailResponse(
                 travelRecord.getId(),
@@ -48,7 +49,7 @@ public record TravelRecordDetailResponse(
                 recordMedia.stream()
                         .map(RecordMedia::getObjectKey)
                         .toList(),
-                tags,
+                tags.stream().map(TagSummaryResponse::from).toList(),
                 travelRecord.getCreatedAt(),
                 travelRecord.getUpdatedAt()
         );

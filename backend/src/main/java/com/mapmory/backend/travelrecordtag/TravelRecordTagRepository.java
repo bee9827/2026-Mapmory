@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 public interface TravelRecordTagRepository extends JpaRepository<TravelRecordTag, Long> {
     @Modifying
     @Query("DELETE FROM TravelRecordTag trt WHERE trt.travelRecord.id = :travelRecordId")
-    void deleteByTravelRecordId(@Param("travelRecordId") Long travelRecordId);
+    void deleteAllByTravelRecordIdInBulk(@Param("travelRecordId") Long travelRecordId);
 
     @Query("""
             SELECT trt.tag
