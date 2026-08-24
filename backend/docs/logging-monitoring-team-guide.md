@@ -204,14 +204,13 @@ http.server.requests
 
 ### 직접 추가한 중요 작업 메트릭
 
-API 전체 시간만 보면 어느 내부 작업이 느린지 알기 어렵다. 그래서 다음 세 작업만 별도로
+API 전체 시간만 보면 어느 내부 작업이 느린지 알기 어렵다. 그래서 다음 두 작업만 별도로
 측정한다.
 
 | operation | 측정하는 작업 |
 | --- | --- |
 | `MEDIA_SYNC` | 여행 기록의 미디어 목록 동기화와 DB 반영 |
 | `MAP_SUMMARY_QUERY` | 지역별 지도 요약 DB 조회 |
-| `S3_PRESIGN` | S3 Presigned URL 생성 |
 
 공통 메트릭 이름은 다음과 같다.
 
@@ -399,7 +398,7 @@ curl -s http://localhost:8080/actuator/prometheus \
 - [x] Actuator Health와 Prometheus 엔드포인트
 - [x] HTTP 서버, JVM, HikariCP 자동 메트릭
 - [x] 카카오 RestClient 외부 요청 메트릭과 타임아웃
-- [x] 중요 내부 작업 3종의 성공·실패 시간 측정
+- [x] 중요 내부 작업 2종의 성공·실패 시간 측정
 - [x] 메트릭 공통 태그와 URI 태그 개수 제한
 - [x] 관련 단위·통합 테스트
 

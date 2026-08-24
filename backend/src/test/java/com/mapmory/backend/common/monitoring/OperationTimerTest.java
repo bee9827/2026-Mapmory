@@ -22,12 +22,12 @@ class OperationTimerTest {
 
     @Test
     void 실패한_작업의_시간을_기록하고_예외를_다시_던진다() {
-        assertThatThrownBy(() -> operationTimer.record(MonitoredOperation.S3_PRESIGN, () -> {
-            throw new IllegalStateException("presign failed");
+        assertThatThrownBy(() -> operationTimer.record(MonitoredOperation.MAP_SUMMARY_QUERY, () -> {
+            throw new IllegalStateException("query failed");
         })).isInstanceOf(IllegalStateException.class)
-                .hasMessage("presign failed");
+                .hasMessage("query failed");
 
-        assertThat(timer(MonitoredOperation.S3_PRESIGN, "FAILURE").count()).isEqualTo(1L);
+        assertThat(timer(MonitoredOperation.MAP_SUMMARY_QUERY, "FAILURE").count()).isEqualTo(1L);
     }
 
     private Timer timer(MonitoredOperation operation, String outcome) {

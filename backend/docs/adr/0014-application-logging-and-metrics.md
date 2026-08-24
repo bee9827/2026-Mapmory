@@ -33,7 +33,7 @@ CloudWatch Agent, 로그 그룹, 대시보드와 알림 구성은 후속 작업�
 | 예외 로그 | 미처리 예외, 응답값 검증 실패, `SERVICE_UNAVAILABLE`을 원인 예외와 함께 `ERROR`로 기록한다. 예상 가능한 비즈니스 예외는 `DEBUG`로 기록한다. | `common/handler` |
 | 로그 형식 | 로컬은 사람이 읽는 콘솔 패턴, 운영은 Spring Boot Logstash JSON 형식을 사용한다. | `application.yaml`, `application-prod.yaml` |
 | HTTP 메트릭 | `http.server.requests`를 7개 SLO 경계로 집계하고 `uri` 태그 값은 최대 50개까지만 등록한다. | `MetricsConfiguration`, `application.yaml` |
-| 내부 작업 메트릭 | `mapmory.operation.duration`으로 미디어 동기화, 지도 요약 쿼리, S3 Presigned URL 생성 시간을 성공·실패별로 기록한다. | `OperationTimer`, `MonitoredOperation` |
+| 내부 작업 메트릭 | `mapmory.operation.duration`으로 미디어 동기화와 지도 요약 쿼리 시간을 성공·실패별로 기록한다. | `OperationTimer`, `MonitoredOperation` |
 | 메트릭 노출 | `health`, `prometheus`만 읽기 전용으로 노출한다. 운영에서는 `127.0.0.1:8081`로 관리 포트를 분리한다. | `application.yaml`, `application-prod.yaml` |
 
 현재 애플리케이션이 생성하고 노출하는 단계까지 구현되어 있다. CloudWatch 수집·저장·대시보드·알림은
@@ -142,7 +142,7 @@ Spring MVC가 자동 생성하는 `http.server.requests`를 요청 수, HTTP 상
 
 공통 메트릭 이름은 `mapmory.operation.duration`으로 하고 다음의 제한된 태그만 사용한다.
 
-- `operation`: `MonitoredOperation` enum의 `MEDIA_SYNC`, `MAP_SUMMARY_QUERY`, `S3_PRESIGN`
+- `operation`: `MonitoredOperation` enum의 `MEDIA_SYNC`, `MAP_SUMMARY_QUERY`
 - `outcome`: `SUCCESS`, `FAILURE`
 
 현재 측정 경계는 다음과 같다.
@@ -151,7 +151,6 @@ Spring MVC가 자동 생성하는 `http.server.requests`를 요청 수, HTTP 상
 | --- | --- | --- | --- |
 | `MEDIA_SYNC` | 미디어 동기화 시작부터 `travelRecordRepository.flush()` 완료까지 | 앞선 여행 기록·미디어 조회와 검증, 응답 DTO 변환 | `flush()`는 현재 영속성 컨텍스트의 다른 미반영 변경도 함께 DB에 반영할 수 있다. |
 | `MAP_SUMMARY_QUERY` | 지도 요약 Repository 호출 시작부터 조회 결과 반환까지 | 부모 Region 검증, 조회 결과의 응답 DTO 변환 | DB 조회 병목만 분리해 본다. |
-| `S3_PRESIGN` | AWS SDK Presigner 호출부터 URI 생성 완료까지 | 클라이언트의 실제 S3 업로드와 네트워크 전송 | Presigned URL 생성은 서버 내부 서명 작업이다. |
 
 내부 작업에는 다음 8개의 고정 SLO 누적 버킷을 적용한다.
 
@@ -240,7 +239,7 @@ curl -s http://localhost:8080/actuator/prometheus \
 
 ```text
 mapmory_operation_duration_seconds_count{operation="MEDIA_SYNC",outcome="SUCCESS",...} 3
-mapmory_operation_duration_seconds_count{operation="S3_PRESIGN",outcome="FAILURE",...} 1
+mapmory_operation_duration_seconds_count{operation="MAP_SUMMARY_QUERY",outcome="FAILURE",...} 1
 ```
 
 ### 새 내부 작업을 계측할 때
@@ -258,7 +257,7 @@ mapmory_operation_duration_seconds_count{operation="S3_PRESIGN",outcome="FAILURE
 - [x] 운영 프로필의 Logstash JSON 구조화 로그
 - [x] 자동 구성된 `RestClient` 외부 HTTP 메트릭과 타임아웃
 - [x] `http.server.requests`의 고정 SLO 버킷과 URI 태그 상한
-- [x] `mapmory.operation.duration`과 초기 3개 내부 작업 계측
+- [x] `mapmory.operation.duration`과 초기 2개 내부 작업 계측
 - [x] 성공·실패 Timer, SLO 설정, URI 카디널리티 테스트
 - [ ] CloudWatch Agent 수집 설정과 전송 메트릭 allowlist
 - [ ] CloudWatch 대시보드와 알림 기준
