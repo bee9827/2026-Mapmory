@@ -30,3 +30,17 @@ Windows에서는 `./gradlew` 대신 `./gradlew.bat`을 사용합니다.
 - [ADR 0006: API 오류 응답에 Problem Details를 사용한다](docs/adr/0006-use-problem-details-for-api-errors.md)
 - [여행 기록 저장 및 목록 조회 방식](docs/travel-record-storage-and-query.md)
 - [Testcontainers 테스트 성능 개선](docs/testcontainers-performance.md)
+
+## 환경변수
+
+필요한 키 목록은 `.env.example` 참고.
+
+**운영 서버**는 `/etc/mapmory.env` 에서 읽는다 (systemd EnvironmentFile).
+새 환경변수가 추가되면 배포 전에 이 파일도 갱신해야 한다.
+
+```bash
+sudo nano /etc/mapmory.env
+sudo systemctl restart mapmory
+```
+
+⚠️ `export` 없이 `키=값` 형식으로 작성한다. 따옴표도 붙이지 않는다.
