@@ -1,30 +1,15 @@
-# Landing CI/CD
+# Landing CI
 
-`landing-cicd.yml` validates every landing-page pull request and deploys only after a landing-related change reaches `main`, or when the workflow is manually dispatched.
+`landing-cicd.yml` validates landing-page changes without deploying them. It runs for landing-related pull requests, changes merged into `main`, and manual workflow dispatches.
 
-## GitHub environment
-
-Create an environment named `landing-production` and add these environment secrets:
-
-- `LANDING_EC2_HOST`: EC2 Elastic IP or SSH hostname
-- `LANDING_EC2_USER`: `ubuntu`
-- `LANDING_EC2_SSH_KEY`: a private SSH key authorized for the EC2 deploy user
-- `LANDING_EC2_KNOWN_HOSTS`: the verified `known_hosts` entry for the EC2 host
-
-Prefer a dedicated deployment key instead of a personal EC2 key. Verify the host fingerprint before saving `LANDING_EC2_KNOWN_HOSTS`.
-
-To prevent an accidental production release, restrict this environment to the `main` branch and configure a required reviewer when the repository plan supports it.
-
-## Pipeline
+## CI pipeline
 
 1. Install dependencies with `npm ci`.
-2. Run the existing landing-page tests.
-3. Build `dist/client`.
-4. Package and retain the static build as a GitHub Actions artifact for seven days.
-5. Copy the artifact to EC2 over SSH.
-6. Extract it into `/var/www/mapmory/releases/<commit>-<attempt>`.
-7. Atomically switch `/var/www/mapmory/current` to the new release.
-8. Validate and reload Nginx.
-9. Verify the landing page locally on the EC2 origin and publicly over HTTPS.
+2. Build `dist/client`.
+3. Run the landing-page tests against the built output.
 
-If the origin verification fails after activation, the deployment script switches `current` back to its previous target and reloads Nginx.
+The workflow does not package a release, access AWS, or connect to EC2. No GitHub environment, AWS credential, or SSH secret is required to run it.
+
+## Deployment
+
+Automatic deployment is intentionally postponed. Production releases must use the separately reviewed manual deployment procedure until the team introduces an AWS-supported deployment pipeline.
