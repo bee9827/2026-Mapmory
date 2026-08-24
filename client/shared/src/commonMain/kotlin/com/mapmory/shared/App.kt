@@ -4,15 +4,23 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -33,6 +41,7 @@ import com.mapmory.shared.presentation.triprecord.screen.TripProfileScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordDetailScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordEditorScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordListScreen
+import com.mapmory.shared.presentation.triprecord.screen.TripRecordPalette
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEffect
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
@@ -72,8 +81,12 @@ fun MapmoryApp(
     var mapScope by remember { mutableStateOf(MapScope.KOREA) }
     var koreaMapUiState by remember { mutableStateOf<KoreaMapUiState>(KoreaMapUiState.ProvinceOverview) }
     val locationsById = remember { appLocations.associateBy(Location::id) }
+    var isEditorVisible by remember { mutableStateOf(false) }
+    var pendingEditorExit by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var pendingPhotoLoadingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var isPhotoLoadingSaveConfirmation by remember { mutableStateOf(false) }
 
-    fun navigateBack(): Boolean {
+    fun navigateBackDirectly(): Boolean {
         if (mapScope == MapScope.KOREA && koreaMapUiState is KoreaMapUiState.DistrictDetail) {
             koreaMapUiState = KoreaMapUiState.ProvinceOverview
             return true
@@ -85,16 +98,34 @@ fun MapmoryApp(
             return true
         }
 
-        // popBackStack can empty the stack when a destination has no parent.
-        // Restore the home route instead of leaving NavHost without content.
         navController.navigate(MapRoute) {
             launchSingleTop = true
         }
         return true
     }
 
+    fun requestEditorExit(exit: () -> Unit) {
+        when {
+            recordsUiState.editor.isPhotoLoading -> {
+                isPhotoLoadingSaveConfirmation = false
+                pendingPhotoLoadingAction = exit
+            }
+            recordsUiState.editor.isDirty -> pendingEditorExit = exit
+            else -> exit()
+        }
+    }
+
+    fun navigateBack(): Boolean {
+        if (isEditorVisible) {
+            requestEditorExit { navigateBackDirectly() }
+            return true
+        }
+        return navigateBackDirectly()
+    }
+
+    val latestNavigateBack by rememberUpdatedState(::navigateBack)
     DisposableEffect(navigation, navController) {
-        navigation?.bindBackHandler(::navigateBack)
+        navigation?.bindBackHandler { latestNavigateBack() }
         onDispose { navigation?.unbindBackHandler() }
     }
 
@@ -294,6 +325,10 @@ fun MapmoryApp(
         }
 
         composable<CreateRoute> {
+            DisposableEffect(Unit) {
+                isEditorVisible = true
+                onDispose { isEditorVisible = false }
+            }
             TripRecordEditorScreen(
                 modifier = Modifier.windowInsetsPadding(
                     contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
@@ -324,11 +359,23 @@ fun MapmoryApp(
                 onPhotoRemoved = { photoId ->
                     recordsViewModel.onAction(TripRecordAction.PhotoRemoved(photoId))
                 },
-                onSaveClick = { recordsViewModel.onAction(TripRecordAction.Save) },
-                onBackClick = { navigateBack() },
-                onMapClick = { navigateToTab(MapRoute) },
-                onRecordClick = { navigateToTab(RecordsRoute) },
-                onProfileClick = { navigateToTab(ProfileRoute) },
+                onPhotoLoadingChanged = { isLoading ->
+                    recordsViewModel.onAction(TripRecordAction.PhotoLoadingChanged(isLoading))
+                },
+                onSaveClick = {
+                    if (recordsUiState.editor.isPhotoLoading) {
+                        isPhotoLoadingSaveConfirmation = true
+                        pendingPhotoLoadingAction = {
+                            recordsViewModel.onAction(TripRecordAction.SaveWithoutPendingPhotos)
+                        }
+                    } else {
+                        recordsViewModel.onAction(TripRecordAction.Save)
+                    }
+                },
+                onBackClick = { requestEditorExit { navigateBackDirectly() } },
+                onMapClick = { requestEditorExit { navigateToTab(MapRoute) } },
+                onRecordClick = { requestEditorExit { navigateToTab(RecordsRoute) } },
+                onProfileClick = { requestEditorExit { navigateToTab(ProfileRoute) } },
             )
         }
 
@@ -371,6 +418,76 @@ fun MapmoryApp(
             )
         }
     }
+
+    pendingEditorExit?.let { exit ->
+        EditorConfirmationDialog(
+            title = "작성 중인 기록이 있어요",
+            message = "지금 나가면 작성한 내용이 사라집니다. 그래도 나갈까요?",
+            confirmLabel = "나가기",
+            confirmColor = TripRecordPalette.danger,
+            onConfirm = {
+                pendingEditorExit = null
+                exit()
+            },
+            onDismiss = { pendingEditorExit = null },
+        )
+    }
+
+    pendingPhotoLoadingAction?.let { action ->
+        EditorConfirmationDialog(
+            title = "사진을 불러오는 중이에요",
+            message = if (isPhotoLoadingSaveConfirmation) {
+                "지금 저장하면 불러오는 중인 사진은 기록에 포함되지 않아요. 현재 내용만 저장할까요?"
+            } else {
+                "지금 나가면 불러오는 사진과 작성 중인 내용은 저장되지 않아요. 그래도 나갈까요?"
+            },
+            confirmLabel = if (isPhotoLoadingSaveConfirmation) "현재 내용 저장" else "나가기",
+            confirmColor = if (isPhotoLoadingSaveConfirmation) {
+                TripRecordPalette.accent
+            } else {
+                TripRecordPalette.danger
+            },
+            onConfirm = {
+                pendingPhotoLoadingAction = null
+                action()
+            },
+            onDismiss = { pendingPhotoLoadingAction = null },
+        )
+    }
+}
+
+@Composable
+private fun EditorConfirmationDialog(
+    title: String,
+    message: String,
+    confirmLabel: String,
+    confirmColor: Color,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+        ),
+        shape = RoundedCornerShape(20.dp),
+        containerColor = TripRecordPalette.surface,
+        titleContentColor = TripRecordPalette.text,
+        textContentColor = TripRecordPalette.bodyText,
+        title = { Text(title) },
+        text = { Text(message) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(confirmLabel, color = confirmColor)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("계속 작성", color = TripRecordPalette.accent)
+            }
+        },
+    )
 }
 
 fun createTripRecordsViewModel(): TripRecordsViewModel = TripRecordsViewModel(appLocations)
