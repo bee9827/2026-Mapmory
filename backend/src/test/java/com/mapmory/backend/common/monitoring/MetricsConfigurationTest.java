@@ -24,6 +24,8 @@ class MetricsConfigurationTest {
                 .isNull();
         assertThat(property(sources, "management.metrics.distribution.slo.http.server.requests"))
                 .isEqualTo("100ms,300ms,500ms,1s,2s,3s,5s");
+        assertThat(property(sources, "management.metrics.distribution.slo.mapmory.operation.duration"))
+                .isEqualTo("10ms,50ms,100ms,300ms,500ms,1s,3s,5s");
     }
 
     @Test

@@ -85,5 +85,7 @@ management:
         http.server.requests: 10ms
       maximum-expected-value:
         http.server.requests: 5s
+        mapmory.operation.duration: 5s
       slo:
         http.server.requests: 100ms,300ms,500ms,1s,2s,3s,5s
+        mapmory.operation.duration: 10ms,50ms,100ms,300ms,500ms,1s,3s,5s

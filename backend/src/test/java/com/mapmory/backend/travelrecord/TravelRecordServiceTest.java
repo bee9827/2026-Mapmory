@@ -12,6 +12,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.common.monitoring.MonitoredOperation;
+import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
@@ -23,6 +25,7 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +35,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -56,6 +60,9 @@ class TravelRecordServiceTest {
 
     @Mock
     private TagService tagService;
+
+    @Spy
+    private OperationTimer operationTimer = new OperationTimer(new SimpleMeterRegistry());
 
     @InjectMocks
     private TravelRecordService travelRecordService;
@@ -209,6 +216,7 @@ class TravelRecordServiceTest {
                     && iterator.next() == mediaA
                     && !iterator.hasNext();
         }));
+        verify(operationTimer).record(eq(MonitoredOperation.MEDIA_SYNC), any());
     }
 
     @Test

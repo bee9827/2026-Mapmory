@@ -1,5 +1,7 @@
 package com.mapmory.backend.upload.storage;
 
+import com.mapmory.backend.common.monitoring.MonitoredOperation;
+import com.mapmory.backend.common.monitoring.OperationTimer;
 import java.net.URI;
 import java.time.Duration;
 import org.springframework.stereotype.Component;
@@ -12,13 +14,16 @@ public class S3PresignedUrlProvider implements PresignedUrlProvider {
 
     private final S3Presigner s3Presigner;
     private final String bucket;
+    private final OperationTimer operationTimer;
 
     public S3PresignedUrlProvider(
             S3Presigner s3Presigner,
-            S3StorageProperties properties
+            S3StorageProperties properties,
+            OperationTimer operationTimer
     ) {
         this.s3Presigner = s3Presigner;
         this.bucket = properties.bucket();
+        this.operationTimer = operationTimer;
     }
 
     @Override
@@ -39,6 +44,9 @@ public class S3PresignedUrlProvider implements PresignedUrlProvider {
                 .putObjectRequest(putObjectRequest)
                 .build();
 
-        return URI.create(s3Presigner.presignPutObject(presignRequest).url().toString());
+        return operationTimer.record(
+                MonitoredOperation.S3_PRESIGN,
+                () -> URI.create(s3Presigner.presignPutObject(presignRequest).url().toString())
+        );
     }
 }

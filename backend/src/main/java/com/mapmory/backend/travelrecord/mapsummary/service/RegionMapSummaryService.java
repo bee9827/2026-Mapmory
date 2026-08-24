@@ -1,12 +1,15 @@
 package com.mapmory.backend.travelrecord.mapsummary.service;
 
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.common.monitoring.MonitoredOperation;
+import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.region.exception.RegionErrorCode;
 import com.mapmory.backend.region.RegionRepository;
 import com.mapmory.backend.tag.TagService;
 import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
 import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
+import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryQueryResult;
 import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryRepository;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -19,17 +22,20 @@ public class RegionMapSummaryService {
     private final RegionMapSummaryRepository regionMapSummaryRepository;
     private final LevelPolicy levelPolicy;
     private final TagService tagService;
+    private final OperationTimer operationTimer;
 
     public RegionMapSummaryService(
             RegionRepository regionRepository,
             RegionMapSummaryRepository regionMapSummaryRepository,
             LevelPolicy levelPolicy,
-            TagService tagService
+            TagService tagService,
+            OperationTimer operationTimer
     ) {
         this.regionRepository = regionRepository;
         this.regionMapSummaryRepository = regionMapSummaryRepository;
         this.levelPolicy = levelPolicy;
         this.tagService = tagService;
+        this.operationTimer = operationTimer;
     }
 
     @Transactional(readOnly = true)
@@ -38,7 +44,11 @@ public class RegionMapSummaryService {
         if (tagId != null) {
             tagService.getOwnedTag(member, tagId);
         }
-        return regionMapSummaryRepository.findRegionMapSummaries(member.getId(), parentRegionId, tagId).stream()
+        List<RegionMapSummaryQueryResult> summaries = operationTimer.record(
+                MonitoredOperation.MAP_SUMMARY_QUERY,
+                () -> regionMapSummaryRepository.findRegionMapSummaries(member.getId(), parentRegionId, tagId)
+        );
+        return summaries.stream()
                 .map(result -> RegionMapSummaryResponse.from(result, levelPolicy))
                 .toList();
     }

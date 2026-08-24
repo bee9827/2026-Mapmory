@@ -2,6 +2,7 @@
 
 - 상태: 채택
 - 날짜: 2026-08-23
+- 최종 갱신: 2026-08-24
 - 관련: ADR 0001, ADR 0002, ADR 0006
 
 ---
@@ -22,6 +23,21 @@ Mapmory는 Spring Boot 기본 로깅과 Micrometer·Actuator·Prometheus Registr
 
 이 ADR은 애플리케이션이 관측 데이터를 **생성하고 노출하는 단계**까지만 결정한다.
 CloudWatch Agent, 로그 그룹, 대시보드와 알림 구성은 후속 작업으로 남긴다.
+
+## 현재 구현 요약
+
+| 영역 | 현재 구현 | 확인 위치 |
+| --- | --- | --- |
+| 외부 HTTP | Spring Boot가 자동 구성한 `RestClient.Builder`를 사용해 연결·읽기 타임아웃과 `http.client.requests`를 적용한다. | `KakaoClientConfig`, `application.yaml` |
+| 요청 추적 | 모든 요청에 UUID 형식의 `X-Request-Id`를 부여하고 MDC의 `requestId`에 저장한 뒤 요청 종료 시 제거한다. | `RequestIdFilter` |
+| 예외 로그 | 미처리 예외, 응답값 검증 실패, `SERVICE_UNAVAILABLE`을 원인 예외와 함께 `ERROR`로 기록한다. 예상 가능한 비즈니스 예외는 `DEBUG`로 기록한다. | `common/handler` |
+| 로그 형식 | 로컬은 사람이 읽는 콘솔 패턴, 운영은 Spring Boot Logstash JSON 형식을 사용한다. | `application.yaml`, `application-prod.yaml` |
+| HTTP 메트릭 | `http.server.requests`를 7개 SLO 경계로 집계하고 `uri` 태그 값은 최대 50개까지만 등록한다. | `MetricsConfiguration`, `application.yaml` |
+| 내부 작업 메트릭 | `mapmory.operation.duration`으로 미디어 동기화, 지도 요약 쿼리, S3 Presigned URL 생성 시간을 성공·실패별로 기록한다. | `OperationTimer`, `MonitoredOperation` |
+| 메트릭 노출 | `health`, `prometheus`만 읽기 전용으로 노출한다. 운영에서는 `127.0.0.1:8081`로 관리 포트를 분리한다. | `application.yaml`, `application-prod.yaml` |
+
+현재 애플리케이션이 생성하고 노출하는 단계까지 구현되어 있다. CloudWatch 수집·저장·대시보드·알림은
+아직 구현하지 않았다.
 
 ## 결정
 
@@ -56,18 +72,19 @@ Servlet Filter에서 요청별 Request ID를 결정한다.
 2. 헤더가 없거나 유효하지 않으면 서버가 UUID를 생성한다.
 3. 값을 MDC의 `requestId`에 넣어 같은 요청에서 발생하는 모든 로그에 자동으로 포함한다.
 4. 응답의 `X-Request-Id` 헤더에도 같은 값을 넣는다.
-5. 요청 처리가 끝나면 `finally`에서 MDC를 반드시 비운다. 스레드 풀에서 이전 요청의 값이
-   다음 요청으로 누출되는 것을 막기 위함이다.
+5. `MDC.putCloseable()`과 try-with-resources를 사용해 요청 처리가 끝나면 MDC 값을 제거한다.
+   정상·예외 흐름 모두에서 정리하여 스레드 풀의 다음 요청으로 값이 누출되지 않게 한다.
 
 예를 들어 여행 기록 생성 중 미디어 저장이 실패하면 다음 로그가 같은 요청임을 알 수 있다.
 
 ```text
-INFO  requestId=abc123 api=TRAVEL_RECORD_CREATE operation=REGION_RESOLVE
-ERROR requestId=abc123 api=TRAVEL_RECORD_CREATE operation=MEDIA_SAVE errorCode=DB_ERROR
+INFO  requestId=550e8400-e29b-41d4-a716-446655440000 ...
+ERROR requestId=550e8400-e29b-41d4-a716-446655440000 event=BUSINESS_EXCEPTION errorCode=SERVICE_UNAVAILABLE
 ```
 
-클라이언트가 오류와 함께 `X-Request-Id: abc123`을 전달하면 개발자는 `requestId=abc123`으로
-요청 전체를 검색할 수 있다. Request ID는 추적용 로그 필드이며 메트릭 태그로 사용하지 않는다.
+클라이언트가 오류와 함께 `X-Request-Id: 550e8400-e29b-41d4-a716-446655440000`을 전달하면
+개발자는 같은 `requestId`로 요청 로그를 검색할 수 있다. Request ID는 추적용 로그 필드이며
+메트릭 태그로 사용하지 않는다.
 
 ### 운영 로그는 구조화된 JSON으로 출력한다
 
@@ -80,14 +97,16 @@ Logstash JSON 형식을 사용한다. 별도 로깅 인코더 의존성은 추�
 | --- | --- |
 | `service`, `environment`, `version` | 실행 환경과 배포 버전 식별 |
 | `requestId` | 단일 요청 추적 |
-| `event` | `TRAVEL_RECORD_CREATED`와 같은 사건 식별 |
-| `api`, `operation` | API와 내부 처리 단계 식별 |
-| `outcome` | `SUCCESS` 또는 `FAILURE` |
-| `errorCode`, `exceptionClass` | 실패 유형 식별 |
-| `memberId`, `travelRecordId`, `mediaCount` | 필요한 최소한의 업무 문맥 |
+| `event` | `BUSINESS_EXCEPTION`, `UNHANDLED_EXCEPTION`, `RESPONSE_VALIDATION_FAILED`와 같은 사건 식별 |
+| `errorCode` | 비즈니스 실패 유형 식별 |
+| `status`, `httpMethod`, `uri` | 실패한 HTTP 요청의 최소 문맥 |
+| `stack_trace` | 원인 예외가 필요한 `ERROR` 로그의 스택 트레이스 |
 
 문장 안에 값을 섞은 비구조 로그와 달리 JSON 로그는 수집기가 정규식 없이 필드별 검색과
 집계를 할 수 있다. MDC 값과 SLF4J fluent API의 key-value를 JSON 필드로 기록한다.
+
+현재 구조화 필드는 예외 처리 경계부터 적용한다. 업무 이벤트 로그와 `memberId`,
+`travelRecordId` 같은 추가 문맥 필드는 실제 운영 검색 요구가 확인된 뒤 최소 범위로 확장한다.
 
 다음 값은 로그에 기록하지 않는다.
 
@@ -102,33 +121,50 @@ Spring MVC가 자동 생성하는 `http.server.requests`를 요청 수, HTTP 상
 기준으로 사용한다. URI는 `/travel-records/{id}`처럼 템플릿으로 집계하고 실제 ID가 포함된
 경로를 태그로 만들지 않는다.
 
-중요 API에 한해 히스토그램 또는 제한된 SLO 버킷을 활성화하여 p95 지연 시간을 계산한다.
-초기 대상은 다음과 같다.
+사전 정의된 percentile histogram은 사용하지 않고 다음 7개의 고정 SLO 누적 버킷만 노출한다.
 
-- 카카오 로그인
-- 여행 기록 생성·수정·상세·목록 조회
-- Region 지도 요약 조회
-- Presigned URL 발급
+```text
+100ms, 300ms, 500ms, 1s, 2s, 3s, 5s
+```
+
+버킷 수를 예측 가능하게 유지하는 대신 p95·p99 근사 정밀도는 이 경계의 간격에 제한된다.
+`http.server.requests`의 `uri` 태그는 `MeterFilter.maximumAllowableTags`로 서로 다른 값 50개까지만
+등록한다. 51번째 새로운 URI 값부터는 요청 자체를 막지 않고 해당 메트릭 등록과 측정만 거부한다.
+이 제한은 비정상 URI 유입으로 인한 메모리·시계열 증가를 막는 안전장치이며, URI 템플릿 집계가
+깨진 근본 원인을 대신하지 않는다.
 
 ### 중요한 내부 작업은 Micrometer Timer로 측정한다
 
-전체 API 응답 시간만으로 병목 지점을 알 수 없는 작업에 `Timer` 또는 `Observation`을 적용한다.
-측정 구간 진입 시 시간을 시작하고, 성공 또는 예외가 결정된 뒤 `finally`에서 해당 Timer를
-종료하여 실패 시에도 측정이 누락되지 않게 한다.
+전체 API 응답 시간만으로 병목 지점을 알 수 없는 작업에 공통 `OperationTimer`를 적용한다.
+`Supplier<T>`로 작업을 전달하고 `Timer.Sample`로 시간을 시작한다. 정상 반환 시 `SUCCESS`,
+`RuntimeException` 또는 `Error` 발생 시 `FAILURE` Timer를 종료한 뒤 원래 결과나 예외를 그대로
+전달한다. 따라서 계측이 기존 업무 흐름을 변경하지 않는다.
 
 공통 메트릭 이름은 `mapmory.operation.duration`으로 하고 다음의 제한된 태그만 사용한다.
 
-- `api`: `KAKAO_LOGIN`, `TRAVEL_RECORD_CREATE` 등 고정된 API 식별자
-- `operation`: `KAKAO_API`, `REGION_RESOLVE`, `TRAVEL_RECORD_SAVE`, `MEDIA_SYNC`,
-  `MAP_SUMMARY_QUERY`, `S3_PRESIGN` 등 고정된 단계
+- `operation`: `MonitoredOperation` enum의 `MEDIA_SYNC`, `MAP_SUMMARY_QUERY`, `S3_PRESIGN`
 - `outcome`: `SUCCESS`, `FAILURE`
 
-측정 대상은 외부 API 호출, DB 쿼리·저장, 트랜잭션의 중요한 단계, 성능 병목 가능성이 있는
-작업으로 제한한다. 모든 private 메서드나 단순 값 변환은 측정하지 않는다.
+현재 측정 경계는 다음과 같다.
+
+| operation | 시작과 종료 | 포함하지 않는 범위 | 주의점 |
+| --- | --- | --- | --- |
+| `MEDIA_SYNC` | 미디어 동기화 시작부터 `travelRecordRepository.flush()` 완료까지 | 앞선 여행 기록·미디어 조회와 검증, 응답 DTO 변환 | `flush()`는 현재 영속성 컨텍스트의 다른 미반영 변경도 함께 DB에 반영할 수 있다. |
+| `MAP_SUMMARY_QUERY` | 지도 요약 Repository 호출 시작부터 조회 결과 반환까지 | 부모 Region 검증, 조회 결과의 응답 DTO 변환 | DB 조회 병목만 분리해 본다. |
+| `S3_PRESIGN` | AWS SDK Presigner 호출부터 URI 생성 완료까지 | 클라이언트의 실제 S3 업로드와 네트워크 전송 | Presigned URL 생성은 서버 내부 서명 작업이다. |
+
+내부 작업에는 다음 8개의 고정 SLO 누적 버킷을 적용한다.
+
+```text
+10ms, 50ms, 100ms, 300ms, 500ms, 1s, 3s, 5s
+```
+
+새 측정 대상은 모든 private 메서드에 일괄 적용하지 않는다. 외부 시스템, DB, 중요한 업무 단계처럼
+운영 중 병목 원인을 분리할 가치가 있는 구간만 `MonitoredOperation` enum에 추가한다.
 
 Timer는 요청별 원본 시간을 저장하는 대신 호출 횟수, 총 시간, 평균, 최대값과 설정한
-히스토그램을 집계한다. 개별 실패의 상세 원인은 동일한 `api`, `operation`, `requestId`를 가진
-구조화 로그에서 확인한다.
+히스토그램을 집계한다. `operation`과 `outcome`은 메트릭 집계용이며 `requestId`는 넣지 않는다.
+개별 실패의 상세 원인은 같은 시간대의 `requestId`가 있는 구조화 로그에서 확인한다.
 
 ### 메트릭의 카디널리티를 제한한다
 
@@ -141,7 +177,7 @@ CloudWatch 요금이 발생하지 않는다. 다만 메트릭 시계열은 애�
 
 허용:
 
-- API·operation의 고정 enum 성격 값
+- `operation`의 고정 enum 값
 - `SUCCESS`·`FAILURE`
 - HTTP 메서드, 상태 코드 또는 상태 코드 그룹
 
@@ -151,9 +187,9 @@ CloudWatch 요금이 발생하지 않는다. 다만 메트릭 시계열은 애�
 - 실제 URI, 파일명, object key
 - 예외 메시지나 임의 문자열
 
-히스토그램은 p95가 실제로 필요한 중요 Timer에만 사용하고, 예상 최솟값·최댓값 또는 SLO
-버킷을 제한한다. CloudWatch 전송 전에는 노출되는 메트릭과 시계열 수를 확인하고 수집 대상
-allowlist를 별도로 정한다.
+히스토그램은 운영 판단에 필요한 HTTP 요청과 중요 내부 Timer에만 사용하고 SLO 버킷을 제한한다.
+CloudWatch 전송 전에는 노출되는 메트릭과 시계열 수를 확인하고 수집 대상 allowlist를 별도로
+정한다.
 
 ### Prometheus 서버는 현재 EC2에 설치하지 않는다
 
@@ -164,15 +200,68 @@ allowlist를 별도로 정한다.
 후속 CloudWatch 작업에서 CloudWatch Agent가 이 엔드포인트를 주기적으로 읽어 필요한 메트릭만
 전송한다.
 
-## 적용 순서
+## 확인 방법
 
-1. 로그 레벨과 민감정보 정책을 기존 예외 처리기에 반영한다.
-2. Request ID Filter와 MDC 정리 로직을 추가한다.
-3. 운영 프로필에서 JSON 구조화 로그를 활성화한다.
-4. 기존 `http.server.requests`와 Prometheus 노출 결과를 검증한다.
-5. 중요 내부 작업에 `mapmory.operation.duration` Timer를 추가한다.
-6. 히스토그램 범위와 태그 카디널리티를 테스트한다.
-7. CloudWatch Agent·대시보드·알림은 후속 작업으로 진행한다.
+### Request ID
+
+로컬 서버 실행 후 응답 헤더를 확인한다.
+
+```bash
+curl -i http://localhost:8080/health
+```
+
+응답에 UUID 형식의 `X-Request-Id`가 있어야 한다. 유효한 UUID를 요청 헤더로 전달하면 응답에도
+같은 값이 반환되어야 한다.
+
+```bash
+curl -i \
+  -H 'X-Request-Id: 550e8400-e29b-41d4-a716-446655440000' \
+  http://localhost:8080/health
+```
+
+### Prometheus 메트릭
+
+```bash
+curl -s http://localhost:8080/actuator/prometheus \
+  | grep -E 'http_server_requests_seconds|mapmory_operation_duration_seconds'
+```
+
+`mapmory.operation.duration`은 해당 업무 기능을 한 번 이상 실행한 뒤 생성된다. 주요 출력은 다음과
+같다.
+
+| Prometheus suffix | 의미 |
+| --- | --- |
+| `_count` | 작업 실행 횟수 |
+| `_sum` | 누적 실행 시간(초) |
+| `_max` | 관측 구간의 최대 실행 시간(초) |
+| `_bucket` | `le` 경계 이하로 완료된 누적 횟수 |
+
+내부 작업은 `operation`, `outcome` 태그로 구분한다.
+
+```text
+mapmory_operation_duration_seconds_count{operation="MEDIA_SYNC",outcome="SUCCESS",...} 3
+mapmory_operation_duration_seconds_count{operation="S3_PRESIGN",outcome="FAILURE",...} 1
+```
+
+### 새 내부 작업을 계측할 때
+
+1. `MonitoredOperation`에 종류가 제한된 enum 값을 추가한다.
+2. 병목을 구분할 수 있는 최소 코드 구간만 `operationTimer.record(...)`로 감싼다.
+3. 사용자 ID, 실제 URI, object key, 예외 메시지를 태그로 넣지 않는다.
+4. 성공 시 결과가 그대로 반환되고 실패 시 원래 예외가 다시 전달되는지 테스트한다.
+5. `/actuator/prometheus`에서 `operation`, `outcome`, SLO 버킷을 확인한다.
+
+## 구현 상태
+
+- [x] 로그 레벨과 민감정보 정책을 예외 처리기에 반영
+- [x] Request ID Filter와 요청 종료 시 MDC 정리
+- [x] 운영 프로필의 Logstash JSON 구조화 로그
+- [x] 자동 구성된 `RestClient` 외부 HTTP 메트릭과 타임아웃
+- [x] `http.server.requests`의 고정 SLO 버킷과 URI 태그 상한
+- [x] `mapmory.operation.duration`과 초기 3개 내부 작업 계측
+- [x] 성공·실패 Timer, SLO 설정, URI 카디널리티 테스트
+- [ ] CloudWatch Agent 수집 설정과 전송 메트릭 allowlist
+- [ ] CloudWatch 대시보드와 알림 기준
 
 ## 검토한 대안
 
@@ -201,7 +290,8 @@ allowlist를 별도로 정한다.
 
 ### 장점
 
-- 대시보드에서 이상을 발견한 뒤 같은 API·operation·Request ID의 로그로 원인을 좁힐 수 있다.
+- 메트릭의 `operation`·`outcome`으로 이상 구간을 찾고, 같은 시간대와 요청 경로의 Request ID
+  로그로 개별 실패 원인을 좁힐 수 있다.
 - 로그 레벨이 운영 의미에 맞게 통일되고 일반적인 4xx가 장애 로그를 오염시키지 않는다.
 - API 전체 지연과 내부 병목 지점을 함께 관찰할 수 있다.
 - 메트릭 태그와 히스토그램 증가를 제한해 JVM 메모리와 후속 CloudWatch 비용을 통제한다.
