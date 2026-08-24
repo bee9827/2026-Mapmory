@@ -1,0 +1,107 @@
+name: Backend CI/CD
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - "api.md"
+      - ".github/workflows/backend-cicd.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "api.md"
+      - ".github/workflows/backend-cicd.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  build:
+    name: Test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Grant Gradle Wrapper permission
+        run: chmod +x gradlew
+
+      - name: Test and build
+        run: ./gradlew clean build --no-daemon
+  deploy:
+    name: Deploy to EC2
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v5
+        with:
+          distribution: corretto
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v5
+      - run: chmod +x gradlew
+      - run: ./gradlew bootJar --no-daemon
+
+      - name: Backup current jar
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            if [ -f /opt/mapmory/mapmory-backend.jar ]; then
+              cp /opt/mapmory/mapmory-backend.jar /opt/mapmory/mapmory-backend.jar.bak
+              echo "backup created"
+            fi
+
+      - name: Copy jar to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "backend/build/libs/mapmory-backend.jar"
+          target: "/opt/mapmory"
+          strip_components: 3
+
+      - name: Restart and health check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo systemctl restart mapmory
+            for i in $(seq 1 24); do
+              if curl -sf http://127.0.0.1:8080/health > /dev/null; then
+                echo "healthy after $((i * 5))s"
+                exit 0
+              fi
+              sleep 5
+            done
+            echo "health check failed"
+            sudo journalctl -u mapmory -n 50 --no-pager
+            exit 1
