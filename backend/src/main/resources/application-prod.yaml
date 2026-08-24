@@ -12,9 +12,13 @@ jwt:
   secret: ${JWT_SECRET}
 
 logging:
+  file:
+    name: /var/log/mapmory/application.log
+
   structured:
     format:
       console: logstash
+      file: logstash
     json:
       add:
         service: ${spring.application.name}
