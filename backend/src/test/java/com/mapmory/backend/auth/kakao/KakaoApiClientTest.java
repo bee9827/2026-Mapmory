@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 class KakaoApiClientTest {
 
@@ -58,7 +59,9 @@ class KakaoApiClientTest {
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
 
         assertThatThrownBy(() -> kakaoApiClient.fetchUser("token"))
-                .isInstanceOfSatisfying(BusinessException.class, exception ->
-                        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.KAKAO_UNAVAILABLE));
+                .isInstanceOfSatisfying(BusinessException.class, exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.KAKAO_UNAVAILABLE);
+                    assertThat(exception.getCause()).isInstanceOf(RestClientResponseException.class);
+                });
     }
 }

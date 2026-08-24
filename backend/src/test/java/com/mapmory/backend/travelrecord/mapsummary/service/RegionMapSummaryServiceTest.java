@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.region.exception.RegionErrorCode;
@@ -18,6 +19,7 @@ import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
 import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
 import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryQueryResult;
 import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -45,6 +47,7 @@ class RegionMapSummaryServiceTest {
     private TagService tagService;
 
     private final LevelPolicy levelPolicy = LevelPolicy.standard();
+    private final OperationTimer operationTimer = new OperationTimer(new SimpleMeterRegistry());
 
     @Nested
     @DisplayName("Region 요약을 조회할 때")
@@ -136,7 +139,8 @@ class RegionMapSummaryServiceTest {
                 regionRepository,
                 regionMapSummaryRepository,
                 levelPolicy,
-                tagService
+                tagService,
+                operationTimer
         );
     }
 

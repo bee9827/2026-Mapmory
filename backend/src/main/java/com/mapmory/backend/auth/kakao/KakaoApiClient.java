@@ -37,12 +37,20 @@ public class KakaoApiClient {
                     .body(KakaoUserResponse.class);
         } catch (RestClientResponseException exception) {
             if (exception.getStatusCode().is5xxServerError()) {
-                throw new BusinessException(AuthErrorCode.KAKAO_UNAVAILABLE);
+                throw kakaoUnavailable(exception);
             }
             throw new BusinessException(AuthErrorCode.INVALID_KAKAO_TOKEN);
         } catch (RestClientException exception) {
             // 연결 실패 등 응답 자체를 받지 못한 경우도 카카오 장애로 취급한다.
-            throw new BusinessException(AuthErrorCode.KAKAO_UNAVAILABLE);
+            throw kakaoUnavailable(exception);
         }
+    }
+
+    private static BusinessException kakaoUnavailable(RestClientException cause) {
+        return new BusinessException(
+                AuthErrorCode.KAKAO_UNAVAILABLE,
+                AuthErrorCode.KAKAO_UNAVAILABLE.detail(),
+                cause
+        );
     }
 }

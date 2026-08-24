@@ -28,8 +28,14 @@ public class UnexpectedExceptionHandler {
             Exception exception,
             HttpServletRequest request
     ) {
-        log.error("Unhandled exception while processing {} {}",
-                request.getMethod(), request.getRequestURI(), exception);
+        log.atError()
+                .addKeyValue("event", "UNHANDLED_EXCEPTION")
+                .addKeyValue("status", 500)
+                .addKeyValue("httpMethod", request.getMethod())
+                .addKeyValue("uri", request.getRequestURI())
+                .setCause(exception)
+                .log("Unhandled exception while processing {} {}",
+                        request.getMethod(), request.getRequestURI());
         return problemDetailFactory.internalServerError(request);
     }
 }

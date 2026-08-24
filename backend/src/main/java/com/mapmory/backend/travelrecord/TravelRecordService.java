@@ -1,6 +1,8 @@
 package com.mapmory.backend.travelrecord;
 
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.common.monitoring.MonitoredOperation;
+import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
@@ -36,19 +38,22 @@ public class TravelRecordService {
     private final RecordMediaRepository recordMediaRepository;
     private final TravelRecordTagService travelRecordTagService;
     private final TagService tagService;
+    private final OperationTimer operationTimer;
 
     public TravelRecordService(
             TravelRecordRepository travelRecordRepository,
             RegionResolver regionResolver,
             RecordMediaRepository recordMediaRepository,
             TravelRecordTagService travelRecordTagService,
-            TagService tagService
+            TagService tagService,
+            OperationTimer operationTimer
     ) {
         this.travelRecordRepository = travelRecordRepository;
         this.regionResolver = regionResolver;
         this.recordMediaRepository = recordMediaRepository;
         this.travelRecordTagService = travelRecordTagService;
         this.tagService = tagService;
+        this.operationTimer = operationTimer;
     }
 
     @Transactional
@@ -125,10 +130,19 @@ public class TravelRecordService {
                 request.startDate(),
                 request.endDate()
         );
-        List<RecordMedia> updatedMedia = synchronizeMedia(travelRecord, existingMedia, objectKeys);
         List<Tag> tags = travelRecordTagService.replace(member, travelRecord, request.tagIds());
-
-        travelRecordRepository.flush();
+        List<RecordMedia> updatedMedia = operationTimer.record(
+                MonitoredOperation.MEDIA_SYNC,
+                () -> {
+                    List<RecordMedia> synchronizedMedia = synchronizeMedia(
+                            travelRecord,
+                            existingMedia,
+                            objectKeys
+                    );
+                    travelRecordRepository.flush();
+                    return synchronizedMedia;
+                }
+        );
 
         return TravelRecordDetailResponse.from(travelRecord, updatedMedia, tags);
     }

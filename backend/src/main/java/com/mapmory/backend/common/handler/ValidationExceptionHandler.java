@@ -50,8 +50,14 @@ public class ValidationExceptionHandler {
             HttpServletRequest request
     ) {
         if (exception.isForReturnValue()) {
-            log.error("Controller return value validation failed: method={}, uri={}",
-                    request.getMethod(), request.getRequestURI(), exception);
+            log.atError()
+                    .addKeyValue("event", "RESPONSE_VALIDATION_FAILED")
+                    .addKeyValue("status", 500)
+                    .addKeyValue("httpMethod", request.getMethod())
+                    .addKeyValue("uri", request.getRequestURI())
+                    .setCause(exception)
+                    .log("Controller return value validation failed: method={}, uri={}",
+                            request.getMethod(), request.getRequestURI());
             return problemDetailFactory.internalServerError(request);
         }
 

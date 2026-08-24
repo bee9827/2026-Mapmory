@@ -10,13 +10,12 @@ import org.springframework.web.client.RestClient;
 public class KakaoClientConfig {
 
     /**
-     * 카카오 호출 전용 RestClient.
-     *
-     * 앱 전역 자동 구성 빌더에 의존하지 않고 직접 생성한다. (외부 호출에 앱의 인터셉터·컨버터를
-     * 얹지 않고, 자동 구성 여부와 무관하게 동작하게 하기 위함)
+     * Spring Boot가 자동 구성한 Builder를 사용한다.
+     * 이를 통해 HTTP 메시지 변환, 타임아웃 설정과 관측 기능이 적용된다.
+     * 자동 빌더를 사용하지 않으면 외부 api 관측이 불가능하다고 한다.
      */
     @Bean
-    public RestClient kakaoRestClient() {
-        return RestClient.create();
+    public RestClient kakaoRestClient(RestClient.Builder builder) {
+        return builder.build();
     }
 }

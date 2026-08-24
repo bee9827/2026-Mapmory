@@ -12,5 +12,28 @@ jwt:
   secret: ${JWT_SECRET}
 
 logging:
+  file:
+    name: /var/log/mapmory/application.log
+
+  structured:
+    format:
+      console: logstash
+      file: logstash
+    json:
+      add:
+        service: ${spring.application.name}
+        environment: prod
+        version: ${APP_VERSION:unknown}
   level:
     org.hibernate.SQL: warn
+    org.flywaydb: info
+    org.springframework.boot.autoconfigure: info
+
+management:
+  server:
+    port: 8081
+    address: 127.0.0.1
+
+  metrics:
+    tags:
+      environment: prod

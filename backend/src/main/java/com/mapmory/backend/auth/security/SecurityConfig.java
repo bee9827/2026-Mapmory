@@ -1,6 +1,7 @@
 package com.mapmory.backend.auth.security;
 
 import jakarta.servlet.DispatcherType;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -42,6 +43,7 @@ public class SecurityConfig {
                         // permitAll 경로에서 예외가 나 /error로 재디스패치될 때 401로 덮여
                         // 원래 에러 응답(404/500 등)이 가려진다.
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers(EndpointRequest.to("health", "prometheus")).permitAll()
                         .requestMatchers("/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
                         .anyRequest().authenticated())

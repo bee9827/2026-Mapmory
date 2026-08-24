@@ -14,3 +14,8 @@ spring:
 jwt:
   # 로컬 개발 전용 키. 운영에는 절대 사용하지 말 것. (HS256: 최소 32바이트)
   secret: local-development-only-secret-key-change-me-0123456789
+
+management:
+  metrics:
+    tags:
+      environment: local
