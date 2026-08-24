@@ -103,6 +103,9 @@ class SecurityIntegrationTest extends IntegrationTest {
                 .andExpect(content().string(containsString("jvm_memory_used_bytes")))
                 .andExpect(content().string(containsString("hikaricp_connections")))
                 .andExpect(content().string(containsString("http_server_requests_seconds_count")))
+                .andExpect(content().string(containsString("http_server_requests_seconds_bucket")))
+                .andExpect(content().string(containsString("uri=\"/health\"")))
+                .andExpect(content().string(containsString("status=\"200\"")))
                 .andExpect(content().string(containsString("service=\"mapmory-backend\"")))
                 .andExpect(content().string(containsString("environment=\"local\"")));
     }
