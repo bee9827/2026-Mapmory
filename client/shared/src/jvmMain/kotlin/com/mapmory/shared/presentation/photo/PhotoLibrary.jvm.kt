@@ -8,7 +8,8 @@ actual fun rememberPhotoLibraryActions(
     onPhotosPicked: (List<SelectedPhoto>) -> Unit,
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
-): PhotoLibraryActions = remember(onMessage) {
+    onLoadingChanged: (Boolean) -> Unit,
+): PhotoLibraryActions = remember(onMessage, onLoadingChanged) {
     PhotoLibraryActions(
         pickFromGallery = { onMessage("사진 선택은 Android와 iOS 앱에서 사용할 수 있어요.") },
         recommendForLocation = { _, _ -> },
