@@ -40,6 +40,7 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
+            implementation("org.jetbrains.compose.ui:ui-tooling-preview:${libs.versions.composeMultiplatform.get()}")
             implementation(libs.jetbrains.androidx.navigation.compose)
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
@@ -83,6 +84,7 @@ ksp {
 
 dependencies {
     add("kspAndroid", libs.androidx.room.compiler)
+    androidRuntimeClasspath("org.jetbrains.compose.ui:ui-tooling:${libs.versions.composeMultiplatform.get()}")
 }
 
 // Compose 1.11.1 does not initialize the output for the newly added KMP device-test variant.

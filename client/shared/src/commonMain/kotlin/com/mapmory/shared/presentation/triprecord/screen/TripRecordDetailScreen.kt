@@ -39,11 +39,14 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
+import com.mapmory.shared.preview.PreviewSurface
+import com.mapmory.shared.preview.previewUiRecords
 
 @Composable
 fun TripRecordDetailScreen(
@@ -485,6 +488,60 @@ private fun String.toMetadataDate(): String {
 private enum class RecordMetadataIcon {
     Location,
     Date,
+}
+
+@Preview(
+    name = "여행 기록 상세",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun TripRecordDetailScreenPreview() {
+    PreviewSurface {
+        TripRecordDetailScreen(
+            uiState = TripRecordDetailUiState.Success(previewUiRecords.first()),
+            onBackClick = {},
+            onEditClick = {},
+            onDeleteClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 상세 로딩",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun LoadingTripRecordDetailScreenPreview() {
+    PreviewSurface {
+        TripRecordDetailScreen(
+            uiState = TripRecordDetailUiState.Loading,
+            onBackClick = {},
+            onEditClick = {},
+            onDeleteClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 상세 오류",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun ErrorTripRecordDetailScreenPreview() {
+    PreviewSurface {
+        TripRecordDetailScreen(
+            uiState = TripRecordDetailUiState.Error("여행 기록을 불러오지 못했어요."),
+            onBackClick = {},
+            onEditClick = {},
+            onDeleteClick = {},
+        )
+    }
 }
 
 

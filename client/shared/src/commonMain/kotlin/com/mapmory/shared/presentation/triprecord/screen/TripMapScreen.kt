@@ -15,9 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,10 +29,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.MapScope
+import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
 import com.mapmory.shared.presentation.map.ui.MapViewport
+import com.mapmory.shared.preview.PreviewSurface
+import com.mapmory.shared.preview.previewVisitedRegions
 import kotlin.math.roundToInt
 
 @Composable
@@ -76,8 +81,6 @@ fun TripMapScreen(
                     .fillMaxWidth()
                     .weight(1f),
             ) {
-                // Keep zoomed map pixels inside a dedicated viewport so they cannot
-                // paint over the bottom app navigation.
                 MapViewport(
                     modifier = Modifier.fillMaxSize(),
                     content = mapContent,
@@ -324,8 +327,18 @@ private fun MapSummaryCard(
                     modifier = Modifier.padding(top = 3.dp),
                     verticalAlignment = Alignment.Bottom,
                 ) {
-                    Text(safeVisitedCount.toString(), color = TripRecordPalette.primary, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                    Text(" / $total", color = TripRecordPalette.headingText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        safeVisitedCount.toString(),
+                        color = TripRecordPalette.primary,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        " / $total",
+                        color = TripRecordPalette.headingText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
             Text(
@@ -338,4 +351,77 @@ private fun MapSummaryCard(
             )
         }
     }
+}
+
+@Preview(
+    name = "여행 지도 화면",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 760,
+)
+@Composable
+private fun TripMapScreenPreview() {
+    PreviewSurface {
+        TripMapScreen(
+            mapContent = { TripMapArtwork() },
+            mapScope = MapScope.KOREA,
+            visitedCount = 8,
+            onBackClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 지도 상세 화면",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 760,
+)
+@Composable
+private fun TripMapDetailScreenPreview() {
+    PreviewSurface {
+        TripMapScreen(
+            mapContent = {
+                KoreaMapArtwork(
+                    regions = GeneratedKoreaMapData.provinces,
+                    visitedRegionCodes = previewVisitedRegions,
+                    showRegionLabels = true,
+                )
+            },
+            mapScope = MapScope.KOREA,
+            visitedCount = 3,
+            mapDetailTitle = "서울특별시",
+            mapDetailTotal = 25,
+            onBackClick = {},
+        )
+    }
+}
+
+@Preview
+@Composable
+private fun MapScopeChipPreview() {
+    MapScopeChip(
+        label = "대한민국",
+        selected = true,
+        onClick = {},
+    )
+}
+
+@Preview
+@Composable
+private fun MapTagFilterPreview() {
+    MapTagFilter()
+}
+
+@Preview
+@Composable
+private fun MapSummaryCardPreview() {
+    MapSummaryCard(
+        mapScope = MapScope.WORLD,
+        visitedCount = 3,
+        mapDetailTitle = "끄룽텝 마하나콘 아몬 랏따나꼬신 마힌따라 아유타야 마하딜록 뽑놉빠랏 랏차타니 부리롬 우돔랏차니우엣 마하싸탄 아몬삐만 아와딴싸티 싸카타띠야 위쓰누깜쁘라씻",
+        // 방콕의 본 도시명에 세계에서 제일 긴 도시 명이랍니다...
+        mapDetailTotal = 9,
+        onMapDetailBackClick = {},
+    )
 }

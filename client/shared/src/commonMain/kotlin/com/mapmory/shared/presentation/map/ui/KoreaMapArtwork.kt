@@ -28,6 +28,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.GeoPoint
 import com.mapmory.shared.presentation.map.domain.ProvincePolygon
+import com.mapmory.shared.preview.PreviewSurface
+import com.mapmory.shared.preview.previewVisitedRegions
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -205,6 +208,36 @@ fun KoreaMapStatusMessage(
             }
         }
     }
+}
+
+@Preview(
+    name = "대한민국 지도 아트워크",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 500,
+)
+@Composable
+fun KoreaMapArtworkPreview() {
+    PreviewSurface {
+        KoreaMapArtwork(
+            visitedRegionCodes = previewVisitedRegions,
+            showRegionLabels = true,
+        )
+    }
+}
+
+@Preview(
+    name = "지도 상태 메시지",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 300,
+)
+@Composable
+fun KoreaMapStatusMessagePreview() {
+    KoreaMapStatusMessage(
+        message = "시·군·구 지도를 불러오는 중...",
+        actionLabel = "다시 시도",
+    )
 }
 
 private data class KoreaProjection(
