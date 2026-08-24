@@ -47,7 +47,11 @@ sealed interface TripRecordAction {
 
     data class PhotoRemoved(val photoId: String) : TripRecordAction
 
+    data class PhotoLoadingChanged(val isLoading: Boolean) : TripRecordAction
+
     data object Save : TripRecordAction
+
+    data object SaveWithoutPendingPhotos : TripRecordAction
 
     data class Delete(val recordId: Long) : TripRecordAction
 
@@ -137,7 +141,14 @@ class TripRecordsViewModel(
 
             is TripRecordAction.PhotosAdded -> addPhotos(action.photos)
             is TripRecordAction.PhotoRemoved -> removePhoto(action.photoId)
+            is TripRecordAction.PhotoLoadingChanged -> updateEditor {
+                copy(isPhotoLoading = action.isLoading)
+            }
             TripRecordAction.Save -> save()
+            TripRecordAction.SaveWithoutPendingPhotos -> {
+                updateEditor { copy(isPhotoLoading = false) }
+                save()
+            }
             is TripRecordAction.Delete -> delete(action.recordId)
             TripRecordAction.EffectHandled -> uiState = uiState.copy(effect = null)
         }
@@ -213,6 +224,7 @@ class TripRecordsViewModel(
 
     private fun save() {
         val editor = uiState.editor
+        if (editor.isPhotoLoading) return
         val title = editor.title.trim()
         val startDate = editor.startDate.takeIf(String::isNotBlank)?.toLocalDateOrNull()
         val endDate = editor.endDate.takeIf(String::isNotBlank)?.toLocalDateOrNull()

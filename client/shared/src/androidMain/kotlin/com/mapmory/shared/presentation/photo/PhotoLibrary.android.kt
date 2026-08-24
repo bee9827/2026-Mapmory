@@ -45,21 +45,28 @@ actual fun rememberPhotoLibraryActions(
     onPhotosPicked: (List<SelectedPhoto>) -> Unit,
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
+    onLoadingChanged: (Boolean) -> Unit,
 ): PhotoLibraryActions {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val latestPicked by rememberUpdatedState(onPhotosPicked)
     val latestRecommended by rememberUpdatedState(onPhotosRecommended)
     val latestMessage by rememberUpdatedState(onMessage)
+    val latestLoadingChanged by rememberUpdatedState(onLoadingChanged)
     var pendingRecommendation by remember { mutableStateOf<Pair<Location, String?>?>(null) }
 
     fun loadRecommendations(target: Location, parentName: String?) {
+        latestLoadingChanged(true)
         scope.launch {
+            try {
             val result = withContext(Dispatchers.IO) {
                 runCatching { context.recommendPhotos(target, parentName) }
             }
-            result.onSuccess(latestRecommended).onFailure {
-                latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+                result.onSuccess(latestRecommended).onFailure {
+                    latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+                }
+            } finally {
+                latestLoadingChanged(false)
             }
         }
     }
@@ -84,8 +91,12 @@ actual fun rememberPhotoLibraryActions(
     val galleryPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(),
     ) { uris ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        if (uris.isEmpty()) {
+            latestLoadingChanged(false)
+            return@rememberLauncherForActivityResult
+        }
         scope.launch {
+            try {
             val photos = withContext(Dispatchers.IO) {
                 Trace.beginAsyncSection("photo.pick.total", TraceCookie.Pick)
                 val startedAt = SystemClock.elapsedRealtime()
@@ -103,10 +114,13 @@ actual fun rememberPhotoLibraryActions(
                     Trace.endAsyncSection("photo.pick.total", TraceCookie.Pick)
                 }
             }
-            if (photos.isEmpty()) {
-                latestMessage("선택한 사진을 읽지 못했어요.")
-            } else {
-                latestPicked(photos)
+                if (photos.isEmpty()) {
+                    latestMessage("선택한 사진을 읽지 못했어요.")
+                } else {
+                    latestPicked(photos)
+                }
+            } finally {
+                latestLoadingChanged(false)
             }
         }
     }
@@ -114,6 +128,7 @@ actual fun rememberPhotoLibraryActions(
     return remember(context, galleryPicker, galleryPermissionLauncher) {
         PhotoLibraryActions(
             pickFromGallery = {
+                latestLoadingChanged(true)
                 galleryPicker.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                 )

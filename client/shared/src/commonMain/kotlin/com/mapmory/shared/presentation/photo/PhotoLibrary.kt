@@ -27,6 +27,7 @@ typealias PhotoLibraryActionsFactory = @Composable (
     onPhotosPicked: (List<SelectedPhoto>) -> Unit,
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
+    onLoadingChanged: (Boolean) -> Unit,
 ) -> PhotoLibraryActions
 
 @Composable
@@ -34,6 +35,7 @@ expect fun rememberPhotoLibraryActions(
     onPhotosPicked: (List<SelectedPhoto>) -> Unit,
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
+    onLoadingChanged: (Boolean) -> Unit,
 ): PhotoLibraryActions
 
 internal fun mergeSelectedPhotos(

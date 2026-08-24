@@ -44,6 +44,27 @@ class TripRecordsViewModelTest {
     }
 
     @Test
+    fun `사진을 불러오는 동안 확인 없이 저장할 수 없고 사진 제외 저장은 가능하다`() {
+        val viewModel = TripRecordsViewModel(locations)
+        viewModel.onAction(TripRecordAction.StartCreating(gangnam))
+        viewModel.onAction(TripRecordAction.EffectHandled)
+        viewModel.onAction(TripRecordAction.TitleChanged("서울 여행"))
+        viewModel.onAction(TripRecordAction.PhotoLoadingChanged(true))
+
+        assertTrue(viewModel.uiState.editor.isSaveEnabled)
+
+        viewModel.onAction(TripRecordAction.Save)
+
+        assertTrue(viewModel.uiState.records.isEmpty())
+        assertNull(viewModel.uiState.effect)
+
+        viewModel.onAction(TripRecordAction.SaveWithoutPendingPhotos)
+
+        assertEquals("서울 여행", viewModel.uiState.records.single().title)
+        assertEquals(TripRecordEffect.OpenRecords, viewModel.uiState.effect)
+    }
+
+    @Test
     fun `화면 액션으로 도메인 여행 기록을 생성하고 UI 상태를 발행한다`() {
         val viewModel = TripRecordsViewModel(locations)
         val initialState = viewModel.uiState

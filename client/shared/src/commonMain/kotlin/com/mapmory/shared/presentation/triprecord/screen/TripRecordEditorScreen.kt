@@ -103,13 +103,14 @@ fun TripRecordEditorScreen(
     onEndDateChanged: (String) -> Unit,
     onPhotosAdded: (List<SelectedPhoto>) -> Unit = {},
     onPhotoRemoved: (String) -> Unit = {},
+    onPhotoLoadingChanged: (Boolean) -> Unit = {},
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
     onMapClick: () -> Unit = {},
     onRecordClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    photoLibraryActionsFactory: PhotoLibraryActionsFactory = { onPicked, onRecommended, onMessage ->
-        rememberPhotoLibraryActions(onPicked, onRecommended, onMessage)
+    photoLibraryActionsFactory: PhotoLibraryActionsFactory = { onPicked, onRecommended, onMessage, onLoadingChanged ->
+        rememberPhotoLibraryActions(onPicked, onRecommended, onMessage, onLoadingChanged)
     },
     modifier: Modifier = Modifier,
 ) {
@@ -148,6 +149,7 @@ fun TripRecordEditorScreen(
             }
         },
         { photoMessage = it },
+        onPhotoLoadingChanged,
     )
     val locationResultsListState = rememberLazyListState()
     val filteredLocations = remember(locationSearchQuery, selectableLocations) {
@@ -206,6 +208,7 @@ fun TripRecordEditorScreen(
                             },
                             onRemoveClick = onPhotoRemoved,
                             recommendationsAvailable = photoLibrary.recommendationsAvailable,
+                            isLoading = uiState.isPhotoLoading,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 18.dp),
@@ -416,8 +419,10 @@ fun TripRecordEditorScreen(
                         val selectedPhotos = recommendedPhotos
                             .filter { it.id in selectedRecommendationIds }
                         isPreparingRecommendationPhotos = true
+                        onPhotoLoadingChanged(true)
                         photoLibrary.prepareForAdding(selectedPhotos) { preparedPhotos ->
                             isPreparingRecommendationPhotos = false
+                            onPhotoLoadingChanged(false)
                             if (preparedPhotos.isEmpty()) {
                                 photoMessage = "선택한 사진의 원본을 읽지 못했어요."
                             } else {
@@ -536,6 +541,7 @@ private fun PhotoSection(
     onRecommendClick: () -> Unit,
     onRemoveClick: (String) -> Unit,
     recommendationsAvailable: Boolean,
+    isLoading: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
@@ -557,7 +563,7 @@ private fun PhotoSection(
             Spacer(Modifier.width(10.dp))
             TextButton(
                 onClick = onRecommendClick,
-                enabled = recommendationsAvailable,
+                enabled = recommendationsAvailable && !isLoading,
                 contentPadding = PaddingValues(horizontal = 9.dp, vertical = 2.dp),
                 modifier = Modifier
                     .height(36.dp)
@@ -581,6 +587,7 @@ private fun PhotoSection(
             photos = photos,
             onAddClick = onAddClick,
             onRemoveClick = onRemoveClick,
+            isAddEnabled = !isLoading,
             modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
         )
     }
@@ -796,6 +803,7 @@ private fun PhotoEditor(
     photos: List<TripRecordPhotoUiState>,
     onAddClick: () -> Unit,
     onRemoveClick: (String) -> Unit,
+    isAddEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -805,7 +813,7 @@ private fun PhotoEditor(
             .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        PhotoActionButton(onClick = onAddClick)
+        PhotoActionButton(onClick = onAddClick, enabled = isAddEnabled)
         photos.forEach { photo ->
             Box {
                 PhotoPreview(photo = photo, modifier = Modifier.size(112.dp, 84.dp))
@@ -828,12 +836,12 @@ private fun PhotoEditor(
 }
 
 @Composable
-private fun PhotoActionButton(onClick: () -> Unit) {
+private fun PhotoActionButton(onClick: () -> Unit, enabled: Boolean) {
     Column(
         modifier = Modifier
             .size(112.dp, 84.dp)
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .background(TripRecordPalette.photoGalleryBackground)
             .border(1.dp, TripRecordPalette.photoGalleryBorder, RoundedCornerShape(14.dp)),
         verticalArrangement = Arrangement.Center,
