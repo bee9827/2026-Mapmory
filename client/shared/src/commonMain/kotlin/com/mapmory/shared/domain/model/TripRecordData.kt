@@ -23,6 +23,8 @@ data class TripRecordDraft(
     val startDate: String?,
     val endDate: String?,
     val mediaObjectKeys: List<String>,
+    // API 요청에는 object key만 사용하고, 로컬 저장소에서는 선택한 사진 표시 데이터를 보존한다.
+    val localMedia: List<TripRecordMediaDraft> = emptyList(),
 )
 
 fun TripRecordDraft.dateValidationError(): String? = when {

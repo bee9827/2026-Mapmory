@@ -57,7 +57,7 @@ class FakeTripRecordRepository(
             content = draft.content,
             startDate = draft.startDate,
             endDate = draft.endDate,
-            media = createMedia(draft.mediaObjectKeys),
+            media = createMedia(draft),
             createdAt = timestamp,
             updatedAt = timestamp,
         )
@@ -76,7 +76,7 @@ class FakeTripRecordRepository(
             content = draft.content,
             startDate = draft.startDate,
             endDate = draft.endDate,
-            media = createMedia(draft.mediaObjectKeys),
+            media = createMedia(draft),
             updatedAt = now(),
         )
         records[index] = updatedRecord
@@ -90,14 +90,21 @@ class FakeTripRecordRepository(
         return Result.success(Unit)
     }
 
-    private fun createMedia(objectKeys: List<String>): List<TripRecordMedia> =
-        objectKeys.mapIndexed { index, objectKey ->
+    private fun createMedia(draft: TripRecordDraft): List<TripRecordMedia> {
+        val localMediaByObjectKey = draft.localMedia.associateBy { it.objectKey }
+        return draft.mediaObjectKeys.mapIndexed { index, objectKey ->
+            val localMedia = localMediaByObjectKey[objectKey]
             TripRecordMedia(
                 id = nextMediaId++,
                 objectKey = objectKey,
-                sortOrder = index,
+                sortOrder = localMedia?.sortOrder ?: index,
                 url = null,
+                previewBytes = localMedia?.previewBytes?.copyOf(),
+                originalBytes = localMedia?.originalBytes?.copyOf(),
+                latitude = localMedia?.latitude,
+                longitude = localMedia?.longitude,
+                capturedAt = localMedia?.capturedAt,
             )
         }
-
+    }
 }

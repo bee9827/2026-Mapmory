@@ -48,7 +48,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     MapmoryApp(
-                        providedRecordsViewModel = appViewModel.recordsViewModel,
+                        container = appViewModel.container,
                         navigation = navigation,
                         contentWindowInsets = WindowInsets.safeDrawing,
                     )
