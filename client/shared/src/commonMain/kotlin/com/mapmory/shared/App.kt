@@ -87,21 +87,22 @@ fun MapmoryApp(
     var isPhotoLoadingSaveConfirmation by remember { mutableStateOf(false) }
 
     fun navigateBackDirectly(): Boolean {
+        if (navController.currentDestination?.id != navController.graph.startDestinationId) {
+            if (navController.popBackStack()) {
+                return true
+            }
+
+            navController.navigate(MapRoute) {
+                launchSingleTop = true
+            }
+            return true
+        }
+
         if (mapScope == MapScope.KOREA && koreaMapUiState is KoreaMapUiState.DistrictDetail) {
             koreaMapUiState = KoreaMapUiState.ProvinceOverview
             return true
         }
-        if (navController.currentDestination?.id == navController.graph.startDestinationId) {
-            return false
-        }
-        if (navController.popBackStack()) {
-            return true
-        }
-
-        navController.navigate(MapRoute) {
-            launchSingleTop = true
-        }
-        return true
+        return false
     }
 
     fun requestEditorExit(exit: () -> Unit) {
