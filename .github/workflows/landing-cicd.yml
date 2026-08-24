@@ -1,0 +1,113 @@
+name: Landing CI/CD
+
+on:
+  pull_request:
+    paths:
+      - "landing/**"
+      - ".github/workflows/landing-cicd.yml"
+  push:
+    branches: [main]
+    paths:
+      - "landing/**"
+      - ".github/workflows/landing-cicd.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: landing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: landing
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build landing page
+        run: npm run build
+
+      - name: Run landing tests
+        run: npm run test:sites
+
+      - name: Package static files
+        run: tar -czf "$RUNNER_TEMP/mapmory-landing.tar.gz" -C dist/client .
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: mapmory-landing
+          path: ${{ runner.temp }}/mapmory-landing.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy to EC2
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: landing-production
+
+    steps:
+      - name: Check out deployment script
+        uses: actions/checkout@v7
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: mapmory-landing
+          path: ${{ runner.temp }}
+
+      - name: Configure SSH
+        env:
+          LANDING_EC2_SSH_KEY: ${{ secrets.LANDING_EC2_SSH_KEY }}
+          LANDING_EC2_KNOWN_HOSTS: ${{ secrets.LANDING_EC2_KNOWN_HOSTS }}
+        run: |
+          test -n "$LANDING_EC2_SSH_KEY"
+          test -n "$LANDING_EC2_KNOWN_HOSTS"
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$LANDING_EC2_SSH_KEY" > "$HOME/.ssh/landing_deploy_key"
+          printf '%s\n' "$LANDING_EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/landing_deploy_key" "$HOME/.ssh/known_hosts"
+
+      - name: Upload and activate release
+        env:
+          LANDING_EC2_HOST: ${{ secrets.LANDING_EC2_HOST }}
+          LANDING_EC2_USER: ${{ secrets.LANDING_EC2_USER }}
+        run: |
+          test -n "$LANDING_EC2_HOST"
+          test -n "$LANDING_EC2_USER"
+          release_id="${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}"
+          remote_archive="/tmp/mapmory-landing-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
+          ssh_options=(-i "$HOME/.ssh/landing_deploy_key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
+
+          scp "${ssh_options[@]}" \
+            "$RUNNER_TEMP/mapmory-landing.tar.gz" \
+            "$LANDING_EC2_USER@$LANDING_EC2_HOST:$remote_archive"
+
+          ssh "${ssh_options[@]}" \
+            "$LANDING_EC2_USER@$LANDING_EC2_HOST" \
+            "bash -s -- '$release_id' '$remote_archive'" \
+            < landing/scripts/deploy-ec2.sh
+
+      - name: Verify public landing page
+        run: curl --fail --silent --show-error --retry 3 --retry-delay 2 https://map-mory.com/ --output /dev/null
