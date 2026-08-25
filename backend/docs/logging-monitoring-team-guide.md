@@ -34,7 +34,7 @@ CloudWatch Agent, 로그 그룹, 대시보드와 알림 같은 **AWS 수집 환�
 | Timer | 작업 실행 횟수와 걸린 시간을 함께 기록하는 Micrometer 메트릭이다. API와 중요 내부 작업의 지연 시간을 측정한다. |
 | 태그(Tag)·라벨(Label) | 메트릭을 `operation=MEDIA_SYNC`, `outcome=SUCCESS`처럼 분류하는 값이다. Prometheus에서는 주로 라벨이라고 부른다. |
 | 카디널리티 | 서로 다른 태그 값 조합의 개수다. 값이 무제한으로 늘면 메모리와 모니터링 비용도 커진다. |
-| 히스토그램·버킷 | 실행 시간을 `100ms 이하`, `500ms 이하`, `1초 이하` 같은 구간별 개수로 모으는 방식이다. |
+| Summary | 실행 횟수·누적 시간과 애플리케이션에서 계산한 percentile을 함께 노출하는 방식이다. |
 | p95 | 전체 요청 중 약 95%가 이 시간 안에 끝났다는 뜻이다. 평균으로 가려지는 느린 요청을 찾는 데 사용한다. |
 | Health Check | 애플리케이션이나 연결된 구성요소가 정상인지 간단한 상태로 확인하는 기능이다. |
 | CloudWatch | AWS의 메트릭·로그 저장, 검색, 대시보드와 알림 서비스다. 애플리케이션이 만든 데이터를 운영자가 보는 곳이다. |
@@ -199,7 +199,7 @@ Spring Boot 코드에서는 점(`.`)이 들어간 이름을 사용하지만 Prom
 http.server.requests
 → http_server_requests_seconds_count
 → http_server_requests_seconds_sum
-→ http_server_requests_seconds_bucket
+→ http_server_requests_seconds{quantile="0.95"}
 ```
 
 ### 직접 추가한 중요 작업 메트릭
@@ -228,22 +228,12 @@ operation=MEDIA_SYNC, outcome=FAILURE
 예를 들어 지도 API가 느릴 때 `MAP_SUMMARY_QUERY`도 느리면 DB 조회가 원인일 가능성이 높다.
 API 전체는 느리지만 이 작업은 빠르다면 인증, DTO 변환 또는 다른 구간을 조사한다.
 
-### 응답시간 버킷을 쉽게 이해하기
+### p95 Summary를 쉽게 이해하기
 
-HTTP 요청은 다음 구간별로 누적 집계된다.
-
-```text
-100ms 이하
-300ms 이하
-500ms 이하
-1초 이하
-2초 이하
-3초 이하
-5초 이하
-```
-
-원본 요청 시간을 모두 저장하지 않고 구간별 개수를 저장한다. 이를 이용해 “요청의 약 95%가
-몇 초 안에 끝났는가?” 같은 p95 값을 계산할 수 있다.
+애플리케이션은 각 URI와 내부 작업의 최근 실행 시간을 이용해 p95를 계산하고
+`quantile="0.95"` 시계열로 노출한다. 예를 들어 p95가 `0.8`이면 해당 태그 조합의 요청 약 95%가
+0.8초 안에 끝났다는 뜻이다. 이 값은 서로 다른 URI나 여러 서버 사이에서 더하거나 평균내면
+정확하지 않으므로 각 시계열을 따로 본다.
 
 ## 로그와 메트릭을 함께 보는 방법
 
