@@ -1,0 +1,9 @@
+# Mobile client code requires approval from an Android team member.
+/client/ @Redish03 @chohs4164 @Soojin6943
+
+# Mobile CI changes follow the same review policy.
+/.github/workflows/android-ci.yml @Redish03 @chohs4164 @Soojin6943
+/.github/workflows/ios-ci.yml @Redish03 @chohs4164 @Soojin6943
+
+# Changes to this ownership policy require an Android team review.
+/.github/CODEOWNERS @Redish03 @chohs4164 @Soojin6943
