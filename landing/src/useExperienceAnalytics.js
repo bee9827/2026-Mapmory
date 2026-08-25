@@ -41,6 +41,7 @@ export function useExperienceAnalytics(experienceType) {
 
       if (!hasViewedRef.current && !viewTimerRef.current) {
         viewTimerRef.current = window.setTimeout(() => {
+          viewTimerRef.current = null;
           if (!isVisibleRef.current || hasViewedRef.current) return;
           hasViewedRef.current = true;
           trackEvent(ANALYTICS_EVENTS.EXPERIENCE_VIEW, {
@@ -62,7 +63,7 @@ export function useExperienceAnalytics(experienceType) {
       if (!hasStartedRef.current || !isVisibleRef.current || document.hidden) return;
 
       activeSecondsRef.current += 1;
-      ENGAGEMENT_MILESTONES.forEach((milestoneSeconds) => {
+      for (const milestoneSeconds of ENGAGEMENT_MILESTONES) {
         if (
           activeSecondsRef.current >= milestoneSeconds
           && !sentMilestonesRef.current.has(milestoneSeconds)
@@ -73,7 +74,7 @@ export function useExperienceAnalytics(experienceType) {
             milestone_seconds: milestoneSeconds,
           });
         }
-      });
+      }
     }, 1000);
 
     return () => window.clearInterval(intervalId);

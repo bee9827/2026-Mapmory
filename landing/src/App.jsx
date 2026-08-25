@@ -1,6 +1,4 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { feature } from "topojson-client";
-import countriesTopology from "world-atlas/countries-110m.json";
 import koreaProvinces from "./data/korea-provinces.json";
 import {
   ArrowDown,
@@ -111,8 +109,8 @@ const koreaMemories = [
 ];
 
 const memoryByCountry = new Map(memories.map((memory) => [memory.id, memory]));
-const countries = feature(countriesTopology, countriesTopology.objects.countries).features;
 const koreaBounds = { minLng: 124.5, maxLng: 130.05, minLat: 33, maxLat: 38.75 };
+const districtMapCache = new Map();
 
 function Brand() {
   return (
@@ -175,6 +173,7 @@ function LaunchWaitlistForm() {
       }
       if (!hasTrackedView.current && !viewTimerRef.current) {
         viewTimerRef.current = window.setTimeout(() => {
+          viewTimerRef.current = null;
           hasTrackedView.current = true;
           trackEvent(ANALYTICS_EVENTS.WAITLIST_FORM_VIEW);
           observer.disconnect();
@@ -300,6 +299,18 @@ function InteractiveGlobe({ selected, onSelect, onInteract, theme, countrySelect
   const [size, setSize] = useState({ width: 540, height: 540 });
   const [hoveredId, setHoveredId] = useState(null);
   const [globeMaterial, setGlobeMaterial] = useState(null);
+  const [countries, setCountries] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      import("topojson-client"),
+      import("world-atlas/countries-110m.json"),
+    ]).then(([{ feature }, { default: topology }]) => {
+      if (active) setCountries(feature(topology, topology.objects.countries).features);
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -344,13 +355,14 @@ function InteractiveGlobe({ selected, onSelect, onInteract, theme, countrySelect
     <div
       className="globe-shell"
       ref={containerRef}
+      role="region"
       aria-label="회전 가능한 Mapmory 세계 지구본"
       onPointerDown={() => onInteract("globe_drag")}
       onWheel={() => onInteract("globe_zoom")}
     >
       {countrySelector}
       <Suspense fallback={<div className="globe-loading"><GlobeHemisphereEast size={28} weight="duotone" /><span>지구본을 준비하고 있어요</span></div>}>
-        {globeMaterial && <Globe ref={globeRef} width={size.width} height={size.height} backgroundColor="rgba(0,0,0,0)" globeMaterial={globeMaterial} showAtmosphere atmosphereColor="#93a6b8" atmosphereAltitude={0.12} polygonsData={countries}
+        {globeMaterial && countries.length > 0 && <Globe ref={globeRef} width={size.width} height={size.height} backgroundColor="rgba(0,0,0,0)" globeMaterial={globeMaterial} showAtmosphere atmosphereColor="#93a6b8" atmosphereAltitude={0.12} polygonsData={countries}
           polygonCapColor={(polygon) => { const id = String(polygon.id); if (id === selected.id) return "#21e69a"; if (id === hoveredId && isVisited(polygon)) return "#72efbd"; return isVisited(polygon) ? "#3fd09a" : "#303b4d"; }}
           polygonSideColor={(polygon) => (isVisited(polygon) ? "#189a6d" : "#1b2532")}
           polygonStrokeColor={(polygon) => (isVisited(polygon) ? "#a3f4d3" : "#778497")}
@@ -414,7 +426,10 @@ function KoreaMap({ selected, onSelect, theme }) {
     if (!shellRef.current) return undefined;
     const observer = new ResizeObserver(([entry]) => {
       const width = Math.max(300, Math.floor(entry.contentRect.width));
-      setDimensions({ width, height: Math.round(width * 1.04) });
+      const height = Math.round(width * 1.04);
+      setDimensions((current) => (
+        current.width === width && current.height === height ? current : { width, height }
+      ));
     });
     observer.observe(shellRef.current);
     return () => observer.disconnect();
@@ -456,7 +471,7 @@ function KoreaMap({ selected, onSelect, theme }) {
 
   return (
     <div className="korea-map-shell" ref={shellRef}>
-      <canvas ref={canvasRef} role="img" aria-label="대한민국 17개 시도 상세 지도. 지도 위의 합정, 여수, 제주 버튼으로 장소 기억을 선택할 수 있습니다." />
+      <canvas ref={canvasRef} role="img" aria-label="대한민국 17개 시도 상세 지도. 지도 위의 서울, 전라남도, 제주특별자치도 버튼으로 장소 기억을 선택할 수 있습니다." />
       {koreaMemories.map((memory) => {
         const [x, y] = projectPoint(memory.lng, memory.lat, dimensions.width, dimensions.height);
         return <button key={memory.key} type="button" className={`map-hotspot ${selected?.key === memory.key ? "is-active" : ""}`} style={{ left: x, top: y }} onClick={() => onSelect(memory, "map")} aria-label={`${memory.province} 상세지도 보기`} aria-pressed={selected?.key === memory.key}><span className="hotspot-dot"><MapPin size={15} weight="fill" /></span><span className="hotspot-label">{memory.provinceShort}<small>{memory.location.split(" · ")[1]}</small></span></button>;
@@ -468,16 +483,20 @@ function KoreaMap({ selected, onSelect, theme }) {
 
 function calculateDistrictBounds(districts) {
   const bounds = { minLng: Infinity, maxLng: -Infinity, minLat: Infinity, maxLat: -Infinity };
-  districts.forEach((district) => district.rings.forEach((ring) => ring.forEach(([lng, lat]) => {
-    bounds.minLng = Math.min(bounds.minLng, lng);
-    bounds.maxLng = Math.max(bounds.maxLng, lng);
-    bounds.minLat = Math.min(bounds.minLat, lat);
-    bounds.maxLat = Math.max(bounds.maxLat, lat);
-  })));
+  for (const district of districts) {
+    for (const ring of district.rings) {
+      for (const [lng, lat] of ring) {
+        bounds.minLng = Math.min(bounds.minLng, lng);
+        bounds.maxLng = Math.max(bounds.maxLng, lng);
+        bounds.minLat = Math.min(bounds.minLat, lat);
+        bounds.maxLat = Math.max(bounds.maxLat, lat);
+      }
+    }
+  }
   return bounds;
 }
 
-function projectDistrictPoint(lng, lat, width, height, bounds) {
+function createDistrictProjection(width, height, bounds) {
   const padding = Math.min(width, height) * 0.08;
   const availableWidth = width - padding * 2;
   const availableHeight = height - padding * 2;
@@ -489,21 +508,36 @@ function projectDistrictPoint(lng, lat, width, height, bounds) {
   const mapHeight = (bounds.maxLat - bounds.minLat) * scale;
   const offsetX = (width - mapWidth) / 2;
   const offsetY = (height - mapHeight) / 2;
-  return [
-    offsetX + (lng - bounds.minLng) * scale,
-    offsetY + (bounds.maxLat - lat) * scale,
-  ];
+  return { scale, offsetX, offsetY, minLng: bounds.minLng, maxLat: bounds.maxLat };
 }
 
 function districtLabelPoint(district) {
-  const largestRing = district.rings.reduce((largest, ring) => (ring.length > largest.length ? ring : largest), district.rings[0]);
-  const bounds = largestRing.reduce((next, [lng, lat]) => ({
-    minLng: Math.min(next.minLng, lng),
-    maxLng: Math.max(next.maxLng, lng),
-    minLat: Math.min(next.minLat, lat),
-    maxLat: Math.max(next.maxLat, lat),
-  }), { minLng: Infinity, maxLng: -Infinity, minLat: Infinity, maxLat: -Infinity });
+  let largestRing = district.rings[0] ?? [];
+  for (const ring of district.rings) {
+    if (ring.length > largestRing.length) largestRing = ring;
+  }
+  const bounds = { minLng: Infinity, maxLng: -Infinity, minLat: Infinity, maxLat: -Infinity };
+  for (const [lng, lat] of largestRing) {
+    bounds.minLng = Math.min(bounds.minLng, lng);
+    bounds.maxLng = Math.max(bounds.maxLng, lng);
+    bounds.minLat = Math.min(bounds.minLat, lat);
+    bounds.maxLat = Math.max(bounds.maxLat, lat);
+  }
   return [(bounds.minLng + bounds.maxLng) / 2, (bounds.minLat + bounds.maxLat) / 2];
+}
+
+async function loadDistrictMap(provinceCode, signal) {
+  if (districtMapCache.has(provinceCode)) return districtMapCache.get(provinceCode);
+
+  const suffix = provinceCode.replace("KR-", "");
+  const response = await fetch(`/assets/maps/korea-districts-${suffix}.json`, { signal });
+  if (!response.ok) throw new Error(`district map ${response.status}`);
+  const data = await response.json();
+  if (!Array.isArray(data?.districts) || data.districts.length === 0) {
+    throw new Error("invalid district map data");
+  }
+  districtMapCache.set(provinceCode, data.districts);
+  return data.districts;
 }
 
 function DistrictMap({ memory }) {
@@ -514,14 +548,9 @@ function DistrictMap({ memory }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    const suffix = memory.provinceCode.replace("KR-", "");
     setMapState({ status: "loading", districts: [] });
-    fetch(`/assets/maps/korea-districts-${suffix}.json`, { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error(`district map ${response.status}`);
-        return response.json();
-      })
-      .then((data) => setMapState({ status: "ready", districts: data.districts }))
+    loadDistrictMap(memory.provinceCode, controller.signal)
+      .then((districts) => setMapState({ status: "ready", districts }))
       .catch((error) => {
         if (error.name !== "AbortError") setMapState({ status: "error", districts: [] });
       });
@@ -532,7 +561,10 @@ function DistrictMap({ memory }) {
     if (!shellRef.current) return undefined;
     const observer = new ResizeObserver(([entry]) => {
       const width = Math.max(300, Math.floor(entry.contentRect.width));
-      setDimensions({ width, height: Math.max(390, Math.round(width * 0.84)) });
+      const height = Math.max(390, Math.round(width * 0.84));
+      setDimensions((current) => (
+        current.width === width && current.height === height ? current : { width, height }
+      ));
     });
     observer.observe(shellRef.current);
     return () => observer.disconnect();
@@ -556,36 +588,40 @@ function DistrictMap({ memory }) {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
     context.lineJoin = "round";
+    const projection = createDistrictProjection(width, height, bounds);
 
-    mapState.districts.forEach((district) => {
+    for (const district of mapState.districts) {
       const active = district.code === memory.districtCode;
       context.beginPath();
-      district.rings.forEach((ring) => {
-        ring.forEach(([lng, lat], index) => {
-          const [x, y] = projectDistrictPoint(lng, lat, width, height, bounds);
+      for (const ring of district.rings) {
+        for (let index = 0; index < ring.length; index += 1) {
+          const [lng, lat] = ring[index];
+          const x = projection.offsetX + (lng - projection.minLng) * projection.scale;
+          const y = projection.offsetY + (projection.maxLat - lat) * projection.scale;
           if (index === 0) context.moveTo(x, y);
           else context.lineTo(x, y);
-        });
+        }
         context.closePath();
-      });
+      }
       context.fillStyle = active ? "#72e5b7" : "#172334";
       context.strokeStyle = active ? "#a8f3d5" : "#45546a";
       context.lineWidth = active ? 2 : 1;
       context.fill("evenodd");
       context.stroke();
-    });
+    }
 
     context.textAlign = "center";
     context.textBaseline = "middle";
-    mapState.districts.forEach((district) => {
+    for (const district of mapState.districts) {
       const active = district.code === memory.districtCode;
       const [lng, lat] = districtLabelPoint(district);
-      const [x, y] = projectDistrictPoint(lng, lat, width, height, bounds);
+      const x = projection.offsetX + (lng - projection.minLng) * projection.scale;
+      const y = projection.offsetY + (projection.maxLat - lat) * projection.scale;
       const fontSize = width < 420 ? (active ? 10 : 8) : (active ? 12 : 10);
       context.font = `${active ? 800 : 650} ${fontSize}px "Noto Sans KR", sans-serif`;
       context.fillStyle = active ? "#073521" : "#95a5b8";
       context.fillText(district.name, x, y);
-    });
+    }
   }, [bounds, dimensions, mapState, memory.districtCode]);
 
   return (
