@@ -13,10 +13,41 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
+  changes:
+    name: Detect iOS changes
+    runs-on: ubuntu-latest
+    outputs:
+      ios: ${{ steps.filter.outputs.ios }}
+
+    steps:
+      - name: Checkout source
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v7
+
+      - name: Detect iOS-related paths
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            ios:
+              - '.github/workflows/ios-ci.yml'
+              - 'client/iosApp/**'
+              - 'client/shared/**'
+              - 'client/gradle/**'
+              - 'client/build.gradle.kts'
+              - 'client/settings.gradle.kts'
+              - 'client/gradle.properties'
+              - 'client/gradlew'
+              - 'client/gradlew.bat'
+
   ios:
     name: Build iOS Simulator
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.ios == 'true'
     runs-on: macos-26
     timeout-minutes: 30
 
