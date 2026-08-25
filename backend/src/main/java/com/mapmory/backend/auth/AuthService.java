@@ -49,9 +49,23 @@ public class AuthService {
         boolean isNewMember = existing.isEmpty();
         Member member = existing.orElseGet(() -> register(providerId, kakaoUser.nickname()));
 
-        String accessToken = jwtProvider.issueAccessToken(member.getId());
-        String refreshToken = refreshTokenService.issue(member);
-        return new LoginResponse(accessToken, refreshToken, isNewMember);
+        return issueTokens(member, isNewMember);
+    }
+
+    /**
+     * 로그인 없이 서비스를 사용하기 위한 게스트 회원을 만든다.
+     *
+     * 카카오 로그인과 달리 외부에 물어볼 신원이 없으므로 식별자를 서버가 발급한다.
+     * 발급 이후의 토큰 체계는 소셜 로그인과 완전히 동일하다. (ADR 0015)
+     */
+    @Transactional
+    public LoginResponse loginAsGuest() {
+        Member member = memberRepository.save(Member.ofGuest(
+                UUID.randomUUID().toString(),
+                resolveName(null),
+                UUID.randomUUID()
+        ));
+        return issueTokens(member, true);
     }
 
     // @Transactional을 두지 않는다. validateAndRevoke가 자체 트랜잭션에서 (재사용 시) 토큰 폐기를
@@ -67,6 +81,12 @@ public class AuthService {
     @Transactional
     public void logout(String refreshToken) {
         refreshTokenService.revoke(refreshToken);
+    }
+
+    private LoginResponse issueTokens(Member member, boolean isNewMember) {
+        String accessToken = jwtProvider.issueAccessToken(member.getId());
+        String refreshToken = refreshTokenService.issue(member);
+        return new LoginResponse(accessToken, refreshToken, isNewMember);
     }
 
     private Member register(String providerId, String nickname) {

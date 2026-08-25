@@ -29,6 +29,8 @@ jwt:
   # 서명 키(jwt.secret)는 프로파일별로 주입한다. (local: application-local, prod: 환경변수)
   access-token-validity: PT30M
   refresh-token-validity: P14D
+  # 게스트 전용. 만료되면 복구 수단이 없으므로 회원(14일)보다 길게 둔다. (ADR 0015)
+  guest-refresh-token-validity: P365D
 
 kakao:
   user-info-uri: https://kapi.kakao.com/v2/user/me

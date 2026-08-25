@@ -28,6 +28,11 @@ public class AuthController {
         return ApiResponse.from(authService.loginWithKakao(request.kakaoAccessToken()));
     }
 
+    @PostMapping("/login/guest")
+    public ApiResponse<LoginResponse> loginAsGuest() {
+        return ApiResponse.from(authService.loginAsGuest());
+    }
+
     @PostMapping("/token/refresh")
     public ApiResponse<TokenResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         return ApiResponse.from(authService.refresh(request.refreshToken()));

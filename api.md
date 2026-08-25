@@ -22,6 +22,7 @@
 | 상태 | Method | Endpoint | 설명 |
 | --- | --- | --- | --- |
 | 구현됨 | `POST` | `/auth/login/kakao` | 카카오 로그인 |
+| 구현됨 | `POST` | `/auth/login/guest` | 게스트 로그인 |
 | 구현됨 | `POST` | `/auth/token/refresh` | Access·Refresh Token 회전 재발급 |
 | 구현됨 | `POST` | `/auth/logout` | Refresh Token 폐기 |
 | 구현됨 | `POST` | `/uploads/presigned-urls` | 이미지 업로드용 Presigned URL 발급 |
@@ -105,6 +106,31 @@ Authorization: Bearer {accessToken}
   }
 }
 ```
+
+### 게스트 로그인
+
+`POST /api/v1/auth/login/guest`
+
+로그인하지 않고 서비스를 사용하기 위한 회원을 만든다. 요청 본문이 없다.
+호출할 때마다 새 회원이 생성되므로, 클라이언트는 발급받은 토큰을 저장해 계속 사용해야 한다.
+
+응답 형식은 카카오 로그인과 같고 `isNewMember`는 항상 `true`다.
+
+#### Response `200 OK`
+
+```json
+{
+  "data": {
+    "accessToken": "mapmory-access-token",
+    "refreshToken": "mapmory-refresh-token",
+    "isNewMember": true
+  }
+}
+```
+
+게스트는 다시 로그인할 수단이 없어 Refresh Token이 만료되면 기록을 복구할 수 없다.
+이 때문에 게스트의 Refresh Token 만료는 회원(14일)보다 긴 365일이다. 재발급할 때마다 만료가
+갱신되므로, 실제로 만료되는 경우는 그 기간 동안 앱을 한 번도 열지 않은 경우다.
 
 ### 토큰 재발급
 
