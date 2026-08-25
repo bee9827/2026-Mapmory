@@ -1,6 +1,6 @@
 # 클라이언트 CI
 
-Mapmory 클라이언트의 `develop` 또는 `main`을 대상으로 하는 Pull Request가 생성·수정되면 GitHub Actions가 자동으로 실행됩니다.
+Mapmory 클라이언트의 `develop` 또는 `main`을 대상으로 하는 Pull Request가 생성·수정되면 GitHub Actions가 변경 경로를 확인합니다.
 
 ## PR에서 실행하는 검증
 
@@ -12,6 +12,21 @@ Mapmory 클라이언트의 `develop` 또는 `main`을 대상으로 하는 Pull R
 4. `:androidApp:assembleDebug` — Android Debug APK 빌드
 
 각 작업을 별도 Step으로 실행하므로 실패한 검증과 로그를 GitHub Actions의 PR Checks 화면에서 바로 확인할 수 있습니다.
+
+### Android CI 실행 범위
+
+Android 빌드는 다음 경로 중 하나가 변경된 경우에만 실행합니다.
+
+- `.github/workflows/android-ci.yml`
+- `client/androidApp/**`
+- `client/shared/**`
+- `client/gradle/**`
+- `client/build.gradle.kts`
+- `client/settings.gradle.kts`
+- `client/gradle.properties`
+- `client/gradlew`, `client/gradlew.bat`
+
+백엔드나 랜딩 페이지만 변경한 PR에서도 필수 체크가 대기 상태로 남지 않도록 workflow 자체는 실행하고, `Detect Android changes` 결과에 따라 `Test and build Android` job을 건너뜁니다. `workflow_dispatch`로 수동 실행한 경우에는 변경 경로와 관계없이 전체 Android 검증을 실행합니다.
 
 ## 로컬에서 동일하게 실행
 
