@@ -17,6 +17,44 @@ import kotlin.test.assertTrue
 
 class TripRecordEditorViewModelTest {
     @Test
+    fun repeatedRouteInitializationKeepsTheDraft() = runSuspend {
+        val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+        val gangnam = Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT)
+
+        viewModel.initialize(recordId = null, selectedLocation = gangnam)
+        viewModel.updateTitle("재생성 뒤에도 남을 제목")
+        viewModel.initialize(recordId = null, selectedLocation = gangnam)
+
+        assertEquals("재생성 뒤에도 남을 제목", viewModel.uiState.title)
+    }
+
+    @Test
+    fun saveWaitsForPendingPhotosUntilUserConfirmsExcludingThem() = runSuspend {
+        val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+        viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
+        viewModel.updateTitle("서울 여행")
+        viewModel.setPhotoLoading(true)
+
+        assertFalse(viewModel.save())
+        assertTrue(repository.getTripRecords(TripRecordQuery()).getOrThrow().records.isEmpty())
+
+        viewModel.setPhotoLoading(false)
+        assertTrue(viewModel.save())
+        assertEquals(
+            "서울 여행",
+            repository.getTripRecords(TripRecordQuery()).getOrThrow().records.single().title,
+        )
+    }
+
+    @Test
     fun saveCreatesAndUpdatesTripRecord() {
         runSuspend {
             val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }

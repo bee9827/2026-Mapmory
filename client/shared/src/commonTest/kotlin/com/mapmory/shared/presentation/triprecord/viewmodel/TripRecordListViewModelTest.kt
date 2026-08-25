@@ -1,16 +1,29 @@
 package com.mapmory.shared.presentation.triprecord.viewmodel
 
-import com.mapmory.shared.runSuspend
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
+import com.mapmory.shared.runSuspend
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class TripRecordListViewModelTest {
+    @Test
+    fun repeatedRouteInitializationKeepsTheCurrentFilter() = runSuspend {
+        val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+        val viewModel = TripRecordListViewModel(GetTripRecordsUseCase(repository))
+
+        viewModel.initialize(locationId = 101)
+        viewModel.updateKeyword("산책")
+        viewModel.initialize(locationId = 101)
+
+        assertEquals(101, viewModel.query.locationId)
+        assertEquals("산책", viewModel.query.keyword)
+    }
+
     @Test
     fun loadChangesStateForSuccessAndFailure() {
         runSuspend {

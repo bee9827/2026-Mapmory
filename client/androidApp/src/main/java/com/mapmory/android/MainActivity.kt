@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
                         .padding(innerPadding),
                 ) {
                     MapmoryApp(
-                        providedRecordsViewModel = appViewModel.recordsViewModel,
+                        container = appViewModel.container,
                         navigation = navigation,
                         contentWindowInsets = WindowInsets.safeDrawing,
                     )

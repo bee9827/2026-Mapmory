@@ -75,6 +75,10 @@ fun TripRecordData.toTripRecordItemUiState(
                 displayName = media.objectKey.substringAfterLast('/'),
                 previewBytes = PhotoPreviewBytes.from(media.previewBytes),
                 sortOrder = media.sortOrder,
+                latitude = media.latitude,
+                longitude = media.longitude,
+                capturedAt = media.capturedAt,
+                originalBytes = PhotoPreviewBytes.from(media.originalBytes),
             )
         },
 )
