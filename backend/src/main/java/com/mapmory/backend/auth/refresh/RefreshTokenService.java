@@ -97,6 +97,16 @@ public class RefreshTokenService {
         return Optional.of(member);
     }
 
+    /**
+     * 회원의 유효한 refresh를 모두 폐기한다.
+     *
+     * 이미 발급된 access는 무상태라 만료까지 남지만, 갱신 경로가 끊겨 세션이 이어지지 않는다.
+     */
+    @Transactional
+    public void revokeAll(Member member) {
+        refreshTokenRepository.revokeAllActiveByMember(member, LocalDateTime.now());
+    }
+
     @Transactional
     public void revoke(String rawToken) {
         refreshTokenRepository.findByTokenHash(hash(rawToken))
