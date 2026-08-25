@@ -23,4 +23,6 @@ cd client
 
 세부 환경 기준은 [docs/environment.md](docs/environment.md)를 확인합니다.
 
+CI 실행 범위와 실패 대응은 [docs/ci.md](docs/ci.md)를 확인합니다.
+
 진행 중인 작업은 [docs/development-tasks.md](docs/development-tasks.md)에서 관리합니다.
