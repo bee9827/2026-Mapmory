@@ -35,6 +35,11 @@ public enum AuthErrorCode implements ErrorCode {
             "유효하지 않은 refresh 토큰입니다.",
             "refresh 토큰이 유효하지 않습니다. 다시 로그인하세요."
     ),
+    GUEST_LOGIN_RATE_LIMITED(
+            ErrorKind.TOO_MANY_REQUESTS,
+            "게스트 로그인 요청이 너무 많습니다.",
+            "잠시 후 다시 시도하세요."
+    ),
     EXPIRED_REFRESH_TOKEN(
             ErrorKind.AUTHENTICATION_REQUIRED,
             "만료된 refresh 토큰입니다.",
