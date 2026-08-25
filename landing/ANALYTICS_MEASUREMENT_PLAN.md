@@ -80,7 +80,7 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 | `landing_version` | `v1`부터 시작하는 안정적인 배포 버전 |
 | `experience_type` | `globe`, `korea_detail` |
 | `interaction_type` | `place_select`, `globe_drag`, `globe_zoom` |
-| `place_id` | `hapjeong`, `shanghai`, `tokyo`, `yeosu`, `jeju` |
+| `place_id` | `hapjeong`, `shanghai`, `tokyo`, `usa-west`, `yeosu`, `jeju` |
 | `selection_source` | `shortcut`, `globe`, `map` |
 | `cta_placement` | `header`, `hero`, `korea_memory`, `final` |
 | `milestone_seconds` | `10`, `30`, `60` |

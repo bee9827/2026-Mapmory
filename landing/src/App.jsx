@@ -58,6 +58,45 @@ const memories = [
     lat: 35.6762,
     lng: 139.6503,
   },
+  {
+    key: "usa-west",
+    id: "840",
+    country: "미국",
+    location: "미국 · 서부 여행",
+    title: "붉은 협곡에서 라스베이거스의 밤까지",
+    shortDescription: "브라이스와 앤텔로프의 붉은 결, 야자수 아래의 오후와 불빛이 켜진 라스베이거스까지 한 번의 여행으로 이어져요.",
+    image: "/assets/team-usa-bryce-canyon.jpg",
+    photos: [
+      {
+        src: "/assets/team-usa-bryce-canyon.jpg",
+        caption: "브라이스 캐니언의 끝없는 기둥",
+        alt: "푸른 하늘 아래 주황빛 암석 기둥이 펼쳐진 브라이스 캐니언",
+      },
+      {
+        src: "/assets/team-usa-antelope-canyon.jpg",
+        caption: "빛이 스며든 앤텔로프 캐니언",
+        alt: "붉은 사암 사이로 햇빛이 들어오는 앤텔로프 캐니언",
+      },
+      {
+        src: "/assets/team-usa-las-vegas-day.jpg",
+        caption: "야자수 아래 라스베이거스의 오후",
+        alt: "맑고 푸른 하늘과 야자수가 보이는 라스베이거스 거리",
+      },
+      {
+        src: "/assets/team-usa-las-vegas-fountain.jpg",
+        caption: "분수에 불이 켜진 라스베이거스의 밤",
+        alt: "조명이 켜진 분수와 건물이 보이는 라스베이거스 야경",
+      },
+      {
+        src: "/assets/team-usa-las-vegas-venetian.jpg",
+        caption: "베네시안 앞에서 마주한 야경",
+        alt: "조명이 켜진 베네시안 건물과 광장이 보이는 라스베이거스의 밤",
+      },
+    ],
+    photoCredit: "Mapmory 개발팀 촬영",
+    lat: 37.0902,
+    lng: -95.7129,
+  },
 ];
 
 const koreaMemories = [
@@ -393,10 +432,47 @@ function PhotoCredit({ label, url }) {
 }
 
 function MemoryCard({ memory }) {
+  const photos = memory.photos ?? [{
+    src: memory.image,
+    caption: memory.location,
+    alt: `${memory.location}에서 남긴 실제 여행 장면`,
+  }];
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const activePhoto = photos[photoIndex];
+  const hasGallery = photos.length > 1;
+
+  const movePhoto = (offset) => {
+    setPhotoIndex((current) => (current + offset + photos.length) % photos.length);
+  };
+
   return (
     <article className="memory-card" aria-live="polite">
       <header><MapPin size={18} weight="fill" /><span>{memory.location}</span><small>{memory.country}</small></header>
-      <div className="memory-image-wrap"><img key={memory.image} src={memory.image} alt={`${memory.location}에서 남긴 실제 여행 장면`} loading="lazy" decoding="async" /></div>
+      <div className={`memory-image-wrap ${hasGallery ? "is-gallery" : ""}`}>
+        <img key={activePhoto.src} src={activePhoto.src} alt={activePhoto.alt} loading="lazy" decoding="async" />
+        {hasGallery && (
+          <>
+            <span className="memory-photo-count" aria-hidden="true">{photoIndex + 1} / {photos.length}</span>
+            <button type="button" className="memory-gallery-arrow is-prev" onClick={() => movePhoto(-1)} aria-label="이전 미국 여행 사진"><ArrowLeft size={18} weight="bold" /></button>
+            <button type="button" className="memory-gallery-arrow is-next" onClick={() => movePhoto(1)} aria-label="다음 미국 여행 사진"><ArrowRight size={18} weight="bold" /></button>
+            <div className="memory-photo-meta">
+              <span>{activePhoto.caption}</span>
+              <div className="memory-photo-dots" role="group" aria-label="미국 여행 사진 선택">
+                {photos.map((photo, index) => (
+                  <button
+                    key={photo.src}
+                    type="button"
+                    className={index === photoIndex ? "is-active" : ""}
+                    onClick={() => setPhotoIndex(index)}
+                    aria-label={`${index + 1}번째 사진: ${photo.caption}`}
+                    aria-pressed={index === photoIndex}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
       <div className="memory-card-body">
         <span className="memory-kind">실제 사진으로 열린 기억</span>
         <h2>{memory.title}</h2>
@@ -751,7 +827,7 @@ function App() {
         <div className="section-heading"><p className="eyebrow">STEP 1 · TRY THE GLOBE</p><h2>지구본을 돌려<br />기억을 먼저 열어보세요.</h2><p>색칠된 나라를 누르면 실제 사진과 그날의 기억이 열립니다.</p></div>
         <div className="experience-stage">
           <article className="globe-panel" id="globe-demo"><header><span><GlobeHemisphereEast size={19} weight="duotone" />3D 기억 지도</span><small><i />민트색 = 저장된 나라</small></header><InteractiveGlobe selected={selectedMemory} onSelect={handleWorldSelect} onInteract={globeAnalytics.startExperience} theme={theme} countrySelector={<LocationSelector selected={selectedMemory} onSelect={handleWorldSelect} />} /></article>
-          <MemoryCard memory={selectedMemory} />
+          <MemoryCard key={selectedMemory.id} memory={selectedMemory} />
         </div>
       </section>
 

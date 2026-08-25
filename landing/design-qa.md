@@ -18,7 +18,7 @@
 - The back button returns to the province map without route navigation.
 - The mobile checks showed no horizontal overflow (`scrollWidth` did not exceed the layout viewport).
 - Browser console errors and warnings: none.
-- Frontend tests: 7 passed.
+- Frontend tests: 10 passed.
 - Production build: passed.
 
 ## Required fidelity surfaces
@@ -26,7 +26,7 @@
 - Fonts and typography: existing Noto Sans KR / Be Vietnam Pro hierarchy is preserved. District labels use compact optical sizes at mobile width so the dense Jeonnam map remains readable.
 - Spacing and layout rhythm: the globe selector is contained by the 3D surface. The level-3 map no longer stretches to the photo-card height, eliminating the large empty lower area found in the first comparison.
 - Colors and visual tokens: the district surface now uses the source's dark slate fills, muted blue-gray boundaries and labels, and a single mint selected district.
-- Image quality and asset fidelity: all six requested memories use the original developer photographs; no generated or placeholder imagery remains in the active flows.
+- Image quality and asset fidelity: the existing developer-owned memories and the five new USA memories use the original photographs; no generated or placeholder imagery remains in the active flows.
 - Copy and content: Huiok copy preserves the user's notes about umami, acidity, and the long wait in a shorter landing-page voice. Level labels clearly distinguish province selection from district detail.
 
 ## Comparison history
@@ -44,6 +44,41 @@
 
 - The globe bundle still produces Vite's existing large-chunk warning; loading and interaction completed successfully, so this is a performance follow-up rather than a visual blocker.
 - The source screenshot covers only the Jeonnam detail state, so other landing sections were checked for consistency and responsiveness rather than pixel fidelity to that source.
+
+## USA west gallery extension
+
+### Evidence
+
+- Source visual truth: `C:/Users/YongSung/Downloads/20251.jpg`, `20709.jpg`, `19812.jpg`, `19937.jpg`, and `19939.jpg`, supplied by the user as five photographs from the same USA trip.
+- Desktop implementation: `C:/Users/YongSung/.codex/visualizations/2026/08/23/01a02dce-4d75-7521-a0b5-3c8f63753f9d/desktop-usa-gallery-final.png`, browser capture at the default desktop viewport with the USA selected and the first gallery image active.
+- Mobile implementation: `C:/Users/YongSung/.codex/visualizations/2026/08/23/01a02dce-4d75-7521-a0b5-3c8f63753f9d/mobile-usa-gallery-card-final.png`, browser capture with a 390 x 844 CSS viewport override and the USA photo card aligned to the viewport.
+- Combined comparison evidence: `C:/Users/YongSung/.codex/visualizations/2026/08/23/01a02dce-4d75-7521-a0b5-3c8f63753f9d/usa-gallery-comparison.png` places all five source photos beside the rendered desktop and mobile states in one image.
+- Density normalization: source photographs retain their original 4000 x 3000, 2252 x 4000, 4000 x 3000, 3000 x 4000, and 4000 x 2252 pixels. The browser captures are evaluated by the rendered content box at device scale 1 rather than raw pixel equality because the source is photography, not a UI mock.
+- Focused comparison: the photo area, gallery controls, caption treatment, and memory-card copy were readable in the combined evidence, so no additional crop was required.
+
+### Interaction and technical checks
+
+- Selecting `미국` highlights the USA on the globe and opens the `미국 · 서부 여행` memory card.
+- All five dot controls and both arrows change the active photograph; each image loaded with the source's non-zero natural dimensions and the count changed from `1 / 5` through `5 / 5`.
+- Landscape and portrait photographs use `object-fit: contain`, preserving the full source frame without stretching the memory card.
+- Mobile layout showed no horizontal overflow (`scrollWidth` equaled the layout viewport width), and the country selector, arrows, counter, caption, dots, title, description, and photo credit remained usable.
+- Browser console errors and warnings: none.
+
+### Required fidelity surfaces
+
+- Fonts and typography: the existing Mapmory hierarchy is preserved; gallery captions and the count remain legible over the photographs at desktop and mobile widths.
+- Spacing and layout rhythm: the gallery keeps the existing memory-card proportions. Portrait images no longer expand the card height, while controls remain inside the image surface.
+- Colors and visual tokens: dark translucent gallery controls reuse the product-map surface and mint active token without competing with the photographs.
+- Image quality and asset fidelity: all five supplied files are present at their original dimensions and shown uncropped with `contain`; no AI-generated or replacement imagery is used.
+- Copy and content: the five captions distinguish Bryce Canyon, Antelope Canyon, Las Vegas daytime, the fountain, and the Venetian night, while the card groups them as one USA west trip.
+
+### Comparison history
+
+1. First browser comparison - blocked.
+   - [P2] Portrait photographs expanded the gallery image element and made the memory card substantially taller than the adjacent globe panel.
+2. Fix applied.
+   - Positioned gallery images inside the fixed image surface and set explicit width, height, and `object-fit: contain` so portrait and landscape sources share one stable card geometry.
+3. Final combined comparison - no actionable P0/P1/P2 differences remain. Source composition is preserved, the five-photo sequence is obvious, and desktop/mobile hierarchy remains intact.
 
 ## Final result
 
