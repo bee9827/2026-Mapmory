@@ -13,6 +13,15 @@ data class SelectedPhoto(
     val originalBytes: ByteArray? = null,
 )
 
+data class PhotoLoadingProgress(
+    val processed: Int,
+    val total: Int,
+) {
+    val percentage: Int?
+        get() = total.takeIf { it > 0 }
+            ?.let { (processed * 100 / it).coerceIn(0, 100) }
+}
+
 data class PhotoLibraryActions(
     val pickFromGallery: () -> Unit,
     val recommendForLocation: (Location, String?) -> Unit,
@@ -28,6 +37,7 @@ typealias PhotoLibraryActionsFactory = @Composable (
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
     onLoadingChanged: (Boolean) -> Unit,
+    onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
 ) -> PhotoLibraryActions
 
 @Composable
@@ -36,6 +46,7 @@ expect fun rememberPhotoLibraryActions(
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
     onLoadingChanged: (Boolean) -> Unit,
+    onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
 ): PhotoLibraryActions
 
 internal fun mergeSelectedPhotos(
