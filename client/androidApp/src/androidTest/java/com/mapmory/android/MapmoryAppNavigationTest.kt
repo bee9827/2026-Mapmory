@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import com.mapmory.shared.MapmoryApp
 import com.mapmory.shared.app.createInMemoryAppContainer
 import com.mapmory.shared.presentation.photo.SelectedPhoto
@@ -51,6 +52,19 @@ class MapmoryAppNavigationTest {
         composeRule.onNodeWithContentDescription("계측 테스트 여행").assertIsDisplayed()
         composeRule.onNodeWithText("계측 테스트 여행").assertIsDisplayed().performClick()
         composeRule.onNodeWithContentDescription("계측 테스트 여행 사진 1").assertIsDisplayed()
+
+        composeRule.onNodeWithContentDescription("더보기").performClick()
+        composeRule.onNodeWithText("수정").performClick()
+        composeRule.onNodeWithText("기록 수정하기").assertIsDisplayed()
+        composeRule.onNodeWithText("계측 테스트 여행")
+            .performTextReplacement("수정된 계측 테스트 여행")
+        composeRule.onNodeWithText("저장").performClick()
+
+        composeRule.onNodeWithText("수정된 계측 테스트 여행").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("뒤로가기").performClick()
+        composeRule.onNodeWithContentDescription("수정된 계측 테스트 여행")
+            .assertIsDisplayed()
+            .performClick()
 
         composeRule.onNodeWithContentDescription("더보기").performClick()
         composeRule.onNodeWithText("삭제").performClick()

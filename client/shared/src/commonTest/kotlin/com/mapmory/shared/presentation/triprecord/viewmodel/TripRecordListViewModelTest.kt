@@ -12,6 +12,40 @@ import kotlin.test.assertIs
 
 class TripRecordListViewModelTest {
     @Test
+    fun refreshReloadsTheCurrentFilterAfterARecordChanges() = runSuspend {
+        val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
+        val original = repository.createTripRecord(
+            TripRecordDraft(
+                locationId = 101,
+                title = "수정 전",
+                content = "",
+                startDate = "2026-08-01",
+                endDate = null,
+                mediaObjectKeys = emptyList(),
+            ),
+        ).getOrThrow()
+        val viewModel = TripRecordListViewModel(GetTripRecordsUseCase(repository))
+        viewModel.initialize(locationId = 101)
+
+        repository.updateTripRecord(
+            original.id,
+            TripRecordDraft(
+                locationId = 101,
+                title = "수정 후",
+                content = "",
+                startDate = "2026-08-01",
+                endDate = null,
+                mediaObjectKeys = emptyList(),
+            ),
+        ).getOrThrow()
+        viewModel.refresh(locationId = 101)
+
+        val state = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
+        assertEquals("수정 후", state.records.single().title)
+        assertEquals(101, viewModel.query.locationId)
+    }
+
+    @Test
     fun repeatedRouteInitializationKeepsTheCurrentFilter() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordListViewModel(GetTripRecordsUseCase(repository))

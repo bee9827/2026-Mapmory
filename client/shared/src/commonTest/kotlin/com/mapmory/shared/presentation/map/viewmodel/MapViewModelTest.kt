@@ -10,6 +10,26 @@ import kotlin.test.assertTrue
 
 class MapViewModelTest {
     @Test
+    fun refreshReloadsTheCurrentlyOpenProvinceAfterARecordMoves() = runSuspend {
+        val catalog = StaticRegionCatalog()
+        val repository = FakeTripRecordRepository(
+            regionCatalog = catalog,
+            now = { "2026-08-24T00:00:00" },
+        )
+        val gangnam = catalog.requireByCode("11680")
+        val seocho = catalog.requireByCode("11650")
+        val record = repository.createTripRecord(draft(gangnam.id, "서울 여행")).getOrThrow()
+        val viewModel = MapViewModel(repository, catalog)
+        viewModel.refresh()
+        viewModel.openProvince("KR-11")
+
+        repository.updateTripRecord(record.id, draft(seocho.id, "서초 여행")).getOrThrow()
+        viewModel.refresh()
+
+        assertEquals(setOf("11650"), viewModel.visitedDistrictCodes("KR-11"))
+    }
+
+    @Test
     fun refreshBuildsVisitedCountriesProvincesAndDistrictsFromRepositoryRecords() = runSuspend {
         val catalog = StaticRegionCatalog()
         val repository = FakeTripRecordRepository(

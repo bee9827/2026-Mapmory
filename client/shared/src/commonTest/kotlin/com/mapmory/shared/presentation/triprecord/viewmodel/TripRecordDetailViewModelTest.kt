@@ -25,9 +25,11 @@ class TripRecordDetailViewModelTest {
                     mediaObjectKeys = emptyList(),
                 ),
             ).getOrThrow()
+            var changeCount = 0
             val viewModel = TripRecordDetailViewModel(
                 getTripRecord = GetTripRecordUseCase(repository),
                 deleteTripRecord = DeleteTripRecordUseCase(repository),
+                onTripRecordsChanged = { changeCount += 1 },
             )
 
             viewModel.load(record.id)
@@ -36,6 +38,7 @@ class TripRecordDetailViewModelTest {
             assertEquals("서울 여행", success.record.title)
 
             assertEquals(true, viewModel.delete())
+            assertEquals(1, changeCount)
             viewModel.load(record.id)
 
             assertIs<TripRecordDetailUiState.Error>(viewModel.uiState)
