@@ -27,5 +27,7 @@ When implementing from a selected generated mock, treat that image as the source
 - Do not show a fake editor, collection form, or recording workflow that differs from the shipping client.
 - Preserve the conversion path `3D 지구본 → 대한민국 상세지도 → 지역의 실제 장소 기억 → 내 기억 지도 만들기 → 다운로드`.
 - Preserve basic landing-page sequence: clear promise, primary CTA, interactive product proof, feature explanation, simple how-it-works, final conversion CTA.
+- Keep the landing visually natural, clean, and immediately understandable. Never add or imply a capability that is not present in the shipping Mapmory product.
+- Treat the current editorial hero and product-flow direction as the preferred design; user review found it substantially better than the previous landing version.
 
 Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts/prepare-sites-build.mjs`, and `tests/sites-worker.test.mjs` intact so the same local prototype can be handed to Sites. Before a Sites handoff, run `npm run build` and `npm run test:sites`; the build must leave `dist/client/index.html`, `dist/server/index.js`, and `dist/.openai/hosting.json`.
