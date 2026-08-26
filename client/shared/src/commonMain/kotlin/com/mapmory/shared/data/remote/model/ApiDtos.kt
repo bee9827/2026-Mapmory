@@ -3,16 +3,19 @@ package com.mapmory.shared.data.remote.model
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ApiErrorDto(
-    val code: String,
-    val message: String,
-    val fieldErrors: List<FieldErrorDto> = emptyList(),
+data class ProblemDetailDto(
+    val title: String? = null,
+    val status: Int? = null,
+    val detail: String? = null,
+    val instance: String? = null,
+    val code: String? = null,
+    val errors: List<ProblemFieldErrorDto> = emptyList(),
 )
 
 @Serializable
-data class FieldErrorDto(
+data class ProblemFieldErrorDto(
     val field: String,
-    val reason: String,
+    val detail: String,
 )
 
 @Serializable
@@ -31,79 +34,49 @@ data class PageDto<T>(
 )
 
 @Serializable
-data class CountryDto(
+data class TripRecordListItemDto(
     val id: Long,
+    val title: String,
+    val regionName: String,
+    val startDate: String,
+    val endDate: String?,
+    val thumbnailUrl: String? = null,
+)
+
+@Serializable
+data class RegionCodeDto(
     val code: String,
     val name: String,
 )
 
 @Serializable
-data class LocationDto(
-    val id: Long,
-    val countryId: Long,
-    val parentId: Long?,
-    val regionCode: String,
-    val name: String,
-    val locationType: String,
-)
-
-@Serializable
-data class MemberSummaryDto(
-    val id: Long,
-    val name: String,
-)
-
-@Serializable
-data class LocationSummaryDto(
-    val id: Long,
-    val countryCode: String,
-    val regionCode: String,
-    val name: String,
-)
-
-@Serializable
-data class TripRecordMediaDto(
-    val id: Long,
-    val objectKey: String,
-    val viewUrl: String? = null,
-    val viewUrlExpiresIn: Long? = null,
-    val sortOrder: Int,
-)
-
-@Serializable
-data class TripRecordListItemDto(
-    val id: Long,
-    val member: MemberSummaryDto,
-    val location: LocationSummaryDto,
-    val title: String,
-    val startDate: String?,
-    val endDate: String?,
-    val thumbnailUrl: String? = null,
-    val thumbnailUrlExpiresIn: Long? = null,
-    val createdAt: String,
-    val updatedAt: String,
+data class TripRecordRegionDto(
+    val country: RegionCodeDto,
+    val province: RegionCodeDto? = null,
+    val district: RegionCodeDto? = null,
 )
 
 @Serializable
 data class TripRecordDetailDto(
     val id: Long,
-    val member: MemberSummaryDto,
-    val location: LocationSummaryDto,
     val title: String,
     val content: String,
-    val startDate: String?,
+    val region: TripRecordRegionDto,
+    val startDate: String,
     val endDate: String?,
-    val media: List<TripRecordMediaDto> = emptyList(),
+    val objectKeys: List<String> = emptyList(),
     val createdAt: String,
     val updatedAt: String,
 )
 
 @Serializable
 data class TripRecordRequestDto(
-    val locationId: Long,
+    val countryCode: String,
+    val provinceCode: String?,
+    val districtCode: String?,
     val title: String,
     val content: String,
-    val startDate: String?,
+    val startDate: String,
     val endDate: String?,
     val objectKeys: List<String> = emptyList(),
 )

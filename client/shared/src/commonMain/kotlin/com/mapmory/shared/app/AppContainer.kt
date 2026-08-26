@@ -87,11 +87,7 @@ fun createAppContainer(
 )
 
 fun createInMemoryAppContainer(
-    memberId: Long = 1L,
     now: () -> String = { "2026-08-24T00:00:00" },
 ): AppContainer = createAppContainer(
-    tripRecordRepository = FakeTripRecordRepository(
-        memberId = memberId,
-        now = now,
-    ),
+    tripRecordRepository = FakeTripRecordRepository(now = now),
 )

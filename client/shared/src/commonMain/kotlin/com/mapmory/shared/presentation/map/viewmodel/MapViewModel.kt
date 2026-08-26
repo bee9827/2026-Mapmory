@@ -40,7 +40,7 @@ class MapViewModel(
                 )
                 return
             }
-            visitedIds += recordPage.records.map { it.locationId }
+            visitedIds += recordPage.records.mapNotNull { it.locationId }
             page += 1
         } while (page < recordPage.totalPages)
 

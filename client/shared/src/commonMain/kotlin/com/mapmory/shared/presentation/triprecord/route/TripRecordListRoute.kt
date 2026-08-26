@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordListScreen
 import com.mapmory.shared.presentation.triprecord.state.TripRecordFilterUiState
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordListViewModel
@@ -13,7 +12,6 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun TripRecordListRoute(
     viewModel: TripRecordListViewModel,
-    regionCatalog: RegionCatalog,
     initialLocationId: Long?,
     onOpenMap: () -> Unit,
     onOpenEditor: () -> Unit,
@@ -32,19 +30,7 @@ internal fun TripRecordListRoute(
         uiState = viewModel.uiState,
         filter = TripRecordFilterUiState(
             locationId = viewModel.query.locationId,
-            keyword = viewModel.query.keyword.orEmpty(),
         ),
-        locations = regionCatalog.locations,
-        onKeywordChanged = { keyword ->
-            viewModel.updateKeyword(keyword)
-        },
-        onLocationChanged = { locationId ->
-            viewModel.filterByLocation(locationId)
-            scope.launch { viewModel.load() }
-        },
-        onSearchClick = {
-            scope.launch { viewModel.load() }
-        },
         onPreviousPageClick = {
             scope.launch { viewModel.previousPage() }
         },

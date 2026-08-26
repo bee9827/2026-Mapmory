@@ -13,22 +13,19 @@ import kotlin.test.assertIs
 class TripRecordListViewModelTest {
     @Test
     fun repeatedRouteInitializationKeepsTheCurrentFilter() = runSuspend {
-        val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+        val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordListViewModel(GetTripRecordsUseCase(repository))
 
         viewModel.initialize(locationId = 101)
-        viewModel.updateKeyword("산책")
         viewModel.initialize(locationId = 101)
 
         assertEquals(101, viewModel.query.locationId)
-        assertEquals("산책", viewModel.query.keyword)
     }
 
     @Test
     fun loadChangesStateForSuccessAndFailure() {
         runSuspend {
             val repository = FakeTripRecordRepository(
-                memberId = 10,
                 now = { "2026-08-07T00:00:00Z" },
             )
             repository.createTripRecord(
@@ -36,7 +33,7 @@ class TripRecordListViewModelTest {
                     locationId = 101,
                     title = "서울 여행",
                     content = "한강을 걸었다.",
-                    startDate = null,
+                    startDate = "2026-08-01",
                     endDate = null,
                     mediaObjectKeys = emptyList(),
                 ),
@@ -46,7 +43,7 @@ class TripRecordListViewModelTest {
                     locationId = 102,
                     title = "부산 여행",
                     content = "바다를 보았다.",
-                    startDate = null,
+                    startDate = "2026-08-02",
                     endDate = null,
                     mediaObjectKeys = emptyList(),
                 ),
@@ -65,12 +62,6 @@ class TripRecordListViewModelTest {
             viewModel.previousPage()
             val previousPage = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
             assertEquals("서울 여행", previousPage.records.single().title)
-
-            viewModel.updateKeyword("없는 기록")
-            viewModel.load()
-
-            val empty = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
-            assertEquals(0, empty.records.size)
 
             viewModel.load(TripRecordQuery(size = 0))
 

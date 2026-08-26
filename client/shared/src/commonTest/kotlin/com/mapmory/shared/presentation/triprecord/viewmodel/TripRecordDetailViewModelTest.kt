@@ -14,13 +14,13 @@ class TripRecordDetailViewModelTest {
     @Test
     fun loadChangesStateForSuccessAndFailure() {
         runSuspend {
-            val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+            val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
             val record = repository.createTripRecord(
                 TripRecordDraft(
                     locationId = 101,
                     title = "서울 여행",
                     content = "한강을 걸었다.",
-                    startDate = null,
+                    startDate = "2026-08-01",
                     endDate = null,
                     mediaObjectKeys = emptyList(),
                 ),

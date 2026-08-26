@@ -13,7 +13,7 @@ class MapViewModelTest {
     @Test
     fun refreshBuildsVisitedCountriesProvincesAndDistrictsFromRepositoryRecords() = runSuspend {
         val catalog = StaticRegionCatalog()
-        val repository = FakeTripRecordRepository(1) { "2026-08-24T00:00:00" }
+        val repository = FakeTripRecordRepository { "2026-08-24T00:00:00" }
         val gangnam = catalog.requireByCode("11680")
         val seoul = catalog.requireByCode("KR-11")
         val japan = catalog.requireByCode("JP")
@@ -34,7 +34,7 @@ class MapViewModelTest {
         locationId = locationId,
         title = title,
         content = "",
-        startDate = null,
+        startDate = "2026-08-01",
         endDate = null,
         mediaObjectKeys = emptyList(),
     )

@@ -12,7 +12,6 @@ class FakeTripRecordRepositoryTest {
     @Test
     fun createUpdateAndDeleteTripRecord() = runSuspend {
         val repository = FakeTripRecordRepository(
-            memberId = 10,
             now = { "2026-08-07T00:00:00Z" },
         )
 
@@ -50,7 +49,7 @@ class FakeTripRecordRepositoryTest {
 
     @Test
     fun createRejectsInvalidDateRange() = runSuspend {
-        val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+        val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
 
         val result = repository.createTripRecord(
             TripRecordDraft(

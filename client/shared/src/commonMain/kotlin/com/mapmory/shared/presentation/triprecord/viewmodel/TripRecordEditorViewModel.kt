@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMediaDraft
@@ -79,7 +80,7 @@ class TripRecordEditorViewModel(
             selectedLocation = location,
             title = record.title,
             content = record.content,
-            startDate = record.startDate.orEmpty(),
+            startDate = record.startDate,
             endDate = record.endDate.orEmpty(),
             mediaObjectKeys = record.media.map { it.objectKey },
             selectedPhotos = record.media.map { media ->
@@ -265,9 +266,16 @@ private fun TripRecordEditorUiState.validationErrors(
 ): Map<TripRecordEditorErrorTarget, String> = buildMap {
     if (selectedLocation == null) {
         put(TripRecordEditorErrorTarget.LOCATION, "장소를 선택해 주세요.")
+    } else if (
+        selectedLocation.type == LocationType.PROVINCE &&
+        selectedLocation.regionCode.startsWith(KoreanProvincePrefix)
+    ) {
+        put(TripRecordEditorErrorTarget.LOCATION, "대한민국은 시·군·구까지 선택해 주세요.")
     }
     if (title.isBlank()) {
         put(TripRecordEditorErrorTarget.TITLE, "제목을 입력해 주세요.")
+    } else if (title.length > MaxTitleLength) {
+        put(TripRecordEditorErrorTarget.TITLE, "제목은 200자 이하여야 합니다.")
     }
 
     val dateError = TripRecordDraft(
@@ -280,6 +288,7 @@ private fun TripRecordEditorUiState.validationErrors(
     ).dateValidationError()
     if (dateError != null) {
         val target = when (dateError) {
+            "시작일을 입력해 주세요." -> TripRecordEditorErrorTarget.START_DATE
             "올바른 시작일을 입력해 주세요." -> TripRecordEditorErrorTarget.START_DATE
             "올바른 종료일을 입력해 주세요." -> TripRecordEditorErrorTarget.END_DATE
             else -> dateRangeErrorTarget
@@ -287,3 +296,6 @@ private fun TripRecordEditorUiState.validationErrors(
         put(target, dateError)
     }
 }
+
+private const val MaxTitleLength = 200
+private const val KoreanProvincePrefix = "KR-"

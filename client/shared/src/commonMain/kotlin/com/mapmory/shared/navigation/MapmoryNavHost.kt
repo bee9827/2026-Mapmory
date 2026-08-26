@@ -55,7 +55,6 @@ internal fun MapmoryNavHost(
             TripRecordListRoute(
                 modifier = Modifier.windowInsetsPadding(contentWindowInsets),
                 viewModel = viewModel,
-                regionCatalog = container.regionCatalog,
                 initialLocationId = route.locationId,
                 onOpenMap = navigator::navigateToMap,
                 onOpenEditor = { navigator.navigateToEditor() },

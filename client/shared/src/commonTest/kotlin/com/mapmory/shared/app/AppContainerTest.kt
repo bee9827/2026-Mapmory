@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 class AppContainerTest {
     @Test
     fun `container can be assembled with a replaceable repository`() {
-        val repository = FakeTripRecordRepository(7) { "2026-08-24T00:00:00" }
+        val repository = FakeTripRecordRepository { "2026-08-24T00:00:00" }
 
         val container = createAppContainer(
             tripRecordRepository = repository,
@@ -36,6 +36,7 @@ class AppContainerTest {
         editor.selectLocation(gangnam)
         editor.updateTitle("컨테이너 여행")
         editor.updateContent("화면별 ViewModel이 같은 저장소를 바라본다.")
+        editor.updateStartDate("2026-08-24")
         editor.addPhotos(
             listOf(
                 SelectedPhoto(

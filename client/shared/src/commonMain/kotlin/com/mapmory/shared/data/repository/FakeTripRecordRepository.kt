@@ -5,12 +5,12 @@ import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordPage
 import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.domain.model.TripRecordSummary
 import com.mapmory.shared.domain.model.dateValidationError
 import com.mapmory.shared.domain.repository.TripRecordRepository
 
 /** 서버 API를 연결하기 전 기록 흐름을 확인하는 메모리 기반 구현이다. */
 class FakeTripRecordRepository(
-    private val memberId: Long,
     private val now: () -> String,
 ) : TripRecordRepository {
     private val records = mutableListOf<TripRecordData>()
@@ -18,22 +18,19 @@ class FakeTripRecordRepository(
     private var nextMediaId = 1L
 
     override suspend fun getTripRecords(query: TripRecordQuery): Result<TripRecordPage> {
-        if (query.page < 0 || query.size <= 0) {
+        if (query.page < 0 || query.size !in 1..MaxPageSize) {
             return Result.failure(IllegalArgumentException("페이지 번호와 크기를 확인해 주세요."))
         }
 
         val filteredRecords = records.filter { record ->
-            (query.locationId == null || record.locationId == query.locationId) &&
-                (query.keyword.isNullOrBlank() ||
-                    record.title.contains(query.keyword, ignoreCase = true) ||
-                    record.content.contains(query.keyword, ignoreCase = true))
+            query.locationId == null || record.locationId == query.locationId
         }
         val totalPages = (filteredRecords.size + query.size - 1) / query.size
         val pageRecords = filteredRecords.drop(query.page * query.size).take(query.size)
 
         return Result.success(
             TripRecordPage(
-                records = pageRecords,
+                records = pageRecords.map(TripRecordData::toSummary),
                 page = query.page,
                 size = query.size,
                 totalElements = filteredRecords.size.toLong(),
@@ -51,11 +48,10 @@ class FakeTripRecordRepository(
         val timestamp = now()
         val record = TripRecordData(
             id = nextRecordId++,
-            memberId = memberId,
             locationId = draft.locationId,
             title = draft.title,
             content = draft.content,
-            startDate = draft.startDate,
+            startDate = requireNotNull(draft.startDate),
             endDate = draft.endDate,
             media = createMedia(draft),
             createdAt = timestamp,
@@ -74,7 +70,7 @@ class FakeTripRecordRepository(
             locationId = draft.locationId,
             title = draft.title,
             content = draft.content,
-            startDate = draft.startDate,
+            startDate = requireNotNull(draft.startDate),
             endDate = draft.endDate,
             media = createMedia(draft),
             updatedAt = now(),
@@ -107,4 +103,18 @@ class FakeTripRecordRepository(
             )
         }
     }
+
 }
+
+private fun TripRecordData.toSummary(): TripRecordSummary = TripRecordSummary(
+    id = id,
+    title = title,
+    startDate = startDate,
+    endDate = endDate,
+    thumbnailUrl = thumbnailUrl,
+    locationId = locationId,
+    content = content,
+    media = media,
+)
+
+private const val MaxPageSize = 100
