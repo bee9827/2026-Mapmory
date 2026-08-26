@@ -6,5 +6,6 @@ public enum ErrorKind {
     ACCESS_DENIED,
     NOT_FOUND,
     CONFLICT,
+    TOO_MANY_REQUESTS,
     SERVICE_UNAVAILABLE
 }

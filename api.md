@@ -76,6 +76,7 @@
 | `403 Forbidden` | 인증됐지만 접근 권한 없음 |
 | `404 Not Found` | 리소스 없음 또는 타인 기록 |
 | `409 Conflict` | 중복 또는 리소스 상태 충돌 |
+| `429 Too Many Requests` | 요청 한도 초과 |
 
 ## 2. Auth API
 
@@ -142,6 +143,10 @@ Authorization: Bearer {게스트 accessToken}
 }
 ```
 
+게스트 계정은 인증 없이 만들어지므로 같은 출처에서 반복 호출하면 `429 GUEST_LOGIN_RATE_LIMITED`로
+거절한다. 정상 사용자가 걸리지 않을 만큼 한도를 넉넉히 두므로, 앱은 발급받은 토큰을 저장해
+재사용하기만 하면 된다.
+
 게스트는 다시 로그인할 수단이 없어 Refresh Token이 만료되면 기록을 복구할 수 없다.
 이 때문에 게스트의 Refresh Token 만료는 회원(14일)보다 긴 365일이다. 재발급할 때마다 만료가
 갱신되므로, 실제로 만료되는 경우는 그 기간 동안 앱을 한 번도 열지 않은 경우다.
@@ -191,6 +196,7 @@ Refresh Token은 회전한다. 재발급에 성공하면 기존 Refresh Token을
 | `401` | `INVALID_REFRESH_TOKEN` | Refresh Token이 유효하지 않거나 폐기됨 |
 | `401` | `EXPIRED_REFRESH_TOKEN` | Refresh Token이 만료됨 |
 | `403` | `ACCESS_DENIED` | 리소스 접근 권한 없음 |
+| `429` | `GUEST_LOGIN_RATE_LIMITED` | 게스트 로그인 요청이 한도를 초과함 |
 | `503` | `KAKAO_UNAVAILABLE` | 카카오 인증 서버를 일시적으로 사용할 수 없음 |
 
 ## 3. Upload API
