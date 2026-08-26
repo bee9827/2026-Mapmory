@@ -238,6 +238,8 @@ Authorization: Bearer {게스트 accessToken}
 
 이미지는 API 서버를 거치지 않고 S3에 직접 업로드한다. 서버는 UUID 기반 `objectKey`만 발급하며, DB에는 만료되는 Presigned URL이 아닌 `objectKey`를 저장한다.
 
+`objectKey`의 형식은 서버가 정하며 환경에 따라 접두사가 달라질 수 있다. 클라이언트는 값을 해석하지 말고 받은 그대로 저장하고 전달한다.
+
 ### 이미지 업로드 URL 발급
 
 `POST /api/v1/uploads/presigned-urls`
