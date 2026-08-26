@@ -46,6 +46,7 @@ actual fun rememberPhotoLibraryActions(
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
     onLoadingChanged: (Boolean) -> Unit,
+    onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
 ): PhotoLibraryActions {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -53,15 +54,20 @@ actual fun rememberPhotoLibraryActions(
     val latestRecommended by rememberUpdatedState(onPhotosRecommended)
     val latestMessage by rememberUpdatedState(onMessage)
     val latestLoadingChanged by rememberUpdatedState(onLoadingChanged)
+    val latestLoadingProgressChanged by rememberUpdatedState(onLoadingProgressChanged)
     var pendingRecommendation by remember { mutableStateOf<Pair<Location, String?>?>(null) }
 
     fun loadRecommendations(target: Location, parentName: String?) {
         latestLoadingChanged(true)
         scope.launch {
             try {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { context.recommendPhotos(target, parentName) }
-            }
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.recommendPhotos(target, parentName) { progress ->
+                            latestLoadingProgressChanged(progress)
+                        }
+                    }
+                }
                 result.onSuccess(latestRecommended).onFailure {
                     latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
                 }
@@ -201,6 +207,7 @@ private fun requiredRecommendationPermissions(): Array<String> = buildList {
 private suspend fun Context.recommendPhotos(
     target: Location,
     parentName: String?,
+    onProgress: (PhotoLoadingProgress) -> Unit,
 ): List<SelectedPhoto> {
     Trace.beginAsyncSection("photo.recommend.total", TraceCookie.Recommend)
     val totalStartedAt = SystemClock.elapsedRealtime()
@@ -214,7 +221,7 @@ private suspend fun Context.recommendPhotos(
         } ?: return emptyList()
         val boundaryLoadMillis = SystemClock.elapsedRealtime() - boundaryStartedAt
         val syncStartedAt = SystemClock.elapsedRealtime()
-        val syncResult = syncPhotoMetadata()
+        val syncResult = syncPhotoMetadata(onProgress)
         val syncMillis = SystemClock.elapsedRealtime() - syncStartedAt
         val regionFilterStartedAt = SystemClock.elapsedRealtime()
         val matchedPhotos = traceSection("photo.recommend.region_filter") {
@@ -256,7 +263,9 @@ private suspend fun Context.recommendPhotos(
     }
 }
 
-private suspend fun Context.syncPhotoMetadata(): PhotoMetadataSyncResult {
+private suspend fun Context.syncPhotoMetadata(
+    onProgress: (PhotoLoadingProgress) -> Unit,
+): PhotoMetadataSyncResult {
     val dao = PhotoMetadataDatabase.getInstance(this).photoMetadataDao()
     return PhotoMetadataSync(
         readPrevious = {
@@ -271,7 +280,9 @@ private suspend fun Context.syncPhotoMetadata(): PhotoMetadataSyncResult {
                 dao.replaceSnapshot(photos, scanId)
             }
         },
-    ).sync()
+    ).sync { processed, total ->
+        onProgress(PhotoLoadingProgress(processed, total))
+    }
 }
 
 internal fun Context.queryPhotoMetadataSnapshot(): List<PhotoMetadataCandidate>? {

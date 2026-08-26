@@ -44,6 +44,23 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
+    fun reportsPhotoScanProgress() = runBlocking {
+        val progress = mutableListOf<Pair<Int, Int>>()
+        sync(
+            current = listOf(
+                candidate(mediaId = 1L, modifiedAtSeconds = 10L),
+                candidate(mediaId = 2L, modifiedAtSeconds = 10L),
+            ),
+            coordinates = emptyMap(),
+            exifReads = mutableListOf(),
+        ).sync { processed, total ->
+            progress += processed to total
+        }
+
+        assertEquals(listOf(1 to 2, 2 to 2), progress)
+    }
+
+    @Test
     fun unchangedPhotoReusesCachedCoordinates() = runBlocking {
         val exifReads = mutableListOf<String>()
         val photo = candidate(mediaId = 1L, modifiedAtSeconds = 10L)
