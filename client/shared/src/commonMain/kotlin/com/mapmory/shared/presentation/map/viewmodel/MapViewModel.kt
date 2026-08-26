@@ -6,9 +6,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.domain.model.MapRegionSummary
 import com.mapmory.shared.domain.region.RegionCatalog
-import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
+import com.mapmory.shared.domain.repository.MapSummaryRepository
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaDistrictMapData
 import com.mapmory.shared.presentation.map.domain.MapScope
 import com.mapmory.shared.presentation.map.state.KoreaMapUiState
@@ -16,36 +16,41 @@ import com.mapmory.shared.presentation.map.state.KoreaMapUiState
 data class MapUiState(
     val scope: MapScope = MapScope.KOREA,
     val koreaMap: KoreaMapUiState = KoreaMapUiState.ProvinceOverview,
-    val visitedLocationIds: Set<Long> = emptySet(),
+    val rootRegions: List<MapRegionSummary> = emptyList(),
+    val koreaProvinces: List<MapRegionSummary> = emptyList(),
+    val districtsByProvince: Map<String, List<MapRegionSummary>> = emptyMap(),
     val errorMessage: String? = null,
 )
 
 class MapViewModel(
-    private val getTripRecords: GetTripRecordsUseCase,
+    private val mapSummaryRepository: MapSummaryRepository,
     private val regionCatalog: RegionCatalog,
 ) : ViewModel() {
-    private val locationsById = regionCatalog.locations.associateBy(Location::id)
-
     var uiState by mutableStateOf(MapUiState())
         private set
 
     suspend fun refresh() {
-        val visitedIds = mutableSetOf<Long>()
-        var page = 0
-        do {
-            val result = getTripRecords(TripRecordQuery(page = page, size = PageSize))
-            val recordPage = result.getOrElse { error ->
+        val roots = mapSummaryRepository.getRootRegions().getOrElse { error ->
+            uiState = uiState.copy(
+                errorMessage = error.message ?: "지도 기록을 불러오지 못했습니다.",
+            )
+            return
+        }
+        val korea = roots.firstOrNull { it.code == KoreaCountryCode }
+        val provinces = korea?.let { root ->
+            mapSummaryRepository.getChildRegions(root.regionId).getOrElse { error ->
                 uiState = uiState.copy(
-                    errorMessage = error.message ?: "지도 기록을 불러오지 못했습니다.",
+                    rootRegions = roots,
+                    errorMessage = error.message ?: "대한민국 지역 기록을 불러오지 못했습니다.",
                 )
                 return
             }
-            visitedIds += recordPage.records.mapNotNull { it.locationId }
-            page += 1
-        } while (page < recordPage.totalPages)
+        }.orEmpty()
 
         uiState = uiState.copy(
-            visitedLocationIds = visitedIds,
+            rootRegions = roots,
+            koreaProvinces = provinces,
+            districtsByProvince = emptyMap(),
             errorMessage = null,
         )
     }
@@ -59,20 +64,42 @@ class MapViewModel(
 
     suspend fun openProvince(provinceCode: String) {
         uiState = uiState.copy(koreaMap = KoreaMapUiState.DistrictLoading(provinceCode))
+        val serverProvinceCode = provinceCode.removePrefix(KoreanProvincePrefix)
+        val province = uiState.koreaProvinces.firstOrNull { it.code == serverProvinceCode }
+        val summaries = province?.let { summary ->
+            mapSummaryRepository.getChildRegions(summary.regionId).getOrElse { error ->
+                uiState = uiState.copy(
+                    koreaMap = KoreaMapUiState.Error(
+                        provinceCode = provinceCode,
+                        message = error.message ?: "지역별 기록을 불러오지 못했습니다.",
+                    ),
+                )
+                return
+            }
+        }.orEmpty()
         uiState = uiState.copy(
-            koreaMap = runCatching {
-                GeneratedKoreaDistrictMapData.forProvince(provinceCode)
-            }.fold(
-                onSuccess = { regions ->
-                    KoreaMapUiState.DistrictDetail(provinceCode, regions)
-                },
-                onFailure = { error ->
-                    KoreaMapUiState.Error(
+            districtsByProvince = uiState.districtsByProvince + (provinceCode to summaries),
+        )
+
+        val result = runCatching {
+            GeneratedKoreaDistrictMapData.forProvince(provinceCode)
+        }
+
+        uiState = result.fold(
+            onSuccess = { regions ->
+                uiState.copy(
+                    koreaMap = KoreaMapUiState.DistrictDetail(provinceCode, regions),
+                    errorMessage = null,
+                )
+            },
+            onFailure = { error ->
+                uiState.copy(
+                    koreaMap = KoreaMapUiState.Error(
                         provinceCode = provinceCode,
                         message = error.message ?: "시·군·구 지도를 불러오지 못했습니다.",
-                    )
-                },
-            ),
+                    ),
+                )
+            },
         )
     }
 
@@ -82,47 +109,42 @@ class MapViewModel(
         return true
     }
 
-    fun hasRecords(location: Location): Boolean = uiState.visitedLocationIds.any { locationId ->
-        locationContains(location, locationsById[locationId])
+    fun hasRecords(location: Location): Boolean = when {
+        location.regionCode.length == CountryCodeLength ->
+            uiState.rootRegions.any { it.code == location.regionCode }
+
+        location.type == LocationType.PROVINCE ->
+            uiState.koreaProvinces.any {
+                it.code == location.regionCode.removePrefix(KoreanProvincePrefix)
+            }
+
+        else -> {
+            val provinceCode = location.parentId
+                ?.let(regionCatalog::findById)
+                ?.regionCode
+            uiState.districtsByProvince[provinceCode]
+                .orEmpty()
+                .any { it.code == location.regionCode }
+        }
     }
 
     val visitedCountryCodes: Set<String>
-        get() = visitedLocations().map { location ->
-            if (location.countryId == KoreaCountryId) "KR" else location.regionCode
-        }.toSet()
+        get() = uiState.rootRegions.map(MapRegionSummary::code).toSet()
 
     val visitedProvinceCodes: Set<String>
-        get() = visitedLocations().mapNotNull { location ->
-            when {
-                location.countryId != KoreaCountryId -> null
-                location.type == LocationType.PROVINCE -> location.regionCode
-                else -> locationsById[location.parentId]?.regionCode
-            }
-        }.toSet()
+        get() = uiState.koreaProvinces
+            .map { "$KoreanProvincePrefix${it.code}" }
+            .toSet()
 
-    fun visitedDistrictCodes(provinceCode: String): Set<String> = visitedLocations()
-        .filter { location ->
-            location.type == LocationType.DISTRICT &&
-                locationsById[location.parentId]?.regionCode == provinceCode
-        }
-        .map(Location::regionCode)
-        .toSet()
+    fun visitedDistrictCodes(provinceCode: String): Set<String> =
+        uiState.districtsByProvince[provinceCode]
+            .orEmpty()
+            .map(MapRegionSummary::code)
+            .toSet()
 
     fun visitedDistrictCount(provinceCode: String): Int = visitedDistrictCodes(provinceCode).size
-
-    private fun visitedLocations(): List<Location> =
-        uiState.visitedLocationIds.mapNotNull(locationsById::get)
-
-    private fun locationContains(selected: Location, recordLocation: Location?): Boolean {
-        recordLocation ?: return false
-        return when {
-            selected.regionCode == "KR" -> recordLocation.countryId == KoreaCountryId
-            selected.countryId == KoreaCountryId && selected.type == LocationType.PROVINCE ->
-                recordLocation.id == selected.id || recordLocation.parentId == selected.id
-            else -> recordLocation.id == selected.id
-        }
-    }
 }
 
-private const val KoreaCountryId = 1L
-private const val PageSize = 100
+private const val KoreaCountryCode = "KR"
+private const val KoreanProvincePrefix = "KR-"
+private const val CountryCodeLength = 2

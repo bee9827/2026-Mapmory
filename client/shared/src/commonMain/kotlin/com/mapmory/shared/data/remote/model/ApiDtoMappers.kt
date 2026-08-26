@@ -2,6 +2,9 @@ package com.mapmory.shared.data.remote.model
 
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.domain.model.MapRegionLevel
+import com.mapmory.shared.domain.model.MapRegionSummary
+import com.mapmory.shared.domain.model.MapRegionType
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMedia
@@ -127,6 +130,15 @@ fun PageDto<TripRecordListItemDto>.toDomain(): TripRecordPage = TripRecordPage(
     size = size,
     totalElements = totalElements,
     totalPages = totalPages,
+)
+
+fun MapRegionSummaryDto.toDomain(): MapRegionSummary = MapRegionSummary(
+    regionId = regionId,
+    code = code,
+    type = MapRegionType.valueOf(regionType),
+    name = name,
+    count = count,
+    level = MapRegionLevel.valueOf(level),
 )
 
 private const val KoreaCountryCode = "KR"

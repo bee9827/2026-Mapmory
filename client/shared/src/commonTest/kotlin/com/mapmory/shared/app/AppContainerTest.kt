@@ -1,6 +1,9 @@
 package com.mapmory.shared.app
 
 import com.mapmory.shared.data.local.StaticRegionCatalog
+import com.mapmory.shared.data.remote.AccessTokenProvider
+import com.mapmory.shared.data.remote.MapSummaryRemoteRepository
+import com.mapmory.shared.data.remote.TripRecordRemoteRepository
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
@@ -16,6 +19,18 @@ import kotlin.test.assertTrue
 
 class AppContainerTest {
     @Test
+    fun `remote container can be assembled from base url and a token provider`() {
+        val container = createRemoteAppContainer(
+            apiBaseUrl = "https://api.example.com/api/v1",
+            accessTokenProvider = AccessTokenProvider { "guest-token" },
+        )
+
+        assertIs<TripRecordRemoteRepository>(container.tripRecordRepository)
+        assertIs<MapSummaryRemoteRepository>(container.mapSummaryRepository)
+        container.close()
+    }
+
+    @Test
     fun `container can be assembled with a replaceable repository`() {
         val repository = FakeTripRecordRepository { "2026-08-24T00:00:00" }
 
@@ -25,6 +40,7 @@ class AppContainerTest {
         )
 
         assertSame(repository, container.tripRecordRepository)
+        assertSame(repository, container.mapSummaryRepository)
     }
 
     @Test

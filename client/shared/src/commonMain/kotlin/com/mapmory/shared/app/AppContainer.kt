@@ -1,8 +1,13 @@
 package com.mapmory.shared.app
 
 import com.mapmory.shared.data.local.StaticRegionCatalog
+import com.mapmory.shared.data.remote.AccessTokenProvider
+import com.mapmory.shared.data.remote.MapSummaryRemoteRepository
+import com.mapmory.shared.data.remote.TripRecordRemoteRepository
+import com.mapmory.shared.data.remote.createHttpClient
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.domain.region.RegionCatalog
+import com.mapmory.shared.domain.repository.MapSummaryRepository
 import com.mapmory.shared.domain.repository.TripRecordRepository
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
 import com.mapmory.shared.domain.usecase.DeleteTripRecordUseCase
@@ -17,6 +22,7 @@ import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordListViewMo
 interface AppContainer {
     val regionCatalog: RegionCatalog
     val tripRecordRepository: TripRecordRepository
+    val mapSummaryRepository: MapSummaryRepository
     val viewModelFactory: MapmoryViewModelFactory
 
     fun close() = Unit
@@ -34,10 +40,11 @@ interface MapmoryViewModelFactory {
 
 private class DefaultMapmoryViewModelFactory(
     private val repository: TripRecordRepository,
+    private val mapSummaryRepository: MapSummaryRepository,
     private val regionCatalog: RegionCatalog,
 ) : MapmoryViewModelFactory {
     override fun createMapViewModel(): MapViewModel = MapViewModel(
-        getTripRecords = GetTripRecordsUseCase(repository),
+        mapSummaryRepository = mapSummaryRepository,
         regionCatalog = regionCatalog,
     )
 
@@ -66,10 +73,12 @@ private class DefaultMapmoryViewModelFactory(
 private class DefaultAppContainer(
     override val regionCatalog: RegionCatalog,
     override val tripRecordRepository: TripRecordRepository,
+    override val mapSummaryRepository: MapSummaryRepository,
     private val onClose: () -> Unit,
 ) : AppContainer {
     override val viewModelFactory: MapmoryViewModelFactory = DefaultMapmoryViewModelFactory(
         repository = tripRecordRepository,
+        mapSummaryRepository = mapSummaryRepository,
         regionCatalog = regionCatalog,
     )
 
@@ -78,16 +87,51 @@ private class DefaultAppContainer(
 
 fun createAppContainer(
     tripRecordRepository: TripRecordRepository,
+    mapSummaryRepository: MapSummaryRepository = requireNotNull(
+        tripRecordRepository as? MapSummaryRepository,
+    ) { "지도 요약 Repository를 함께 전달해 주세요." },
     regionCatalog: RegionCatalog = StaticRegionCatalog(),
     onClose: () -> Unit = {},
 ): AppContainer = DefaultAppContainer(
     regionCatalog = regionCatalog,
     tripRecordRepository = tripRecordRepository,
+    mapSummaryRepository = mapSummaryRepository,
     onClose = onClose,
 )
 
 fun createInMemoryAppContainer(
     now: () -> String = { "2026-08-24T00:00:00" },
-): AppContainer = createAppContainer(
-    tripRecordRepository = FakeTripRecordRepository(now = now),
-)
+): AppContainer {
+    val regionCatalog = StaticRegionCatalog()
+    return createAppContainer(
+        tripRecordRepository = FakeTripRecordRepository(
+            regionCatalog = regionCatalog,
+            now = now,
+        ),
+        regionCatalog = regionCatalog,
+    )
+}
+
+/** 게스트 로그인이 완료돼 토큰을 제공할 수 있다는 가정 아래 원격 구현을 조립한다. */
+fun createRemoteAppContainer(
+    apiBaseUrl: String,
+    accessTokenProvider: AccessTokenProvider,
+    regionCatalog: RegionCatalog = StaticRegionCatalog(),
+): AppContainer {
+    val client = createHttpClient()
+    return createAppContainer(
+        tripRecordRepository = TripRecordRemoteRepository(
+            client = client,
+            apiBaseUrl = apiBaseUrl,
+            accessTokenProvider = accessTokenProvider,
+            regionCatalog = regionCatalog,
+        ),
+        mapSummaryRepository = MapSummaryRemoteRepository(
+            client = client,
+            apiBaseUrl = apiBaseUrl,
+            accessTokenProvider = accessTokenProvider,
+        ),
+        regionCatalog = regionCatalog,
+        onClose = client::close,
+    )
+}

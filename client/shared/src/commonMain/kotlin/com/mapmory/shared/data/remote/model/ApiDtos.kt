@@ -85,3 +85,13 @@ data class TripRecordRequestDto(
 data class IdResponseDto(
     val id: Long,
 )
+
+@Serializable
+data class MapRegionSummaryDto(
+    val regionId: Long,
+    val code: String,
+    val regionType: String,
+    val name: String,
+    val count: Long,
+    val level: String,
+)

@@ -3,7 +3,6 @@ package com.mapmory.shared.presentation.map.viewmodel
 import com.mapmory.shared.data.local.StaticRegionCatalog
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.domain.model.TripRecordDraft
-import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
 import com.mapmory.shared.runSuspend
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -13,15 +12,25 @@ class MapViewModelTest {
     @Test
     fun refreshBuildsVisitedCountriesProvincesAndDistrictsFromRepositoryRecords() = runSuspend {
         val catalog = StaticRegionCatalog()
-        val repository = FakeTripRecordRepository { "2026-08-24T00:00:00" }
+        val repository = FakeTripRecordRepository(
+            regionCatalog = catalog,
+            now = { "2026-08-24T00:00:00" },
+        )
         val gangnam = catalog.requireByCode("11680")
         val seoul = catalog.requireByCode("KR-11")
         val japan = catalog.requireByCode("JP")
         repository.createTripRecord(draft(gangnam.id, "서울 여행")).getOrThrow()
         repository.createTripRecord(draft(japan.id, "일본 여행")).getOrThrow()
-        val viewModel = MapViewModel(GetTripRecordsUseCase(repository), catalog)
+        val korea = repository.getRootRegions().getOrThrow().single { it.code == "KR" }
+        val serverSeoul = repository.getChildRegions(korea.regionId).getOrThrow().single { it.code == "11" }
+        assertEquals(
+            setOf("11680"),
+            repository.getChildRegions(serverSeoul.regionId).getOrThrow().map { it.code }.toSet(),
+        )
+        val viewModel = MapViewModel(repository, catalog)
 
         viewModel.refresh()
+        viewModel.openProvince("KR-11")
 
         assertEquals(setOf("KR", "JP"), viewModel.visitedCountryCodes)
         assertEquals(setOf("KR-11"), viewModel.visitedProvinceCodes)
