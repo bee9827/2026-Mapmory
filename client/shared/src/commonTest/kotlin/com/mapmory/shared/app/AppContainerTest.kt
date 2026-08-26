@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
 
 class AppContainerTest {
     @Test
-    fun `container can be assembled with a replaceable repository`() {
+    fun `교체_가능한_저장소로_컨테이너를_구성할_수_있다`() {
         val repository = FakeTripRecordRepository(7) { "2026-08-24T00:00:00" }
 
         val container = createAppContainer(
@@ -28,7 +28,7 @@ class AppContainerTest {
     }
 
     @Test
-    fun `screen view models share one repository without sharing ui state`() = runSuspend {
+    fun `화면_ViewModel은_UI_상태를_공유하지_않고_저장소를_공유한다`() = runSuspend {
         val container = createInMemoryAppContainer()
         val gangnam = container.regionCatalog.requireByCode("11680")
         val editor = container.viewModelFactory.createTripRecordEditorViewModel()

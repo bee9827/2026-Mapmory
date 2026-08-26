@@ -9,7 +9,7 @@ class StaticRegionCatalogTest {
     private val catalog = StaticRegionCatalog()
 
     @Test
-    fun `canonical province and district codes resolve without App composable`() {
+    fun `App_컴포저블_없이_정규_시도와_지역_코드를_조회한다`() {
         val seoul = catalog.findByCode("KR-11")
         val gangnam = catalog.findDistrict(
             provinceCode = "KR-11",
@@ -23,7 +23,7 @@ class StaticRegionCatalogTest {
     }
 
     @Test
-    fun `district lookup never crosses the requested province`() {
+    fun `지역_조회는_요청한_시도를_벗어나지_않는다`() {
         assertNull(
             catalog.findDistrict(
                 provinceCode = "KR-26",

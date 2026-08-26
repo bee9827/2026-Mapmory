@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
 
 class LocationRemoteRepositoryTest {
     @Test
-    fun getLocationsMapsServerLocationAndQuery() = runBlocking {
+    fun `지역_조회는_서버_지역과_검색어를_매핑한다`() = runBlocking {
         val client = HttpClient(MockEngine) {
             configureCommonHttpClient()
             engine {
