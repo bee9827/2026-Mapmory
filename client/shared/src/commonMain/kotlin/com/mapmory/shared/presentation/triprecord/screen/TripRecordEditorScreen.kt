@@ -735,22 +735,31 @@ private fun TripRecordEditorUiState.errorMessageFor(target: TripRecordEditorErro
 
 @Composable
 private fun CompanionChips(modifier: Modifier = Modifier) {
+    val companions = remember { listOf("가족", "애인", "친구", "혼자") }
+    var selectedCompanion by remember { mutableStateOf<String?>(null) }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        listOf("가족", "애인", "친구", "혼자").forEach { companion ->
+        companions.forEach { companion ->
+            val selected = selectedCompanion == companion
             Text(
                 text = companion,
-                color = TripRecordPalette.text,
+                color = if (selected) TripRecordPalette.primary else TripRecordPalette.text,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50.dp))
-                    .background(TripRecordPalette.surface)
+                    .background(
+                        if (selected) TripRecordPalette.primarySoft else TripRecordPalette.surface,
+                    )
                     .border(1.dp, TripRecordPalette.line, RoundedCornerShape(50.dp))
+                    .clickable {
+                        selectedCompanion = if (selected) null else companion
+                    }
                     .padding(horizontal = 11.dp, vertical = 7.dp),
             )
         }
