@@ -66,6 +66,7 @@ actual fun rememberPhotoLibraryActions(
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
     onLoadingChanged: (Boolean) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
 ): PhotoLibraryActions {
     val scope = rememberCoroutineScope()
     val controller = remember(scope) { IosPhotoLibraryController(scope) }

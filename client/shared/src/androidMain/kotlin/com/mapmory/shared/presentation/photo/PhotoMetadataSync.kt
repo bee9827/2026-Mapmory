@@ -9,7 +9,9 @@ internal class PhotoMetadataSync(
     private val writeSnapshot: suspend (List<PhotoMetadataEntity>, Long) -> Unit,
     private val scanIdProvider: () -> Long = { System.currentTimeMillis() },
 ) {
-    suspend fun sync(): PhotoMetadataSyncResult {
+    suspend fun sync(
+        onProgress: (processed: Int, total: Int) -> Unit = { _, _ -> },
+    ): PhotoMetadataSyncResult {
         val previousPhotos = readPrevious()
         val previousById = previousPhotos.associateBy(PhotoMetadataEntity::mediaId)
         val currentPhotos = readCurrent() ?: return PhotoMetadataSyncResult(
@@ -19,6 +21,9 @@ internal class PhotoMetadataSync(
             previousPhotoCount = previousPhotos.size,
         )
         val scanId = scanIdProvider()
+        val total = currentPhotos.size
+        val progressStep = (total / 100).coerceAtLeast(1)
+        var processed = 0
         var exifReadCount = 0
         var reusedCoordinateCount = 0
         val photos = currentPhotos.map { candidate ->
@@ -41,6 +46,10 @@ internal class PhotoMetadataSync(
             } else {
                 exifReadCount++
                 readCoordinates(candidate.contentUri)
+            }
+            processed++
+            if (processed == total || processed % progressStep == 0) {
+                onProgress(processed, total)
             }
             PhotoMetadataEntity(
                 mediaId = candidate.mediaId,
