@@ -274,7 +274,7 @@ private suspend fun Context.syncPhotoMetadata(): PhotoMetadataSyncResult {
     ).sync()
 }
 
-private fun Context.queryPhotoMetadataSnapshot(): List<PhotoMetadataCandidate>? {
+internal fun Context.queryPhotoMetadataSnapshot(): List<PhotoMetadataCandidate>? {
     val projection = arrayOf(
         MediaStore.Images.Media._ID,
         MediaStore.Images.Media.DISPLAY_NAME,
@@ -383,7 +383,7 @@ private fun logPhotoPickPerformance(
     )
 }
 
-private fun Context.readPhoto(
+internal fun Context.readPhoto(
     uri: Uri,
     knownName: String? = null,
     knownCoordinates: Pair<Double, Double>? = null,
@@ -560,7 +560,7 @@ private fun Context.queryPhotoMetadata(uri: Uri): Pair<String?, Long?> {
     } ?: (null to null)
 }
 
-private fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = runCatching {
+internal fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = runCatching {
     val metadataUri = if (
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
         ContextCompat.checkSelfPermission(

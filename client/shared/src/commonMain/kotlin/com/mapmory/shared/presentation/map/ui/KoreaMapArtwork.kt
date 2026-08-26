@@ -183,6 +183,7 @@ private data class MapTransform(
 private const val MinZoom = 1f
 private const val MaxZoom = 6f
 private const val PanSlackFraction = 0.1f
+private const val BoundaryEpsilon = 0.000001f
 
 @Composable
 fun KoreaMapStatusMessage(
@@ -373,6 +374,7 @@ private fun pointInRing(point: GeoPoint, ring: List<GeoPoint>): Boolean {
     var inside = false
     var previous = ring.last()
     ring.forEach { current ->
+        if (pointOnSegment(point, previous, current)) return true
         val crossesY = (current.latitude > point.latitude) != (previous.latitude > point.latitude)
         if (crossesY) {
             val intersectionLongitude =
@@ -384,6 +386,14 @@ private fun pointInRing(point: GeoPoint, ring: List<GeoPoint>): Boolean {
         previous = current
     }
     return inside
+}
+
+private fun pointOnSegment(point: GeoPoint, start: GeoPoint, end: GeoPoint): Boolean {
+    val cross = (point.latitude - start.latitude) * (end.longitude - start.longitude) -
+        (point.longitude - start.longitude) * (end.latitude - start.latitude)
+    if (kotlin.math.abs(cross) > BoundaryEpsilon) return false
+    return point.longitude in minOf(start.longitude, end.longitude)..maxOf(start.longitude, end.longitude) &&
+        point.latitude in minOf(start.latitude, end.latitude)..maxOf(start.latitude, end.latitude)
 }
 
 private data class KoreaBounds(

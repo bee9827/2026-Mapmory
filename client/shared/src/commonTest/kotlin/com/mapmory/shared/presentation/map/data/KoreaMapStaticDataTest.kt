@@ -51,6 +51,14 @@ class KoreaMapStaticDataTest {
     }
 
     @Test
+    fun mapTapOnTheRightOrTopBoundaryStillSelectsTheRegion() {
+        val region = square("KR-11", "서울특별시", 0f, 0f, 10f, 10f)
+
+        assertEquals("KR-11", listOf(region).regionAt(GeoPoint(10f, 5f))?.code)
+        assertEquals("KR-11", listOf(region).regionAt(GeoPoint(5f, 10f))?.code)
+    }
+
+    @Test
     fun generatedMapKeepsSeoulAndGyeonggiBoundariesDistinct() {
         assertEquals(
             "KR-11",
