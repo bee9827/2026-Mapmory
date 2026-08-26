@@ -14,7 +14,7 @@ import org.springframework.core.io.ClassPathResource;
 class MetricsConfigurationTest {
 
     @Test
-    void HTTP_응답_시간은_제한된_SLO_버킷으로_수집한다() throws IOException {
+    void HTTP와_내부_작업_응답_시간은_p95_Summary로_수집한다() throws IOException {
         List<PropertySource<?>> sources = new YamlPropertySourceLoader().load(
                 "application",
                 new ClassPathResource("application.yaml")
@@ -23,9 +23,13 @@ class MetricsConfigurationTest {
         assertThat(property(sources, "management.metrics.distribution.percentiles-histogram.http.server.requests"))
                 .isNull();
         assertThat(property(sources, "management.metrics.distribution.slo.http.server.requests"))
-                .isEqualTo("100ms,300ms,500ms,1s,2s,3s,5s");
+                .isNull();
         assertThat(property(sources, "management.metrics.distribution.slo.mapmory.operation.duration"))
-                .isEqualTo("10ms,50ms,100ms,300ms,500ms,1s,3s,5s");
+                .isNull();
+        assertThat(property(sources, "management.metrics.distribution.percentiles.http.server.requests"))
+                .isEqualTo(0.95);
+        assertThat(property(sources, "management.metrics.distribution.percentiles.mapmory.operation.duration"))
+                .isEqualTo(0.95);
     }
 
     @Test
