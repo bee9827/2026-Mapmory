@@ -8,7 +8,7 @@ import kotlinx.coroutines.runBlocking
 
 class PhotoRecommendationRegionDeviceTest {
     @Test
-    fun canonicalDistrictCodeLoadsItsBundledBoundary() = runBlocking {
+    fun `정규_지역_코드로_번들된_지도_경계를_조회한다`() = runBlocking {
         val gangnam = Location(
             id = 11680L,
             countryId = 1L,
@@ -22,7 +22,7 @@ class PhotoRecommendationRegionDeviceTest {
     }
 
     @Test
-    fun unknownDistrictCodeDoesNotUseAnotherBoundary() = runBlocking {
+    fun `알_수_없는_지역_코드는_다른_지도_경계를_사용하지_않는다`() = runBlocking {
         val unknownDistrict = Location(
             id = 11999L,
             countryId = 1L,

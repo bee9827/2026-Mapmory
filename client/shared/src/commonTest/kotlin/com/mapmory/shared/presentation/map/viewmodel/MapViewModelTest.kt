@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 class MapViewModelTest {
     @Test
-    fun refreshBuildsVisitedCountriesProvincesAndDistrictsFromRepositoryRecords() = runSuspend {
+    fun `새로고침은_저장소_기록에서_방문_국가_시도_지역을_구성한다`() = runSuspend {
         val catalog = StaticRegionCatalog()
         val repository = FakeTripRecordRepository(1) { "2026-08-24T00:00:00" }
         val gangnam = catalog.requireByCode("11680")

@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 
 class PhotoLibraryTest {
     @Test
-    fun selectedPhotosAreDeduplicatedWithoutAnApplicationLimit() {
+    fun `선택한_사진은_앱_제한_없이_중복_제거된다`() {
         val existing = listOf(photo("same"), photo("existing"))
         val incoming = listOf(photo("same")) + (1..20).map { photo("new-$it") }
 
@@ -21,7 +21,7 @@ class PhotoLibraryTest {
     }
 
     @Test
-    fun boundaryIncludesInteriorAndEdgeButRejectsOutsideCoordinates() {
+    fun `경계는_내부와_선_위_좌표를_포함하고_외부_좌표는_거부한다`() {
         val region = PhotoRecommendationRegion(
             code = "test",
             rings = listOf(square(left = 0f, bottom = 0f, right = 10f, top = 10f)),
@@ -35,7 +35,7 @@ class PhotoLibraryTest {
     }
 
     @Test
-    fun degenerateRingsDoNotMatchAnyPhoto() {
+    fun `퇴화한_링은_어떤_사진과도_일치하지_않는다`() {
         val region = PhotoRecommendationRegion(
             code = "invalid",
             rings = listOf(
@@ -48,7 +48,7 @@ class PhotoLibraryTest {
     }
 
     @Test
-    fun boundaryChecksEveryDisconnectedRing() {
+    fun `경계는_분리된_모든_링을_확인한다`() {
         val region = PhotoRecommendationRegion(
             code = "islands",
             rings = listOf(
@@ -63,7 +63,7 @@ class PhotoLibraryTest {
     }
 
     @Test
-    fun generatedSeoulBoundaryRejectsNearbyGyeonggiPhoto() {
+    fun `생성된_서울_경계는_인접한_경기도_사진을_거부한다`() {
         val seoul = GeneratedKoreaMapData.provinces.single { it.code == "KR-11" }
         val region = PhotoRecommendationRegion(seoul.code, seoul.rings)
 
@@ -72,7 +72,7 @@ class PhotoLibraryTest {
     }
 
     @Test
-    fun recommendationKeepsNewestInputOrderAndStopsAtTwelveMatches() {
+    fun `추천_결과는_최신_입력_순서를_유지하고_열두_개에서_멈춘다`() {
         val region = PhotoRecommendationRegion(
             code = "test",
             rings = listOf(square(left = 0f, bottom = 0f, right = 10f, top = 10f)),
@@ -90,7 +90,7 @@ class PhotoLibraryTest {
     }
 
     @Test
-    fun nonPositiveRecommendationLimitReturnsNoPhotos() {
+    fun `양수가_아닌_추천_개수_제한은_사진을_반환하지_않는다`() {
         val region = PhotoRecommendationRegion(
             code = "test",
             rings = listOf(square(left = 0f, bottom = 0f, right = 10f, top = 10f)),

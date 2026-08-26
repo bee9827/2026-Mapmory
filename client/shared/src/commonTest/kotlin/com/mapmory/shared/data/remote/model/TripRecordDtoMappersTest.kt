@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 
 class ApiDtoMappersTest {
     @Test
-    fun tripRecordDetailMapsMediaAndDates() {
+    fun `여행_기록_상세는_미디어와_날짜를_매핑한다`() {
         val result = TripRecordDetailDto(
             id = 101,
             member = MemberSummaryDto(10, "맵모리"),
@@ -26,7 +26,7 @@ class ApiDtoMappersTest {
     }
 
     @Test
-    fun draftMapsToRequestWithObjectKeys() {
+    fun `초안은_Object_Key를_포함한_요청으로_변환된다`() {
         val result = TripRecordRequestDto(
             locationId = 1,
             title = "제목",
