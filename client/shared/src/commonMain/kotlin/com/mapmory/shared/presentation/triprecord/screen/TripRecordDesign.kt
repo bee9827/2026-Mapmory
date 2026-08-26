@@ -46,7 +46,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
@@ -251,7 +250,6 @@ internal fun TripBottomBar(
     selectedIconColor: Color = TripRecordPalette.accent,
     selectedLabelColor: Color = TripRecordPalette.accent,
     unselectedColor: Color = TripRecordPalette.muted,
-    contentTopPadding: Dp = 0.dp,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -276,7 +274,6 @@ internal fun TripBottomBar(
             selectedIconColor = selectedIconColor,
             selectedLabelColor = selectedLabelColor,
             unselectedColor = unselectedColor,
-            contentTopPadding = contentTopPadding,
             modifier = Modifier.weight(1f),
         )
         TripBottomItem(
@@ -286,7 +283,6 @@ internal fun TripBottomBar(
             selectedIconColor = selectedIconColor,
             selectedLabelColor = selectedLabelColor,
             unselectedColor = unselectedColor,
-            contentTopPadding = contentTopPadding,
             modifier = Modifier.weight(1f),
         )
         TripBottomItem(
@@ -296,7 +292,6 @@ internal fun TripBottomBar(
             selectedIconColor = selectedIconColor,
             selectedLabelColor = selectedLabelColor,
             unselectedColor = unselectedColor,
-            contentTopPadding = contentTopPadding,
             modifier = Modifier.weight(1f),
         )
     }
@@ -316,7 +311,6 @@ private fun TripBottomItem(
     selectedIconColor: Color,
     selectedLabelColor: Color,
     unselectedColor: Color,
-    contentTopPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     val iconColor = if (selected) selectedIconColor else unselectedColor
@@ -324,8 +318,7 @@ private fun TripBottomItem(
     Column(
         modifier = modifier
             .height(64.dp)
-            .clickable(onClick = onClick)
-            .padding(top = contentTopPadding),
+            .clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
