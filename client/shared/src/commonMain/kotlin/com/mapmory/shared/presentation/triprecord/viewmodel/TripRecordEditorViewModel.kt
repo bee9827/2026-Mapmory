@@ -24,6 +24,7 @@ class TripRecordEditorViewModel(
     private val updateTripRecord: UpdateTripRecordUseCase,
     private val getTripRecord: GetTripRecordUseCase? = null,
     private val regionCatalog: RegionCatalog? = null,
+    private val onTripRecordsChanged: () -> Unit = {},
 ) : ViewModel() {
     private var isRouteInitialized = false
 
@@ -193,8 +194,9 @@ class TripRecordEditorViewModel(
                 TripRecordMediaDraft(
                     objectKey = photo.id,
                     sortOrder = index,
-                    previewBytes = photo.previewBytes?.bytesForDecoding()?.copyOf(),
-                    originalBytes = photo.originalBytes?.bytesForDecoding()?.copyOf(),
+                    previewBytes = photo.previewBytes?.bytesForDecoding(),
+                    originalBytes = photo.originalBytes?.bytesForDecoding(),
+                    fileName = photo.displayName,
                     latitude = photo.latitude,
                     longitude = photo.longitude,
                     capturedAt = photo.capturedAt,
@@ -208,6 +210,7 @@ class TripRecordEditorViewModel(
         return result.fold(
             onSuccess = { record ->
                 savedRecordId = record.id
+                onTripRecordsChanged()
                 uiState = uiState.copy(isSaving = false)
                 true
             },

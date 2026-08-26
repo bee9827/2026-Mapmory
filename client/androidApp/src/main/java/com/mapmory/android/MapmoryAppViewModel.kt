@@ -1,11 +1,21 @@
 package com.mapmory.android
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import com.mapmory.shared.data.auth.AndroidAuthTokenStore
 import com.mapmory.shared.app.AppContainer
-import com.mapmory.shared.app.createInMemoryAppContainer
+import com.mapmory.shared.app.MAPMORY_API_BASE_URL
+import com.mapmory.shared.app.createGuestRemoteAppContainer
 
-class MapmoryAppViewModel : ViewModel() {
-    val container: AppContainer = createInMemoryAppContainer()
+class MapmoryAppViewModel(application: Application) : AndroidViewModel(application) {
+    private val configuredApiBaseUrl = application.getString(R.string.mapmory_api_base_url)
+        .takeIf(String::isNotBlank)
+        ?: MAPMORY_API_BASE_URL
+
+    val container: AppContainer = createGuestRemoteAppContainer(
+        apiBaseUrl = configuredApiBaseUrl,
+        tokenStore = AndroidAuthTokenStore(application),
+    )
 
     override fun onCleared() {
         container.close()

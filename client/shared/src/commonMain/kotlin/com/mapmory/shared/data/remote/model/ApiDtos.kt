@@ -24,6 +24,50 @@ data class ApiResponseDto<T>(
 )
 
 @Serializable
+data class GuestLoginResponseDto(
+    val accessToken: String,
+    val refreshToken: String,
+    val isNewMember: Boolean,
+)
+
+@Serializable
+data class RefreshTokenRequestDto(
+    val refreshToken: String,
+)
+
+@Serializable
+data class TokenResponseDto(
+    val accessToken: String,
+    val refreshToken: String,
+)
+
+@Serializable
+data class PresignedUploadRequestDto(
+    val files: List<UploadFileRequestDto>,
+)
+
+@Serializable
+data class UploadFileRequestDto(
+    val fileName: String,
+    val contentType: String,
+    val fileSize: Long,
+)
+
+@Serializable
+data class PresignedUploadsDto(
+    val uploads: List<PresignedUploadDto>,
+)
+
+@Serializable
+data class PresignedUploadDto(
+    val objectKey: String,
+    val presignedUrl: String,
+    val method: String,
+    val contentType: String,
+    val expiresIn: Long,
+)
+
+@Serializable
 data class PageDto<T>(
     val items: List<T>,
     val page: Int,

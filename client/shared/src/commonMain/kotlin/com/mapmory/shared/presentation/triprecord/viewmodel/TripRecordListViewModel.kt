@@ -34,6 +34,17 @@ class TripRecordListViewModel(
         load()
     }
 
+    suspend fun refresh(locationId: Long?) {
+        if (!isRouteInitialized) {
+            initialize(locationId)
+            return
+        }
+        if (query.locationId != locationId) {
+            filterByLocation(locationId)
+        }
+        load()
+    }
+
     suspend fun load(query: TripRecordQuery = this.query) {
         this.query = query
         uiState = TripRecordListUiState.Loading

@@ -13,6 +13,7 @@ import kotlinx.coroutines.launch
 internal fun TripRecordListRoute(
     viewModel: TripRecordListViewModel,
     initialLocationId: Long?,
+    tripRecordRevision: Long,
     onOpenMap: () -> Unit,
     onOpenEditor: () -> Unit,
     onOpenDetail: (Long) -> Unit,
@@ -21,8 +22,8 @@ internal fun TripRecordListRoute(
 ) {
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(viewModel, initialLocationId) {
-        viewModel.initialize(initialLocationId)
+    LaunchedEffect(viewModel, initialLocationId, tripRecordRevision) {
+        viewModel.refresh(initialLocationId)
     }
 
     TripRecordListScreen(

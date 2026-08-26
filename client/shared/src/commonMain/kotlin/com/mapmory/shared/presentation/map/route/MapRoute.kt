@@ -23,6 +23,7 @@ internal fun MapRoute(
     viewModel: MapViewModel,
     regionCatalog: RegionCatalog,
     backHandlerRegistry: MapmoryBackHandlerRegistry,
+    tripRecordRevision: Long,
     onOpenRecords: (Long?) -> Unit,
     onOpenEditor: (Long?) -> Unit,
     onOpenProfile: () -> Unit,
@@ -32,7 +33,7 @@ internal fun MapRoute(
     val scope = rememberCoroutineScope()
     val latestNestedBack = rememberUpdatedState { viewModel.closeProvince() }
 
-    LaunchedEffect(viewModel) {
+    LaunchedEffect(viewModel, tripRecordRevision) {
         viewModel.refresh()
     }
 

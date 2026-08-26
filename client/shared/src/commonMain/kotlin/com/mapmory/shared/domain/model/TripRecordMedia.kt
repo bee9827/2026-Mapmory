@@ -19,6 +19,7 @@ data class TripRecordMediaDraft(
     val sortOrder: Int,
     val previewBytes: ByteArray?,
     val originalBytes: ByteArray? = null,
+    val fileName: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
     val capturedAt: String? = null,

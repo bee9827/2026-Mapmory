@@ -30,6 +30,12 @@ class MapViewModel(
         private set
 
     suspend fun refresh() {
+        val openProvinceCode = when (val mapState = uiState.koreaMap) {
+            is KoreaMapUiState.DistrictLoading -> mapState.provinceCode
+            is KoreaMapUiState.DistrictDetail -> mapState.provinceCode
+            is KoreaMapUiState.Error -> mapState.provinceCode
+            KoreaMapUiState.ProvinceOverview -> null
+        }
         val roots = mapSummaryRepository.getRootRegions().getOrElse { error ->
             uiState = uiState.copy(
                 errorMessage = error.message ?: "지도 기록을 불러오지 못했습니다.",
@@ -53,6 +59,7 @@ class MapViewModel(
             districtsByProvince = emptyMap(),
             errorMessage = null,
         )
+        openProvinceCode?.let { provinceCode -> openProvince(provinceCode) }
     }
 
     fun changeScope(scope: MapScope) {
