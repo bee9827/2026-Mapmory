@@ -43,6 +43,10 @@ upload:
       bucket: ${AWS_S3_BUCKET:mapmory-local}
       region: ${AWS_REGION:ap-northeast-2}
 
+waitlist:
+  cors:
+    allowed-origins: ${WAITLIST_ALLOWED_ORIGINS:http://localhost:4173,http://localhost:5173,https://map-mory.com,https://www.map-mory.com}
+
 server:
   port: 8080
   servlet:
