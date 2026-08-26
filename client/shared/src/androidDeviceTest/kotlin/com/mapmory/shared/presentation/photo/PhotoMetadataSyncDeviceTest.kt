@@ -28,7 +28,7 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
-    fun newPhotoReadsExifAndWritesRoom() = runBlocking {
+    fun `새_사진의_EXIF를_읽고_Room에_저장한다`() = runBlocking {
         val exifReads = mutableListOf<String>()
         val result = sync(
             current = listOf(candidate(mediaId = 1L, modifiedAtSeconds = 10L)),
@@ -44,7 +44,7 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
-    fun unchangedPhotoReusesCachedCoordinates() = runBlocking {
+    fun `변경되지_않은_사진은_캐시된_좌표를_재사용한다`() = runBlocking {
         val exifReads = mutableListOf<String>()
         val photo = candidate(mediaId = 1L, modifiedAtSeconds = 10L)
         sync(
@@ -68,7 +68,7 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
-    fun modifiedPhotoReadsExifAgainAndUpdatesCoordinates() = runBlocking {
+    fun `변경된_사진은_EXIF를_다시_읽고_좌표를_갱신한다`() = runBlocking {
         val photo = candidate(mediaId = 1L, modifiedAtSeconds = 10L)
         sync(
             current = listOf(photo),
@@ -92,7 +92,7 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
-    fun photoWithoutGpsIsRetriedUntilCoordinatesAreAvailable() = runBlocking {
+    fun `GPS가_없는_사진은_좌표를_얻을_때까지_다시_시도한다`() = runBlocking {
         val photo = candidate(mediaId = 1L, modifiedAtSeconds = 10L)
         val firstResult = sync(
             current = listOf(photo),
@@ -119,7 +119,7 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
-    fun mixedSnapshotReusesOnlyUnchangedLocatedPhotos() = runBlocking {
+    fun `혼합_스냅샷에서는_변경되지_않은_위치_사진만_재사용한다`() = runBlocking {
         val unchanged = candidate(mediaId = 1L, modifiedAtSeconds = 10L)
         val changed = candidate(mediaId = 2L, modifiedAtSeconds = 10L)
         sync(
@@ -148,7 +148,7 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
-    fun photoMissingFromCurrentSnapshotIsRemoved() = runBlocking {
+    fun `현재_스냅샷에_없는_사진은_삭제한다`() = runBlocking {
         val first = candidate(mediaId = 1L, modifiedAtSeconds = 10L)
         val second = candidate(mediaId = 2L, modifiedAtSeconds = 10L)
         sync(
@@ -171,7 +171,7 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
-    fun emptyMediaStoreSnapshotClearsRoom() = runBlocking {
+    fun `빈_MediaStore_스냅샷은_Room을_비운다`() = runBlocking {
         val photo = candidate(mediaId = 1L, modifiedAtSeconds = 10L)
         sync(
             current = listOf(photo),
@@ -190,7 +190,7 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
-    fun roomQueriesFilterLocatedPhotosAndOrderByCaptureTime() = runBlocking {
+    fun `Room_조회는_위치가_있는_사진만_필터링하고_촬영_시각순으로_정렬한다`() = runBlocking {
         val newest = candidate(mediaId = 1L, modifiedAtSeconds = 10L, capturedAtMillis = 300L)
         val withoutGps = candidate(mediaId = 2L, modifiedAtSeconds = 10L, capturedAtMillis = 200L)
         val oldest = candidate(mediaId = 3L, modifiedAtSeconds = 10L, capturedAtMillis = 100L)
@@ -215,7 +215,7 @@ class PhotoMetadataSyncDeviceTest {
     }
 
     @Test
-    fun mediaStoreFailureKeepsPreviousSnapshot() = runBlocking {
+    fun `MediaStore_조회_실패_시_기존_스냅샷을_유지한다`() = runBlocking {
         val photo = candidate(mediaId = 1L, modifiedAtSeconds = 10L)
         sync(
             current = listOf(photo),
