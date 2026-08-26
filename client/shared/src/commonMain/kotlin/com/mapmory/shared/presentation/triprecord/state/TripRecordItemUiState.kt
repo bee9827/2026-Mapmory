@@ -74,12 +74,12 @@ fun TripRecordData.toTripRecordItemUiState(
             TripRecordPhotoUiState(
                 id = media.objectKey,
                 displayName = media.objectKey.substringAfterLast('/'),
-                previewBytes = PhotoPreviewBytes.from(media.previewBytes),
+                previewBytes = PhotoPreviewBytes.from(media.previewBytes ?: media.originalBytes),
                 sortOrder = media.sortOrder,
                 latitude = media.latitude,
                 longitude = media.longitude,
                 capturedAt = media.capturedAt,
-                originalBytes = PhotoPreviewBytes.from(media.originalBytes),
+                originalBytes = null,
             )
         },
 )
@@ -95,16 +95,20 @@ fun TripRecordSummary.toTripRecordItemUiState(
     locationName = locationName,
     photos = media
         .sortedBy { it.sortOrder }
-        .map { media ->
+        .mapIndexed { index, media ->
             TripRecordPhotoUiState(
                 id = media.objectKey,
                 displayName = media.objectKey.substringAfterLast('/'),
-                previewBytes = PhotoPreviewBytes.from(media.previewBytes),
+                previewBytes = if (index == 0) {
+                    PhotoPreviewBytes.from(media.previewBytes ?: media.originalBytes)
+                } else {
+                    null
+                },
                 sortOrder = media.sortOrder,
                 latitude = media.latitude,
                 longitude = media.longitude,
                 capturedAt = media.capturedAt,
-                originalBytes = PhotoPreviewBytes.from(media.originalBytes),
+                originalBytes = null,
             )
         },
 )
