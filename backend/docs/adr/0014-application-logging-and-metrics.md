@@ -32,7 +32,7 @@ CloudWatch Agent, 로그 그룹, 대시보드와 알림 구성은 후속 작업�
 | 요청 추적 | 모든 요청에 UUID 형식의 `X-Request-Id`를 부여하고 MDC의 `requestId`에 저장한 뒤 요청 종료 시 제거한다. | `RequestIdFilter` |
 | 예외 로그 | 미처리 예외, 응답값 검증 실패, `SERVICE_UNAVAILABLE`을 원인 예외와 함께 `ERROR`로 기록한다. 예상 가능한 비즈니스 예외는 `DEBUG`로 기록한다. | `common/handler` |
 | 로그 형식 | 로컬은 사람이 읽는 콘솔 패턴, 운영은 Spring Boot Logstash JSON 형식을 사용한다. | `application.yaml`, `application-prod.yaml` |
-| HTTP 메트릭 | `http.server.requests`를 7개 SLO 경계로 집계하고 `uri` 태그 값은 최대 50개까지만 등록한다. | `MetricsConfiguration`, `application.yaml` |
+| HTTP 메트릭 | `http.server.requests`의 p95를 애플리케이션에서 계산하고 `uri` 태그 값은 최대 50개까지만 등록한다. | `MetricsConfiguration`, `application.yaml` |
 | 내부 작업 메트릭 | `mapmory.operation.duration`으로 미디어 동기화와 지도 요약 쿼리 시간을 성공·실패별로 기록한다. | `OperationTimer`, `MonitoredOperation` |
 | 메트릭 노출 | `health`, `prometheus`만 읽기 전용으로 노출한다. 운영에서는 `127.0.0.1:8081`로 관리 포트를 분리한다. | `application.yaml`, `application-prod.yaml` |
 
@@ -121,13 +121,14 @@ Spring MVC가 자동 생성하는 `http.server.requests`를 요청 수, HTTP 상
 기준으로 사용한다. URI는 `/travel-records/{id}`처럼 템플릿으로 집계하고 실제 ID가 포함된
 경로를 태그로 만들지 않는다.
 
-사전 정의된 percentile histogram은 사용하지 않고 다음 7개의 고정 SLO 누적 버킷만 노출한다.
+CloudWatch Agent의 Prometheus-to-CloudWatch 경로는 Histogram을 버리고 Counter, Gauge, Summary만
+지원한다. 따라서 SLO 누적 버킷 대신 `0.95` 클라이언트 percentile을 설정해 p95를 Summary로
+노출한다. 실행 횟수와 누적 시간은 `_count`, `_sum`, 최대 시간은 `_max`, p95는
+`quantile="0.95"`인 기본 시계열로 확인한다.
 
-```text
-100ms, 300ms, 500ms, 1s, 2s, 3s, 5s
-```
-
-버킷 수를 예측 가능하게 유지하는 대신 p95·p99 근사 정밀도는 이 경계의 간격에 제한된다.
+클라이언트 percentile은 태그나 여러 인스턴스 사이에서 합산할 수 없다. 현재는 운영 EC2 한 대의
+URI별 지연을 보는 용도로 사용한다. 다중 인스턴스로 확장할 때는 Histogram을 지원하는 수집·조회
+경로로 전환하거나 지연 시간 집계 방식을 다시 결정한다.
 `http.server.requests`의 `uri` 태그는 `MeterFilter.maximumAllowableTags`로 서로 다른 값 50개까지만
 등록한다. 51번째 새로운 URI 값부터는 요청 자체를 막지 않고 해당 메트릭 등록과 측정만 거부한다.
 이 제한은 비정상 URI 유입으로 인한 메모리·시계열 증가를 막는 안전장치이며, URI 템플릿 집계가
@@ -152,17 +153,14 @@ Spring MVC가 자동 생성하는 `http.server.requests`를 요청 수, HTTP 상
 | `MEDIA_SYNC` | 미디어 동기화 시작부터 `travelRecordRepository.flush()` 완료까지 | 앞선 여행 기록·미디어 조회와 검증, 응답 DTO 변환 | `flush()`는 현재 영속성 컨텍스트의 다른 미반영 변경도 함께 DB에 반영할 수 있다. |
 | `MAP_SUMMARY_QUERY` | 지도 요약 Repository 호출 시작부터 조회 결과 반환까지 | 부모 Region 검증, 조회 결과의 응답 DTO 변환 | DB 조회 병목만 분리해 본다. |
 
-내부 작업에는 다음 8개의 고정 SLO 누적 버킷을 적용한다.
-
-```text
-10ms, 50ms, 100ms, 300ms, 500ms, 1s, 3s, 5s
-```
+내부 작업에도 `0.95` 클라이언트 percentile을 적용해 CloudWatch Agent가 지원하는 Summary로
+노출한다. p95는 각 `operation`, `outcome` 조합별로 계산하며 서로 합산하지 않는다.
 
 새 측정 대상은 모든 private 메서드에 일괄 적용하지 않는다. 외부 시스템, DB, 중요한 업무 단계처럼
 운영 중 병목 원인을 분리할 가치가 있는 구간만 `MonitoredOperation` enum에 추가한다.
 
-Timer는 요청별 원본 시간을 저장하는 대신 호출 횟수, 총 시간, 평균, 최대값과 설정한
-히스토그램을 집계한다. `operation`과 `outcome`은 메트릭 집계용이며 `requestId`는 넣지 않는다.
+Timer는 요청별 원본 시간을 영구 저장하지 않고 호출 횟수, 총 시간, 최대값과 최근 관측값을
+이용한 p95를 집계한다. `operation`과 `outcome`은 메트릭 집계용이며 `requestId`는 넣지 않는다.
 개별 실패의 상세 원인은 같은 시간대의 `requestId`가 있는 구조화 로그에서 확인한다.
 
 ### 메트릭의 카디널리티를 제한한다
@@ -171,8 +169,8 @@ Micrometer가 JVM 안에서 메트릭을 계산하거나 `/actuator/prometheus`�
 CloudWatch 요금이 발생하지 않는다. 다만 메트릭 시계열은 애플리케이션 메모리를 사용하고,
 후속 단계에서 CloudWatch로 전송하면 커스텀 메트릭과 데이터 수집 비용이 발생할 수 있다.
 
-메트릭 시계열은 대략 `메트릭 이름 × 태그 값 조합 × 히스토그램 버킷`만큼 늘어난다.
-따라서 값의 종류가 제한된 low-cardinality 태그만 허용한다.
+메트릭 시계열은 대략 `메트릭 이름 × 태그 값 조합 × 통계 종류`만큼 늘어난다. 따라서 값의
+종류가 제한된 low-cardinality 태그만 허용한다.
 
 허용:
 
@@ -186,7 +184,7 @@ CloudWatch 요금이 발생하지 않는다. 다만 메트릭 시계열은 애�
 - 실제 URI, 파일명, object key
 - 예외 메시지나 임의 문자열
 
-히스토그램은 운영 판단에 필요한 HTTP 요청과 중요 내부 Timer에만 사용하고 SLO 버킷을 제한한다.
+클라이언트 percentile은 운영 판단에 필요한 HTTP 요청과 중요 내부 Timer에만 적용한다.
 CloudWatch 전송 전에는 노출되는 메트릭과 시계열 수를 확인하고 수집 대상 allowlist를 별도로
 정한다.
 
@@ -233,7 +231,7 @@ curl -s http://localhost:8080/actuator/prometheus \
 | `_count` | 작업 실행 횟수 |
 | `_sum` | 누적 실행 시간(초) |
 | `_max` | 관측 구간의 최대 실행 시간(초) |
-| `_bucket` | `le` 경계 이하로 완료된 누적 횟수 |
+| suffix 없음 + `quantile="0.95"` | 해당 태그 조합의 p95 실행 시간(초) |
 
 내부 작업은 `operation`, `outcome` 태그로 구분한다.
 
@@ -248,7 +246,7 @@ mapmory_operation_duration_seconds_count{operation="MAP_SUMMARY_QUERY",outcome="
 2. 병목을 구분할 수 있는 최소 코드 구간만 `operationTimer.record(...)`로 감싼다.
 3. 사용자 ID, 실제 URI, object key, 예외 메시지를 태그로 넣지 않는다.
 4. 성공 시 결과가 그대로 반환되고 실패 시 원래 예외가 다시 전달되는지 테스트한다.
-5. `/actuator/prometheus`에서 `operation`, `outcome`, SLO 버킷을 확인한다.
+5. `/actuator/prometheus`에서 `operation`, `outcome`, `quantile="0.95"`를 확인한다.
 
 ## 구현 상태
 
@@ -256,9 +254,9 @@ mapmory_operation_duration_seconds_count{operation="MAP_SUMMARY_QUERY",outcome="
 - [x] Request ID Filter와 요청 종료 시 MDC 정리
 - [x] 운영 프로필의 Logstash JSON 구조화 로그
 - [x] 자동 구성된 `RestClient` 외부 HTTP 메트릭과 타임아웃
-- [x] `http.server.requests`의 고정 SLO 버킷과 URI 태그 상한
+- [x] `http.server.requests`의 p95 Summary와 URI 태그 상한
 - [x] `mapmory.operation.duration`과 초기 2개 내부 작업 계측
-- [x] 성공·실패 Timer, SLO 설정, URI 카디널리티 테스트
+- [x] 성공·실패 Timer, p95 설정, URI 카디널리티 테스트
 - [ ] CloudWatch Agent 수집 설정과 전송 메트릭 allowlist
 - [ ] CloudWatch 대시보드와 알림 기준
 
@@ -293,7 +291,7 @@ mapmory_operation_duration_seconds_count{operation="MAP_SUMMARY_QUERY",outcome="
   로그로 개별 실패 원인을 좁힐 수 있다.
 - 로그 레벨이 운영 의미에 맞게 통일되고 일반적인 4xx가 장애 로그를 오염시키지 않는다.
 - API 전체 지연과 내부 병목 지점을 함께 관찰할 수 있다.
-- 메트릭 태그와 히스토그램 증가를 제한해 JVM 메모리와 후속 CloudWatch 비용을 통제한다.
+- 메트릭 태그와 percentile 적용 대상을 제한해 JVM 메모리와 후속 CloudWatch 비용을 통제한다.
 - 애플리케이션 관측 규칙과 CloudWatch 인프라 구성을 분리해 단계적으로 도입할 수 있다.
 
 ### 비용과 주의점
@@ -301,7 +299,8 @@ mapmory_operation_duration_seconds_count{operation="MAP_SUMMARY_QUERY",outcome="
 - Filter, MDC, 구조화 로그와 내부 Timer 구현 및 테스트가 추가된다.
 - 비동기 실행으로 요청 문맥을 넘길 경우 MDC 전파를 별도로 처리해야 한다.
 - 로그에 내부 ID를 포함할 때도 접근 권한과 보관 기간을 제한해야 한다.
-- p95를 위한 히스토그램은 메모리와 시계열 수를 늘리므로 대상과 버킷을 제한해야 한다.
+- p95 계산은 JVM 메모리와 시계열을 추가로 사용하며 여러 인스턴스나 태그 조합 사이에서
+  합산할 수 없다.
 - 로그만으로 완전한 감사 이력을 보장하지 않는다. 감사 로그 요구사항은 별도로 결정한다.
 
 ## 검증 원칙
@@ -321,4 +320,5 @@ mapmory_operation_duration_seconds_count{operation="MAP_SUMMARY_QUERY",outcome="
 - [Micrometer: Timers](https://docs.micrometer.io/micrometer/reference/concepts/timers.html)
 - [Prometheus: Storage](https://prometheus.io/docs/prometheus/latest/storage/)
 - [Amazon CloudWatch: Metrics concepts](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html)
+- [Amazon CloudWatch Agent: Prometheus metric type conversion](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ContainerInsights-Prometheus-metrics-conversion.html)
 - [Amazon CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/)

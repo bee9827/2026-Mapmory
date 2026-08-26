@@ -45,6 +45,10 @@ upload:
       bucket: ${AWS_S3_BUCKET:mapmory-local}
       region: ${AWS_REGION:ap-northeast-2}
 
+waitlist:
+  cors:
+    allowed-origins: ${WAITLIST_ALLOWED_ORIGINS:http://localhost:4173,http://localhost:5173,https://map-mory.com,https://www.map-mory.com}
+
 server:
   port: 8080
   servlet:
@@ -88,6 +92,6 @@ management:
       maximum-expected-value:
         http.server.requests: 5s
         mapmory.operation.duration: 5s
-      slo:
-        http.server.requests: 100ms,300ms,500ms,1s,2s,3s,5s
-        mapmory.operation.duration: 10ms,50ms,100ms,300ms,500ms,1s,3s,5s
+      percentiles:
+        http.server.requests: 0.95
+        mapmory.operation.duration: 0.95
