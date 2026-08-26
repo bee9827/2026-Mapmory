@@ -31,6 +31,20 @@ class PhotoLibraryTest {
         assertTrue(region.contains(latitude = 5.0, longitude = 0.0))
         assertFalse(region.contains(latitude = 5.0, longitude = 10.1))
         assertFalse(region.contains(latitude = 91.0, longitude = 5.0))
+        assertFalse(region.contains(latitude = 5.0, longitude = 181.0))
+    }
+
+    @Test
+    fun degenerateRingsDoNotMatchAnyPhoto() {
+        val region = PhotoRecommendationRegion(
+            code = "invalid",
+            rings = listOf(
+                emptyList(),
+                listOf(GeoPoint(0f, 0f), GeoPoint(1f, 1f)),
+            ),
+        )
+
+        assertFalse(region.contains(latitude = 0.5, longitude = 0.5))
     }
 
     @Test
