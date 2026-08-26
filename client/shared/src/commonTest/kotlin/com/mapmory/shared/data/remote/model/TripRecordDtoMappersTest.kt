@@ -11,7 +11,7 @@ class ApiDtoMappersTest {
     private val catalog = StaticRegionCatalog()
 
     @Test
-    fun detailRegionCodesAndObjectKeysMapToLocalDomain() {
+    fun `상세_지역_코드와_Object_Key를_로컬_도메인으로_매핑한다`() {
         val result = TripRecordDetailDto(
             id = 101,
             title = "비 오는 날의 제주시",
@@ -34,7 +34,7 @@ class ApiDtoMappersTest {
     }
 
     @Test
-    fun koreanDistrictDraftMapsToServerCodePath() {
+    fun `국내_시군구_초안을_서버_코드_경로로_매핑한다`() {
         val jejuCity = catalog.requireByCode("50110")
 
         val request = TripRecordDraft(
@@ -53,7 +53,7 @@ class ApiDtoMappersTest {
     }
 
     @Test
-    fun foreignDraftMapsOnlyCountryCode() {
+    fun `해외_초안은_국가_코드만_매핑한다`() {
         val japan = catalog.requireByCode("JP")
 
         val request = TripRecordDraft(
@@ -71,7 +71,7 @@ class ApiDtoMappersTest {
     }
 
     @Test
-    fun createRequestRejectsMissingStartDateBeforeNetworkCall() {
+    fun `시작일이_없는_생성_요청은_네트워크_호출_전에_거부한다`() {
         val japan = catalog.requireByCode("JP")
 
         assertFailsWith<IllegalArgumentException> {
@@ -87,7 +87,7 @@ class ApiDtoMappersTest {
     }
 
     @Test
-    fun provinceListFilterMapsToCountryAndProvinceCodes() {
+    fun `시도_목록_필터를_국가와_시도_코드로_매핑한다`() {
         val jejuProvince = catalog.requireByCode("KR-49")
 
         val path = TripRecordQuery(locationId = jejuProvince.id).toRegionQuery(catalog)
@@ -98,7 +98,7 @@ class ApiDtoMappersTest {
     }
 
     @Test
-    fun koreanRecordRequiresDistrictAndTitleIsLimitedToTwoHundredCharacters() {
+    fun `국내_기록은_시군구가_필수이고_제목은_200자로_제한한다`() {
         val seoul = catalog.requireByCode("KR-11")
         val japan = catalog.requireByCode("JP")
 

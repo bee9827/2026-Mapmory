@@ -31,7 +31,7 @@ import kotlin.test.assertTrue
 
 class AppContainerTest {
     @Test
-    fun `guest remote container logs in and saves then loads a server record`() = runBlocking {
+    fun `게스트_원격_컨테이너는_로그인하고_서버_기록을_저장한_뒤_조회한다`() = runBlocking {
         var requestCount = 0
         val client = HttpClient(MockEngine) {
             configureCommonHttpClient()
@@ -148,7 +148,7 @@ class AppContainerTest {
     }
 
     @Test
-    fun `remote container can be assembled from base url and a token provider`() {
+    fun `토큰_공급자로_원격_컨테이너를_구성할_수_있다`() {
         val container = createRemoteAppContainer(
             apiBaseUrl = "https://api.example.com/api/v1",
             accessTokenProvider = AccessTokenProvider { "guest-token" },
@@ -160,7 +160,7 @@ class AppContainerTest {
     }
 
     @Test
-    fun `container can be assembled with a replaceable repository`() {
+    fun `교체_가능한_저장소로_컨테이너를_구성할_수_있다`() {
         val repository = FakeTripRecordRepository { "2026-08-24T00:00:00" }
 
         val container = createAppContainer(
@@ -173,7 +173,7 @@ class AppContainerTest {
     }
 
     @Test
-    fun `screen view models share one repository without sharing ui state`() = runSuspend {
+    fun `화면_ViewModel은_UI_상태를_공유하지_않고_저장소를_공유한다`() = runSuspend {
         val container = createInMemoryAppContainer()
         val gangnam = container.regionCatalog.requireByCode("11680")
         val editor = container.viewModelFactory.createTripRecordEditorViewModel()

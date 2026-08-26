@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
 
 class TripRecordEditorViewModelTest {
     @Test
-    fun repeatedRouteInitializationKeepsTheDraft() = runSuspend {
+    fun `경로를_반복_초기화해도_작성_초안을_유지한다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(repository),
@@ -33,7 +33,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun saveWaitsForPendingPhotosUntilUserConfirmsExcludingThem() = runSuspend {
+    fun `저장은_대기_중인_사진을_기다리고_사용자_확인_후_제외한다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(repository),
@@ -56,7 +56,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun saveCreatesAndUpdatesTripRecord() {
+    fun `저장은_여행_기록을_생성하고_수정한다`() {
         runSuspend {
             val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
             val viewModel = TripRecordEditorViewModel(
@@ -92,7 +92,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun saveRequiresStartDateAndRejectsInvalidDateRange() {
+    fun `저장은_시작일을_요구하고_잘못된_날짜_범위를_거부한다`() {
         runSuspend {
             val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
             val viewModel = TripRecordEditorViewModel(
@@ -129,7 +129,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun editingShowsOnlyTheTouchedFieldErrorImmediately() {
+    fun `수정_중에는_건드린_필드의_오류만_즉시_표시한다`() {
         runSuspend {
             val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
             val viewModel = TripRecordEditorViewModel(
@@ -174,7 +174,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun koreanRecordRequiresDistrictSelection() = runSuspend {
+    fun `국내_기록은_시군구_선택을_요구한다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(repository),
@@ -192,7 +192,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun mediaObjectKeysCanBeAddedAndRemoved() {
+    fun `미디어_Object_Key를_추가하고_삭제할_수_있다`() {
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(FakeTripRecordRepository { "2026-08-07T00:00:00Z" }),
             updateTripRecord = UpdateTripRecordUseCase(FakeTripRecordRepository { "2026-08-07T00:00:00Z" }),

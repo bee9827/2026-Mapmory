@@ -22,7 +22,7 @@ class TripRecordRemoteRepositoryTest {
     private val catalog = StaticRegionCatalog()
 
     @Test
-    fun getRecordsSendsBearerTokenAndRegionCodePath() = runBlocking {
+    fun `기록_조회는_Bearer_토큰과_지역_코드_경로를_전송한다`() = runBlocking {
         val jejuProvince = catalog.requireByCode("KR-49")
         val client = client { request ->
             assertEquals("GET", request.method.value)
@@ -46,7 +46,7 @@ class TripRecordRemoteRepositoryTest {
     }
 
     @Test
-    fun createUsesCodeBasedBodyThenLoadsCreatedDetail() = runBlocking {
+    fun `기록_생성은_코드_기반_본문을_전송하고_생성된_상세를_조회한다`() = runBlocking {
         val jejuCity = catalog.requireByCode("50110")
         var requestCount = 0
         val client = client { request ->
@@ -85,7 +85,7 @@ class TripRecordRemoteRepositoryTest {
     }
 
     @Test
-    fun updateUsesDetailReturnedByPutWithoutAnExtraGet() = runBlocking {
+    fun `기록_수정은_추가_GET_없이_PUT_응답_상세를_사용한다`() = runBlocking {
         val jejuCity = catalog.requireByCode("50110")
         var requestCount = 0
         val client = client { request ->
@@ -112,7 +112,7 @@ class TripRecordRemoteRepositoryTest {
     }
 
     @Test
-    fun problemDetailsResponseIsExposedAsApiException() = runBlocking {
+    fun `Problem_Details_응답을_API_예외로_노출한다`() = runBlocking {
         val client = client {
             jsonResponse(
                 json = """{"title":"요청 값이 올바르지 않습니다.","status":400,"detail":"1개의 필드가 유효하지 않습니다.","instance":"/api/v1/travel-records","code":"VALIDATION_ERROR","errors":[{"field":"countryCode","detail":"형식이 올바르지 않습니다."}]}""",
@@ -132,7 +132,7 @@ class TripRecordRemoteRepositoryTest {
     }
 
     @Test
-    fun missingTokenFailsBeforeSendingAProtectedRequest() = runBlocking {
+    fun `토큰이_없으면_보호_요청을_전송하기_전에_실패한다`() = runBlocking {
         var requestCount = 0
         val client = client {
             requestCount += 1
@@ -153,7 +153,7 @@ class TripRecordRemoteRepositoryTest {
     }
 
     @Test
-    fun invalidPaginationAndRecordIdsFailBeforeNetworkCall() = runBlocking {
+    fun `잘못된_페이지와_기록_ID는_네트워크_호출_전에_실패한다`() = runBlocking {
         var requestCount = 0
         val client = client {
             requestCount += 1
@@ -174,7 +174,7 @@ class TripRecordRemoteRepositoryTest {
     }
 
     @Test
-    fun deleteUsesProtectedRecordEndpointAndAcceptsNoContent() = runBlocking {
+    fun `기록_삭제는_보호_엔드포인트의_No_Content를_허용한다`() = runBlocking {
         val client = client { request ->
             assertEquals("DELETE", request.method.value)
             assertEquals("/api/v1/travel-records/101", request.url.encodedPath)

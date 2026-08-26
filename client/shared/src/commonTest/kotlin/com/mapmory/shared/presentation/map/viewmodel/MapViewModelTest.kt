@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class MapViewModelTest {
     @Test
-    fun refreshReloadsTheCurrentlyOpenProvinceAfterARecordMoves() = runSuspend {
+    fun `새로고침은_기록_지역_변경_후_열린_시도를_다시_조회한다`() = runSuspend {
         val catalog = StaticRegionCatalog()
         val repository = FakeTripRecordRepository(
             regionCatalog = catalog,
@@ -30,7 +30,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun refreshBuildsVisitedCountriesProvincesAndDistrictsFromRepositoryRecords() = runSuspend {
+    fun `새로고침은_저장소_기록에서_방문_국가_시도_지역을_구성한다`() = runSuspend {
         val catalog = StaticRegionCatalog()
         val repository = FakeTripRecordRepository(
             regionCatalog = catalog,

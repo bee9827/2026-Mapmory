@@ -99,7 +99,6 @@ fun TripProfileScreen(
                 selectedIconColor = TripRecordPalette.primary,
                 selectedLabelColor = TripRecordPalette.navigationSelectedLabel,
                 unselectedColor = TripRecordPalette.navigationUnselected,
-                contentTopPadding = 6.dp,
             )
         }
     }

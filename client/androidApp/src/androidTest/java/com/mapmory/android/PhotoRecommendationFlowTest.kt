@@ -19,7 +19,7 @@ class PhotoRecommendationFlowTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun selectedLocationRecommendationCanBeReviewedAndAdded() {
+    fun `선택한_장소의_추천_사진을_확인하고_추가할_수_있다`() {
         val seoul = province()
         val gangnam = district(parentId = seoul.id)
         val recommendedPhoto = SelectedPhoto(
@@ -51,7 +51,7 @@ class PhotoRecommendationFlowTest {
                 onPhotosAdded = { photos -> addedPhotos = photos },
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, onRecommended, _, _ ->
+                photoLibraryActionsFactory = { _, onRecommended, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { location, parentName ->
@@ -86,7 +86,7 @@ class PhotoRecommendationFlowTest {
     }
 
     @Test
-    fun recommendationWithoutLocationShowsGuidanceWithoutCallingPhotoLibrary() {
+    fun `장소를_선택하지_않으면_사진_라이브러리를_호출하지_않고_안내를_표시한다`() {
         var recommendationCalls = 0
 
         composeRule.setContent {
@@ -100,7 +100,7 @@ class PhotoRecommendationFlowTest {
                 onEndDateChanged = {},
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, _, _, _ ->
+                photoLibraryActionsFactory = { _, _, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { _, _ -> recommendationCalls += 1 },

@@ -21,7 +21,7 @@ class MapmoryAppNavigationTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun recordListDetailDeleteAndEditorUseDestinationViewModels() {
+    fun `기록_목록_상세_삭제와_편집_화면은_목적지_ViewModel을_사용한다`() {
         val container = createInMemoryAppContainer()
         val gangnam = container.regionCatalog.requireByCode("11680")
         val photoBytes = createPngBytes()
@@ -74,7 +74,7 @@ class MapmoryAppNavigationTest {
         composeRule.onNodeWithText("아직 작성한 여행 기록이 없어요.").assertIsDisplayed()
 
         composeRule.onNodeWithText("지도").performClick()
-        composeRule.onNodeWithText("＋").performClick()
+        composeRule.onNodeWithContentDescription("새 기록 작성").performClick()
         composeRule.onNodeWithText("기록 남기기").assertIsDisplayed()
     }
 

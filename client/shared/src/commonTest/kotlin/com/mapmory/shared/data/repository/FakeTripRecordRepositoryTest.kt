@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 class FakeTripRecordRepositoryTest {
     @Test
-    fun createUpdateAndDeleteTripRecord() = runSuspend {
+    fun `여행_기록을_생성하고_수정하고_삭제한다`() = runSuspend {
         val repository = FakeTripRecordRepository(
             now = { "2026-08-07T00:00:00Z" },
         )
@@ -48,7 +48,7 @@ class FakeTripRecordRepositoryTest {
     }
 
     @Test
-    fun createRejectsInvalidDateRange() = runSuspend {
+    fun `잘못된_날짜_범위로_생성을_거부한다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
 
         val result = repository.createTripRecord(
