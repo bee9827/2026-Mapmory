@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 
 class PhotoLibraryAndroidDeviceTest {
     @Test
-    fun mediaStoreSnapshotAndPhotoReaderUseAndroidContentResolver() {
+    fun `MediaStore_스냅샷과_사진_리더는_Android_ContentResolver를_사용한다`() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val fixture = insertFixturePhoto(context)
         try {

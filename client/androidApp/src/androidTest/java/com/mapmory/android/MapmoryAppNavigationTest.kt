@@ -20,7 +20,7 @@ class MapmoryAppNavigationTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun recordListDetailDeleteAndEditorUseDestinationViewModels() {
+    fun `기록_목록_상세_삭제와_편집_화면은_목적지_ViewModel을_사용한다`() {
         val container = createInMemoryAppContainer()
         val gangnam = container.regionCatalog.requireByCode("11680")
         val photoBytes = createPngBytes()

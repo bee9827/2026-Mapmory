@@ -12,7 +12,7 @@ import kotlin.test.assertIs
 
 class TripRecordListViewModelTest {
     @Test
-    fun repeatedRouteInitializationKeepsTheCurrentFilter() = runSuspend {
+    fun `경로를_반복_초기화해도_현재_필터를_유지한다`() = runSuspend {
         val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordListViewModel(GetTripRecordsUseCase(repository))
 
@@ -25,7 +25,7 @@ class TripRecordListViewModelTest {
     }
 
     @Test
-    fun loadChangesStateForSuccessAndFailure() {
+    fun `로드는_성공과_실패에_따라_상태를_변경한다`() {
         runSuspend {
             val repository = FakeTripRecordRepository(
                 memberId = 10,
