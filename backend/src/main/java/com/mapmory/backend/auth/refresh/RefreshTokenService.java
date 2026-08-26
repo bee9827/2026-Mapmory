@@ -3,6 +3,7 @@ package com.mapmory.backend.auth.refresh;
 import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.auth.jwt.JwtProperties;
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.member.AuthProvider;
 import com.mapmory.backend.member.Member;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -13,6 +14,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Optional;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +32,7 @@ public class RefreshTokenService {
 
     private final RefreshTokenRepository refreshTokenRepository;
     private final Duration refreshTokenValidity;
+    private final Duration guestRefreshTokenValidity;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public RefreshTokenService(
@@ -38,14 +41,26 @@ public class RefreshTokenService {
     ) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.refreshTokenValidity = jwtProperties.refreshTokenValidity();
+        this.guestRefreshTokenValidity = jwtProperties.guestRefreshTokenValidity();
     }
 
     @Transactional
     public String issue(Member member) {
         String rawToken = generateRawToken();
-        LocalDateTime expiresAt = LocalDateTime.now().plus(refreshTokenValidity);
+        LocalDateTime expiresAt = LocalDateTime.now().plus(validityFor(member));
         refreshTokenRepository.save(RefreshToken.issue(member, hash(rawToken), expiresAt));
         return rawToken;
+    }
+
+    /**
+     * 게스트는 다시 로그인할 수단이 없어 refresh가 만료되면 기록을 복구할 방법이 없다.
+     * 회전 때마다 만료가 갱신되므로, 긴 유효기간은 "그 기간 동안 앱을 한 번도 열지 않은 경우"에만
+     * 의미를 갖는다. (ADR 0015)
+     */
+    private Duration validityFor(Member member) {
+        return member.getProvider() == AuthProvider.GUEST
+                ? guestRefreshTokenValidity
+                : refreshTokenValidity;
     }
 
     /**
@@ -73,7 +88,23 @@ public class RefreshTokenService {
         }
 
         refreshToken.revoke(now);
-        return Optional.of(refreshToken.getMember());
+
+        // 호출부(AuthService#refresh)는 트랜잭션 밖에서 실행되므로 반환 시점에 세션이 닫힌다.
+        // member는 지연 로딩 프록시라, 여기서 초기화해 두지 않으면 호출부에서 필드를 읽을 때
+        // LazyInitializationException이 난다. (잠금 범위를 넓히지 않으려고 fetch join 대신 초기화를 쓴다)
+        Member member = refreshToken.getMember();
+        Hibernate.initialize(member);
+        return Optional.of(member);
+    }
+
+    /**
+     * 회원의 유효한 refresh를 모두 폐기한다.
+     *
+     * 이미 발급된 access는 무상태라 만료까지 남지만, 갱신 경로가 끊겨 세션이 이어지지 않는다.
+     */
+    @Transactional
+    public void revokeAll(Member member) {
+        refreshTokenRepository.revokeAllActiveByMember(member, LocalDateTime.now());
     }
 
     @Transactional

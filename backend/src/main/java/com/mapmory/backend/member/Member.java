@@ -55,6 +55,26 @@ public class Member extends BaseEntity {
         return new Member(provider, providerId, name, uuid);
     }
 
+    /**
+     * 로그인하지 않은 사용자를 위한 회원. providerId는 서버가 발급한다.
+     * 나중에 소셜 로그인을 하면 이 행의 provider/providerId만 교체해 승격한다. (ADR 0015)
+     */
+    public static Member ofGuest(String providerId, String name, UUID uuid) {
+        return new Member(AuthProvider.GUEST, providerId, name, uuid);
+    }
+
+    /**
+     * 게스트를 소셜 회원으로 승격한다.
+     *
+     * 새 회원을 만들지 않고 이 행의 소속만 바꾸므로, member_id를 참조하는 기록은 그대로 유지된다.
+     * (ADR 0015)
+     */
+    public void promote(AuthProvider provider, String providerId, String name) {
+        this.provider = provider;
+        this.providerId = providerId;
+        this.name = name;
+    }
+
     public Long getId() {
         return id;
     }

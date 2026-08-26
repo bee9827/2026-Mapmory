@@ -69,6 +69,10 @@ public class RefreshToken {
         this.revokedAt = now;
     }
 
+    public LocalDateTime getExpiresAt() {
+        return expiresAt;
+    }
+
     public Member getMember() {
         return member;
     }

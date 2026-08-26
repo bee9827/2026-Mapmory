@@ -22,6 +22,7 @@
 | 상태 | Method | Endpoint | 설명 |
 | --- | --- | --- | --- |
 | 구현됨 | `POST` | `/auth/login/kakao` | 카카오 로그인 |
+| 구현됨 | `POST` | `/auth/login/guest` | 게스트 로그인 |
 | 구현됨 | `POST` | `/auth/token/refresh` | Access·Refresh Token 회전 재발급 |
 | 구현됨 | `POST` | `/auth/logout` | Refresh Token 폐기 |
 | 구현됨 | `POST` | `/uploads/presigned-urls` | 이미지 업로드용 Presigned URL 발급 |
@@ -94,6 +95,20 @@ Authorization: Bearer {accessToken}
 }
 ```
 
+게스트로 사용 중이었다면 게스트 Access Token을 함께 보낸다. 새 회원을 만들지 않고 그 회원을
+승격하므로 게스트로 남긴 기록이 그대로 이어진다.
+
+```
+Authorization: Bearer {게스트 accessToken}
+```
+
+이미 같은 카카오 계정으로 가입한 회원이 있으면 **기존 회원으로 로그인되고 게스트가 남긴 기록은
+이어지지 않는다.** 게스트의 Refresh Token은 폐기되어 그 세션으로는 더 이상 갱신할 수 없다.
+클라이언트는 카카오 로그인 전에 이 가능성을 안내해야 한다.
+
+승격으로 로그인한 경우 `isNewMember`는 `false`다. 게스트로 이미 앱을 사용했으므로 온보딩을
+반복하지 않기 위해서다.
+
 #### Response `200 OK`
 
 ```json
@@ -105,6 +120,31 @@ Authorization: Bearer {accessToken}
   }
 }
 ```
+
+### 게스트 로그인
+
+`POST /api/v1/auth/login/guest`
+
+로그인하지 않고 서비스를 사용하기 위한 회원을 만든다. 요청 본문이 없다.
+호출할 때마다 새 회원이 생성되므로, 클라이언트는 발급받은 토큰을 저장해 계속 사용해야 한다.
+
+응답 형식은 카카오 로그인과 같고 `isNewMember`는 항상 `true`다.
+
+#### Response `200 OK`
+
+```json
+{
+  "data": {
+    "accessToken": "mapmory-access-token",
+    "refreshToken": "mapmory-refresh-token",
+    "isNewMember": true
+  }
+}
+```
+
+게스트는 다시 로그인할 수단이 없어 Refresh Token이 만료되면 기록을 복구할 수 없다.
+이 때문에 게스트의 Refresh Token 만료는 회원(14일)보다 긴 365일이다. 재발급할 때마다 만료가
+갱신되므로, 실제로 만료되는 경우는 그 기간 동안 앱을 한 번도 열지 않은 경우다.
 
 ### 토큰 재발급
 

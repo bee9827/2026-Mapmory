@@ -39,19 +39,61 @@ public class AuthService {
         this.refreshTokenService = refreshTokenService;
     }
 
+    /**
+     * 카카오 로그인.
+     *
+     * 게스트로 사용 중이었다면(authenticatedMemberId가 게스트 회원) 새 회원을 만들지 않고
+     * 그 회원을 승격해, 게스트로 남긴 기록이 그대로 이어지게 한다.
+     *
+     * 이미 같은 카카오 계정으로 가입한 회원이 있으면 한 사람에게 회원 행이 둘인 상황이므로,
+     * 기존 회원을 우선하고 게스트 세션은 끊는다. 이때 게스트가 남긴 기록은 이어지지 않는다.
+     * (ADR 0015)
+     */
     @Transactional
-    public LoginResponse loginWithKakao(String kakaoAccessToken) {
+    public LoginResponse loginWithKakao(String kakaoAccessToken, Long authenticatedMemberId) {
         KakaoUserResponse kakaoUser = kakaoApiClient.fetchUser(kakaoAccessToken);
         String providerId = String.valueOf(kakaoUser.id());
+        Optional<Member> guest = findGuest(authenticatedMemberId);
 
-        Optional<Member> existing =
+        Optional<Member> registered =
                 memberRepository.findByProviderAndProviderId(AuthProvider.KAKAO, providerId);
-        boolean isNewMember = existing.isEmpty();
-        Member member = existing.orElseGet(() -> register(providerId, kakaoUser.nickname()));
+        if (registered.isPresent()) {
+            guest.ifPresent(refreshTokenService::revokeAll);
+            return issueTokens(registered.get(), false);
+        }
 
-        String accessToken = jwtProvider.issueAccessToken(member.getId());
-        String refreshToken = refreshTokenService.issue(member);
-        return new LoginResponse(accessToken, refreshToken, isNewMember);
+        if (guest.isPresent()) {
+            Member promoted = guest.get();
+            promoted.promote(AuthProvider.KAKAO, providerId, resolveName(kakaoUser.nickname()));
+            // 게스트로 이미 앱을 사용했으므로 온보딩을 반복하지 않도록 신규로 보지 않는다.
+            return issueTokens(promoted, false);
+        }
+
+        return issueTokens(register(providerId, kakaoUser.nickname()), true);
+    }
+
+    private Optional<Member> findGuest(Long memberId) {
+        if (memberId == null) {
+            return Optional.empty();
+        }
+        return memberRepository.findById(memberId)
+                .filter(member -> member.getProvider() == AuthProvider.GUEST);
+    }
+
+    /**
+     * 로그인 없이 서비스를 사용하기 위한 게스트 회원을 만든다.
+     *
+     * 카카오 로그인과 달리 외부에 물어볼 신원이 없으므로 식별자를 서버가 발급한다.
+     * 발급 이후의 토큰 체계는 소셜 로그인과 완전히 동일하다. (ADR 0015)
+     */
+    @Transactional
+    public LoginResponse loginAsGuest() {
+        Member member = memberRepository.save(Member.ofGuest(
+                UUID.randomUUID().toString(),
+                resolveName(null),
+                UUID.randomUUID()
+        ));
+        return issueTokens(member, true);
     }
 
     // @Transactional을 두지 않는다. validateAndRevoke가 자체 트랜잭션에서 (재사용 시) 토큰 폐기를
@@ -67,6 +109,12 @@ public class AuthService {
     @Transactional
     public void logout(String refreshToken) {
         refreshTokenService.revoke(refreshToken);
+    }
+
+    private LoginResponse issueTokens(Member member, boolean isNewMember) {
+        String accessToken = jwtProvider.issueAccessToken(member.getId());
+        String refreshToken = refreshTokenService.issue(member);
+        return new LoginResponse(accessToken, refreshToken, isNewMember);
     }
 
     private Member register(String providerId, String nickname) {

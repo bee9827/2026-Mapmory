@@ -7,6 +7,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record JwtProperties(
         String secret,
         Duration accessTokenValidity,
-        Duration refreshTokenValidity
+        Duration refreshTokenValidity,
+        // 게스트는 로그인 수단이 없어 refresh 만료 시 복구할 방법이 없으므로 별도로 길게 둔다. (ADR 0015)
+        Duration guestRefreshTokenValidity
 ) {
 }
