@@ -1,5 +1,6 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,6 +28,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -93,15 +96,28 @@ fun TripMapScreen(
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(TripRecordPalette.primary)
-                        .clickable(onClick = onCreateClick),
+                    .clickable(onClick = onCreateClick),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        "＋",
-                        color = TripRecordPalette.onPrimary,
-                        fontSize = 27.sp,
-                        fontWeight = FontWeight.Light,
-                    )
+                    Canvas(Modifier.size(24.dp)) {
+                        val strokeWidth = 2.dp.toPx()
+                        val center = Offset(size.width / 2f, size.height / 2f)
+                        val armLength = size.minDimension * 0.32f
+                        drawLine(
+                            color = TripRecordPalette.onPrimary,
+                            start = Offset(center.x - armLength, center.y),
+                            end = Offset(center.x + armLength, center.y),
+                            strokeWidth = strokeWidth,
+                            cap = StrokeCap.Round,
+                        )
+                        drawLine(
+                            color = TripRecordPalette.onPrimary,
+                            start = Offset(center.x, center.y - armLength),
+                            end = Offset(center.x, center.y + armLength),
+                            strokeWidth = strokeWidth,
+                            cap = StrokeCap.Round,
+                        )
+                    }
                 }
             }
 
@@ -116,7 +132,6 @@ fun TripMapScreen(
                 selectedIconColor = TripRecordPalette.primary,
                 selectedLabelColor = TripRecordPalette.navigationSelectedLabel,
                 unselectedColor = TripRecordPalette.navigationUnselected,
-                contentTopPadding = 6.dp,
             )
         }
     }

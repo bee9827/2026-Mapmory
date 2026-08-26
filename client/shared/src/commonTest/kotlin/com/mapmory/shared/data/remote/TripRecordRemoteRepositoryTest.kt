@@ -15,7 +15,7 @@ import kotlin.test.assertEquals
 
 class TripRecordRemoteRepositoryTest {
     @Test
-    fun getRecordsSendsContractQueryAndMemberHeader() = runBlocking {
+    fun `기록_조회는_계약된_검색어와_회원_헤더를_전송한다`() = runBlocking {
         val client = HttpClient(MockEngine) {
             configureCommonHttpClient()
             engine {

@@ -12,7 +12,7 @@ import kotlin.test.assertIs
 
 class TripRecordDetailViewModelTest {
     @Test
-    fun loadChangesStateForSuccessAndFailure() {
+    fun `로드는_성공과_실패에_따라_상태를_변경한다`() {
         runSuspend {
             val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
             val record = repository.createTripRecord(
