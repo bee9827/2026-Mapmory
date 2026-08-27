@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
@@ -24,25 +25,37 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.mapmory.shared.MapmoryApp
 import com.mapmory.shared.MapmoryNavigation
+import com.mapmory.shared.MapmoryTheme
 
-private val SystemBarColor = Color(0xFF111518)
+private val LightSystemBarColor = Color(0xFFFAFCFB)
+private val DarkSystemBarColor = Color(0xFF111518)
 
 class MainActivity : ComponentActivity() {
     private val appViewModel: MapmoryAppViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(SystemBarColor.toArgb()),
-            navigationBarStyle = SystemBarStyle.dark(SystemBarColor.toArgb()),
-        )
         setContent {
             val navigation = remember { MapmoryNavigation() }
             var lastBackPressedAt by remember { mutableLongStateOf(0L) }
+            val isDarkTheme = MapmoryTheme.isDark
+            val systemBarColor = if (isDarkTheme) DarkSystemBarColor else LightSystemBarColor
+
+            SideEffect {
+                val barStyle = if (isDarkTheme) {
+                    SystemBarStyle.dark(systemBarColor.toArgb())
+                } else {
+                    SystemBarStyle.light(systemBarColor.toArgb(), systemBarColor.toArgb())
+                }
+                enableEdgeToEdge(
+                    statusBarStyle = barStyle,
+                    navigationBarStyle = barStyle,
+                )
+            }
 
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
-                containerColor = SystemBarColor,
+                containerColor = systemBarColor,
                 contentWindowInsets = WindowInsets(0, 0, 0, 0),
             ) { innerPadding ->
                 Box(

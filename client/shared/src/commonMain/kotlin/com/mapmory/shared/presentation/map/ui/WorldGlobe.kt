@@ -22,6 +22,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.mapmory.shared.MapmoryTheme
 import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
 import com.mapmory.shared.presentation.map.domain.CountryPolygon
 import com.mapmory.shared.presentation.map.math.Quaternion
@@ -67,6 +68,7 @@ internal fun WorldGlobe(
             }
         }
     }
+    val isDark = MapmoryTheme.isDark
 
     Box(
         modifier = modifier
@@ -112,14 +114,18 @@ internal fun WorldGlobe(
             val globeRadius = min(size.width, size.height) * 0.42f * zoom
             val center = Offset(size.width / 2f, size.height / 2f)
 
-            drawRect(color = Color(0xFF121518))
+            drawRect(color = if (isDark) Color(0xFF121518) else Color(0xFFFAFCFB))
 
             drawCircle(
                 brush = Brush.radialGradient(
                     colorStops = arrayOf(
                         0f to Color.Transparent,
                         0.82f to Color.Transparent,
-                        0.91f to Color(0xFF7F9ABA).copy(alpha = 0.055f),
+                        0.91f to if (isDark) {
+                            Color(0xFF7F9ABA).copy(alpha = 0.055f)
+                        } else {
+                            Color(0xFF789587).copy(alpha = 0.08f)
+                        },
                         1f to Color.Transparent,
                     ),
                     center = center,
@@ -131,11 +137,11 @@ internal fun WorldGlobe(
 
             drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFF2A3747),
-                        Color(0xFF1B2533),
-                        Color(0xFF111923),
-                    ),
+                    colors = if (isDark) {
+                        listOf(Color(0xFF2A3747), Color(0xFF1B2533), Color(0xFF111923))
+                    } else {
+                        listOf(Color(0xFFF8FAF8), Color(0xFFF0F4F1), Color(0xFFE7EDE9))
+                    },
                     center = center - Offset(globeRadius * 0.28f, globeRadius * 0.28f),
                     radius = globeRadius * 1.2f,
                 ),
@@ -158,14 +164,26 @@ internal fun WorldGlobe(
                 val isVisited = country.code in visitedCountryCodes
                 drawPath(
                     path = path,
-                    color = if (isVisited) Color(0xFF35C987) else Color(0xFF2B3546),
+                    color = if (isVisited) {
+                        if (isDark) Color(0xFF35C987) else Color(0xFF4D9272)
+                    } else {
+                        if (isDark) Color(0xFF2B3546) else Color(0xFFDCE4DF)
+                    },
                 )
                 drawPath(
                     path = path,
                     color = if (isVisited) {
-                        Color(0xFF8AEBC1).copy(alpha = 0.82f)
+                        if (isDark) {
+                            Color(0xFF8AEBC1).copy(alpha = 0.82f)
+                        } else {
+                            Color(0xFF2F7659).copy(alpha = 0.72f)
+                        }
                     } else {
-                        Color(0xFF7C8FAA).copy(alpha = 0.54f)
+                        if (isDark) {
+                            Color(0xFF7C8FAA).copy(alpha = 0.54f)
+                        } else {
+                            Color(0xFFB8C6BD).copy(alpha = 0.72f)
+                        }
                     },
                     style = Stroke(width = if (isVisited) 1.25.dp.toPx() else 0.85.dp.toPx()),
                 )
@@ -174,8 +192,8 @@ internal fun WorldGlobe(
             drawCircle(
                 brush = Brush.radialGradient(
                     colorStops = arrayOf(
-                        0f to Color.White.copy(alpha = 0.09f),
-                        0.42f to Color.White.copy(alpha = 0.025f),
+                        0f to Color.White.copy(alpha = if (isDark) 0.09f else 0.34f),
+                        0.42f to Color.White.copy(alpha = if (isDark) 0.025f else 0.12f),
                         1f to Color.Transparent,
                     ),
                     center = center - Offset(globeRadius * 0.42f, globeRadius * 0.42f),

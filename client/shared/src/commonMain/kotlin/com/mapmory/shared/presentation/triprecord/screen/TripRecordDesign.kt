@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,64 +49,68 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mapmory.shared.MapmoryTheme
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
 import com.mapmory.shared.preview.PreviewSurface
 import org.jetbrains.compose.resources.decodeToImageBitmap
 
 internal object TripRecordPalette {
-    val background = Color(0xFF111518)
-    val surface = Color(0xFF1A1E22)
-    val surfaceElevated = Color(0xFF102A32)
-    val line = Color(0xFF1B363E)
-    val text = Color(0xFFE9F4F2)
-    val muted = Color(0xFF81999E)
-    val accent = Color(0xFF35C988)
-    val accentSoft = Color(0xFF123E3A)
-    val danger = Color(0xFFFF6264)
-    val photoRecommendText = Color.White
-    val photoRecommendBackground = Color(0xFF382125)
-    val photoRecommendBorder = Color(0xFF99555D)
-    val photoGalleryBackground = Color(0xFF1B2D26)
-    val photoGalleryBorder = Color(0xFF3E7960)
+    val background get() = themeColor(Color(0xFFFAFCFB), Color(0xFF111518))
+    val surface get() = themeColor(Color.White, Color(0xFF1A1E22))
+    val surfaceElevated get() = themeColor(Color(0xFFF7FAF8), Color(0xFF102A32))
+    val line get() = themeColor(Color(0xFFE1E7E3), Color(0xFF1B363E))
+    val text get() = themeColor(Color(0xFF1F2924), Color(0xFFE9F4F2))
+    val muted get() = themeColor(Color(0xFF89948E), Color(0xFF81999E))
+    val accent get() = themeColor(Color(0xFF4D9272), Color(0xFF35C988))
+    val accentSoft get() = themeColor(Color(0xFFE9F2ED), Color(0xFF123E3A))
+    val danger get() = themeColor(Color(0xFFC94C57), Color(0xFFFF6264))
+    val photoRecommendText get() = themeColor(Color(0xFFBB4D56), Color.White)
+    val photoRecommendBackground get() = themeColor(Color(0xFFFFF1F1), Color(0xFF382125))
+    val photoRecommendBorder get() = themeColor(Color(0xFFDB6A70), Color(0xFF99555D))
+    val photoGalleryBackground get() = themeColor(Color(0xFFF3F7F4), Color(0xFF1B2D26))
+    val photoGalleryBorder get() = themeColor(Color(0xFFD9E6DE), Color(0xFF3E7960))
 
     // Shared tokens used by the map, journal, and statistics dashboards.
-    val pageBackground = Color(0xFF121518)
-    val softSurface = Color(0xFF1C2124)
-    val border = Color(0xFF2B3135)
-    val primary = Color(0xFF35C987)
-    val primarySoft = Color(0xFF173B2D)
-    val secondaryAccent = Color(0xFF67D9A2)
-    val onPrimary = Color(0xFF071B12)
-    val headingText = Color(0xFFF1F5F3)
-    val bodyText = Color(0xFFBDC6C2)
-    val secondaryText = Color(0xFF89938F)
-    val navigationDivider = Color(0xFF2C3431)
-    val navigationUnselected = Color(0xFF77827D)
-    val navigationSelectedLabel = Color(0xFFA2ADA7)
+    val pageBackground get() = themeColor(Color(0xFFFAFCFB), Color(0xFF121518))
+    val softSurface get() = themeColor(Color(0xFFF0F4F1), Color(0xFF1C2124))
+    val border get() = themeColor(Color(0xFFE4E9E6), Color(0xFF2B3135))
+    val primary get() = themeColor(Color(0xFF4D9272), Color(0xFF35C987))
+    val primarySoft get() = themeColor(Color(0xFFE9F2ED), Color(0xFF173B2D))
+    val secondaryAccent get() = themeColor(Color(0xFF4A896B), Color(0xFF67D9A2))
+    val onPrimary get() = themeColor(Color.White, Color(0xFF071B12))
+    val headingText get() = themeColor(Color(0xFF1F2924), Color(0xFFF1F5F3))
+    val bodyText get() = themeColor(Color(0xFF5F6E66), Color(0xFFBDC6C2))
+    val secondaryText get() = themeColor(Color(0xFF89948E), Color(0xFF89938F))
+    val navigationDivider get() = themeColor(Color(0xFFE1E7E3), Color(0xFF2C3431))
+    val navigationUnselected get() = themeColor(Color(0xFF9AA59F), Color(0xFF77827D))
+    val navigationSelectedLabel get() = themeColor(Color(0xFF5F6E66), Color(0xFFA2ADA7))
     val contentOnMedia = Color.White
     val mediaScrim = Color.Black.copy(alpha = 0.62f)
-    val metadataDateBackground = Color(0xFF24292D)
+    val metadataDateBackground get() = themeColor(Color(0xFFF0F4F1), Color(0xFF24292D))
 }
 
 internal object TripMapPalette {
-    val logoText = Color(0xFFF4F8F5)
-    val scopeBackground = Color(0xFF151C19)
-    val scopeBorder = Color(0xFF2D3A34)
-    val scopeSelectedBackground = Color(0xFF2A3832)
-    val scopeSelectedText = Color(0xFFEEF7F1)
-    val scopeUnselectedText = Color(0xFF92A09A)
-    val tagBackground = Color(0xFF1A2421)
-    val tagText = Color(0xFFBDC8C2)
-    val tagSelectedText = Color(0xFF072118)
-    val dashboardBadgeText = Color(0xFF9CE6BF)
+    val logoText get() = themeColor(Color(0xFF1F2924), Color(0xFFF4F8F5))
+    val scopeBackground get() = themeColor(Color(0xFFF1F5F2), Color(0xFF151C19))
+    val scopeBorder get() = themeColor(Color(0xFFDCE7E0), Color(0xFF2D3A34))
+    val scopeSelectedBackground get() = themeColor(Color.White, Color(0xFF2A3832))
+    val scopeSelectedText get() = themeColor(Color(0xFF2D4539), Color(0xFFEEF7F1))
+    val scopeUnselectedText get() = themeColor(Color(0xFF7A8880), Color(0xFF92A09A))
+    val tagBackground get() = themeColor(Color(0xFFF7FAF8), Color(0xFF1A2421))
+    val tagText get() = themeColor(Color(0xFF6B786F), Color(0xFFBDC8C2))
+    val tagSelectedText get() = themeColor(Color.White, Color(0xFF072118))
+    val dashboardBadgeText get() = themeColor(Color(0xFF4A896B), Color(0xFF9CE6BF))
 }
 
 internal object TripStatisticsPalette {
-    val divider = Color(0xFF30363A)
-    val mapBorder = Color(0xFF343B40)
-    val mapLand = Color(0xFF293039)
-    val mapOutline = Color(0xFF424B53)
+    val divider get() = themeColor(Color(0xFFE6EBE8), Color(0xFF30363A))
+    val mapBorder get() = themeColor(Color(0xFFE1E7E3), Color(0xFF343B40))
+    val mapLand get() = themeColor(Color(0xFFDCE4DF), Color(0xFF293039))
+    val mapOutline get() = themeColor(Color(0xFFC8D3CC), Color(0xFF424B53))
 }
+
+internal fun themeColor(light: Color, dark: Color): Color =
+    if (MapmoryTheme.isDark) dark else light
 
 @Composable
 internal fun rememberDismissKeyboardOnTapModifier(): Modifier {
@@ -121,8 +126,8 @@ internal fun rememberDismissKeyboardOnTapModifier(): Modifier {
 
 @Composable
 internal fun TripRecordTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = darkColorScheme(
+    val colors = if (MapmoryTheme.isDark) {
+        darkColorScheme(
             primary = TripRecordPalette.accent,
             onPrimary = TripRecordPalette.background,
             secondary = TripRecordPalette.muted,
@@ -134,7 +139,24 @@ internal fun TripRecordTheme(content: @Composable () -> Unit) {
             onSurfaceVariant = TripRecordPalette.muted,
             outline = TripRecordPalette.line,
             error = TripRecordPalette.danger,
-        ),
+        )
+    } else {
+        lightColorScheme(
+            primary = TripRecordPalette.accent,
+            onPrimary = Color.White,
+            secondary = TripRecordPalette.muted,
+            background = TripRecordPalette.background,
+            onBackground = TripRecordPalette.text,
+            surface = TripRecordPalette.surface,
+            onSurface = TripRecordPalette.text,
+            surfaceVariant = TripRecordPalette.surfaceElevated,
+            onSurfaceVariant = TripRecordPalette.muted,
+            outline = TripRecordPalette.line,
+            error = TripRecordPalette.danger,
+        )
+    }
+    MaterialTheme(
+        colorScheme = colors,
         content = content,
     )
 }

@@ -35,6 +35,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalUriHandler
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mapmory.shared.MapmoryTheme
 import com.mapmory.shared.PrivacyPolicy
 import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
 import com.mapmory.shared.presentation.triprecord.state.TopLocationUiModel
@@ -108,7 +110,41 @@ fun TripProfileScreen(
             onDismissRequest = { showSettings = false },
             containerColor = TripRecordPalette.surface,
             title = { Text("설정", color = TripRecordPalette.headingText) },
-            text = { Text("Mapmory의 서비스 정책을 확인할 수 있어요.", color = TripRecordPalette.bodyText) },
+            text = {
+                Column {
+                    Text(
+                        text = "화면 테마",
+                        color = TripRecordPalette.bodyText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        ThemeOption(
+                            label = "라이트 모드",
+                            selected = !MapmoryTheme.isDark,
+                            onClick = { MapmoryTheme.isDark = false },
+                            modifier = Modifier.weight(1f),
+                        )
+                        ThemeOption(
+                            label = "다크 모드",
+                            selected = MapmoryTheme.isDark,
+                            onClick = { MapmoryTheme.isDark = true },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (PrivacyPolicy.URL.isNotBlank()) {
+                        Text(
+                            text = "서비스 정책은 아래 버튼에서 확인할 수 있어요.",
+                            color = TripRecordPalette.secondaryText,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 20.dp),
+                        )
+                    }
+                }
+            },
             confirmButton = {
                 if (PrivacyPolicy.URL.isNotBlank()) {
                     TextButton(onClick = { uriHandler.openUri(PrivacyPolicy.URL) }) {
@@ -121,6 +157,36 @@ fun TripProfileScreen(
                     Text("닫기", color = TripRecordPalette.secondaryText)
                 }
             },
+        )
+    }
+}
+
+@Composable
+private fun ThemeOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(11.dp)
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(if (selected) TripRecordPalette.primarySoft else Color.Transparent)
+            .border(
+                width = 1.dp,
+                color = if (selected) TripRecordPalette.primary else TripRecordPalette.border,
+                shape = shape,
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = if (selected) TripRecordPalette.primary else TripRecordPalette.bodyText,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
         )
     }
 }
