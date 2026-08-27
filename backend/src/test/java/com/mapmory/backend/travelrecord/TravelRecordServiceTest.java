@@ -108,6 +108,22 @@ class TravelRecordServiceTest {
     }
 
     @Test
+    void 본문이_null이면_빈_문자열로_정규화해_여행_일지를_생성한다() {
+        Region japan = mock(Region.class);
+        TravelRecordRequest request = new TravelRecordRequest(
+                "JP", null, null, "일본 여행", null, LocalDate.of(2026, 8, 11), null, List.of(), List.of()
+        );
+
+        when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
+        when(travelRecordRepository.save(any(TravelRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        TravelRecord result = travelRecordService.create(member, request);
+
+        assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
     void 지역_계층과_정렬된_Object_Key를_포함한_일지_상세를_조회한다() {
         Region country = Region.of(null, null, "KR", "대한민국", RegionType.COUNTRY);
         Region province = Region.of(country, country, "49", "제주특별자치도", RegionType.PROVINCE);
