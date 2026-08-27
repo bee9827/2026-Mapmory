@@ -468,6 +468,18 @@ private fun topViewController(): UIViewController? {
 private fun onMain(block: () -> Unit) {
     dispatch_async(dispatch_get_main_queue(), block)
 }
+
+private fun nowMillis(): Long = (NSDate().timeIntervalSinceReferenceDate * 1000.0).toLong()
+
+private fun elapsedMillis(startedAtMillis: Long): Long =
+    (nowMillis() - startedAtMillis).coerceAtLeast(0L)
+
+private fun logPhotoPerformance(message: String) {
+    if (Platform.isDebugBinary) {
+        NSLog("MapmoryPhotoPerf $message")
+    }
+}
+
 private const val PreviewSizePx = 1280
 private const val PreviewJpegQuality = 0.85
 private const val FullGalleryAccessMessage =
