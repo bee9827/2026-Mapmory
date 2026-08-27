@@ -1,16 +1,19 @@
 const environment = import.meta.env ?? {};
 const measurementId = environment.VITE_GA_MEASUREMENT_ID?.trim()
   || (environment.PROD ? "G-MC93CZWLZF" : "");
-const landingVersion = environment.VITE_LANDING_VERSION?.trim() || "v1";
+const landingVersion = environment.VITE_LANDING_VERSION?.trim() || "v2";
 
 export const ANALYTICS_EVENTS = Object.freeze({
+  EXPERIENCE_CTA_CLICK: "experience_cta_click",
   EXPERIENCE_VIEW: "experience_view",
   EXPERIENCE_START: "experience_start",
-  PLACE_SELECT: "place_select",
-  EXPERIENCE_ENGAGEMENT: "experience_engagement",
+  MEMORY_OPEN: "memory_open",
+  KOREA_MEMORY_ADD: "korea_memory_add",
+  EXPERIENCE_END: "experience_end",
   WAITLIST_CTA_CLICK: "waitlist_cta_click",
   WAITLIST_FORM_VIEW: "waitlist_form_view",
   WAITLIST_FORM_START: "waitlist_form_start",
+  WAITLIST_SUBMIT_ATTEMPT: "waitlist_submit_attempt",
   WAITLIST_SUBMIT: "waitlist_submit",
   WAITLIST_SUBMIT_ERROR: "waitlist_submit_error",
   DOWNLOAD_CLICK: "download_click",
@@ -18,6 +21,25 @@ export const ANALYTICS_EVENTS = Object.freeze({
 
 const supportedEvents = new Set(Object.values(ANALYTICS_EVENTS));
 const forbiddenParameterPattern = /(email|phone|name|address|message|free.?text)/i;
+const supportedParameters = new Set([
+  "experience_type",
+  "interaction_type",
+  "memory_id",
+  "selection_source",
+  "cta_placement",
+  "open_index",
+  "add_index",
+  "time_since_start_ms",
+  "active_duration_ms",
+  "unique_memories_opened",
+  "last_completed_step",
+  "exit_reason",
+  "attempt_number",
+  "result",
+  "error_type",
+  "validation_field",
+  "transport_type",
+]);
 
 let initialized = false;
 
@@ -34,6 +56,7 @@ export function initializeAnalytics() {
   window.gtag("config", measurementId, {
     anonymize_ip: true,
     send_page_view: true,
+    landing_version: landingVersion,
   });
 
   const script = document.createElement("script");
@@ -45,7 +68,8 @@ export function initializeAnalytics() {
 export function buildEventParameters(parameters = {}) {
   const safeParameters = Object.fromEntries(
     Object.entries(parameters).filter(([key, value]) => (
-      !forbiddenParameterPattern.test(key)
+      supportedParameters.has(key)
+      && !forbiddenParameterPattern.test(key)
       && value !== undefined
       && value !== null
       && value !== ""

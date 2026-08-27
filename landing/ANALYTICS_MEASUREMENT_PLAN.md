@@ -3,7 +3,7 @@
 기준일: 2026-08-25  
 대상 페이지: <https://map-mory.com/>  
 GA4 측정 ID: `G-MC93CZWLZF`  
-현재 랜딩 버전: `v1`
+현재 랜딩 버전: `v2`
 
 ## 1. 측정 목적
 
@@ -42,17 +42,19 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 | 핵심 결과 | 체험 전환 효과 = 체험 시작 세션의 신규 신청률 ÷ 비체험 세션의 신규 신청률 | **1.0 초과** | 0.8 미만 | 배포 전 | 최소 200세션 후 판단 |
 | 선행 지표 | 체험 도달률 = `experience_view(globe)` 세션 ÷ 전체 세션 | **50% 이상** | 35% 미만 | 배포 전 | 내부 가설 |
 | 선행 지표 | 체험 활성화율 = `experience_start` 세션 ÷ `experience_view` 세션 | **30% 이상** | 20% 미만 | 배포 전 | 내부 가설 |
-| 선행 지표 | 장소 탐색률 = `place_select` 세션 ÷ `experience_start` 세션 | **60% 이상** | 40% 미만 | 배포 전 | 내부 가설 |
+| 선행 지표 | 첫 기억 열기율 = `memory_open(open_index=1)` 세션 ÷ `experience_start` 세션 | **60% 이상** | 40% 미만 | 배포 전 | 내부 가설 |
+| 선행 지표 | 기억 탐색 깊이 = 체험당 `memory_open`의 고유 `memory_id` 수 | 기준선 수집 | 해당 없음 | 배포 전 | 결과별 분포 비교 |
+| 진단 지표 | 실제 체험시간 = `experience_end.active_duration_ms` | 기준선 수집 | 해당 없음 | 배포 전 | 평균보다 분포와 결과별 차이 우선 |
 | 선행 지표 | 폼 시작률 = `waitlist_form_start` 세션 ÷ `waitlist_form_view` 세션 | **25% 이상** | 15% 미만 | 배포 전 | 내부 가설 |
 | 선행 지표 | 폼 완료율 = `waitlist_submit` 세션 ÷ `waitlist_form_start` 세션 | **70% 이상** | 50% 미만 | 배포 전 | 한 필드 폼 가설 |
-| 가드레일 | 기술 제출 오류율 = `waitlist_submit_error(error_type!=validation)` ÷ `waitlist_form_start` | **2% 미만** | 5% 초과 | 배포 전 | 백엔드 로그와 함께 확인 |
+| 가드레일 | 기술 제출 오류율 = `waitlist_submit_error(error_type!=validation)` ÷ `waitlist_submit_attempt` | **2% 미만** | 5% 초과 | 배포 전 | 백엔드 로그와 함께 확인 |
 
 운영 해석 기준:
 
 - 신규 대기 명단 전환율 **8% 이상**은 초기 강한 신호로 본다.
-- 체험 활성화율이 높아도 신청률이 오르지 않으면 체험은 재미는 있지만 제품 가치나 CTA로 연결되지 않는 것이다.
+- 체험 활성화율이나 체험시간이 높아도 기억 열기와 신청률이 오르지 않으면 체험은 재미 또는 혼란에 머물고 제품 가치나 CTA로 연결되지 않는 것이다.
 - 폼 시작률이 낮으면 제안 문구·신뢰·개인정보 설명을, 폼 완료율이 낮으면 검증 오류와 체크박스 마찰을 먼저 본다.
-- `experience_engagement`의 10·30·60초 값과 CTA 위치별 클릭률은 첫 기간에는 목표를 두지 않고 기준선을 만든다.
+- `experience_end`의 정확한 활성 체험시간과 체험당 고유 기억 수, CTA 위치별 클릭률은 첫 기간에는 목표를 두지 않고 기준선을 만든다.
 
 ## 4. 이벤트 사전
 
@@ -60,13 +62,16 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 
 | 이벤트 | 발생 조건 | 주요 파라미터 | 중복 방지 |
 | --- | --- | --- | --- |
+| `experience_cta_click` | 헤더·히어로·스크롤 유도에서 체험 진입 링크 클릭 | `experience_type`, `cta_placement` | 클릭마다 기록 |
 | `experience_view` | 체험 영역이 50% 이상 1초간 노출 | `experience_type` | 체험 종류별 페이지당 1회 |
-| `experience_start` | 첫 장소 선택·지구본 드래그·확대 | `experience_type`, `interaction_type` | 체험 종류별 페이지당 1회 |
-| `place_select` | 선택이 바뀌어 기억 카드가 실제로 변경 | `experience_type`, `place_id`, `selection_source` | 같은 장소 재선택 제외 |
-| `experience_engagement` | 체험 시작 후 화면이 보이는 활성 시간이 10·30·60초에 도달 | `experience_type`, `milestone_seconds` | 각 마일스톤 1회 |
-| `waitlist_cta_click` | 헤더·히어로·대한민국 기억 카드 CTA 클릭 | `cta_placement` | 클릭마다 기록 |
+| `experience_start` | 첫 기억 선택·지구본 드래그·확대·대한민국 기억 추가 | `experience_type`, `interaction_type` | 체험 종류별 페이지당 1회 |
+| `memory_open` | 선택 모션이 끝나고 별도 기억 패널이 실제로 열림 | `experience_type`, `memory_id`, `selection_source`, `open_index`, `time_since_start_ms` | 같은 체험에서 같은 기억은 1회 |
+| `korea_memory_add` | 대한민국 지도 색칠 모션이 끝나 기억 추가가 완료 | `experience_type`, `memory_id`, `add_index`, `time_since_start_ms` | 같은 체험에서 같은 기억은 1회 |
+| `experience_end` | 시작한 체험 영역을 1.5초 이상 벗어나거나 페이지를 떠남 | `experience_type`, `active_duration_ms`, `unique_memories_opened`, `last_completed_step`, `exit_reason` | 체험 종류별 첫 체험 1회 |
+| `waitlist_cta_click` | 헤더·대한민국 기억 카드의 출시 알림 CTA 클릭 | `cta_placement` | 클릭마다 기록 |
 | `waitlist_form_view` | 폼이 50% 이상 1초간 노출 | 없음 | 페이지당 1회 |
 | `waitlist_form_start` | 폼 내부 최초 포커스 또는 값 변경 | 없음 | 페이지당 1회 |
+| `waitlist_submit_attempt` | 제출 버튼을 눌러 클라이언트 검증을 시작 | `attempt_number` | 제출 시도마다 기록 |
 | `waitlist_submit` | 백엔드가 신규 또는 기존 신청으로 성공 응답 | `result` | 제출 성공마다 기록 |
 | `waitlist_submit_error` | 클라이언트 검증, 네트워크, 서버 또는 응답 오류 | `error_type`, `validation_field` | 오류 발생마다 기록 |
 | `download_click` | 공개 출시 후 Google Play CTA 클릭 | `cta_placement` | 클릭마다 기록 |
@@ -77,38 +82,52 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 
 | 파라미터 | 허용값 |
 | --- | --- |
-| `landing_version` | `v1`부터 시작하는 안정적인 배포 버전 |
+| `landing_version` | `v2`부터 시작하는 안정적인 배포 버전. 자동 `page_view`에도 포함 |
 | `experience_type` | `globe`, `korea_detail` |
-| `interaction_type` | `place_select`, `globe_drag`, `globe_zoom` |
-| `place_id` | `hapjeong`, `shanghai`, `tokyo`, `usa-west`, `yeosu`, `jeju` |
-| `selection_source` | `shortcut`, `globe`, `map` |
-| `cta_placement` | `header`, `hero`, `korea_memory`, `final` |
-| `milestone_seconds` | `10`, `30`, `60` |
+| `interaction_type` | `place_select`, `memory_add`, `globe_drag`, `globe_zoom` |
+| `memory_id` | `jeju-coast`, `shanghai`, `tokyo`, `usa-west`, `hapjeong`, `yeosu`, `jeju` |
+| `selection_source` | `shortcut`, `globe`, `photo_tray`, `reveal_tray`, `map` |
+| `cta_placement` | `header`, `header_nav`, `hero`, `scroll_cue`, `korea_memory`, `final` |
+| `open_index` | 해당 체험에서 처음 연 고유 기억부터 `1`, `2`, `3` 순서 |
+| `add_index` | 대한민국 체험에서 추가 완료한 고유 기억 순서 |
+| `active_duration_ms` | 체험 시작 후 체험 영역이 보이고 탭이 활성화된 정확한 누적 밀리초 |
+| `time_since_start_ms` | 체험 시작부터 기억 열기 또는 추가 완료까지의 활성 밀리초 |
+| `unique_memories_opened` | 체험 종료 시점까지 연 고유 기억 수 |
+| `last_completed_step` | `experience_start`, `memory_open`, `korea_memory_add` |
+| `exit_reason` | `section_exit`, `page_hide` |
+| `attempt_number` | 현재 페이지에서의 폼 제출 시도 순서 |
 | `result` | `subscribed`, `already_subscribed` |
 | `error_type` | `validation`, `network`, `server`, `request`, `response`, `unknown` |
 
 ## 5. GA4 보고서 구성
 
-GA4에서 다음 이벤트 파라미터를 이벤트 범위 맞춤 측정기준으로 등록한다.
+GA4에서 다음 문자열 파라미터를 이벤트 범위 맞춤 측정기준으로 등록한다.
 
-`landing_version`, `experience_type`, `interaction_type`, `place_id`, `selection_source`, `cta_placement`, `result`, `error_type`, `validation_field`, `milestone_seconds`
+`landing_version`, `experience_type`, `interaction_type`, `memory_id`, `selection_source`, `cta_placement`, `last_completed_step`, `exit_reason`, `result`, `error_type`, `validation_field`
+
+다음 숫자 파라미터는 이벤트 범위 맞춤 측정항목으로 등록한다.
+
+`open_index`, `add_index`, `time_since_start_ms`, `active_duration_ms`, `unique_memories_opened`, `attempt_number`
 
 권장 탐색 보고서:
 
-1. **기본 전환 퍼널**: `page_view → waitlist_form_view → waitlist_form_start → waitlist_submit`
-2. **체험 효과 퍼널**: `experience_view → experience_start → place_select → waitlist_submit`
-3. **CTA 비교**: `cta_placement`별 `waitlist_cta_click`, 이후 `waitlist_submit` 비율
-4. **체험 비교**: `experience_type`별 시작률, 장소 선택률, 10·30·60초 도달률
-5. **품질 보고서**: `error_type`별 `waitlist_submit_error`와 백엔드 오류 로그 비교
+1. **전체 순차 퍼널**: `page_view → experience_view → experience_start → memory_open(open_index=1) → waitlist_form_view → waitlist_form_start → waitlist_submit_attempt → waitlist_submit`
+2. **기억 탐색 깊이**: `experience_type`별 `open_index=1 → 2 → 3` 도달률과 체험당 고유 `memory_id` 수
+3. **체험시간 비교**: `experience_end.active_duration_ms`를 기억 0개·1개·2개 이상·신규 신청 결과로 분리
+4. **첫 가치 도달시간**: `memory_open(open_index=1).time_since_start_ms`의 분포
+5. **CTA 비교**: `cta_placement`별 `experience_cta_click` 및 `waitlist_cta_click` 이후 다음 단계 진입률
+6. **품질 보고서**: `error_type`별 `waitlist_submit_error`와 백엔드 오류 로그 비교
 
-`waitlist_submit`은 GA4 핵심 이벤트로 지정한다. 신규 획득 수치를 볼 때는 `result=subscribed`로 필터링하고, 최종 고유 신청자 수는 백엔드 DB를 사용한다.
+GA4 관리자 화면에서 `waitlist_submit` 중 `result=subscribed`인 이벤트를 권장 이벤트 `generate_lead`로 생성하고 핵심 이벤트로 지정한다. 최종 고유 신청자 수는 백엔드 DB를 사용한다.
+
+단계별 이탈률은 별도 이탈 이벤트를 만들지 않고 같은 세션의 순차 퍼널에서 `1 - 다음 단계 사용자 수 ÷ 현재 단계 사용자 수`로 계산한다. 정확한 체험시간은 단순 페이지 체류시간이 아니라 `experience_end.active_duration_ms`를 사용한다.
 
 ## 6. 실측 업데이트 절차
 
 매주 같은 기간과 유입 조건을 사용해 아래 순서로 이 문서의 `현재 실측`과 `차이/판정`을 갱신한다.
 
 1. 내부 개발·QA 트래픽을 제외한다.
-2. `landing_version`으로 페이지 변경 전후를 분리한다.
+2. 자동 `page_view`와 모든 커스텀 이벤트의 `landing_version`으로 페이지 변경 전후를 분리한다.
 3. 전체와 모바일을 함께 보고, 모바일 표본도 별도로 확인한다.
 4. GA4 신규 신청 이벤트 수와 DB 신규 행 수의 차이를 확인한다.
 5. 기준 미달 지표는 바로 UI를 바꾸기 전에 해당 단계의 유입 품질과 오류율을 함께 확인한다.
