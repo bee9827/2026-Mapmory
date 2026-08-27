@@ -1,0 +1,7 @@
+node_modules/
+dist/
+audit/
+audit-v3/
+qa/
+.DS_Store
+*.log
