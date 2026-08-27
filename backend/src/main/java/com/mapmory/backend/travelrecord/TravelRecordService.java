@@ -14,6 +14,7 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
+import com.mapmory.backend.upload.service.UploadedObjectVerifier;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ public class TravelRecordService {
     private final TagService tagService;
     private final OperationTimer operationTimer;
     private final Clock clock;
+    private final UploadedObjectVerifier uploadedObjectVerifier;
 
     public TravelRecordService(
             TravelRecordRepository travelRecordRepository,
@@ -51,7 +53,8 @@ public class TravelRecordService {
             TravelRecordTagService travelRecordTagService,
             TagService tagService,
             OperationTimer operationTimer,
-            Clock clock
+            Clock clock,
+            UploadedObjectVerifier uploadedObjectVerifier
     ) {
         this.travelRecordRepository = travelRecordRepository;
         this.regionResolver = regionResolver;
@@ -60,12 +63,15 @@ public class TravelRecordService {
         this.tagService = tagService;
         this.operationTimer = operationTimer;
         this.clock = clock;
+        this.uploadedObjectVerifier = uploadedObjectVerifier;
     }
 
     @Transactional
     public TravelRecord create(Member member, TravelRecordRequest request) {
         validateTravelDates(request.startDate(), request.endDate());
         validateTravelRecordRegion(request);
+        List<String> objectKeys = objectKeys(request);
+        uploadedObjectVerifier.verifyAllUploaded(objectKeys);
         Region region = resolveRegion(request);
 
         TravelRecord travelRecord = TravelRecord.of(
@@ -79,8 +85,6 @@ public class TravelRecordService {
 
         TravelRecord savedTravelRecord = travelRecordRepository.save(travelRecord);
         travelRecordTagService.replace(member, savedTravelRecord, request.tagIds());
-
-        List<String> objectKeys = request.objectKeys() == null ? List.of() : request.objectKeys();
 
         // TODO : save or saveAll 결정하고 적용하기
         for (int index = 0; index < objectKeys.size(); index++) {
@@ -121,13 +125,15 @@ public class TravelRecordService {
         validateTravelRecordRegion(request);
         TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, member.getId())
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
-        List<String> objectKeys = request.objectKeys() == null ? List.of() : request.objectKeys();
+        List<String> objectKeys = objectKeys(request);
         validateUniqueObjectKeys(objectKeys);
 
         Region region = resolveRegion(request);
         List<RecordMedia> existingMedia = recordMediaRepository
                 .findByTravelRecordIdOrderBySortOrderAsc(travelRecordId);
-        validateObjectKeysAreAvailable(objectKeys, existingMedia);
+        List<String> newObjectKeys = newObjectKeys(objectKeys, existingMedia);
+        validateObjectKeysAreAvailable(newObjectKeys);
+        uploadedObjectVerifier.verifyAllUploaded(newObjectKeys);
 
         travelRecord.update(
                 region,
@@ -308,17 +314,23 @@ public class TravelRecordService {
         }
     }
 
-    private void validateObjectKeysAreAvailable(
+    private static List<String> objectKeys(TravelRecordRequest request) {
+        return request.objectKeys() == null ? List.of() : request.objectKeys();
+    }
+
+    private static List<String> newObjectKeys(
             List<String> objectKeys,
             List<RecordMedia> existingMedia
     ) {
         Set<String> existingObjectKeys = existingMedia.stream()
                 .map(RecordMedia::getObjectKey)
                 .collect(Collectors.toSet());
-        List<String> newObjectKeys = objectKeys.stream()
+        return objectKeys.stream()
                 .filter(objectKey -> !existingObjectKeys.contains(objectKey))
                 .toList();
+    }
 
+    private void validateObjectKeysAreAvailable(List<String> newObjectKeys) {
         if (!newObjectKeys.isEmpty()
                 && !recordMediaRepository.findByObjectKeyIn(newObjectKeys).isEmpty()) {
             throw new BusinessException(TravelRecordErrorCode.INVALID_OBJECT_KEY);

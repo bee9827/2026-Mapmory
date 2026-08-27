@@ -25,6 +25,7 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
+import com.mapmory.backend.upload.service.UploadedObjectVerifier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -69,6 +70,8 @@ class TravelRecordServiceTest {
     @Mock
     private TagService tagService;
 
+    @Mock
+    private UploadedObjectVerifier uploadedObjectVerifier;
     @Spy
     private OperationTimer operationTimer = new OperationTimer(new SimpleMeterRegistry());
 
@@ -87,7 +90,8 @@ class TravelRecordServiceTest {
                 travelRecordTagService,
                 tagService,
                 operationTimer,
-                FIXED_CLOCK
+                FIXED_CLOCK,
+                uploadedObjectVerifier
         );
     }
 
