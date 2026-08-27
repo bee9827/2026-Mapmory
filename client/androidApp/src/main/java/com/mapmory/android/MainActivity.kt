@@ -23,13 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.colorResource
 import com.mapmory.shared.MapmoryApp
 import com.mapmory.shared.MapmoryNavigation
-
-private val LightSystemBarColor = Color(0xFFFAFCFB)
-private val DarkSystemBarColor = Color(0xFF111518)
 
 class MainActivity : ComponentActivity() {
     private val appViewModel: MapmoryAppViewModel by viewModels()
@@ -40,7 +37,9 @@ class MainActivity : ComponentActivity() {
             val navigation = remember { MapmoryNavigation() }
             var lastBackPressedAt by remember { mutableLongStateOf(0L) }
             var isDarkTheme by rememberSaveable { mutableStateOf(false) }
-            val systemBarColor = if (isDarkTheme) DarkSystemBarColor else LightSystemBarColor
+            val systemBarColor = colorResource(
+                if (isDarkTheme) R.color.mapmory_system_bar_dark else R.color.mapmory_system_bar_light,
+            )
 
             SideEffect {
                 val barStyle = if (isDarkTheme) {
