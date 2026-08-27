@@ -1,0 +1,29 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto21
+
+  pre_build:
+    commands:
+      - cd backend
+      - chmod +x gradlew
+      - chmod +x scripts/*.sh
+
+  build:
+    commands:
+      - ./gradlew clean build --no-daemon
+
+  post_build:
+    commands:
+      - mkdir -p deploy/scripts
+      - cp build/libs/mapmory-backend.jar deploy/
+      - cp appspec.yml deploy/
+      - cp scripts/*.sh deploy/scripts/
+
+artifacts:
+  base-directory: backend/deploy
+  files:
+    - "**/*"
+  discard-paths: no
