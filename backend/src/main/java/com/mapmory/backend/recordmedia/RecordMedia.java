@@ -64,7 +64,7 @@ public class RecordMedia {
         return objectKey;
     }
 
-    public Long getTravelRecordId() {
+    public Long travelRecordId() {
         return travelRecord.getId();
     }
 

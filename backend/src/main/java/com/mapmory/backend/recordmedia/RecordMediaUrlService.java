@@ -42,7 +42,7 @@ public class RecordMediaUrlService {
                 .findByTravelRecordIdInOrderByTravelRecordIdAscSortOrderAscIdAsc(travelRecordIds);
         for (RecordMedia media : recordMedia) {
             thumbnailUrls.computeIfAbsent(
-                    media.getTravelRecordId(),
+                    media.travelRecordId(),
                     ignored -> createViewUrl(media.getThumbnailObjectKey())
             );
         }
