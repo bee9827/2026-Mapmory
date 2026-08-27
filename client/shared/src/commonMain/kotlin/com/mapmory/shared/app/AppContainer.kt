@@ -3,14 +3,21 @@ package com.mapmory.shared.app
 import com.mapmory.shared.data.auth.AuthTokenStore
 import com.mapmory.shared.data.auth.GuestSessionManager
 import com.mapmory.shared.data.local.StaticRegionCatalog
+import com.mapmory.shared.data.media.CachedTripRecordThumbnailLoader
+import com.mapmory.shared.data.media.MemoryPhotoPreviewCache
+import com.mapmory.shared.data.media.PhotoPreviewCache
+import com.mapmory.shared.data.media.PhotoPreviewLoader
 import com.mapmory.shared.data.remote.AccessTokenProvider
 import com.mapmory.shared.data.remote.AuthRemoteRepository
 import com.mapmory.shared.data.remote.MapSummaryRemoteRepository
 import com.mapmory.shared.data.remote.PhotoUploadRemoteRepository
+import com.mapmory.shared.data.remote.PresignedPhotoRemoteSource
 import com.mapmory.shared.data.remote.TripRecordRemoteRepository
 import com.mapmory.shared.data.remote.createHttpClient
+import com.mapmory.shared.data.remote.installMapmoryAuthRetry
 import com.mapmory.shared.data.repository.AuthenticatedMapSummaryRepository
 import com.mapmory.shared.data.repository.AuthenticatedTripRecordRepository
+import com.mapmory.shared.data.repository.CachedMediaTripRecordRepository
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.data.repository.UploadingTripRecordRepository
 import com.mapmory.shared.domain.region.RegionCatalog
@@ -25,6 +32,7 @@ import com.mapmory.shared.presentation.map.viewmodel.MapViewModel
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordDetailViewModel
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordEditorViewModel
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordListViewModel
+import com.mapmory.shared.presentation.triprecord.thumbnail.TripRecordThumbnailLoader
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -57,6 +65,7 @@ private class DefaultMapmoryViewModelFactory(
     private val repository: TripRecordRepository,
     private val mapSummaryRepository: MapSummaryRepository,
     private val regionCatalog: RegionCatalog,
+    private val thumbnailLoader: TripRecordThumbnailLoader?,
     private val onTripRecordsChanged: () -> Unit,
 ) : MapmoryViewModelFactory {
     override fun createMapViewModel(): MapViewModel = MapViewModel(
@@ -68,6 +77,7 @@ private class DefaultMapmoryViewModelFactory(
         TripRecordListViewModel(
             getTripRecords = GetTripRecordsUseCase(repository),
             regionCatalog = regionCatalog,
+            thumbnailLoader = thumbnailLoader,
         )
 
     override fun createTripRecordDetailViewModel(): TripRecordDetailViewModel =
@@ -92,6 +102,7 @@ private class DefaultAppContainer(
     override val regionCatalog: RegionCatalog,
     override val tripRecordRepository: TripRecordRepository,
     override val mapSummaryRepository: MapSummaryRepository,
+    private val thumbnailLoader: TripRecordThumbnailLoader?,
     private val onClose: () -> Unit,
 ) : AppContainer {
     private val mutableTripRecordRevision = MutableStateFlow(0L)
@@ -101,6 +112,7 @@ private class DefaultAppContainer(
         repository = tripRecordRepository,
         mapSummaryRepository = mapSummaryRepository,
         regionCatalog = regionCatalog,
+        thumbnailLoader = thumbnailLoader,
         onTripRecordsChanged = {
             mutableTripRecordRevision.update { revision -> revision + 1 }
         },
@@ -115,11 +127,13 @@ fun createAppContainer(
         tripRecordRepository as? MapSummaryRepository,
     ) { "지도 요약 Repository를 함께 전달해 주세요." },
     regionCatalog: RegionCatalog = StaticRegionCatalog(),
+    thumbnailLoader: TripRecordThumbnailLoader? = null,
     onClose: () -> Unit = {},
 ): AppContainer = DefaultAppContainer(
     regionCatalog = regionCatalog,
     tripRecordRepository = tripRecordRepository,
     mapSummaryRepository = mapSummaryRepository,
+    thumbnailLoader = thumbnailLoader,
     onClose = onClose,
 )
 
@@ -165,6 +179,7 @@ fun createGuestRemoteAppContainer(
     tokenStore: AuthTokenStore,
     apiBaseUrl: String = MAPMORY_API_BASE_URL,
     regionCatalog: RegionCatalog = StaticRegionCatalog(),
+    photoPreviewCache: PhotoPreviewCache = MemoryPhotoPreviewCache(),
 ): AppContainer {
     val client = createHttpClient()
     return createGuestRemoteAppContainer(
@@ -172,6 +187,7 @@ fun createGuestRemoteAppContainer(
         apiBaseUrl = apiBaseUrl,
         tokenStore = tokenStore,
         regionCatalog = regionCatalog,
+        photoPreviewCache = photoPreviewCache,
         onClose = client::close,
     )
 }
@@ -181,11 +197,16 @@ internal fun createGuestRemoteAppContainer(
     apiBaseUrl: String,
     tokenStore: AuthTokenStore,
     regionCatalog: RegionCatalog = StaticRegionCatalog(),
+    photoPreviewCache: PhotoPreviewCache = MemoryPhotoPreviewCache(),
     onClose: () -> Unit = client::close,
 ): AppContainer {
     val session = GuestSessionManager(
         gateway = AuthRemoteRepository(client, apiBaseUrl),
         tokenStore = tokenStore,
+    )
+    client.installMapmoryAuthRetry(
+        session = session,
+        apiBaseUrl = apiBaseUrl,
     )
     val remoteTripRecords = TripRecordRemoteRepository(
         client = client,
@@ -206,11 +227,20 @@ internal fun createGuestRemoteAppContainer(
         ),
         delegate = remoteTripRecords,
     )
+    val photoPreviewLoader = PhotoPreviewLoader(
+        cache = photoPreviewCache,
+        remoteSource = PresignedPhotoRemoteSource(client),
+    )
+    val cachedMediaTripRecords = CachedMediaTripRecordRepository(
+        delegate = uploadingTripRecords,
+        loader = photoPreviewLoader,
+    )
 
     return createAppContainer(
-        tripRecordRepository = AuthenticatedTripRecordRepository(session, uploadingTripRecords),
+        tripRecordRepository = AuthenticatedTripRecordRepository(session, cachedMediaTripRecords),
         mapSummaryRepository = AuthenticatedMapSummaryRepository(session, remoteMapSummary),
         regionCatalog = regionCatalog,
+        thumbnailLoader = CachedTripRecordThumbnailLoader(photoPreviewLoader),
         onClose = onClose,
     )
 }
