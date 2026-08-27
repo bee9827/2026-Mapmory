@@ -33,6 +33,7 @@ const memories = [
     photoCredit: "Mapmory 개발팀 촬영",
     lat: 37.549,
     lng: 126.914,
+    viewpoint: { lat: 36.35, lng: 127.8, altitude: 2.05 },
   },
   {
     key: "shanghai",
@@ -45,6 +46,7 @@ const memories = [
     photoCredit: "Mapmory 개발팀 촬영",
     lat: 31.2304,
     lng: 121.4737,
+    viewpoint: { lat: 35.86, lng: 104.2, altitude: 2.05 },
   },
   {
     key: "tokyo",
@@ -57,6 +59,7 @@ const memories = [
     photoCredit: "Mapmory 개발팀 촬영",
     lat: 35.6762,
     lng: 139.6503,
+    viewpoint: { lat: 36.2, lng: 138.25, altitude: 2.05 },
   },
   {
     key: "usa-west",
@@ -96,6 +99,7 @@ const memories = [
     photoCredit: "Mapmory 개발팀 촬영",
     lat: 37.0902,
     lng: -95.7129,
+    viewpoint: { lat: 39.8, lng: -98.6, altitude: 2.05 },
   },
 ];
 
@@ -332,13 +336,15 @@ function LaunchWaitlistForm() {
   );
 }
 
-function InteractiveGlobe({ selected, onSelect, onInteract, theme, countrySelector }) {
+function InteractiveGlobe({ selected, focusRequest, onSelect, onInteract, theme, countrySelector }) {
   const globeRef = useRef(null);
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 540, height: 540 });
   const [hoveredId, setHoveredId] = useState(null);
   const [globeMaterial, setGlobeMaterial] = useState(null);
   const [countries, setCountries] = useState([]);
+  const [isGlobeReady, setIsGlobeReady] = useState(false);
+  const hasFocusedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -372,9 +378,15 @@ function InteractiveGlobe({ selected, onSelect, onInteract, theme, countrySelect
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => { globeRef.current?.pointOfView({ lat: selected.lat, lng: selected.lng, altitude: 2.05 }, 850); }, [selected, globeMaterial]);
+  useEffect(() => {
+    if (!isGlobeReady || !globeRef.current) return;
+    const viewpoint = selected.viewpoint ?? { lat: selected.lat, lng: selected.lng, altitude: 2.05 };
+    globeRef.current.pointOfView(viewpoint, hasFocusedRef.current ? 850 : 0);
+    hasFocusedRef.current = true;
+  }, [focusRequest, isGlobeReady, selected]);
 
   useEffect(() => {
+    if (!isGlobeReady) return undefined;
     const controls = globeRef.current?.controls();
     if (!controls) return undefined;
     controls.enablePan = false;
@@ -386,7 +398,7 @@ function InteractiveGlobe({ selected, onSelect, onInteract, theme, countrySelect
     const element = containerRef.current;
     element?.addEventListener("pointerdown", stopAutoRotate, { once: true });
     return () => element?.removeEventListener("pointerdown", stopAutoRotate);
-  }, [size, globeMaterial]);
+  }, [isGlobeReady, size, globeMaterial]);
 
   const isVisited = (polygon) => memoryByCountry.has(String(polygon.id));
 
@@ -402,15 +414,16 @@ function InteractiveGlobe({ selected, onSelect, onInteract, theme, countrySelect
       {countrySelector}
       <Suspense fallback={<div className="globe-loading"><GlobeHemisphereEast size={28} weight="duotone" /><span>지구본을 준비하고 있어요</span></div>}>
         {globeMaterial && countries.length > 0 && <Globe ref={globeRef} width={size.width} height={size.height} backgroundColor="rgba(0,0,0,0)" globeMaterial={globeMaterial} showAtmosphere atmosphereColor="#93a6b8" atmosphereAltitude={0.12} polygonsData={countries}
-          polygonCapColor={(polygon) => { const id = String(polygon.id); if (id === selected.id) return "#21e69a"; if (id === hoveredId && isVisited(polygon)) return "#72efbd"; return isVisited(polygon) ? "#3fd09a" : "#303b4d"; }}
-          polygonSideColor={(polygon) => (isVisited(polygon) ? "#189a6d" : "#1b2532")}
-          polygonStrokeColor={(polygon) => (isVisited(polygon) ? "#a3f4d3" : "#778497")}
-          polygonAltitude={(polygon) => (String(polygon.id) === selected.id ? 0.025 : isVisited(polygon) ? 0.012 : 0.003)}
+          onGlobeReady={() => setIsGlobeReady(true)}
+          polygonCapColor={(polygon) => { const id = String(polygon.id); if (id === selected.id) return "#f6c66f"; if (id === hoveredId && isVisited(polygon)) return "#72efbd"; return isVisited(polygon) ? "#3fd09a" : "#303b4d"; }}
+          polygonSideColor={(polygon) => (String(polygon.id) === selected.id ? "#b87924" : isVisited(polygon) ? "#189a6d" : "#1b2532")}
+          polygonStrokeColor={(polygon) => (String(polygon.id) === selected.id ? "#fff1c7" : isVisited(polygon) ? "#a3f4d3" : "#778497")}
+          polygonAltitude={(polygon) => (String(polygon.id) === selected.id ? 0.04 : isVisited(polygon) ? 0.012 : 0.003)}
           polygonsTransitionDuration={250}
           onPolygonHover={(polygon) => { const visited = polygon && isVisited(polygon); setHoveredId(visited ? String(polygon.id) : null); if (containerRef.current) containerRef.current.style.cursor = visited ? "pointer" : "grab"; }}
           onPolygonClick={(polygon) => { const memory = memoryByCountry.get(String(polygon.id)); if (memory) onSelect(memory, "globe"); }} />}
       </Suspense>
-      <p className="globe-instruction"><GlobeHemisphereEast size={18} weight="duotone" />드래그해 돌리고, 민트색 장소를 눌러보세요</p>
+      <p className="globe-instruction"><NavigationArrow size={18} weight="fill" />잡고 돌려보세요 · 민트색 나라를 누르면 기억이 열려요</p>
     </div>
   );
 }
@@ -602,35 +615,47 @@ function districtLabelPoint(district) {
   return [(bounds.minLng + bounds.maxLng) / 2, (bounds.minLat + bounds.maxLat) / 2];
 }
 
-async function loadDistrictMap(provinceCode, signal) {
+async function loadDistrictMap(provinceCode) {
   if (districtMapCache.has(provinceCode)) return districtMapCache.get(provinceCode);
 
   const suffix = provinceCode.replace("KR-", "");
-  const response = await fetch(`/assets/maps/korea-districts-${suffix}.json`, { signal });
-  if (!response.ok) throw new Error(`district map ${response.status}`);
-  const data = await response.json();
-  if (!Array.isArray(data?.districts) || data.districts.length === 0) {
-    throw new Error("invalid district map data");
-  }
-  districtMapCache.set(provinceCode, data.districts);
-  return data.districts;
+  const request = fetch(`/assets/maps/korea-districts-${suffix}.json`)
+    .then((response) => {
+      if (!response.ok) throw new Error(`district map ${response.status}`);
+      return response.json();
+    })
+    .then((data) => {
+      if (!Array.isArray(data?.districts) || data.districts.length === 0) {
+        throw new Error("invalid district map data");
+      }
+      return data.districts;
+    })
+    .catch((error) => {
+      districtMapCache.delete(provinceCode);
+      throw error;
+    });
+
+  districtMapCache.set(provinceCode, request);
+  return request;
 }
 
-function DistrictMap({ memory }) {
+function DistrictMap({ memory, theme }) {
   const shellRef = useRef(null);
   const canvasRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 620, height: 540 });
   const [mapState, setMapState] = useState({ status: "loading", districts: [] });
 
   useEffect(() => {
-    const controller = new AbortController();
+    let active = true;
     setMapState({ status: "loading", districts: [] });
-    loadDistrictMap(memory.provinceCode, controller.signal)
-      .then((districts) => setMapState({ status: "ready", districts }))
+    loadDistrictMap(memory.provinceCode)
+      .then((districts) => {
+        if (active) setMapState({ status: "ready", districts });
+      })
       .catch((error) => {
-        if (error.name !== "AbortError") setMapState({ status: "error", districts: [] });
+        if (active && error.name !== "AbortError") setMapState({ status: "error", districts: [] });
       });
-    return () => controller.abort();
+    return () => { active = false; };
   }, [memory.provinceCode]);
 
   useEffect(() => {
@@ -679,8 +704,8 @@ function DistrictMap({ memory }) {
         }
         context.closePath();
       }
-      context.fillStyle = active ? "#72e5b7" : "#172334";
-      context.strokeStyle = active ? "#a8f3d5" : "#45546a";
+      context.fillStyle = active ? "#72e5b7" : theme === "dark" ? "#172334" : "#e1e9e4";
+      context.strokeStyle = active ? (theme === "dark" ? "#a8f3d5" : "#21845f") : theme === "dark" ? "#45546a" : "#a8b7ae";
       context.lineWidth = active ? 2 : 1;
       context.fill("evenodd");
       context.stroke();
@@ -695,10 +720,10 @@ function DistrictMap({ memory }) {
       const y = projection.offsetY + (projection.maxLat - lat) * projection.scale;
       const fontSize = width < 420 ? (active ? 10 : 8) : (active ? 12 : 10);
       context.font = `${active ? 800 : 650} ${fontSize}px "Noto Sans KR", sans-serif`;
-      context.fillStyle = active ? "#073521" : "#95a5b8";
+      context.fillStyle = active ? "#073521" : theme === "dark" ? "#95a5b8" : "#53645a";
       context.fillText(district.name, x, y);
     }
-  }, [bounds, dimensions, mapState, memory.districtCode]);
+  }, [bounds, dimensions, mapState, memory.districtCode, theme]);
 
   return (
     <div className="district-map-shell" ref={shellRef}>
@@ -714,6 +739,12 @@ function KoreaDetailExperience({ theme }) {
   const [selected, setSelected] = useState(koreaMemories[0]);
   const [detailLevel, setDetailLevel] = useState(2);
   const analytics = useExperienceAnalytics("korea_detail");
+
+  useEffect(() => {
+    void Promise.allSettled(
+      koreaMemories.map((memory) => loadDistrictMap(memory.provinceCode)),
+    );
+  }, []);
 
   const handleSelect = (memory, selectionSource) => {
     analytics.startExperience("place_select");
@@ -738,9 +769,8 @@ function KoreaDetailExperience({ theme }) {
           <div><span className="app-kicker">MY TRIP MAP</span><h3>{detailLevel === 2 ? "나의 대한민국 지도" : selected.province}</h3></div>
           <div className="map-progress"><strong>3</strong><span>/ 17</span><small>18% 채움</small></div>
         </header>
-        <div className="scope-toggle" role="group" aria-label="지도 범위"><button type="button" className="is-active" aria-pressed="true"><MapTrifold size={17} weight="fill" />대한민국</button><a href="#experience"><GlobeHemisphereEast size={17} weight="duotone" />전세계</a></div>
         {detailLevel === 2 ? (
-          <>
+          <div className="detail-level-content">
             <div className="region-shortcuts" role="group" aria-label="상세 지역 기억 선택">
               <span><b>2단계</b> 시·도를 눌러 장소로 들어가세요</span>
               <div>{koreaMemories.map((memory) => <button key={memory.key} type="button" onClick={() => handleSelect(memory, "shortcut")}>{memory.province}</button>)}</div>
@@ -756,14 +786,14 @@ function KoreaDetailExperience({ theme }) {
                 </ol>
               </aside>
             </div>
-          </>
+          </div>
         ) : (
-          <div className="region-detail-stage" aria-live="polite">
+          <div className="region-detail-stage detail-level-content" aria-live="polite">
             <div className="region-detail-toolbar">
               <button type="button" onClick={handleBack}><ArrowLeft size={18} weight="bold" />대한민국 지도로 돌아가기</button>
             </div>
             <div className="district-detail-grid">
-              <DistrictMap memory={selected} />
+              <DistrictMap memory={selected} theme={theme} />
               <article className="region-memory-card is-detail">
                 <div className="region-photo"><img key={selected.image} src={selected.image} alt={`${selected.location}의 실제 사진`} loading="lazy" decoding="async" /><span>{selected.category}</span></div>
                 <div className="region-memory-body">
@@ -794,10 +824,12 @@ function KoreaDetailExperience({ theme }) {
 function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("mapmory-theme") || "light");
   const [selectedMemory, setSelectedMemory] = useState(memories[0]);
+  const [globeFocusRequest, setGlobeFocusRequest] = useState(0);
   const globeAnalytics = useExperienceAnalytics("globe");
 
   const handleWorldSelect = (memory, selectionSource) => {
     globeAnalytics.startExperience("place_select");
+    setGlobeFocusRequest((current) => current + 1);
     if (selectedMemory.id === memory.id) return;
     globeAnalytics.trackPlaceSelect(memory.key, selectionSource);
     setSelectedMemory(memory);
@@ -809,24 +841,38 @@ function App() {
     <main id="top">
       <header className="site-header">
         <Brand />
-        <nav aria-label="주요 메뉴"><a href="#experience">전세계 체험</a><a href="#korea-detail">대한민국 상세지도</a><a href="#journey">사용 흐름</a></nav>
+        <nav aria-label="주요 메뉴"><a href="#experience">지구본 체험</a><a href="#korea-detail">대한민국 지도</a><a href="#journey">앱 흐름</a></nav>
         <div className="header-actions"><ThemeToggle theme={theme} onChange={setTheme} /><DownloadButton className="header-download" placement="header" /></div>
       </header>
 
       <section className="hero">
-        <div className="hero-copy">
-          <p className="eyebrow">PLACE-BASED MEMORY ARCHIVE</p>
-          <h1>다녀온 곳이 쌓일수록,<br />나만의 <em>기억 지도</em>가 완성돼요.</h1>
-          <p className="hero-description">사진은 앨범에 흩어져도, 장소는 기억을 다시 불러와요.<br />여행부터 데이트, 카페, 라멘까지 원하는 방식으로 모아보세요.</p>
-          <div className="hero-actions"><DownloadButton placement="hero" /><a className="button button-secondary" href="#experience"><GlobeHemisphereEast size={19} weight="duotone" />설치 전에 먼저 체험하기</a></div>
-          <p className="release-note"><CheckCircle size={17} weight="fill" />비공개 테스트 진행 중 · 이메일로 정식 출시 알림</p>
+        <div className="hero-intro">
+          <div className="hero-copy">
+            <p className="eyebrow">PLACE-BASED MEMORY ARCHIVE</p>
+            <h1>장소를 따라가면,<br />그날의 <em>기억</em>이<br />다시 열려요.</h1>
+            <p className="hero-description">사진과 장소를 모아 나만의 기억 지도를 만들어요.</p>
+            <div className="hero-actions">
+              <a className="button button-primary" href="#experience" onClick={() => globeAnalytics.startExperience("hero_cta")}><GlobeHemisphereEast size={19} weight="duotone" />지구본 돌려보기</a>
+              <DownloadButton className="hero-release" placement="hero" />
+            </div>
+            <p className="release-note"><CheckCircle size={17} weight="fill" />비공개 테스트 진행 중 · Google Play 출시 준비</p>
+          </div>
+
+          <figure className="hero-photo">
+            <img src="/assets/team-jeju-coast.jpg" alt="해 질 무렵 검은 바위 사이로 파도가 밀려오는 제주 바닷가" />
+            <figcaption><span><MapPin size={16} weight="fill" />제주 바닷가의 저녁</span><small>Mapmory 개발팀의 실제 기록</small></figcaption>
+          </figure>
         </div>
+        <a className="hero-fold-cue" href="#experience"><span>아래로 내려 앱 경험해보기</span><ArrowDown size={18} weight="bold" /></a>
       </section>
 
       <section className="experience-section" id="experience" ref={globeAnalytics.sectionRef}>
-        <div className="section-heading"><p className="eyebrow">STEP 1 · TRY THE GLOBE</p><h2>지구본을 돌려<br />기억을 먼저 열어보세요.</h2><p>색칠된 나라를 누르면 실제 사진과 그날의 기억이 열립니다.</p></div>
+        <div className="section-heading section-heading-flow">
+          <div><p className="eyebrow">01 · 세계</p><h2>지구본을 돌려<br />기억을 찾아요.</h2></div>
+          <p>기억이 있는 나라를 선택하면, 실제 사진과 짧은 기록이 별도의 기억 패널에서 열립니다.</p>
+        </div>
         <div className="experience-stage">
-          <article className="globe-panel" id="globe-demo"><header><span><GlobeHemisphereEast size={19} weight="duotone" />3D 기억 지도</span><small><i />민트색 = 저장된 나라</small></header><InteractiveGlobe selected={selectedMemory} onSelect={handleWorldSelect} onInteract={globeAnalytics.startExperience} theme={theme} countrySelector={<LocationSelector selected={selectedMemory} onSelect={handleWorldSelect} />} /></article>
+          <article className="globe-panel" id="globe-demo"><header><span><GlobeHemisphereEast size={19} weight="duotone" />3D 기억 지도</span><small><i />민트색 = 기록 <i className="is-selected" />금색 = 선택</small></header><InteractiveGlobe selected={selectedMemory} focusRequest={globeFocusRequest} onSelect={handleWorldSelect} onInteract={globeAnalytics.startExperience} theme={theme} countrySelector={<LocationSelector selected={selectedMemory} onSelect={handleWorldSelect} />} /></article>
           <MemoryCard key={selectedMemory.id} memory={selectedMemory} />
         </div>
       </section>
