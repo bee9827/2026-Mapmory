@@ -15,6 +15,8 @@ import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.RegionDetailResponse;
 import com.mapmory.backend.travelrecord.dto.RegionItemResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordListItemResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecord.dto.TravelRecordResponse;
@@ -146,6 +148,35 @@ class TravelRecordControllerTest {
                 .andExpect(jsonPath("$.data.media[0].viewUrl")
                         .value("https://download.example/mapmory/travel-records/a.jpg"))
                 .andExpect(jsonPath("$.data.media[0].viewUrlExpiresIn").value(300L));
+    }
+
+    @Test
+    void 여행_일지_목록에_썸네일_URL을_반환한다() throws Exception {
+        TravelRecordListResponse list = new TravelRecordListResponse(
+                List.of(new TravelRecordListItemResponse(
+                        101L,
+                        "제주 여행",
+                        "제주시",
+                        LocalDate.of(2026, 8, 11),
+                        LocalDate.of(2026, 8, 13),
+                        "https://download.example/mapmory/travel-records/a.jpg",
+                        300L,
+                        List.of()
+                )),
+                0,
+                20,
+                1,
+                1,
+                false
+        );
+        when(travelRecordService.findAll(MEMBER, null, null, null, null, 0, 20))
+                .thenReturn(list);
+
+        mockMvcWithLoginMember().perform(get("/api/v1/travel-records"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].thumbnailUrl")
+                        .value("https://download.example/mapmory/travel-records/a.jpg"))
+                .andExpect(jsonPath("$.data.items[0].thumbnailUrlExpiresIn").value(300L));
     }
 
     @Test

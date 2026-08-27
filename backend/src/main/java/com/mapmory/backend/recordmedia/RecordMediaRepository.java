@@ -8,5 +8,10 @@ public interface RecordMediaRepository extends JpaRepository<RecordMedia, Long> 
 
     List<RecordMedia> findByTravelRecordIdOrderBySortOrderAsc(Long travelRecordId);
 
+    List<RecordMedia> findByTravelRecordIdInAndSortOrder(
+            Collection<Long> travelRecordIds,
+            int sortOrder
+    );
+
     List<RecordMedia> findByObjectKeyIn(Collection<String> objectKeys);
 }

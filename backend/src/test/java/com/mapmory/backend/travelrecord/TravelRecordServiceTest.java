@@ -380,16 +380,51 @@ class TravelRecordServiceTest {
         Region region = mock(Region.class);
         when(travelRecord.getId()).thenReturn(101L);
         when(travelRecord.getRegion()).thenReturn(region);
+        RecordMedia thumbnail = RecordMedia.of(
+                travelRecord,
+                "mapmory/travel-records/a.jpg",
+                null,
+                0
+        );
         Page<TravelRecord> expected = new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1);
         when(travelRecordRepository.findByMemberIdAndOptionalTagId(eq(10L), eq(null), any(Pageable.class)))
                 .thenReturn(expected);
+        when(recordMediaRepository.findByTravelRecordIdInAndSortOrder(List.of(101L), 0))
+                .thenReturn(List.of(thumbnail));
 
         TravelRecordListResponse result = travelRecordService.findAll(member, null, null, null, null, 0, 20);
 
         assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.items().getFirst().thumbnailUrl())
+                .isEqualTo("https://download.example/mapmory/travel-records/a.jpg");
+        assertThat(result.items().getFirst().thumbnailUrlExpiresIn()).isEqualTo(300L);
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(travelRecordRepository).findByMemberIdAndOptionalTagId(eq(10L), eq(null), captor.capture());
         assertThat(captor.getValue().getPageSize()).isEqualTo(20);
+        verify(recordMediaRepository).findByTravelRecordIdInAndSortOrder(List.of(101L), 0);
+        verify(presignedUrlProvider).createPresignedGetUrl(
+                "mapmory/travel-records/a.jpg",
+                Duration.ofMinutes(5)
+        );
+    }
+
+    @Test
+    void 미디어가_없는_일지_목록은_썸네일_정보가_null이다() {
+        TravelRecord travelRecord = mock(TravelRecord.class);
+        Region region = mock(Region.class);
+        when(travelRecord.getId()).thenReturn(101L);
+        when(travelRecord.getRegion()).thenReturn(region);
+        Page<TravelRecord> expected = new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1);
+        when(travelRecordRepository.findByMemberIdAndOptionalTagId(eq(10L), eq(null), any(Pageable.class)))
+                .thenReturn(expected);
+        when(recordMediaRepository.findByTravelRecordIdInAndSortOrder(List.of(101L), 0))
+                .thenReturn(List.of());
+
+        TravelRecordListResponse result = travelRecordService.findAll(member, null, null, null, null, 0, 20);
+
+        assertThat(result.items().getFirst().thumbnailUrl()).isNull();
+        assertThat(result.items().getFirst().thumbnailUrlExpiresIn()).isNull();
+        verify(presignedUrlProvider, never()).createPresignedGetUrl(anyString(), any());
     }
 
     @Test

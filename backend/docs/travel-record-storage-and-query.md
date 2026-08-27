@@ -198,7 +198,9 @@ PageRequest.of(
 | `totalPages` | 전체 페이지 수 |
 | `hasNext` | 다음 페이지 존재 여부 |
 
-목록 아이템은 `id`, `title`, `regionName`, `startDate`, `endDate`, `thumbnailUrl`만 반환한다. 본문과 전체 이미지 목록은 목록 응답에서 제외한다.
+목록 아이템은 `id`, `title`, `regionName`, `startDate`, `endDate`, `thumbnailUrl`, `thumbnailUrlExpiresIn`을 반환한다. 본문과 전체 이미지 목록은 목록 응답에서 제외한다.
+
+`thumbnailUrl`은 현재 페이지의 기록 ID를 모아 `sort_order = 0`인 첫 미디어를 한 번에 조회한 뒤 Presigned GET URL로 생성한다. `thumb_key`가 있으면 썸네일 객체를 사용하고, 아직 생성되지 않았다면 원본 `object_key`를 사용한다. 미디어가 없는 기록은 `thumbnailUrl`과 `thumbnailUrlExpiresIn`이 모두 `null`이다.
 
 생성과 목록 조회의 성공 응답은 다음처럼 `data` 필드로 감싼다.
 
@@ -309,7 +311,7 @@ Service는 `travelRecordId`와 `memberId`로 소유권을 확인한 후 새 Regi
 | 생성·목록 페이징 테스트 | 구현 |
 | 여행 기록 상세 조회 및 소유권 검사 | 구현 |
 | 여행 기록 전체 수정 및 미디어 동기화 | 구현 |
-| 목록 썸네일 URL 생성 | 미구현, 현재 `null` |
+| 목록 썸네일 URL 생성 | 구현 |
 | 상세 조회 Object Key의 Presigned GET URL 변환 | 구현 |
 | 키워드 검색 | 미구현 |
 | 날짜 범위 검증 | 미구현 |

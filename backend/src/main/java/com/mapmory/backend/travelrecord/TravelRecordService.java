@@ -214,13 +214,21 @@ public class TravelRecordService {
             }
         }
 
+        List<Long> travelRecordIds = travelRecords.getContent().stream()
+                .map(TravelRecord::getId)
+                .toList();
         Map<Long, List<Tag>> tagsByTravelRecordId =
-                travelRecordTagService.findByTravelRecordIds(
-                        travelRecords.getContent().stream().map(TravelRecord::getId).toList()
-                );
+                travelRecordTagService.findByTravelRecordIds(travelRecordIds);
+        Duration expiration = uploadPolicyProperties.presignedUrlExpiration();
+        Map<Long, String> thumbnailUrlsByTravelRecordId = createThumbnailUrls(
+                travelRecordIds,
+                expiration
+        );
         return TravelRecordListResponse.from(
                 travelRecords,
-                tagsByTravelRecordId
+                tagsByTravelRecordId,
+                thumbnailUrlsByTravelRecordId,
+                expiration.toSeconds()
         );
     }
 
@@ -343,6 +351,24 @@ public class TravelRecordService {
                 .toList();
 
         return TravelRecordDetailResponse.from(travelRecord, recordMedia, tags, media);
+    }
+
+    private Map<Long, String> createThumbnailUrls(
+            List<Long> travelRecordIds,
+            Duration expiration
+    ) {
+        if (travelRecordIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return recordMediaRepository.findByTravelRecordIdInAndSortOrder(travelRecordIds, 0).stream()
+                .collect(Collectors.toMap(
+                        RecordMedia::getTravelRecordId,
+                        media -> presignedUrlProvider.createPresignedGetUrl(
+                                media.getThumbnailObjectKey(),
+                                expiration
+                        ).toString()
+                ));
     }
 
 }

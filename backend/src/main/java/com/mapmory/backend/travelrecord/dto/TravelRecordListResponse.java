@@ -16,13 +16,19 @@ public record TravelRecordListResponse(
 ) {
     public static TravelRecordListResponse from(
             Page<TravelRecord> travelRecords,
-            Map<Long, List<Tag>> tagsByTravelRecordId
+            Map<Long, List<Tag>> tagsByTravelRecordId,
+            Map<Long, String> thumbnailUrlsByTravelRecordId,
+            long thumbnailUrlExpiresIn
     ) {
         return new TravelRecordListResponse(
                 travelRecords.getContent().stream()
                         .map(travelRecord -> TravelRecordListItemResponse.from(
                                 travelRecord,
-                                tagsByTravelRecordId.getOrDefault(travelRecord.getId(), List.of())
+                                tagsByTravelRecordId.getOrDefault(travelRecord.getId(), List.of()),
+                                thumbnailUrlsByTravelRecordId.get(travelRecord.getId()),
+                                thumbnailUrlsByTravelRecordId.containsKey(travelRecord.getId())
+                                        ? thumbnailUrlExpiresIn
+                                        : null
                         ))
                         .toList(),
                 travelRecords.getNumber(),

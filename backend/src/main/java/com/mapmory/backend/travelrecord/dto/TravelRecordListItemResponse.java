@@ -13,11 +13,14 @@ public record TravelRecordListItemResponse(
         LocalDate startDate,
         LocalDate endDate,
         String thumbnailUrl,
+        Long thumbnailUrlExpiresIn,
         List<TagSummaryResponse> tags
 ) {
     public static TravelRecordListItemResponse from(
             TravelRecord travelRecord,
-            List<Tag> tags
+            List<Tag> tags,
+            String thumbnailUrl,
+            Long thumbnailUrlExpiresIn
     ) {
         return new TravelRecordListItemResponse(
                 travelRecord.getId(),
@@ -25,7 +28,8 @@ public record TravelRecordListItemResponse(
                 travelRecord.getRegion().getName(),
                 travelRecord.getStartDate(),
                 travelRecord.getEndDate(),
-                null, // 다음 단계에서 첫 번째 미디어의 URL을 넣는다.
+                thumbnailUrl,
+                thumbnailUrlExpiresIn,
                 tags.stream().map(TagSummaryResponse::from).toList()
         );
     }

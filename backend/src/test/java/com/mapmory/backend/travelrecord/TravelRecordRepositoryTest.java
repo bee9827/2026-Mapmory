@@ -160,6 +160,12 @@ class TravelRecordRepositoryTest extends MySqlTestContainerSupport {
         assertThat(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(travelRecord.getId()))
                 .extracting(RecordMedia::getObjectKey)
                 .containsExactly("mapmory/detail/a.jpg", "mapmory/detail/b.jpg");
+        assertThat(recordMediaRepository.findByTravelRecordIdInAndSortOrder(
+                java.util.List.of(travelRecord.getId()),
+                0
+        ))
+                .extracting(RecordMedia::getObjectKey)
+                .containsExactly("mapmory/detail/a.jpg");
         assertThat(recordMediaRepository.findByObjectKeyIn(
                 java.util.List.of("mapmory/detail/a.jpg")
         ))
