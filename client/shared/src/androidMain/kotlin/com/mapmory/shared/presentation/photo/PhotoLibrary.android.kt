@@ -601,8 +601,8 @@ private fun formatDate(epochMillis: Long?): String? = epochMillis?.let {
     SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(it))
 }
 
-private const val PreviewSizePx = 2048
-private const val PreviewJpegQuality = 96
+private const val PreviewSizePx = 1280
+private const val PreviewJpegQuality = 85
 private const val OriginalJpegQuality = 100
 private const val PhotoPerformanceTag = "MapmoryPhotoPerf"
 private const val FullGalleryAccessMessage =

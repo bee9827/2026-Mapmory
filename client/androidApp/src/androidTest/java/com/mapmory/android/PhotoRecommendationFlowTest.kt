@@ -51,7 +51,7 @@ class PhotoRecommendationFlowTest {
                 onPhotosAdded = { photos -> addedPhotos = photos },
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, onRecommended, _, _ ->
+                photoLibraryActionsFactory = { _, onRecommended, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { location, parentName ->
@@ -100,7 +100,7 @@ class PhotoRecommendationFlowTest {
                 onEndDateChanged = {},
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, _, _, _ ->
+                photoLibraryActionsFactory = { _, _, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { _, _ -> recommendationCalls += 1 },

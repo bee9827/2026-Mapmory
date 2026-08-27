@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -26,6 +28,7 @@ internal fun MapmoryNavHost(
     backHandlerRegistry: MapmoryBackHandlerRegistry,
     contentWindowInsets: WindowInsets,
 ) {
+    val tripRecordRevision by container.tripRecordRevision.collectAsState()
     NavHost(
         navController = navController,
         startDestination = MapRoute,
@@ -39,6 +42,7 @@ internal fun MapmoryNavHost(
                 viewModel = viewModel,
                 regionCatalog = container.regionCatalog,
                 backHandlerRegistry = backHandlerRegistry,
+                tripRecordRevision = tripRecordRevision,
                 onOpenRecords = navigator::navigateToRecords,
                 onOpenEditor = { locationId ->
                     navigator.navigateToEditor(selectedLocationId = locationId)
@@ -55,8 +59,8 @@ internal fun MapmoryNavHost(
             TripRecordListRoute(
                 modifier = Modifier.windowInsetsPadding(contentWindowInsets),
                 viewModel = viewModel,
-                regionCatalog = container.regionCatalog,
                 initialLocationId = route.locationId,
+                tripRecordRevision = tripRecordRevision,
                 onOpenMap = navigator::navigateToMap,
                 onOpenEditor = { navigator.navigateToEditor() },
                 onOpenDetail = navigator::navigateToDetail,
@@ -114,6 +118,7 @@ internal fun MapmoryNavHost(
                     ),
                 ),
                 recordId = route.recordId,
+                tripRecordRevision = tripRecordRevision,
                 viewModel = viewModel,
                 onBack = { navigator.navigateBack() },
                 onEdit = { recordId ->

@@ -14,6 +14,7 @@ class TripRecordDetailViewModel(
     private val getTripRecord: GetTripRecordUseCase,
     private val deleteTripRecord: DeleteTripRecordUseCase,
     private val regionCatalog: RegionCatalog? = null,
+    private val onTripRecordsChanged: () -> Unit = {},
 ) : ViewModel() {
     var uiState by mutableStateOf<TripRecordDetailUiState>(TripRecordDetailUiState.Idle)
         private set
@@ -38,7 +39,10 @@ class TripRecordDetailViewModel(
         val record = (uiState as? TripRecordDetailUiState.Success)?.record ?: return false
         uiState = TripRecordDetailUiState.Deleting
         return deleteTripRecord(record.id).fold(
-            onSuccess = { true },
+            onSuccess = {
+                onTripRecordsChanged()
+                true
+            },
             onFailure = { error ->
                 uiState = TripRecordDetailUiState.Error(
                     error.message ?: "여행 기록을 삭제하지 못했습니다.",

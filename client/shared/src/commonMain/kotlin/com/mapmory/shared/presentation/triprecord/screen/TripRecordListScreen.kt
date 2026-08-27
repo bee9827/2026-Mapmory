@@ -36,22 +36,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.presentation.triprecord.state.TripRecordFilterUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
 import com.mapmory.shared.preview.PreviewSurface
-import com.mapmory.shared.preview.previewLocations
 import com.mapmory.shared.preview.previewUiRecords
 
 @Composable
 fun TripRecordListScreen(
     uiState: TripRecordListUiState,
     filter: TripRecordFilterUiState,
-    locations: List<Location>,
-    onKeywordChanged: (String) -> Unit,
-    onLocationChanged: (Long?) -> Unit,
-    onSearchClick: () -> Unit,
     onPreviousPageClick: () -> Unit,
     onNextPageClick: () -> Unit,
     onCreateClick: () -> Unit,
@@ -95,7 +89,7 @@ fun TripRecordListScreen(
                     is TripRecordListUiState.Success -> {
                         if (uiState.records.isEmpty()) {
                             EmptyTripRecords(
-                                hasFilter = filter.keyword.isNotBlank() || filter.locationId != null,
+                                hasFilter = filter.locationId != null,
                                 modifier = Modifier.weight(1f),
                             )
                         } else {
@@ -400,10 +394,6 @@ fun TripRecordListScreenPreview() {
         TripRecordListScreen(
             uiState = TripRecordListUiState.Success(previewUiRecords, page = 0, totalPages = 3),
             filter = TripRecordFilterUiState(),
-            locations = previewLocations,
-            onKeywordChanged = {},
-            onLocationChanged = {},
-            onSearchClick = {},
             onPreviousPageClick = {},
             onNextPageClick = {},
             onCreateClick = {},
@@ -425,10 +415,6 @@ fun EmptyTripRecordListScreenPreview() {
         TripRecordListScreen(
             uiState = TripRecordListUiState.Success(emptyList(), page = 0, totalPages = 0),
             filter = TripRecordFilterUiState(),
-            locations = previewLocations,
-            onKeywordChanged = {},
-            onLocationChanged = {},
-            onSearchClick = {},
             onPreviousPageClick = {},
             onNextPageClick = {},
             onCreateClick = {},
@@ -450,10 +436,6 @@ fun LoadingTripRecordListScreenPreview() {
         TripRecordListScreen(
             uiState = TripRecordListUiState.Loading,
             filter = TripRecordFilterUiState(),
-            locations = previewLocations,
-            onKeywordChanged = {},
-            onLocationChanged = {},
-            onSearchClick = {},
             onPreviousPageClick = {},
             onNextPageClick = {},
             onCreateClick = {},
@@ -475,10 +457,6 @@ fun ErrorTripRecordListScreenPreview() {
         TripRecordListScreen(
             uiState = TripRecordListUiState.Error("여행 기록을 불러오지 못했어요."),
             filter = TripRecordFilterUiState(),
-            locations = previewLocations,
-            onKeywordChanged = {},
-            onLocationChanged = {},
-            onSearchClick = {},
             onPreviousPageClick = {},
             onNextPageClick = {},
             onCreateClick = {},
