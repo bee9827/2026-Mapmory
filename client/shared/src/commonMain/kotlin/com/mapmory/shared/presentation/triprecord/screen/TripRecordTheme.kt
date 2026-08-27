@@ -1,6 +1,5 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -10,22 +9,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import com.mapmory.shared.LocalMapmoryTheme
-
-@Composable
-internal fun rememberDismissKeyboardOnTapModifier(): Modifier {
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    return Modifier.pointerInput(focusManager, keyboardController) {
-        detectTapGestures {
-            focusManager.clearFocus(force = true)
-            keyboardController?.hide()
-        }
-    }
-}
 
 @Composable
 internal fun TripRecordTheme(content: @Composable () -> Unit) {
