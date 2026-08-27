@@ -1,17 +1,17 @@
-name: Backend CI/CD
+name: Backend CI
 
 on:
   pull_request:
     paths:
       - "backend/**"
       - "api.md"
-      - ".github/workflows/backend-cicd.yml"
+      - ".github/workflows/backend-ci.yml"
   push:
     branches: [main]
     paths:
       - "backend/**"
       - "api.md"
-      - ".github/workflows/backend-cicd.yml"
+      - ".github/workflows/backend-ci.yml"
   workflow_dispatch:
 
 permissions:
