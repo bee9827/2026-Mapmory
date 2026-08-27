@@ -22,7 +22,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.mapmory.shared.MapmoryTheme
+import com.mapmory.shared.LocalMapmoryTheme
 import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
 import com.mapmory.shared.presentation.map.domain.CountryPolygon
 import com.mapmory.shared.presentation.map.math.Quaternion
@@ -68,7 +68,7 @@ internal fun WorldGlobe(
             }
         }
     }
-    val isDark = MapmoryTheme.isDark
+    val isDark = LocalMapmoryTheme.current.isDark
 
     Box(
         modifier = modifier

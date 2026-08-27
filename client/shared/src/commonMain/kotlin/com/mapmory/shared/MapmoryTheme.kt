@@ -1,9 +1,17 @@
 package com.mapmory.shared
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.staticCompositionLocalOf
 
-object MapmoryTheme {
-    var isDark by mutableStateOf(false)
+@Immutable
+data class MapmoryThemeState(
+    val isDark: Boolean,
+    val onThemeChange: (Boolean) -> Unit,
+)
+
+val LocalMapmoryTheme = staticCompositionLocalOf {
+    MapmoryThemeState(
+        isDark = false,
+        onThemeChange = {},
+    )
 }

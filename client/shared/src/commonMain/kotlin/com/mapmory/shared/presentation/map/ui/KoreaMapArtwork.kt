@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
-import com.mapmory.shared.MapmoryTheme
+import com.mapmory.shared.LocalMapmoryTheme
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.GeoPoint
 import com.mapmory.shared.presentation.map.domain.ProvincePolygon
@@ -57,7 +57,7 @@ fun KoreaMapArtwork(
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val currentOnRegionClick by rememberUpdatedState(onRegionClick)
     val textMeasurer = rememberTextMeasurer()
-    val isDark = MapmoryTheme.isDark
+    val isDark = LocalMapmoryTheme.current.isDark
     val labelStyle = TextStyle(
         color = if (isDark) Color(0xFF7085A8) else Color(0xFF6B786F),
         fontSize = when {
