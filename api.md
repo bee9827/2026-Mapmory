@@ -442,14 +442,16 @@ Authorization: Bearer {게스트 accessToken}
 | `districtCode` | String | 조건부 | `KR`이면 필수 |
 | `title` | String | 예 | 공백이 아닌 문자를 포함해야 하며 최대 200자 |
 | `content` | String | 아니요 | `null`, 빈 문자열·공백 허용 |
-| `startDate` | LocalDate | 예 | `YYYY-MM-DD` |
-| `endDate` | LocalDate | 아니요 | 시작일보다 빠를 수 없음 |
+| `startDate` | LocalDate | 예 | `YYYY-MM-DD`, 오늘 또는 과거 |
+| `endDate` | LocalDate | 아니요 | 오늘 또는 과거이며 시작일과 같거나 이후 |
 | `objectKeys` | String[] | 아니요 | 업로드 완료된 Object Key 목록 |
 | `tagIds` | Long[] | 아니요 | 빈 배열 허용, 최대 5개, 중복 불가, 모두 현재 회원 소유 |
 
 `objectKeys`는 배열 순서대로 `record_media.sort_order`를 0부터 부여해 저장한다. 값이 없거나 `null`이면 미디어를 생성하지 않는다.
 
 `content`가 없거나 `null`이면 서버는 빈 문자열로 정규화해 저장한다.
+
+여행 날짜는 `Asia/Seoul`의 오늘을 기준으로 검증한다. 시작일과 종료일 모두 미래일 수 없으며 오늘은 허용한다. 종료일을 입력했다면 시작일보다 빠를 수 없다. 생성과 수정에 같은 규칙을 적용한다.
 
 `tagIds`가 없거나 `null`이면 태그를 연결하지 않는다. 새 태그를 입력한 클라이언트는 먼저 `POST /tags`로 태그를 생성한 뒤 반환된 ID를 여행 기록 요청에 포함한다. 여행 기록과 태그 연결은 같은 트랜잭션에서 저장한다.
 
@@ -469,7 +471,7 @@ Authorization: Bearer {게스트 accessToken}
 | `404` | `REGION_NOT_FOUND` | 요청한 국가·시도·시군구가 존재하지 않음 |
 | `400` | `INVALID_REGION_HIERARCHY` | 요청 지역의 부모 관계가 맞지 않음 |
 | `400` | `INVALID_REGION_TYPE` | 한국 기록의 최종 지역이 `DISTRICT`가 아님 |
-| `400` | `INVALID_TRAVEL_DATE_RANGE` | 종료일이 시작일보다 빠름 |
+| `400` | `INVALID_TRAVEL_DATE_RANGE` | 시작일·종료일이 미래이거나 종료일이 시작일보다 빠름 |
 | `400` | `INVALID_OBJECT_KEY` | Object Key 형식 또는 소유자가 올바르지 않음 |
 | `409` | `OBJECT_NOT_UPLOADED` | S3 업로드가 확인되지 않음 |
 | `400` | `TOO_MANY_TAGS` | 임시 기록당 태그 5개 제한 초과 |
@@ -627,7 +629,7 @@ Access Token에서 식별한 현재 회원의 기록만 반환한다.
 | `400` | `INVALID_OBJECT_KEY` | Object Key가 중복되거나 다른 기록에서 사용 중임 |
 | `404` | `TRAVEL_RECORD_NOT_FOUND` | 기록이 없거나 현재 회원의 기록이 아님 |
 
-Region 관련 오류는 생성 API와 동일하게 처리한다.
+날짜와 Region 관련 오류는 생성 API와 동일하게 처리한다.
 
 ### 여행 기록 삭제
 
@@ -750,5 +752,4 @@ Authorization: Bearer {accessToken}
 - 여행 기록 생성·수정 시 태그 소유권 검증과 연결 변경을 같은 트랜잭션에서 처리
 - 지도 요약 Repository에 선택적 `tagId` 조건을 추가하고 MySQL 실행 계획 검증
 - 목록·상세 응답에 `tags`를 추가한 뒤 KMP DTO 계약 갱신
-- 여행 날짜 범위 검증 보완
 - 여행 기록 생성에서도 Object Key 중복·소유권·업로드 완료 검증을 문서 계약과 일치시킴

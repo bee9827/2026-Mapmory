@@ -26,14 +26,15 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -45,6 +46,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class TravelRecordServiceTest {
+
+    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalDate TODAY = LocalDate.of(2026, 8, 27);
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            TODAY.atStartOfDay(SERVICE_ZONE).toInstant(),
+            SERVICE_ZONE
+    );
 
     @Mock
     private TravelRecordRepository travelRecordRepository;
@@ -64,7 +72,6 @@ class TravelRecordServiceTest {
     @Spy
     private OperationTimer operationTimer = new OperationTimer(new SimpleMeterRegistry());
 
-    @InjectMocks
     private TravelRecordService travelRecordService;
 
     private Member member;
@@ -73,6 +80,15 @@ class TravelRecordServiceTest {
     void setUp() {
         member = mock(Member.class);
         lenient().when(member.getId()).thenReturn(10L);
+        travelRecordService = new TravelRecordService(
+                travelRecordRepository,
+                regionResolver,
+                recordMediaRepository,
+                travelRecordTagService,
+                tagService,
+                operationTimer,
+                FIXED_CLOCK
+        );
     }
 
     @Test
@@ -111,6 +127,48 @@ class TravelRecordServiceTest {
     }
 
     @Test
+    void 종료일이_시작일보다_빠르면_여행_일지를_생성하지_않는다() {
+        LocalDate startDate = TODAY.minusDays(1);
+        TravelRecordRequest request = createRequest(startDate, startDate.minusDays(1));
+
+        assertInvalidTravelDates(request);
+    }
+
+    @Test
+    void 시작일이_미래이면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest(
+                TODAY.plusDays(1),
+                null
+        );
+
+        assertInvalidTravelDates(request);
+    }
+
+    @Test
+    void 종료일이_미래이면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest(
+                TODAY,
+                TODAY.plusDays(1)
+        );
+
+        assertInvalidTravelDates(request);
+    }
+
+    @Test
+    void 시작일과_종료일이_오늘이면_여행_일지를_생성한다() {
+        Region japan = mock(Region.class);
+        TravelRecordRequest request = createRequest(TODAY, TODAY);
+        when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
+        when(travelRecordRepository.save(any(TravelRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        TravelRecord result = travelRecordService.create(member, request);
+
+        assertThat(result.getStartDate()).isEqualTo(TODAY);
+        assertThat(result.getEndDate()).isEqualTo(TODAY);
+    }
+
+    @Test
     void 지역_계층과_정렬된_Object_Key를_포함한_일지_상세를_조회한다() {
         Region country = Region.of(null, null, "KR", "대한민국", RegionType.COUNTRY);
         Region province = Region.of(country, country, "49", "제주특별자치도", RegionType.PROVINCE);
@@ -144,6 +202,28 @@ class TravelRecordServiceTest {
                 "mapmory/travel-records/a.jpg",
                 "mapmory/travel-records/b.jpg"
         );
+    }
+
+    private TravelRecordRequest createRequest(LocalDate startDate, LocalDate endDate) {
+        return new TravelRecordRequest(
+                "JP",
+                null,
+                null,
+                "일본 여행",
+                "",
+                startDate,
+                endDate,
+                List.of(),
+                List.of()
+        );
+    }
+
+    private void assertInvalidTravelDates(TravelRecordRequest request) {
+        assertThatThrownBy(() -> travelRecordService.create(member, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode().code())
+                                .isEqualTo("INVALID_TRAVEL_DATE_RANGE"));
+        verify(travelRecordRepository, never()).save(any(TravelRecord.class));
     }
 
     @Test
