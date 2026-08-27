@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 class TripRecordEditorViewModelTest {
     @Test
     fun `경로를_반복_초기화해도_작성_초안을_유지한다`() = runSuspend {
-        val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+        val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(repository),
             updateTripRecord = UpdateTripRecordUseCase(repository),
@@ -34,13 +34,14 @@ class TripRecordEditorViewModelTest {
 
     @Test
     fun `저장은_대기_중인_사진을_기다리고_사용자_확인_후_제외한다`() = runSuspend {
-        val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+        val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(repository),
             updateTripRecord = UpdateTripRecordUseCase(repository),
         )
         viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
         viewModel.updateTitle("서울 여행")
+        viewModel.updateStartDate("2026-08-01")
         viewModel.setPhotoLoading(true)
 
         assertFalse(viewModel.save())
@@ -57,7 +58,7 @@ class TripRecordEditorViewModelTest {
     @Test
     fun `저장은_여행_기록을_생성하고_수정한다`() {
         runSuspend {
-            val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+            val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
             val viewModel = TripRecordEditorViewModel(
                 createTripRecord = CreateTripRecordUseCase(repository),
                 updateTripRecord = UpdateTripRecordUseCase(repository),
@@ -66,6 +67,7 @@ class TripRecordEditorViewModelTest {
             viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
             viewModel.updateTitle("서울 여행")
             viewModel.updateContent("한강을 걸었다.")
+            viewModel.updateStartDate("2026-08-01")
 
             assertTrue(viewModel.save())
             assertEquals(
@@ -73,7 +75,8 @@ class TripRecordEditorViewModelTest {
                 GetTripRecordsUseCase(repository)(TripRecordQuery()).getOrThrow().records.single().title,
             )
 
-            val record = repository.getTripRecords(TripRecordQuery()).getOrThrow().records.single()
+            val recordId = repository.getTripRecords(TripRecordQuery()).getOrThrow().records.single().id
+            val record = repository.getTripRecord(recordId).getOrThrow()
             viewModel.startEditing(
                 record = record,
                 location = Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT),
@@ -89,9 +92,9 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun `저장은_한쪽_날짜_생략을_허용하고_잘못된_날짜_범위를_거부한다`() {
+    fun `저장은_시작일을_요구하고_잘못된_날짜_범위를_거부한다`() {
         runSuspend {
-            val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+            val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
             val viewModel = TripRecordEditorViewModel(
                 createTripRecord = CreateTripRecordUseCase(repository),
                 updateTripRecord = UpdateTripRecordUseCase(repository),
@@ -101,8 +104,12 @@ class TripRecordEditorViewModelTest {
             viewModel.updateTitle("서울 여행")
             viewModel.updateEndDate("2026-08-01")
 
+            assertFalse(viewModel.save())
+            assertEquals("시작일을 입력해 주세요.", viewModel.uiState.errorMessage)
+            assertEquals(TripRecordEditorErrorTarget.START_DATE, viewModel.uiState.errorTarget)
+
+            viewModel.updateStartDate("2026-08-01")
             assertTrue(viewModel.save())
-            assertTrue(viewModel.uiState.fieldErrors.isEmpty())
 
             viewModel.updateStartDate("2026-08-02")
             assertEquals("종료일은 시작일보다 빠를 수 없습니다.", viewModel.uiState.errorMessage)
@@ -124,7 +131,7 @@ class TripRecordEditorViewModelTest {
     @Test
     fun `수정_중에는_건드린_필드의_오류만_즉시_표시한다`() {
         runSuspend {
-            val repository = FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }
+            val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
             val viewModel = TripRecordEditorViewModel(
                 createTripRecord = CreateTripRecordUseCase(repository),
                 updateTripRecord = UpdateTripRecordUseCase(repository),
@@ -157,14 +164,38 @@ class TripRecordEditorViewModelTest {
             )
             viewModel.updateTitle("서울 여행")
             assertTrue(viewModel.uiState.fieldErrors.isEmpty())
+
+            viewModel.updateTitle("가".repeat(201))
+            assertEquals(
+                mapOf(TripRecordEditorErrorTarget.TITLE to "제목은 200자 이하여야 합니다."),
+                viewModel.uiState.fieldErrors,
+            )
         }
+    }
+
+    @Test
+    fun `국내_기록은_시군구_선택을_요구한다`() = runSuspend {
+        val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+        viewModel.selectLocation(Location(1, 1, null, "KR-11", "서울특별시", LocationType.PROVINCE))
+        viewModel.updateTitle("서울 여행")
+        viewModel.updateStartDate("2026-08-01")
+
+        assertFalse(viewModel.save())
+        assertEquals(
+            "대한민국은 시·군·구까지 선택해 주세요.",
+            viewModel.uiState.fieldErrors[TripRecordEditorErrorTarget.LOCATION],
+        )
     }
 
     @Test
     fun `미디어_Object_Key를_추가하고_삭제할_수_있다`() {
         val viewModel = TripRecordEditorViewModel(
-            createTripRecord = CreateTripRecordUseCase(FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }),
-            updateTripRecord = UpdateTripRecordUseCase(FakeTripRecordRepository(10) { "2026-08-07T00:00:00Z" }),
+            createTripRecord = CreateTripRecordUseCase(FakeTripRecordRepository { "2026-08-07T00:00:00Z" }),
+            updateTripRecord = UpdateTripRecordUseCase(FakeTripRecordRepository { "2026-08-07T00:00:00Z" }),
         )
 
         viewModel.addMediaObjectKey(" records/1/photo.jpg ")

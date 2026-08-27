@@ -55,7 +55,6 @@ internal val previewLocations = listOf(
 private val previewRecords = listOf(
     TripRecordData(
         id = 101L,
-        memberId = 7L,
         locationId = 2L,
         title = "봄날의 서울",
         content = "천천히 걸으며 발견한 서울의 새로운 모습",
@@ -75,7 +74,6 @@ private val previewRecords = listOf(
     ),
     TripRecordData(
         id = 102L,
-        memberId = 7L,
         locationId = 3L,
         title = "비 오는 서초 산책",
         content = "빗소리와 따뜻한 커피가 좋았던 오후",

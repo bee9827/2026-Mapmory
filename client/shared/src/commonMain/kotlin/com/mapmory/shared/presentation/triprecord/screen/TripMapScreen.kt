@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -96,7 +98,8 @@ fun TripMapScreen(
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(TripRecordPalette.primary)
-                    .clickable(onClick = onCreateClick),
+                        .clickable(onClick = onCreateClick)
+                        .semantics { contentDescription = "새 기록 작성" },
                     contentAlignment = Alignment.Center,
                 ) {
                     Canvas(Modifier.size(24.dp)) {
