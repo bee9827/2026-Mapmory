@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TravelRecordService {
 
     private static final int MAX_PAGE_SIZE = 100;
+    private static final String KOREA_COUNTRY_CODE = "KR";
     private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 
     private final TravelRecordRepository travelRecordRepository;
@@ -93,11 +94,8 @@ public class TravelRecordService {
     @Transactional
     public TravelRecord create(Member member, TravelRecordRequest request) {
         validateTravelDates(request.startDate(), request.endDate());
-        Region region = regionResolver.resolve(
-                request.countryCode(),
-                request.provinceCode(),
-                request.districtCode()
-        );
+        validateTravelRecordRegion(request);
+        Region region = resolveRegion(request);
 
         TravelRecord travelRecord = TravelRecord.of(
                 member,
@@ -149,6 +147,7 @@ public class TravelRecordService {
             TravelRecordRequest request
     ) {
         validateTravelDates(request.startDate(), request.endDate());
+        validateTravelRecordRegion(request);
         TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, member.getId())
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
         List<String> objectKeys = request.objectKeys() == null ? List.of() : request.objectKeys();
@@ -316,6 +315,24 @@ public class TravelRecordService {
                 request.provinceCode(),
                 request.districtCode()
         );
+    }
+
+    private void validateTravelRecordRegion(TravelRecordRequest request) {
+        String countryCode = request.countryCode();
+        String provinceCode = request.provinceCode();
+        String districtCode = request.districtCode();
+        validateRegionCodeFormat(countryCode, provinceCode, districtCode);
+
+        if (KOREA_COUNTRY_CODE.equals(countryCode)) {
+            if (provinceCode == null || districtCode == null) {
+                throw new BusinessException(TravelRecordErrorCode.REGION_REQUIRED);
+            }
+            return;
+        }
+
+        if (provinceCode != null || districtCode != null) {
+            throw new BusinessException(TravelRecordErrorCode.INVALID_REGION_TYPE);
+        }
     }
 
     private void validateUniqueObjectKeys(List<String> objectKeys) {

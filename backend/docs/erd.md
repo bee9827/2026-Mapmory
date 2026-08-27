@@ -151,6 +151,8 @@ erDiagram
 
 계층은 코드 접두사가 아닌 `parent_id`로만 판단한다. `root_id`는 국가별 필터와 집계를 빠르게 처리하기 위한 보조 컬럼이다.
 
+여행 기록 요청의 국가 코드는 대문자 2자리로 제한한다. 시도·시군구 코드는 입력하는 경우 공백 없이 20자 이하인지 확인한 뒤, `(parent_id, region_type, region_code)` 경로로 존재 여부와 직접 부모 관계를 검증한다. 대한민국 기록은 `DISTRICT`, 해외 기록은 `COUNTRY` Region만 참조한다.
+
 현재 인덱스:
 
 - `INDEX(parent_id)`

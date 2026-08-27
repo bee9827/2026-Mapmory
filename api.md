@@ -1,6 +1,6 @@
 # Mapmory API 명세
 
-> 기준일: 2026-08-27 · 범위: 인증, 지역 선택, 지도 마킹, 여행 기록, 이미지 첨부, 사용자 생성 태그
+> 기준일: 2026-08-28 · 범위: 인증, 지역 선택, 지도 마킹, 여행 기록, 이미지 첨부, 사용자 생성 태그
 
 이 문서는 Mapmory API의 기준 계약이다. API 목록의 `구현 전 설계` 항목은 구현에 앞서 합의한 목표 계약이며, 구현이 끝나면 `구현됨`으로 상태를 변경한다.
 
@@ -392,6 +392,7 @@ Authorization: Bearer {게스트 accessToken}
 | 대한민국 시·군·구 | `countryCode`, `provinceCode`, `districtCode` | `DISTRICT` |
 
 - `countryCode = KR`이면 `provinceCode`, `districtCode`가 모두 필수다.
+- `countryCode`는 대문자 2자리이며, 하위 지역 코드는 입력하는 경우 공백 없이 20자 이하여야 한다.
 - `provinceCode`는 선택 국가의 직접 자식 `PROVINCE`여야 한다.
 - `districtCode`는 선택 시도의 직접 자식 `DISTRICT`여야 한다.
 - 해외에서는 MVP 기준 국가 단위만 허용한다.
@@ -437,9 +438,9 @@ Authorization: Bearer {게스트 accessToken}
 
 | 필드 | 타입 | 필수 | 제약조건 |
 | --- | --- | --- | --- |
-| `countryCode` | String | 예 | 존재하는 ISO 3166-1 alpha-2 코드 |
-| `provinceCode` | String | 조건부 | `KR`이면 필수 |
-| `districtCode` | String | 조건부 | `KR`이면 필수 |
+| `countryCode` | String | 예 | 대문자 2자리이며 존재하는 ISO 3166-1 alpha-2 코드 |
+| `provinceCode` | String | 조건부 | `KR`이면 필수, 입력 시 공백 없이 최대 20자 |
+| `districtCode` | String | 조건부 | `KR`이면 필수, 입력 시 공백 없이 최대 20자 |
 | `title` | String | 예 | 공백이 아닌 문자를 포함해야 하며 최대 200자 |
 | `content` | String | 아니요 | `null`, 빈 문자열·공백 허용 |
 | `startDate` | LocalDate | 예 | `YYYY-MM-DD`, 오늘 또는 과거 |
@@ -470,7 +471,7 @@ Authorization: Bearer {게스트 accessToken}
 | `400` | `REGION_REQUIRED` | 한국 기록에 시도 또는 시군구가 없음 |
 | `404` | `REGION_NOT_FOUND` | 요청한 국가·시도·시군구가 존재하지 않음 |
 | `400` | `INVALID_REGION_HIERARCHY` | 요청 지역의 부모 관계가 맞지 않음 |
-| `400` | `INVALID_REGION_TYPE` | 한국 기록의 최종 지역이 `DISTRICT`가 아님 |
+| `400` | `INVALID_REGION_TYPE` | 대한민국이 시군구 단위가 아니거나 해외 요청에 하위 지역이 포함됨 |
 | `400` | `INVALID_TRAVEL_DATE_RANGE` | 시작일·종료일이 미래이거나 종료일이 시작일보다 빠름 |
 | `400` | `INVALID_OBJECT_KEY` | Object Key 형식 또는 소유자가 올바르지 않음 |
 | `409` | `OBJECT_NOT_UPLOADED` | S3 업로드가 확인되지 않음 |
