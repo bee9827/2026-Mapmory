@@ -90,6 +90,76 @@ final result: passed
 
 ---
 
+# Rejected typography experiment: SUIT — 2026-08-27
+
+## Target and evidence
+
+- Selected typography direction: second displayed typography concept, combined with the third concept's relaxed spacing while preserving the current landing layout.
+- Generated type reference: `C:\Users\YongSung\.codex\generated_images\01a03c75-bb1d-7201-bea1-2716a4bced09\exec-a21a1831-e26e-4000-86a9-d2471f7233ce.png`
+- Previous desktop baseline: `design-qa/manus-typography-source/mapmory-current-desktop-1280x720.png`
+- Previous mobile baseline: `design-qa/manus-typography-source/mapmory-current-mobile-390x844.png`
+- SUIT desktop implementation: `design-qa/suit-typography-v1/desktop-1280x720.png`
+- SUIT mobile implementation: `design-qa/suit-typography-v1/mobile-390x844.png`
+
+## Applied system
+
+- Primary interface and body: self-hosted `SUIT Variable`, weight range 100–900.
+- Hero and section headings: weight 600 with relaxed line height and restrained negative tracking.
+- Buttons: weight 650 so controls remain clear without matching the headline's former heavy block tone.
+- Memory word and photo-record captions: `Nanum Pen Script` only.
+- Existing photography, copy, line breaks, layout, color, interaction, and component geometry were preserved.
+
+## Verification
+
+- Desktop 1280 × 720: hero stays on one line, SUIT is loaded at weight 600, and horizontal overflow is absent.
+- Mobile 390 × 844: hero remains two lines, SUIT is loaded at weight 600, and horizontal overflow is absent.
+- Computed mobile hero: 32.79 px, 41.32 px line height, −0.79 px tracking.
+- Computed desktop hero: 40.96 px, 51.2 px line height, −0.90 px tracking.
+- Browser console errors and warnings: none.
+- The preview server is bound to `127.0.0.1` only; the previously opened LAN/mobile port remains closed.
+
+## Decision
+
+- Technical QA passed, but the visual result felt too rigid in user review.
+- This experiment was rejected and replaced with the third displayed LINE Seed editorial direction.
+
+final result: rejected by user
+
+---
+
+# LINE Seed editorial typography QA — 2026-08-27
+
+## Target and evidence
+
+- Selected typography direction: third displayed typography concept.
+- Generated type reference: `C:\Users\YongSung\.codex\generated_images\01a03c75-bb1d-7201-bea1-2716a4bced09\exec-b2f52f37-e78f-4335-bba2-cc457e11d313.png`
+- Desktop implementation: `design-qa/line-seed-editorial-v1/desktop-1280x720.png`
+- Mobile implementation: `design-qa/line-seed-editorial-v1/mobile-390x844.png`
+- Side-by-side comparison: `design-qa/line-seed-editorial-v1/comparison-option3-vs-implementation.png`
+
+## Applied system
+
+- Primary interface and body: self-hosted `LINE Seed Sans KR` Regular/Bold.
+- Hero: Bold with 1.24 line height and restrained negative tracking, preserving the selected concept's clear weight without the compressed SUIT tone.
+- Body: Regular for a quieter reading rhythm.
+- Memory word and photo captions: `Nanum Pen Script` only.
+- Existing centered layout, photographs, copy, controls, and interactions are unchanged.
+
+## Verification
+
+- Desktop 1280 × 720: hero remains on one line; computed size 42.88 px, weight 700, line height 53.17 px, tracking −0.64 px.
+- Mobile 390 × 844: hero remains two lines; computed size 33.18 px, weight 700, line height 42.14 px, tracking −0.60 px.
+- Horizontal overflow: none at both viewports.
+- Browser console errors and warnings: none.
+- The rejected SUIT runtime asset was removed; only the existing LINE Seed files remain.
+- The preview server remains bound to `127.0.0.1` only.
+
+## Final result
+
+final result: passed
+
+---
+
 # Korea multi-add and desktop density QA — 2026-08-27
 
 ## Audit scope and evidence

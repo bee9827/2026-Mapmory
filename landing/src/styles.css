@@ -87,7 +87,7 @@ main { overflow-x: clip; }
   box-shadow: 0 12px 34px rgba(20, 43, 31, 0.1);
   backdrop-filter: blur(18px);
 }
-.brand { font: 700 25px/1 "LINE Seed Sans KR", system-ui, sans-serif; letter-spacing: -1.2px; }
+.brand { font: 700 25px/1 "LINE Seed Sans KR", system-ui, sans-serif; letter-spacing: -0.035em; }
 .brand strong { color: var(--accent-strong); }
 .site-header nav { display: flex; gap: 34px; color: var(--muted); font-size: 14px; font-weight: 600; }
 .site-header nav a:hover { color: var(--text); }
@@ -96,7 +96,7 @@ main { overflow-x: clip; }
 .theme-toggle button { width: 34px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 999px; color: var(--muted); background: transparent; cursor: pointer; }
 .theme-toggle button.is-active { color: var(--accent-strong); background: var(--surface-soft); }
 
-.button { min-height: 52px; padding: 0 25px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; border: 1px solid transparent; cursor: pointer; transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease; }
+.button { min-height: 52px; padding: 0 25px; border-radius: 13px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; letter-spacing: -0.01em; border: 1px solid transparent; cursor: pointer; transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease; }
 .button:hover:not(:disabled) { transform: translateY(-2px); }
 .button-primary { color: #062b1c; background: var(--accent); border-color: var(--accent); }
 .button-primary:hover:not(:disabled) { background: #49edae; }
@@ -104,7 +104,7 @@ main { overflow-x: clip; }
 .button:disabled { cursor: not-allowed; opacity: 0.66; }
 .header-download { min-height: 44px; padding-inline: 20px; font-size: 14px; }
 
-.eyebrow { margin: 0 0 18px; color: var(--accent-strong); font: 700 12px/1.4 "LINE Seed Sans KR", system-ui, sans-serif; letter-spacing: 0.08em; }
+.eyebrow { margin: 0 0 18px; color: var(--accent-strong); font: 700 12px/1.4 "LINE Seed Sans KR", system-ui, sans-serif; letter-spacing: 0.06em; }
 h1 em, h2 em { color: var(--accent-strong); font-style: normal; }
 .hero-copy h1,
 .section-heading h2,
@@ -120,10 +120,10 @@ h1 em, h2 em { color: var(--accent-strong); font-style: normal; }
 .hero-intro { display: flex; flex-direction: column; align-items: center; }
 .hero-copy { width: 100%; text-align: center; }
 .hero-copy .eyebrow { margin-bottom: 20px; }
-.hero-copy h1 { max-width: 100%; margin: 0 auto; font-size: clamp(40px, 3.35vw, 50px); line-height: 1.18; letter-spacing: -0.04em; text-wrap: balance; white-space: nowrap; word-break: keep-all; }
+.hero-copy h1 { max-width: 100%; margin: 0 auto; font-size: clamp(42px, 3.35vw, 50px); font-weight: 700; line-height: 1.24; letter-spacing: -0.015em; text-wrap: balance; white-space: nowrap; word-break: keep-all; }
 .hero-memory-word { position: relative; display: inline-block; min-width: 1.8em; isolation: isolate; }
 .hero-memory-word > em { position: relative; z-index: 1; opacity: 0; }
-.hero-memory-word > span { position: absolute; z-index: 2; left: 50%; top: -0.25em; color: var(--accent-strong); font: 400 1.45em/1 "Nanum Pen Script", cursive; letter-spacing: -0.05em; white-space: nowrap; opacity: 1; transform: translateX(-50%) rotate(-3.5deg); pointer-events: none; }
+.hero-memory-word > span { position: absolute; z-index: 2; left: 50%; top: -0.18em; color: var(--accent-strong); font: 400 1.34em/1 "Nanum Pen Script", cursive; letter-spacing: -0.035em; white-space: nowrap; opacity: 1; transform: translateX(-50%) rotate(-2.5deg); pointer-events: none; }
 .hero-description { margin: 20px 0 0; color: var(--muted); font-size: 17px; line-height: 1.8; }
 .hero-actions { margin-top: 28px; display: flex; align-items: center; justify-content: center; gap: 12px; }
 .release-note { margin: 10px 0 0; display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); font-size: 12px; }
@@ -492,7 +492,7 @@ footer p { margin: 10px 0 0; }
   .brand { font-size: 22px; }
   .hero { width: min(100% - 48px, 520px); min-height: calc(100svh - 76px); padding: 28px 0 18px; }
   .hero-copy .eyebrow { margin-bottom: 14px; }
-  .hero-copy h1 { max-width: 340px; font-size: clamp(31px, 8.7vw, 35px); line-height: 1.22; letter-spacing: -0.04em; text-align: center; white-space: normal; }
+  .hero-copy h1 { max-width: 340px; font-size: clamp(32px, 8.5vw, 35px); line-height: 1.27; letter-spacing: -0.018em; text-align: center; white-space: normal; }
   .hero-memory-word { min-width: 1.75em; }
   .hero-description { margin-top: 16px; font-size: 14px; line-height: 1.8; }
   .hero-description br { display: none; }
