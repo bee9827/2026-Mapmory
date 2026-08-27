@@ -198,6 +198,7 @@ function LaunchWaitlistForm() {
   const emailRef = useRef(null);
   const hasTrackedView = useRef(false);
   const hasTrackedStart = useRef(false);
+  const submitAttemptCountRef = useRef(0);
   const viewTimerRef = useRef(null);
   const [email, setEmail] = useState("");
   const [privacyConsent, setPrivacyConsent] = useState(false);
@@ -253,6 +254,10 @@ function LaunchWaitlistForm() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    submitAttemptCountRef.current += 1;
+    trackEvent(ANALYTICS_EVENTS.WAITLIST_SUBMIT_ATTEMPT, {
+      attempt_number: submitAttemptCountRef.current,
+    });
     if (!emailRef.current?.checkValidity()) {
       failValidation("올바른 이메일 주소를 입력해 주세요.", "invalid_email", emailRef.current);
       return;
@@ -929,9 +934,8 @@ function KoreaDetailExperience({ theme }) {
   }, [detailLevel]);
 
   const openDetail = (memory, selectionSource) => {
-    analytics.startExperience("place_select");
     if (selected?.key !== memory.key || detailLevel !== 3) {
-      analytics.trackPlaceSelect(memory.key, selectionSource);
+      analytics.trackMemoryOpen(memory.key, selectionSource);
     }
     setSelected(memory);
     setIsAddPanelOpen(false);
@@ -952,12 +956,14 @@ function KoreaDetailExperience({ theme }) {
       return;
     }
     clearTimeout(transitionTimerRef.current);
+    analytics.startExperience("memory_add");
     setAddedMemoryKeys((current) => new Set([...current, memory.key]));
     setSelected(memory);
     setIsAddPanelOpen(false);
     setTransitioningKey(memory.key);
     setAddFeedback(`${memory.province}가 지도에 채워지고 있어요. 색이 모두 채워질 때까지 잠시 봐주세요.`);
     transitionTimerRef.current = setTimeout(() => {
+      analytics.trackMemoryAdd(memory.key);
       setTransitioningKey(null);
       setAddFeedback(`${memory.province}가 채워졌어요. 색칠된 지역이나 상세지역 보기 버튼을 눌러 기억을 열어보세요.`);
       const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
@@ -1070,6 +1076,7 @@ function GlobeOnboarding({ onDismiss }) {
     <button
       type="button"
       className="globe-onboarding-overlay"
+      onPointerDown={(event) => event.stopPropagation()}
       onClick={onDismiss}
       aria-label="지구본을 돌려보세요. 민트색 나라를 누르면 기억이 열려요."
     >
@@ -1082,7 +1089,7 @@ function GlobeOnboarding({ onDismiss }) {
   );
 }
 
-function HeroSection({ onExperienceStart }) {
+function HeroSection({ onExperienceEntry }) {
   const [photoStep, setPhotoStep] = useState(0);
   const heroRef = useRef(null);
 
@@ -1123,7 +1130,7 @@ function HeroSection({ onExperienceStart }) {
           <h1>장소를 따라가면, 그날의 <span className="hero-memory-word"><em>기억</em><span aria-hidden="true">기억</span></span>이 다시 열려요.</h1>
           <p className="hero-description">사진과 장소를 모아 나만의 기억 지도를 만들어요.</p>
           <div className="hero-actions">
-            <a className="button button-primary" href="#experience" onClick={() => onExperienceStart("hero_cta")}><GlobeHemisphereEast size={19} weight="duotone" />지구본 돌려보기</a>
+            <a className="button button-primary" href="#experience" onClick={() => onExperienceEntry("hero")}><GlobeHemisphereEast size={19} weight="duotone" />지구본 돌려보기</a>
           </div>
         </div>
 
@@ -1143,7 +1150,7 @@ function HeroSection({ onExperienceStart }) {
         </div>
         <p className="release-note"><CheckCircle size={17} weight="fill" />Google Play 출시 준비 중</p>
       </div>
-      <a className="hero-fold-cue" href="#experience"><span>아래로 내려 앱 경험해보기</span><ArrowDown size={18} weight="bold" /></a>
+      <a className="hero-fold-cue" href="#experience" onClick={() => onExperienceEntry("scroll_cue")}><span>아래로 내려 앱 경험해보기</span><ArrowDown size={18} weight="bold" /></a>
     </section>
   );
 }
@@ -1167,14 +1174,12 @@ function App() {
     setGlobeFocusRequest((current) => current + 1);
     const isNewSelection = selectedMemory.id !== memory.id;
     setIsWorldSelecting(true);
-    if (selectedMemory.id !== memory.id) {
-      globeAnalytics.trackPlaceSelect(memory.key, selectionSource);
-      setSelectedMemory(memory);
-    }
+    if (selectedMemory.id !== memory.id) setSelectedMemory(memory);
     worldSelectionTimerRef.current = setTimeout(() => {
       setDisplayedMemory(memory);
       setIsWorldMemoryOpen(true);
       setIsWorldSelecting(false);
+      globeAnalytics.trackMemoryOpen(memory.key, selectionSource);
     }, isNewSelection ? WORLD_SELECTION_MOTION_MS + 120 : 320);
   };
 
@@ -1237,11 +1242,14 @@ function App() {
     <main id="top">
       <header className="site-header">
         <Brand />
-        <nav aria-label="주요 메뉴"><a href="#experience">지구본 체험</a><a href="#korea-detail">대한민국 지도</a></nav>
+        <nav aria-label="주요 메뉴">
+          <a href="#experience" onClick={() => globeAnalytics.trackEntryClick("header_nav")}>지구본 체험</a>
+          <a href="#korea-detail" onClick={() => trackEvent(ANALYTICS_EVENTS.EXPERIENCE_CTA_CLICK, { experience_type: "korea_detail", cta_placement: "header_nav" })}>대한민국 지도</a>
+        </nav>
         <div className="header-actions"><ThemeToggle theme={theme} onChange={setTheme} /><DownloadButton className="header-download" placement="header" /></div>
       </header>
 
-      <HeroSection onExperienceStart={globeAnalytics.startExperience} />
+      <HeroSection onExperienceEntry={globeAnalytics.trackEntryClick} />
 
       <section className="experience-section" id="experience" ref={setExperienceSectionRef}>
         <div className="experience-pin">
