@@ -69,4 +69,4 @@ adb -s <serial> shell setprop log.tag.MapmoryPhotoPerf DEBUG
 adb -s <serial> logcat -v time -s MapmoryPhotoPerf:D
 ```
 
-`exif_reads`, `reused_coordinates`, `metadata_sync_ms`를 비교할 수 있지만, 현재는 고정된 성능 기준선으로 사용하지 않는다. Photo Picker UI 자동화, 권한별 UI 자동화, Macrobenchmark와 CI 성능 기준선은 별도 작업으로 남긴다.
+`exif_reads`, `reused_coordinates`, `metadata_sync_ms`를 비교할 수 있지만, 현재는 고정된 성능 기준선으로 사용하지 않는다. Photo Picker UI 자동화와 권한별 UI 자동화는 계속 수동 검증 대상이다. 앱 시작 시간은 [모바일 모니터링 기준](../android-monitoring.md)의 로컬 측정 스크립트를 사용하고, 지도 전환 Macrobenchmark와 CI 성능 기준선은 필요성이 확인될 때 별도 도입한다.
