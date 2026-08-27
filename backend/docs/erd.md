@@ -167,8 +167,8 @@ erDiagram
 | `region_id` | `BIGINT` | NOT NULL, FK → `region.id` | 기록 대상 Region |
 | `title` | `VARCHAR(200)` | NOT NULL | 제목, 애플리케이션에서 공백 입력을 금지하고 최대 200자로 제한 |
 | `content` | `TEXT` | NOT NULL | 선택 본문, 요청의 `null`은 애플리케이션에서 빈 문자열로 정규화 |
-| `start_date` | `DATE` | NOT NULL | 여행 시작일 |
-| `end_date` | `DATE` | NULL | 여행 종료일 |
+| `start_date` | `DATE` | NOT NULL | 여행 시작일, 애플리케이션에서 미래 날짜 금지 |
+| `end_date` | `DATE` | NULL | 여행 종료일, 미래 날짜 및 시작일 이전 날짜 금지 |
 | `created_at` | `DATETIME` | NOT NULL | 생성 시각 |
 | `updated_at` | `DATETIME` | NOT NULL | 마지막 수정 시각 |
 

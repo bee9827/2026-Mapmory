@@ -17,6 +17,9 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -35,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class TravelRecordService {
 
     private static final int MAX_PAGE_SIZE = 100;
+    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 
     private final TravelRecordRepository travelRecordRepository;
     private final RegionResolver regionResolver;
@@ -43,6 +47,7 @@ public class TravelRecordService {
     private final TagService tagService;
     private final OperationTimer operationTimer;
     private final RecordMediaUrlService recordMediaUrlService;
+    private final Clock clock;
 
     public TravelRecordService(
             TravelRecordRepository travelRecordRepository,
@@ -53,6 +58,28 @@ public class TravelRecordService {
             OperationTimer operationTimer,
             RecordMediaUrlService recordMediaUrlService
     ) {
+        this(
+                travelRecordRepository,
+                regionResolver,
+                recordMediaRepository,
+                travelRecordTagService,
+                tagService,
+                operationTimer,
+                recordMediaUrlService,
+                Clock.system(SERVICE_ZONE)
+        );
+    }
+
+    TravelRecordService(
+            TravelRecordRepository travelRecordRepository,
+            RegionResolver regionResolver,
+            RecordMediaRepository recordMediaRepository,
+            TravelRecordTagService travelRecordTagService,
+            TagService tagService,
+            OperationTimer operationTimer,
+            RecordMediaUrlService recordMediaUrlService,
+            Clock clock
+    ) {
         this.travelRecordRepository = travelRecordRepository;
         this.regionResolver = regionResolver;
         this.recordMediaRepository = recordMediaRepository;
@@ -60,10 +87,12 @@ public class TravelRecordService {
         this.tagService = tagService;
         this.operationTimer = operationTimer;
         this.recordMediaUrlService = recordMediaUrlService;
+        this.clock = clock;
     }
 
     @Transactional
     public TravelRecord create(Member member, TravelRecordRequest request) {
+        validateTravelDates(request.startDate(), request.endDate());
         Region region = regionResolver.resolve(
                 request.countryCode(),
                 request.provinceCode(),
@@ -119,6 +148,7 @@ public class TravelRecordService {
             Long travelRecordId,
             TravelRecordRequest request
     ) {
+        validateTravelDates(request.startDate(), request.endDate());
         TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, member.getId())
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
         List<String> objectKeys = request.objectKeys() == null ? List.of() : request.objectKeys();
@@ -260,6 +290,15 @@ public class TravelRecordService {
                     TravelRecordErrorCode.INVALID_PAGINATION,
                     "page는 0 이상이고 size는 1 이상 %d 이하여야 합니다.".formatted(MAX_PAGE_SIZE)
             );
+        }
+    }
+
+    private void validateTravelDates(LocalDate startDate, LocalDate endDate) {
+        LocalDate today = LocalDate.now(clock);
+        if (startDate == null
+                || startDate.isAfter(today)
+                || (endDate != null && (endDate.isBefore(startDate) || endDate.isAfter(today)))) {
+            throw new BusinessException(TravelRecordErrorCode.INVALID_TRAVEL_DATE_RANGE);
         }
     }
 

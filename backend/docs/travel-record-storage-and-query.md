@@ -55,6 +55,7 @@ flowchart LR
 Controller
   → X-Member-Id와 TravelRecordRequest 수신
 Service
+  → 여행 날짜 범위와 미래 날짜 검증
   → 회원 참조 조회
   → 국가 → 시도 → 시군구 순서로 Region 조회
   → TravelRecord 저장
@@ -99,10 +100,14 @@ Controller
 
 여행 기록과 미디어 저장은 하나의 트랜잭션에서 실행한다. 중간 저장이 실패하면 전체 작업이 롤백된다.
 
-### 기본 입력값 검증
+### 기본 입력값과 여행 날짜 검증
 
 - `title`은 공백이 아닌 문자를 포함해야 하며 최대 200자다.
 - `content`는 선택값이다. 요청에서 생략하거나 `null`로 보내면 빈 문자열로 정규화해 저장한다.
+- `startDate`와 `endDate`는 `Asia/Seoul`의 오늘보다 미래일 수 없으며 오늘은 허용한다.
+- `endDate`를 입력했다면 `startDate`와 같거나 이후여야 한다.
+- 날짜 규칙은 여행 기록 생성과 수정에 동일하게 적용한다.
+- 날짜가 올바르지 않으면 저장 전에 `400 INVALID_TRAVEL_DATE_RANGE`를 반환한다.
 - 기본 입력값이 올바르지 않으면 `400 VALIDATION_ERROR`를 반환하고 여행 기록 저장을 시작하지 않는다.
 
 ## 5. 여행 기록 목록 조회
@@ -321,7 +326,7 @@ Service는 `travelRecordId`와 `memberId`로 소유권을 확인한 후 새 Regi
 | 목록 썸네일 URL 생성 | 구현 |
 | 상세 조회 Object Key의 Presigned GET URL 변환 | 구현 |
 | 키워드 검색 | 미구현 |
-| 날짜 범위 검증 | 미구현 |
+| 날짜 범위·미래 날짜 검증 | 구현 |
 | Object Key 소유권·업로드 검증 | 미구현 |
 | Region 미존재 도메인 예외 | 미구현 |
 | 성공 응답 `data` 래퍼 | 구현 |
