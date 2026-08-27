@@ -3,5 +3,7 @@ dist/
 audit/
 audit-v3/
 qa/
+# Visual QA captures are retained locally and summarized in Markdown.
+design-qa/**/
 .DS_Store
 *.log
