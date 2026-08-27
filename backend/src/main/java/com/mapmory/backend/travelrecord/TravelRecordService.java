@@ -12,8 +12,12 @@ import com.mapmory.backend.tag.Tag;
 import com.mapmory.backend.tag.TagService;
 import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
+import com.mapmory.backend.upload.policy.UploadPolicyProperties;
+import com.mapmory.backend.upload.storage.PresignedUrlProvider;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -39,6 +43,8 @@ public class TravelRecordService {
     private final TravelRecordTagService travelRecordTagService;
     private final TagService tagService;
     private final OperationTimer operationTimer;
+    private final PresignedUrlProvider presignedUrlProvider;
+    private final UploadPolicyProperties uploadPolicyProperties;
 
     public TravelRecordService(
             TravelRecordRepository travelRecordRepository,
@@ -46,7 +52,9 @@ public class TravelRecordService {
             RecordMediaRepository recordMediaRepository,
             TravelRecordTagService travelRecordTagService,
             TagService tagService,
-            OperationTimer operationTimer
+            OperationTimer operationTimer,
+            PresignedUrlProvider presignedUrlProvider,
+            UploadPolicyProperties uploadPolicyProperties
     ) {
         this.travelRecordRepository = travelRecordRepository;
         this.regionResolver = regionResolver;
@@ -54,6 +62,8 @@ public class TravelRecordService {
         this.travelRecordTagService = travelRecordTagService;
         this.tagService = tagService;
         this.operationTimer = operationTimer;
+        this.presignedUrlProvider = presignedUrlProvider;
+        this.uploadPolicyProperties = uploadPolicyProperties;
     }
 
     @Transactional
@@ -100,7 +110,7 @@ public class TravelRecordService {
         List<RecordMedia> recordMedia = recordMediaRepository
                 .findByTravelRecordIdOrderBySortOrderAsc(travelRecordId);
 
-        return TravelRecordDetailResponse.from(
+        return createDetailResponse(
                 travelRecord,
                 recordMedia,
                 travelRecordTagService.findByTravelRecordId(travelRecordId)
@@ -144,7 +154,7 @@ public class TravelRecordService {
                 }
         );
 
-        return TravelRecordDetailResponse.from(travelRecord, updatedMedia, tags);
+        return createDetailResponse(travelRecord, updatedMedia, tags);
     }
 
     @Transactional
@@ -316,6 +326,23 @@ public class TravelRecordService {
 
         recordMediaRepository.deleteAll(existingMediaByObjectKey.values());
         return recordMediaRepository.saveAll(updatedMedia);
+    }
+
+    private TravelRecordDetailResponse createDetailResponse(
+            TravelRecord travelRecord,
+            List<RecordMedia> recordMedia,
+            List<Tag> tags
+    ) {
+        Duration expiration = uploadPolicyProperties.presignedUrlExpiration();
+        List<TravelRecordMediaResponse> media = recordMedia.stream()
+                .map(item -> TravelRecordMediaResponse.from(
+                        item,
+                        presignedUrlProvider.createPresignedGetUrl(item.getObjectKey(), expiration),
+                        expiration
+                ))
+                .toList();
+
+        return TravelRecordDetailResponse.from(travelRecord, recordMedia, tags, media);
     }
 
 }

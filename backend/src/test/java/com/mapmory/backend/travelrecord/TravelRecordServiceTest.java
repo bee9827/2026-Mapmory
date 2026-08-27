@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -23,9 +24,14 @@ import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.tag.TagService;
 import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
+import com.mapmory.backend.upload.policy.UploadPolicyProperties;
+import com.mapmory.backend.upload.storage.PresignedUrlProvider;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.net.URI;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -61,6 +67,12 @@ class TravelRecordServiceTest {
     @Mock
     private TagService tagService;
 
+    @Mock
+    private PresignedUrlProvider presignedUrlProvider;
+
+    @Mock
+    private UploadPolicyProperties uploadPolicyProperties;
+
     @Spy
     private OperationTimer operationTimer = new OperationTimer(new SimpleMeterRegistry());
 
@@ -73,6 +85,9 @@ class TravelRecordServiceTest {
     void setUp() {
         member = mock(Member.class);
         lenient().when(member.getId()).thenReturn(10L);
+        lenient().when(uploadPolicyProperties.presignedUrlExpiration()).thenReturn(Duration.ofMinutes(5));
+        lenient().when(presignedUrlProvider.createPresignedGetUrl(anyString(), any()))
+                .thenAnswer(invocation -> URI.create("https://download.example/" + invocation.getArgument(0)));
     }
 
     @Test
@@ -128,6 +143,26 @@ class TravelRecordServiceTest {
                 "mapmory/travel-records/a.jpg",
                 "mapmory/travel-records/b.jpg"
         );
+        assertThat(result.media())
+                .extracting(TravelRecordMediaResponse::viewUrl)
+                .containsExactly(
+                        "https://download.example/mapmory/travel-records/a.jpg",
+                        "https://download.example/mapmory/travel-records/b.jpg"
+                );
+        assertThat(result.media())
+                .extracting(TravelRecordMediaResponse::viewUrlExpiresIn)
+                .containsOnly(300L);
+        assertThat(result.media())
+                .extracting(TravelRecordMediaResponse::sortOrder)
+                .containsExactly(0, 1);
+        verify(presignedUrlProvider).createPresignedGetUrl(
+                "mapmory/travel-records/a.jpg",
+                Duration.ofMinutes(5)
+        );
+        verify(presignedUrlProvider).createPresignedGetUrl(
+                "mapmory/travel-records/b.jpg",
+                Duration.ofMinutes(5)
+        );
     }
 
     @Test
@@ -153,6 +188,8 @@ class TravelRecordServiceTest {
         assertThat(result.region().province()).isNull();
         assertThat(result.region().district()).isNull();
         assertThat(result.objectKeys()).isEmpty();
+        assertThat(result.media()).isEmpty();
+        verify(presignedUrlProvider, never()).createPresignedGetUrl(anyString(), any());
     }
 
     @Test

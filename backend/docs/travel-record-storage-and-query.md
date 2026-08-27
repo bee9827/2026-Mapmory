@@ -233,7 +233,7 @@ X-Member-Id: 10
 
 Repository에서 `travelRecordId`와 `memberId`를 함께 조건으로 사용한다. 기록이 없거나 다른 회원의 기록인 경우 모두 `404 TRAVEL_RECORD_NOT_FOUND`를 반환하여 기록의 존재 여부가 노출되지 않게 한다.
 
-응답에는 제목, 본문, 여행 날짜, 국가·시도·시군구 계층, 생성·수정 시각을 포함한다. 미디어는 `sort_order` 오름차순의 `objectKeys` 배열로 반환한다.
+응답에는 제목, 본문, 여행 날짜, 국가·시도·시군구 계층, 생성·수정 시각을 포함한다. 기존 저장·수정 계약을 위한 `objectKeys`와 함께, `sort_order` 오름차순으로 조회 가능한 Presigned GET URL을 담은 `media`를 반환한다.
 
 ```json
 {
@@ -252,13 +252,22 @@ Repository에서 `travelRecordId`와 `memberId`를 함께 조건으로 사용한
       "mapmory/travel-records/a.jpg",
       "mapmory/travel-records/b.jpg"
     ],
+    "media": [
+      {
+        "id": 1,
+        "objectKey": "mapmory/travel-records/a.jpg",
+        "viewUrl": "https://bucket.s3.ap-northeast-2.amazonaws.com/...?X-Amz-Signature=...",
+        "viewUrlExpiresIn": 300,
+        "sortOrder": 0
+      }
+    ],
     "createdAt": "2026-08-14T10:30:00",
     "updatedAt": "2026-08-15T09:00:00"
   }
 }
 ```
 
-국가 단위 기록은 `province`와 `district`가 `null`이다. 현재는 S3 객체 키만 제공하며, Presigned GET URL 변환은 S3 연동 시 추가한다.
+국가 단위 기록은 `province`와 `district`가 `null`이다. `viewUrl`은 상세 응답을 만들 때마다 S3 Presigned GET URL로 생성하며, `viewUrlExpiresIn`은 초 단위 만료 시간이다. URL은 DB에 저장하지 않는다.
 
 ## 9. 여행 기록 수정
 
@@ -294,7 +303,7 @@ Service는 `travelRecordId`와 `memberId`로 소유권을 확인한 후 새 Regi
 | 여행 기록 상세 조회 및 소유권 검사 | 구현 |
 | 여행 기록 전체 수정 및 미디어 동기화 | 구현 |
 | 목록 썸네일 URL 생성 | 미구현, 현재 `null` |
-| 상세 조회 Object Key의 Presigned GET URL 변환 | 미구현 |
+| 상세 조회 Object Key의 Presigned GET URL 변환 | 구현 |
 | 키워드 검색 | 미구현 |
 | 날짜 범위 검증 | 미구현 |
 | Object Key 소유권·업로드 검증 | 미구현 |
