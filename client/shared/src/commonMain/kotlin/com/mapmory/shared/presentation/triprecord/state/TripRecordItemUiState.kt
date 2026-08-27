@@ -93,7 +93,16 @@ fun TripRecordSummary.toTripRecordItemUiState(
     startDate = startDate,
     endDate = endDate,
     locationName = locationName,
-    photos = media
+    photos = thumbnailPreviewBytes?.let { bytes ->
+        listOf(
+            TripRecordPhotoUiState(
+                id = "thumbnail-$id",
+                displayName = "thumbnail-$id",
+                previewBytes = PhotoPreviewBytes.from(bytes),
+                sortOrder = 0,
+            ),
+        )
+    } ?: media
         .sortedBy { it.sortOrder }
         .mapIndexed { index, media ->
             TripRecordPhotoUiState(
