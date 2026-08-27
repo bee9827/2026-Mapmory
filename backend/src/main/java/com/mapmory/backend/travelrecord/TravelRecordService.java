@@ -16,7 +16,6 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,7 +35,6 @@ public class TravelRecordService {
 
     private static final int MAX_PAGE_SIZE = 100;
     private static final String KOREA_COUNTRY_CODE = "KR";
-    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 
     private final TravelRecordRepository travelRecordRepository;
     private final RegionResolver regionResolver;
@@ -47,25 +45,6 @@ public class TravelRecordService {
     private final Clock clock;
 
     public TravelRecordService(
-            TravelRecordRepository travelRecordRepository,
-            RegionResolver regionResolver,
-            RecordMediaRepository recordMediaRepository,
-            TravelRecordTagService travelRecordTagService,
-            TagService tagService,
-            OperationTimer operationTimer
-    ) {
-        this(
-                travelRecordRepository,
-                regionResolver,
-                recordMediaRepository,
-                travelRecordTagService,
-                tagService,
-                operationTimer,
-                Clock.system(SERVICE_ZONE)
-        );
-    }
-
-    TravelRecordService(
             TravelRecordRepository travelRecordRepository,
             RegionResolver regionResolver,
             RecordMediaRepository recordMediaRepository,
