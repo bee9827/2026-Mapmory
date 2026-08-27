@@ -200,7 +200,7 @@ PageRequest.of(
 
 목록 아이템은 `id`, `title`, `regionName`, `startDate`, `endDate`, `thumbnailUrl`, `thumbnailUrlExpiresIn`을 반환한다. 본문과 전체 이미지 목록은 목록 응답에서 제외한다.
 
-`thumbnailUrl`은 현재 페이지의 기록 ID를 모아 `sort_order = 0`인 첫 미디어를 한 번에 조회한 뒤 Presigned GET URL로 생성한다. `thumb_key`가 있으면 썸네일 객체를 사용하고, 아직 생성되지 않았다면 원본 `object_key`를 사용한다. 미디어가 없는 기록은 `thumbnailUrl`과 `thumbnailUrlExpiresIn`이 모두 `null`이다.
+`thumbnailUrl`은 현재 페이지의 기록 ID를 모아 미디어를 한 번에 정렬 조회한 뒤 기록별 첫 미디어의 Presigned GET URL로 생성한다. `thumb_key`가 있으면 썸네일 객체를 사용하고, 아직 생성되지 않았다면 원본 `object_key`를 사용한다. 미디어가 없는 기록은 `thumbnailUrl`과 `thumbnailUrlExpiresIn`이 모두 `null`이다.
 
 생성과 목록 조회의 성공 응답은 다음처럼 `data` 필드로 감싼다.
 

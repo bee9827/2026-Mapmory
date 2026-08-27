@@ -4,8 +4,10 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.common.monitoring.MonitoredOperation;
 import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
+import com.mapmory.backend.recordmedia.ExpiringUrl;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
+import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
 import com.mapmory.backend.tag.Tag;
@@ -15,9 +17,6 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
-import com.mapmory.backend.upload.policy.UploadPolicyProperties;
-import com.mapmory.backend.upload.storage.PresignedUrlProvider;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -43,8 +42,7 @@ public class TravelRecordService {
     private final TravelRecordTagService travelRecordTagService;
     private final TagService tagService;
     private final OperationTimer operationTimer;
-    private final PresignedUrlProvider presignedUrlProvider;
-    private final UploadPolicyProperties uploadPolicyProperties;
+    private final RecordMediaUrlService recordMediaUrlService;
 
     public TravelRecordService(
             TravelRecordRepository travelRecordRepository,
@@ -53,8 +51,7 @@ public class TravelRecordService {
             TravelRecordTagService travelRecordTagService,
             TagService tagService,
             OperationTimer operationTimer,
-            PresignedUrlProvider presignedUrlProvider,
-            UploadPolicyProperties uploadPolicyProperties
+            RecordMediaUrlService recordMediaUrlService
     ) {
         this.travelRecordRepository = travelRecordRepository;
         this.regionResolver = regionResolver;
@@ -62,8 +59,7 @@ public class TravelRecordService {
         this.travelRecordTagService = travelRecordTagService;
         this.tagService = tagService;
         this.operationTimer = operationTimer;
-        this.presignedUrlProvider = presignedUrlProvider;
-        this.uploadPolicyProperties = uploadPolicyProperties;
+        this.recordMediaUrlService = recordMediaUrlService;
     }
 
     @Transactional
@@ -219,16 +215,12 @@ public class TravelRecordService {
                 .toList();
         Map<Long, List<Tag>> tagsByTravelRecordId =
                 travelRecordTagService.findByTravelRecordIds(travelRecordIds);
-        Duration expiration = uploadPolicyProperties.presignedUrlExpiration();
-        Map<Long, String> thumbnailUrlsByTravelRecordId = createThumbnailUrls(
-                travelRecordIds,
-                expiration
-        );
+        Map<Long, ExpiringUrl> thumbnailUrlsByTravelRecordId =
+                recordMediaUrlService.createThumbnailUrls(travelRecordIds);
         return TravelRecordListResponse.from(
                 travelRecords,
                 tagsByTravelRecordId,
-                thumbnailUrlsByTravelRecordId,
-                expiration.toSeconds()
+                thumbnailUrlsByTravelRecordId
         );
     }
 
@@ -341,34 +333,14 @@ public class TravelRecordService {
             List<RecordMedia> recordMedia,
             List<Tag> tags
     ) {
-        Duration expiration = uploadPolicyProperties.presignedUrlExpiration();
         List<TravelRecordMediaResponse> media = recordMedia.stream()
                 .map(item -> TravelRecordMediaResponse.from(
                         item,
-                        presignedUrlProvider.createPresignedGetUrl(item.getObjectKey(), expiration),
-                        expiration
+                        recordMediaUrlService.createViewUrl(item.getObjectKey())
                 ))
                 .toList();
 
         return TravelRecordDetailResponse.from(travelRecord, recordMedia, tags, media);
-    }
-
-    private Map<Long, String> createThumbnailUrls(
-            List<Long> travelRecordIds,
-            Duration expiration
-    ) {
-        if (travelRecordIds.isEmpty()) {
-            return Map.of();
-        }
-
-        return recordMediaRepository.findByTravelRecordIdInAndSortOrder(travelRecordIds, 0).stream()
-                .collect(Collectors.toMap(
-                        RecordMedia::getTravelRecordId,
-                        media -> presignedUrlProvider.createPresignedGetUrl(
-                                media.getThumbnailObjectKey(),
-                                expiration
-                        ).toString()
-                ));
     }
 
 }
