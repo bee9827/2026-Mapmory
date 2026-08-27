@@ -21,6 +21,7 @@ fun TripRecordListItemDto.toDomain(): TripRecordSummary = TripRecordSummary(
     startDate = startDate,
     endDate = endDate,
     thumbnailUrl = thumbnailUrl,
+    thumbnailUrlExpiresIn = thumbnailUrlExpiresIn,
 )
 
 fun TripRecordDetailDto.toDomain(regionCatalog: RegionCatalog): TripRecordData {
@@ -45,14 +46,25 @@ fun TripRecordDetailDto.toDomain(regionCatalog: RegionCatalog): TripRecordData {
         content = content,
         startDate = startDate,
         endDate = endDate,
-        media = objectKeys.mapIndexed { index, objectKey ->
-            TripRecordMedia(
-                id = index.toLong(),
-                objectKey = objectKey,
-                sortOrder = index,
-                url = null,
-            )
-        },
+        media = media
+            .map { item ->
+                TripRecordMedia(
+                    id = item.id,
+                    objectKey = item.objectKey,
+                    sortOrder = item.sortOrder,
+                    url = item.viewUrl,
+                )
+            }
+            .ifEmpty {
+                objectKeys.mapIndexed { index, objectKey ->
+                    TripRecordMedia(
+                        id = index.toLong(),
+                        objectKey = objectKey,
+                        sortOrder = index,
+                        url = null,
+                    )
+                }
+            },
         createdAt = createdAt,
         updatedAt = updatedAt,
     )
