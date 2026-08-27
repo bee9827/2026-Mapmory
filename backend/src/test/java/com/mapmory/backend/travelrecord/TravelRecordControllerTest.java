@@ -168,6 +168,43 @@ class TravelRecordControllerTest {
         verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "kr", "KOR"})
+    void 국가_코드_형식이_올바르지_않으면_여행_일지를_생성하지_않는다(String countryCode) throws Exception {
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestBody(countryCode, null, null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("countryCode"));
+
+        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
+    @Test
+    void 시도_코드가_공백이면_여행_일지를_생성하지_않는다() throws Exception {
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestBody("KR", " ", "50110")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("provinceCode"));
+
+        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
+    @Test
+    void 시군구_코드가_공백이면_여행_일지를_생성하지_않는다() throws Exception {
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestBody("KR", "49", " ")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("districtCode"));
+
+        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
     @Test
     void 본문이_null이면_여행_일지를_생성한다() throws Exception {
         TravelRecord travelRecord = TravelRecord.of(
@@ -320,5 +357,27 @@ class TravelRecordControllerTest {
                   "objectKeys": []
                 }
                 """.formatted(title, content);
+    }
+
+    private String createRequestBody(String countryCode, String provinceCode, String districtCode) {
+        return """
+                {
+                  "countryCode": "%s",
+                  "provinceCode": %s,
+                  "districtCode": %s,
+                  "title": "여행",
+                  "content": "",
+                  "startDate": "2026-08-11",
+                  "objectKeys": []
+                }
+                """.formatted(
+                countryCode,
+                nullableJsonString(provinceCode),
+                nullableJsonString(districtCode)
+        );
+    }
+
+    private String nullableJsonString(String value) {
+        return value == null ? "null" : "\"%s\"".formatted(value);
     }
 }

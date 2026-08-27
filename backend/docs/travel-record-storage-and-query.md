@@ -1,6 +1,6 @@
 # 여행 기록 저장 및 조회 방식
 
-> 기준일: 2026-08-27 · 현재 구현된 생성, 목록, 상세 조회 및 수정 기준
+> 기준일: 2026-08-28 · 현재 구현된 생성, 목록, 상세 조회 및 수정 기준
 
 ## 1. 목적
 
@@ -56,6 +56,7 @@ Controller
   → X-Member-Id와 TravelRecordRequest 수신
 Service
   → 여행 날짜 범위와 미래 날짜 검증
+  → 지역 코드 형식과 국내·해외 선택 단위 검증
   → 회원 참조 조회
   → 국가 → 시도 → 시군구 순서로 Region 조회
   → TravelRecord 저장
@@ -109,6 +110,15 @@ Controller
 - 날짜 규칙은 여행 기록 생성과 수정에 동일하게 적용한다.
 - 날짜가 올바르지 않으면 저장 전에 `400 INVALID_TRAVEL_DATE_RANGE`를 반환한다.
 - 기본 입력값이 올바르지 않으면 `400 VALIDATION_ERROR`를 반환하고 여행 기록 저장을 시작하지 않는다.
+
+### 지역 입력값 검증
+
+- `countryCode`는 필수이며 대문자 2자리다.
+- `provinceCode`와 `districtCode`는 입력하는 경우 공백 없이 20자 이하여야 한다.
+- 대한민국(`KR`)은 시도와 시군구를 모두 입력해 `DISTRICT` 단위로 저장한다. 누락하면 `400 REGION_REQUIRED`를 반환한다.
+- 해외는 국가 단위만 허용한다. 하위 지역을 포함하면 `400 INVALID_REGION_TYPE`을 반환한다.
+- `RegionResolver`는 코드 경로를 `parent_id`로 탐색해 존재 여부와 직접 부모 관계를 검증한다.
+- 존재하지 않는 지역은 `404 REGION_NOT_FOUND`, 다른 부모에 속한 지역은 `400 INVALID_REGION_HIERARCHY`를 반환한다.
 
 ## 5. 여행 기록 목록 조회
 
@@ -309,8 +319,8 @@ Service는 `travelRecordId`와 `memberId`로 소유권을 확인한 후 새 Regi
 | 상세 조회 Object Key의 Presigned GET URL 변환 | 미구현 |
 | 키워드 검색 | 미구현 |
 | 날짜 범위·미래 날짜 검증 | 구현 |
+| 지역 코드·선택 단위·계층 검증 | 구현 |
 | Object Key 소유권·업로드 검증 | 미구현 |
-| Region 미존재 도메인 예외 | 미구현 |
 | 성공 응답 `data` 래퍼 | 구현 |
 
 ## 11. 관련 문서

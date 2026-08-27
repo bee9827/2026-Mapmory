@@ -169,6 +169,41 @@ class TravelRecordServiceTest {
     }
 
     @Test
+    void 대한민국_여행에_시도가_없으면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest("KR", null, null);
+
+        assertInvalidRegion(request, "REGION_REQUIRED");
+    }
+
+    @Test
+    void 대한민국_여행에_시군구가_없으면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest("KR", "49", null);
+
+        assertInvalidRegion(request, "REGION_REQUIRED");
+    }
+
+    @Test
+    void 해외_여행에_하위_지역이_있으면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest("JP", "13", null);
+
+        assertInvalidRegion(request, "INVALID_REGION_TYPE");
+    }
+
+    @Test
+    void 대한민국_시군구_단위_여행_일지를_생성한다() {
+        Region jejuCity = mock(Region.class);
+        TravelRecordRequest request = createRequest("KR", "49", "50110");
+        when(regionResolver.resolve("KR", "49", "50110")).thenReturn(jejuCity);
+        when(travelRecordRepository.save(any(TravelRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        TravelRecord result = travelRecordService.create(member, request);
+
+        assertThat(result.getRegion()).isEqualTo(jejuCity);
+        verify(travelRecordRepository).save(result);
+    }
+
+    @Test
     void 지역_계층과_정렬된_Object_Key를_포함한_일지_상세를_조회한다() {
         Region country = Region.of(null, null, "KR", "대한민국", RegionType.COUNTRY);
         Region province = Region.of(country, country, "49", "제주특별자치도", RegionType.PROVINCE);
@@ -218,11 +253,36 @@ class TravelRecordServiceTest {
         );
     }
 
+    private TravelRecordRequest createRequest(
+            String countryCode,
+            String provinceCode,
+            String districtCode
+    ) {
+        return new TravelRecordRequest(
+                countryCode,
+                provinceCode,
+                districtCode,
+                "여행",
+                "",
+                TODAY,
+                null,
+                List.of(),
+                List.of()
+        );
+    }
+
     private void assertInvalidTravelDates(TravelRecordRequest request) {
         assertThatThrownBy(() -> travelRecordService.create(member, request))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode().code())
                                 .isEqualTo("INVALID_TRAVEL_DATE_RANGE"));
+        verify(travelRecordRepository, never()).save(any(TravelRecord.class));
+    }
+
+    private void assertInvalidRegion(TravelRecordRequest request, String errorCode) {
+        assertThatThrownBy(() -> travelRecordService.create(member, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode().code()).isEqualTo(errorCode));
         verify(travelRecordRepository, never()).save(any(TravelRecord.class));
     }
 
