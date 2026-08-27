@@ -12,6 +12,7 @@ import {
   MapTrifold,
   Moon,
   NavigationArrow,
+  Plus,
   Sun,
 } from "@phosphor-icons/react";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics.js";
@@ -344,6 +345,7 @@ function InteractiveGlobe({ selected, focusRequest, onSelect, onInteract, theme,
   const [globeMaterial, setGlobeMaterial] = useState(null);
   const [countries, setCountries] = useState([]);
   const [isGlobeReady, setIsGlobeReady] = useState(false);
+  const [isGlobeInView, setIsGlobeInView] = useState(false);
   const hasFocusedRef = useRef(false);
 
   useEffect(() => {
@@ -377,6 +379,26 @@ function InteractiveGlobe({ selected, focusRequest, onSelect, onInteract, theme,
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || !("IntersectionObserver" in window)) {
+      setIsGlobeInView(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsGlobeInView(entry.isIntersecting),
+      { rootMargin: "120px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isGlobeReady || !globeRef.current) return;
+    if (isGlobeInView) globeRef.current.resumeAnimation();
+    else globeRef.current.pauseAnimation();
+  }, [isGlobeInView, isGlobeReady]);
 
   useEffect(() => {
     if (!isGlobeReady || !globeRef.current) return;
@@ -505,11 +527,14 @@ function projectPoint(lng, lat, width, height) {
   return [x, y];
 }
 
-function KoreaMap({ selected, onSelect, theme }) {
+function KoreaMap({ memories: visibleMemories, selected, onSelect, theme }) {
   const shellRef = useRef(null);
   const canvasRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 620, height: 650 });
-  const visitedCodes = useMemo(() => new Set(koreaMemories.map((memory) => memory.provinceCode)), []);
+  const visitedCodes = useMemo(
+    () => new Set(visibleMemories.map((memory) => memory.provinceCode)),
+    [visibleMemories],
+  );
 
   useEffect(() => {
     if (!shellRef.current) return undefined;
@@ -560,12 +585,12 @@ function KoreaMap({ selected, onSelect, theme }) {
 
   return (
     <div className="korea-map-shell" ref={shellRef}>
-      <canvas ref={canvasRef} role="img" aria-label="대한민국 17개 시도 상세 지도. 지도 위의 서울, 전라남도, 제주특별자치도 버튼으로 장소 기억을 선택할 수 있습니다." />
-      {koreaMemories.map((memory) => {
+      <canvas ref={canvasRef} role="img" aria-label={`대한민국 17개 시도 상세 지도. 현재 ${visibleMemories.length}개 지역에 기억이 표시되어 있습니다.`} />
+      {visibleMemories.map((memory) => {
         const [x, y] = projectPoint(memory.lng, memory.lat, dimensions.width, dimensions.height);
         return <button key={memory.key} type="button" className={`map-hotspot ${selected?.key === memory.key ? "is-active" : ""}`} style={{ left: x, top: y }} onClick={() => onSelect(memory, "map")} aria-label={`${memory.province} 상세지도 보기`} aria-pressed={selected?.key === memory.key}><span className="hotspot-dot"><MapPin size={15} weight="fill" /></span><span className="hotspot-label">{memory.provinceShort}<small>{memory.location.split(" · ")[1]}</small></span></button>;
       })}
-      <div className="map-legend"><i />기억이 있는 지역 <span>{koreaMemories.length}곳</span></div>
+      <div className="map-legend"><i />기억이 있는 지역 <span>{visibleMemories.length}곳</span></div>
     </div>
   );
 }
@@ -736,9 +761,16 @@ function DistrictMap({ memory, theme }) {
 }
 
 function KoreaDetailExperience({ theme }) {
-  const [selected, setSelected] = useState(koreaMemories[0]);
+  const [selected, setSelected] = useState(null);
+  const [addedMemoryKeys, setAddedMemoryKeys] = useState(() => new Set());
+  const [addFeedback, setAddFeedback] = useState("아래 사진을 추가해 지도가 채워지는 과정을 체험해보세요.");
   const [detailLevel, setDetailLevel] = useState(2);
   const analytics = useExperienceAnalytics("korea_detail");
+  const addedMemories = useMemo(
+    () => koreaMemories.filter((memory) => addedMemoryKeys.has(memory.key)),
+    [addedMemoryKeys],
+  );
+  const fillPercent = Math.round((addedMemories.length / 17) * 100);
 
   useEffect(() => {
     void Promise.allSettled(
@@ -747,12 +779,22 @@ function KoreaDetailExperience({ theme }) {
   }, []);
 
   const handleSelect = (memory, selectionSource) => {
+    if (!addedMemoryKeys.has(memory.key)) return;
     analytics.startExperience("place_select");
-    if (selected.key !== memory.key || detailLevel !== 3) {
+    if (selected?.key !== memory.key || detailLevel !== 3) {
       analytics.trackPlaceSelect(memory.key, selectionSource);
     }
     setSelected(memory);
     setDetailLevel(3);
+  };
+
+  const handleAdd = (memory) => {
+    if (addedMemoryKeys.has(memory.key)) {
+      handleSelect(memory, "photo_tray");
+      return;
+    }
+    setAddedMemoryKeys((current) => new Set([...current, memory.key]));
+    setAddFeedback(`${memory.province}가 지도에 채워졌어요. 색칠된 지역을 눌러 기억을 볼 수 있어요.`);
   };
 
   const handleBack = () => setDetailLevel(2);
@@ -760,30 +802,48 @@ function KoreaDetailExperience({ theme }) {
   return (
     <section className="detail-section" id="korea-detail" ref={analytics.sectionRef}>
       <div className="detail-heading">
-        <div><p className="eyebrow">FROM GLOBE TO REGION</p><h2>대한민국에서는<br /><em>지역의 기억까지</em> 들어가요.</h2></div>
-        <p>17개 시·도 지도에서 지역을 고르면 같은 화면 안에서 장소의 사진과 기억이 열립니다. 합정·여수·제주를 눌러보세요.</p>
+        <div><p className="eyebrow">FROM PHOTO TO REGION</p><h2>사진을 더하면<br /><em>지역의 기억이</em> 채워져요.</h2></div>
+        <p>실제 앱처럼 장소가 담긴 사진을 추가하면 해당 시·도가 지도에 색칠됩니다. 색칠된 지역은 다시 눌러 장소의 기억을 조회할 수 있어요.</p>
       </div>
 
       <div className={`detail-demo detail-level-${detailLevel}`}>
         <header className="map-app-header">
-          <div><span className="app-kicker">MY TRIP MAP</span><h3>{detailLevel === 2 ? "나의 대한민국 지도" : selected.province}</h3></div>
-          <div className="map-progress"><strong>3</strong><span>/ 17</span><small>18% 채움</small></div>
+          <div><span className="app-kicker">MY TRIP MAP</span><h3>{detailLevel === 2 ? "나의 대한민국 지도" : selected?.province}</h3></div>
+          <div className="map-progress"><strong>{addedMemories.length}</strong><span>/ 17</span><small>{fillPercent}% 채움</small></div>
         </header>
         {detailLevel === 2 ? (
           <div className="detail-level-content">
-            <div className="region-shortcuts" role="group" aria-label="상세 지역 기억 선택">
-              <span><b>2단계</b> 시·도를 눌러 장소로 들어가세요</span>
-              <div>{koreaMemories.map((memory) => <button key={memory.key} type="button" onClick={() => handleSelect(memory, "shortcut")}>{memory.province}</button>)}</div>
+            <div className="memory-add-panel">
+              <div className="memory-add-heading">
+                <span><b>2단계</b> Mapmory 개발팀의 실제 사진으로 체험해보세요</span>
+                <p aria-live="polite">{addFeedback}</p>
+              </div>
+              <div className="memory-add-list" role="list" aria-label="지도에 추가할 예시 사진">
+                {koreaMemories.map((memory) => {
+                  const isAdded = addedMemoryKeys.has(memory.key);
+                  return (
+                    <article className={`memory-add-card ${isAdded ? "is-added" : ""}`} key={memory.key} role="listitem">
+                      <img src={memory.image} alt={`${memory.location}의 실제 사진`} loading="lazy" decoding="async" />
+                      <div><span>{memory.location}</span><small>{memory.photoCredit}</small></div>
+                      <button type="button" onClick={() => handleAdd(memory)} aria-label={isAdded ? `${memory.province} 기억 보기` : `${memory.province} 사진을 지도에 추가하기`}>
+                        {isAdded ? <><CheckCircle size={16} weight="fill" />기억 보기</> : <><Plus size={15} weight="bold" />추가하기</>}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
             </div>
             <div className="detail-stage detail-stage-map">
-              <KoreaMap selected={null} onSelect={handleSelect} theme={theme} />
+              <KoreaMap memories={addedMemories} selected={null} onSelect={handleSelect} theme={theme} />
               <aside className="map-guide" aria-label="대한민국 상세지도 이용 안내">
                 <span className="selector-step">2단계</span>
-                <h3>색칠된 지역을 눌러보세요</h3>
-                <p>서울, 전남, 제주 중 하나를 고르면 이 화면이 해당 장소의 기억으로 바뀝니다.</p>
-                <ol>
-                  {koreaMemories.map((memory) => <li key={memory.key}><i /><span>{memory.province}</span><strong>{memory.location.split(" · ")[1]}</strong></li>)}
-                </ol>
+                <h3>{addedMemories.length ? "색칠된 지역을 눌러보세요" : "사진으로 지도를 채워보세요"}</h3>
+                <p>{addedMemories.length ? "추가한 사진의 지역을 누르면 장소의 실제 기억이 열립니다." : "위 사진의 추가하기 버튼을 누르면 해당 장소가 있는 시·도에 색이 채워집니다."}</p>
+                {addedMemories.length > 0 && (
+                  <ol>
+                    {addedMemories.map((memory) => <li key={memory.key}><i /><button className="map-guide-memory" type="button" onClick={() => handleSelect(memory, "guide")}><span>{memory.province}</span><strong>{memory.location.split(" · ")[1]}</strong></button></li>)}
+                  </ol>
+                )}
               </aside>
             </div>
           </div>
@@ -821,6 +881,74 @@ function KoreaDetailExperience({ theme }) {
   );
 }
 
+function HeroSection({ onExperienceStart }) {
+  const [photoStep, setPhotoStep] = useState(0);
+  const heroRef = useRef(null);
+
+  useEffect(() => {
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (reducedMotion.matches) {
+      setPhotoStep(2);
+      return undefined;
+    }
+
+    let frame = 0;
+    const updatePhotoStep = () => {
+      frame = 0;
+      const heroTop = heroRef.current?.offsetTop ?? 0;
+      const distance = Math.max(0, window.scrollY - heroTop + 20);
+      const nextStep = distance >= 170 ? 2 : distance >= 70 ? 1 : 0;
+      setPhotoStep((current) => Math.max(current, nextStep));
+    };
+    const handleScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updatePhotoStep);
+    };
+
+    const startsAtHeroTop = window.location.hash === "" || window.location.hash === "#top";
+    if (startsAtHeroTop) window.scrollTo(0, 0);
+    frame = window.requestAnimationFrame(updatePhotoStep);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return (
+    <section className="hero" ref={heroRef}>
+      <div className="hero-intro">
+        <div className="hero-copy">
+          <p className="eyebrow">PLACE-BASED MEMORY ARCHIVE</p>
+          <h1>장소를 따라가면, 그날의 <span className="hero-memory-word"><em>기억</em><span aria-hidden="true">기억</span></span>이 다시 열려요.</h1>
+          <p className="hero-description">사진과 장소를 모아 나만의 기억 지도를 만들어요.</p>
+          <div className="hero-actions">
+            <a className="button button-primary" href="#experience" onClick={() => onExperienceStart("hero_cta")}><GlobeHemisphereEast size={19} weight="duotone" />지구본 돌려보기</a>
+            <DownloadButton className="hero-release" placement="hero" />
+          </div>
+        </div>
+
+        <div className={`hero-photo-cluster photo-step-${photoStep}`} aria-label="스크롤하며 하나씩 더해지는 Mapmory 개발팀의 실제 장소 기록 세 장">
+          <figure className="hero-photo hero-photo-main">
+            <img src="/assets/team-jeju-coast.jpg" alt="해 질 무렵 검은 바위 사이로 파도가 밀려오는 제주 바닷가" loading="eager" fetchPriority="high" decoding="async" />
+            <figcaption><span><MapPin size={16} weight="fill" /><span className="hero-photo-handwriting">파도 소리가 남은 저녁</span></span><small>Mapmory 개발팀 촬영</small></figcaption>
+          </figure>
+          <figure className="hero-photo hero-photo-left">
+            <img src="/assets/team-hapjeong-huiok.jpg" alt="합정 희옥에서 먹은 시오 라멘" loading="eager" decoding="async" />
+            <figcaption><span><MapPin size={15} weight="fill" /><span className="hero-photo-handwriting">기다림 끝의 따뜻한 한 그릇</span></span><small>Mapmory 개발팀 촬영</small></figcaption>
+          </figure>
+          <figure className="hero-photo hero-photo-right">
+            <img src="/assets/team-yeosu-mochi.jpg" alt="여수 여행에서 함께 나눠 먹은 딸기모찌" loading="eager" decoding="async" />
+            <figcaption><span><MapPin size={15} weight="fill" /><span className="hero-photo-handwriting">함께 나눈 달콤한 한 상자</span></span><small>Mapmory 개발팀 촬영</small></figcaption>
+          </figure>
+        </div>
+        <p className="release-note"><CheckCircle size={17} weight="fill" />비공개 테스트 진행 중 · Google Play 출시 준비</p>
+      </div>
+      <a className="hero-fold-cue" href="#experience"><span>아래로 내려 앱 경험해보기</span><ArrowDown size={18} weight="bold" /></a>
+    </section>
+  );
+}
+
 function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("mapmory-theme") || "light");
   const [selectedMemory, setSelectedMemory] = useState(memories[0]);
@@ -845,26 +973,7 @@ function App() {
         <div className="header-actions"><ThemeToggle theme={theme} onChange={setTheme} /><DownloadButton className="header-download" placement="header" /></div>
       </header>
 
-      <section className="hero">
-        <div className="hero-intro">
-          <div className="hero-copy">
-            <p className="eyebrow">PLACE-BASED MEMORY ARCHIVE</p>
-            <h1>장소를 따라가면,<br />그날의 <em>기억</em>이<br />다시 열려요.</h1>
-            <p className="hero-description">사진과 장소를 모아 나만의 기억 지도를 만들어요.</p>
-            <div className="hero-actions">
-              <a className="button button-primary" href="#experience" onClick={() => globeAnalytics.startExperience("hero_cta")}><GlobeHemisphereEast size={19} weight="duotone" />지구본 돌려보기</a>
-              <DownloadButton className="hero-release" placement="hero" />
-            </div>
-            <p className="release-note"><CheckCircle size={17} weight="fill" />비공개 테스트 진행 중 · Google Play 출시 준비</p>
-          </div>
-
-          <figure className="hero-photo">
-            <img src="/assets/team-jeju-coast.jpg" alt="해 질 무렵 검은 바위 사이로 파도가 밀려오는 제주 바닷가" />
-            <figcaption><span><MapPin size={16} weight="fill" />제주 바닷가의 저녁</span><small>Mapmory 개발팀의 실제 기록</small></figcaption>
-          </figure>
-        </div>
-        <a className="hero-fold-cue" href="#experience"><span>아래로 내려 앱 경험해보기</span><ArrowDown size={18} weight="bold" /></a>
-      </section>
+      <HeroSection onExperienceStart={globeAnalytics.startExperience} />
 
       <section className="experience-section" id="experience" ref={globeAnalytics.sectionRef}>
         <div className="section-heading section-heading-flow">
