@@ -259,6 +259,13 @@ Repository에서 `travelRecordId`와 `memberId`를 함께 조건으로 사용한
         "viewUrl": "https://bucket.s3.ap-northeast-2.amazonaws.com/...?X-Amz-Signature=...",
         "viewUrlExpiresIn": 300,
         "sortOrder": 0
+      },
+      {
+        "id": 2,
+        "objectKey": "mapmory/travel-records/b.jpg",
+        "viewUrl": "https://bucket.s3.ap-northeast-2.amazonaws.com/...?X-Amz-Signature=...",
+        "viewUrlExpiresIn": 300,
+        "sortOrder": 1
       }
     ],
     "createdAt": "2026-08-14T10:30:00",
