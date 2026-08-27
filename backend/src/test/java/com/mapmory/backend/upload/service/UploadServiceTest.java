@@ -7,6 +7,7 @@ import com.mapmory.backend.upload.dto.CreatePresignedUrlsRequest;
 import com.mapmory.backend.upload.dto.CreatePresignedUrlsResponse;
 import com.mapmory.backend.upload.dto.UploadFileRequest;
 import com.mapmory.backend.upload.policy.ObjectKeyGenerator;
+import com.mapmory.backend.upload.storage.S3StorageProperties;
 import com.mapmory.backend.upload.policy.UploadPolicy;
 import com.mapmory.backend.upload.policy.UploadPolicyProperties;
 import com.mapmory.backend.upload.storage.PresignedUrlProvider;
@@ -27,7 +28,7 @@ class UploadServiceTest {
         FakePresignedUrlProvider provider = new FakePresignedUrlProvider();
         UploadService uploadService = new UploadService(
                 new UploadPolicy(properties),
-                new ObjectKeyGenerator(),
+                new ObjectKeyGenerator(new S3StorageProperties("mapmory-test", "ap-northeast-2", "")),
                 provider,
                 properties
         );
