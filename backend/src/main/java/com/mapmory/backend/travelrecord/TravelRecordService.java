@@ -4,8 +4,10 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.common.monitoring.MonitoredOperation;
 import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
+import com.mapmory.backend.recordmedia.ExpiringUrl;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
+import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
 import com.mapmory.backend.tag.Tag;
@@ -15,9 +17,6 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
-import com.mapmory.backend.upload.policy.UploadPolicyProperties;
-import com.mapmory.backend.upload.storage.PresignedUrlProvider;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -43,8 +42,7 @@ public class TravelRecordService {
     private final TravelRecordTagService travelRecordTagService;
     private final TagService tagService;
     private final OperationTimer operationTimer;
-    private final PresignedUrlProvider presignedUrlProvider;
-    private final UploadPolicyProperties uploadPolicyProperties;
+    private final RecordMediaUrlService recordMediaUrlService;
 
     public TravelRecordService(
             TravelRecordRepository travelRecordRepository,
@@ -53,8 +51,7 @@ public class TravelRecordService {
             TravelRecordTagService travelRecordTagService,
             TagService tagService,
             OperationTimer operationTimer,
-            PresignedUrlProvider presignedUrlProvider,
-            UploadPolicyProperties uploadPolicyProperties
+            RecordMediaUrlService recordMediaUrlService
     ) {
         this.travelRecordRepository = travelRecordRepository;
         this.regionResolver = regionResolver;
@@ -62,8 +59,7 @@ public class TravelRecordService {
         this.travelRecordTagService = travelRecordTagService;
         this.tagService = tagService;
         this.operationTimer = operationTimer;
-        this.presignedUrlProvider = presignedUrlProvider;
-        this.uploadPolicyProperties = uploadPolicyProperties;
+        this.recordMediaUrlService = recordMediaUrlService;
     }
 
     @Transactional
@@ -214,13 +210,17 @@ public class TravelRecordService {
             }
         }
 
+        List<Long> travelRecordIds = travelRecords.getContent().stream()
+                .map(TravelRecord::getId)
+                .toList();
         Map<Long, List<Tag>> tagsByTravelRecordId =
-                travelRecordTagService.findByTravelRecordIds(
-                        travelRecords.getContent().stream().map(TravelRecord::getId).toList()
-                );
+                travelRecordTagService.findByTravelRecordIds(travelRecordIds);
+        Map<Long, ExpiringUrl> thumbnailUrlsByTravelRecordId =
+                recordMediaUrlService.createThumbnailUrls(travelRecordIds);
         return TravelRecordListResponse.from(
                 travelRecords,
-                tagsByTravelRecordId
+                tagsByTravelRecordId,
+                thumbnailUrlsByTravelRecordId
         );
     }
 
@@ -333,12 +333,10 @@ public class TravelRecordService {
             List<RecordMedia> recordMedia,
             List<Tag> tags
     ) {
-        Duration expiration = uploadPolicyProperties.presignedUrlExpiration();
         List<TravelRecordMediaResponse> media = recordMedia.stream()
                 .map(item -> TravelRecordMediaResponse.from(
                         item,
-                        presignedUrlProvider.createPresignedGetUrl(item.getObjectKey(), expiration),
-                        expiration
+                        recordMediaUrlService.createViewUrl(item.getObjectKey())
                 ))
                 .toList();
 

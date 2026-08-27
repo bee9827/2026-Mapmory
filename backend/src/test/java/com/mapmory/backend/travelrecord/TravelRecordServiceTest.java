@@ -16,8 +16,10 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.common.monitoring.MonitoredOperation;
 import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
+import com.mapmory.backend.recordmedia.ExpiringUrl;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaRepository;
+import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
 import com.mapmory.backend.region.RegionType;
@@ -27,13 +29,10 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
-import com.mapmory.backend.upload.policy.UploadPolicyProperties;
-import com.mapmory.backend.upload.storage.PresignedUrlProvider;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import java.net.URI;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -68,10 +67,7 @@ class TravelRecordServiceTest {
     private TagService tagService;
 
     @Mock
-    private PresignedUrlProvider presignedUrlProvider;
-
-    @Mock
-    private UploadPolicyProperties uploadPolicyProperties;
+    private RecordMediaUrlService recordMediaUrlService;
 
     @Spy
     private OperationTimer operationTimer = new OperationTimer(new SimpleMeterRegistry());
@@ -85,9 +81,11 @@ class TravelRecordServiceTest {
     void setUp() {
         member = mock(Member.class);
         lenient().when(member.getId()).thenReturn(10L);
-        lenient().when(uploadPolicyProperties.presignedUrlExpiration()).thenReturn(Duration.ofMinutes(5));
-        lenient().when(presignedUrlProvider.createPresignedGetUrl(anyString(), any()))
-                .thenAnswer(invocation -> URI.create("https://download.example/" + invocation.getArgument(0)));
+        lenient().when(recordMediaUrlService.createViewUrl(anyString()))
+                .thenAnswer(invocation -> new ExpiringUrl(
+                        "https://download.example/" + invocation.getArgument(0),
+                        300L
+                ));
     }
 
     @Test
@@ -155,14 +153,8 @@ class TravelRecordServiceTest {
         assertThat(result.media())
                 .extracting(TravelRecordMediaResponse::sortOrder)
                 .containsExactly(0, 1);
-        verify(presignedUrlProvider).createPresignedGetUrl(
-                "mapmory/travel-records/a.jpg",
-                Duration.ofMinutes(5)
-        );
-        verify(presignedUrlProvider).createPresignedGetUrl(
-                "mapmory/travel-records/b.jpg",
-                Duration.ofMinutes(5)
-        );
+        verify(recordMediaUrlService).createViewUrl("mapmory/travel-records/a.jpg");
+        verify(recordMediaUrlService).createViewUrl("mapmory/travel-records/b.jpg");
     }
 
     @Test
@@ -189,7 +181,7 @@ class TravelRecordServiceTest {
         assertThat(result.region().district()).isNull();
         assertThat(result.objectKeys()).isEmpty();
         assertThat(result.media()).isEmpty();
-        verify(presignedUrlProvider, never()).createPresignedGetUrl(anyString(), any());
+        verify(recordMediaUrlService, never()).createViewUrl(anyString());
     }
 
     @Test
@@ -383,13 +375,43 @@ class TravelRecordServiceTest {
         Page<TravelRecord> expected = new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1);
         when(travelRecordRepository.findByMemberIdAndOptionalTagId(eq(10L), eq(null), any(Pageable.class)))
                 .thenReturn(expected);
+        when(recordMediaUrlService.createThumbnailUrls(List.of(101L)))
+                .thenReturn(Map.of(
+                        101L,
+                        new ExpiringUrl(
+                                "https://download.example/mapmory/travel-records/a.jpg",
+                                300L
+                        )
+                ));
 
         TravelRecordListResponse result = travelRecordService.findAll(member, null, null, null, null, 0, 20);
 
         assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.items().getFirst().thumbnailUrl())
+                .isEqualTo("https://download.example/mapmory/travel-records/a.jpg");
+        assertThat(result.items().getFirst().thumbnailUrlExpiresIn()).isEqualTo(300L);
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(travelRecordRepository).findByMemberIdAndOptionalTagId(eq(10L), eq(null), captor.capture());
         assertThat(captor.getValue().getPageSize()).isEqualTo(20);
+        verify(recordMediaUrlService).createThumbnailUrls(List.of(101L));
+    }
+
+    @Test
+    void 미디어가_없는_일지_목록은_썸네일_정보가_null이다() {
+        TravelRecord travelRecord = mock(TravelRecord.class);
+        Region region = mock(Region.class);
+        when(travelRecord.getId()).thenReturn(101L);
+        when(travelRecord.getRegion()).thenReturn(region);
+        Page<TravelRecord> expected = new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1);
+        when(travelRecordRepository.findByMemberIdAndOptionalTagId(eq(10L), eq(null), any(Pageable.class)))
+                .thenReturn(expected);
+        when(recordMediaUrlService.createThumbnailUrls(List.of(101L))).thenReturn(Map.of());
+
+        TravelRecordListResponse result = travelRecordService.findAll(member, null, null, null, null, 0, 20);
+
+        assertThat(result.items().getFirst().thumbnailUrl()).isNull();
+        assertThat(result.items().getFirst().thumbnailUrlExpiresIn()).isNull();
+        verify(recordMediaUrlService).createThumbnailUrls(List.of(101L));
     }
 
     @Test

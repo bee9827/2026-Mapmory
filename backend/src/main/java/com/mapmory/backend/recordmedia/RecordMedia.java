@@ -64,6 +64,17 @@ public class RecordMedia {
         return objectKey;
     }
 
+    public Long travelRecordId() {
+        return travelRecord.getId();
+    }
+
+    public String getThumbnailObjectKey() {
+        if (thumbKey == null || thumbKey.isBlank()) {
+            return objectKey;
+        }
+        return thumbKey;
+    }
+
     public int getSortOrder() {
         return sortOrder;
     }
