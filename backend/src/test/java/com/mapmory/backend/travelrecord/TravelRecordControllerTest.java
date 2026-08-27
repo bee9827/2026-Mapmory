@@ -15,11 +15,13 @@ import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.RegionDetailResponse;
 import com.mapmory.backend.travelrecord.dto.RegionItemResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecord.dto.TravelRecordResponse;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
@@ -138,7 +140,12 @@ class TravelRecordControllerTest {
                 .andExpect(jsonPath("$.data.region.country.code").value("KR"))
                 .andExpect(jsonPath("$.data.region.district.code").value("50110"))
                 .andExpect(jsonPath("$.data.objectKeys[0]")
-                        .value("mapmory/travel-records/a.jpg"));
+                        .value("mapmory/travel-records/a.jpg"))
+                .andExpect(jsonPath("$.data.media[0].objectKey")
+                        .value("mapmory/travel-records/a.jpg"))
+                .andExpect(jsonPath("$.data.media[0].viewUrl")
+                        .value("https://download.example/mapmory/travel-records/a.jpg"))
+                .andExpect(jsonPath("$.data.media[0].viewUrlExpiresIn").value(300L));
     }
 
     @Test
@@ -170,7 +177,9 @@ class TravelRecordControllerTest {
                 .andExpect(jsonPath("$.data.title").value("수정된 제주 여행"))
                 .andExpect(jsonPath("$.data.region.district.code").value("50110"))
                 .andExpect(jsonPath("$.data.objectKeys[0]")
-                        .value("travel-records/10/b.jpg"));
+                        .value("travel-records/10/b.jpg"))
+                .andExpect(jsonPath("$.data.media[0].viewUrl")
+                        .value("https://download.example/travel-records/10/b.jpg"));
     }
 
     @Test
@@ -194,6 +203,16 @@ class TravelRecordControllerTest {
                 LocalDate.of(2026, 8, 11),
                 LocalDate.of(2026, 8, 13),
                 objectKeys,
+                IntStream.range(0, objectKeys.size())
+                        .mapToObj(index -> new TravelRecordMediaResponse(
+                                (long) index + 1,
+                                objectKeys.get(index),
+                                "https://download.example/" + objectKeys.get(index),
+                                300L,
+                                index
+                        ))
+                        .toList(),
+                List.of(),
                 null,
                 null
         );

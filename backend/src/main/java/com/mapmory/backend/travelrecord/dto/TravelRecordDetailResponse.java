@@ -16,6 +16,7 @@ public record TravelRecordDetailResponse(
         LocalDate startDate,
         LocalDate endDate,
         List<String> objectKeys,
+        List<TravelRecordMediaResponse> media,
         List<TagSummaryResponse> tags,
         LocalDateTime createdAt,
         LocalDateTime updatedAt
@@ -31,13 +32,14 @@ public record TravelRecordDetailResponse(
             LocalDateTime createdAt,
             LocalDateTime updatedAt
     ) {
-        this(id, title, content, region, startDate, endDate, objectKeys, List.of(), createdAt, updatedAt);
+        this(id, title, content, region, startDate, endDate, objectKeys, List.of(), List.of(), createdAt, updatedAt);
     }
 
     public static TravelRecordDetailResponse from(
             TravelRecord travelRecord,
             List<RecordMedia> recordMedia,
-            List<Tag> tags
+            List<Tag> tags,
+            List<TravelRecordMediaResponse> media
     ) {
         return new TravelRecordDetailResponse(
                 travelRecord.getId(),
@@ -49,6 +51,7 @@ public record TravelRecordDetailResponse(
                 recordMedia.stream()
                         .map(RecordMedia::getObjectKey)
                         .toList(),
+                media,
                 tags.stream().map(TagSummaryResponse::from).toList(),
                 travelRecord.getCreatedAt(),
                 travelRecord.getUpdatedAt()
