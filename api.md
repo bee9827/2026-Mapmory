@@ -1,6 +1,6 @@
 # Mapmory API 명세
 
-> 기준일: 2026-08-26 · 범위: 인증, 지역 선택, 지도 마킹, 여행 기록, 이미지 첨부, 사용자 생성 태그
+> 기준일: 2026-08-27 · 범위: 인증, 지역 선택, 지도 마킹, 여행 기록, 이미지 첨부, 사용자 생성 태그
 
 이 문서는 Mapmory API의 기준 계약이다. API 목록의 `구현 전 설계` 항목은 구현에 앞서 합의한 목표 계약이며, 구현이 끝나면 `구현됨`으로 상태를 변경한다.
 
@@ -440,14 +440,16 @@ Authorization: Bearer {게스트 accessToken}
 | `countryCode` | String | 예 | 존재하는 ISO 3166-1 alpha-2 코드 |
 | `provinceCode` | String | 조건부 | `KR`이면 필수 |
 | `districtCode` | String | 조건부 | `KR`이면 필수 |
-| `title` | String | 예 | 최대 200자, 빈 문자열·공백 허용 |
-| `content` | String | 예 | 빈 문자열·공백 허용 |
+| `title` | String | 예 | 공백이 아닌 문자를 포함해야 하며 최대 200자 |
+| `content` | String | 아니요 | `null`, 빈 문자열·공백 허용 |
 | `startDate` | LocalDate | 예 | `YYYY-MM-DD` |
 | `endDate` | LocalDate | 아니요 | 시작일보다 빠를 수 없음 |
 | `objectKeys` | String[] | 아니요 | 업로드 완료된 Object Key 목록 |
 | `tagIds` | Long[] | 아니요 | 빈 배열 허용, 최대 5개, 중복 불가, 모두 현재 회원 소유 |
 
 `objectKeys`는 배열 순서대로 `record_media.sort_order`를 0부터 부여해 저장한다. 값이 없거나 `null`이면 미디어를 생성하지 않는다.
+
+`content`가 없거나 `null`이면 서버는 빈 문자열로 정규화해 저장한다.
 
 `tagIds`가 없거나 `null`이면 태그를 연결하지 않는다. 새 태그를 입력한 클라이언트는 먼저 `POST /tags`로 태그를 생성한 뒤 반환된 ID를 여행 기록 요청에 포함한다. 여행 기록과 태그 연결은 같은 트랜잭션에서 저장한다.
 
@@ -748,5 +750,5 @@ Authorization: Bearer {accessToken}
 - 여행 기록 생성·수정 시 태그 소유권 검증과 연결 변경을 같은 트랜잭션에서 처리
 - 지도 요약 Repository에 선택적 `tagId` 조건을 추가하고 MySQL 실행 계획 검증
 - 목록·상세 응답에 `tags`를 추가한 뒤 KMP DTO 계약 갱신
-- 현재 구현에서 누락된 `title` 최대 200자 검증, `content` null 검증, 여행 날짜 범위 검증 보완
+- 여행 날짜 범위 검증 보완
 - 여행 기록 생성에서도 Object Key 중복·소유권·업로드 완료 검증을 문서 계약과 일치시킴

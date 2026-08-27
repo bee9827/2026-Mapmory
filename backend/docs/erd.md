@@ -165,8 +165,8 @@ erDiagram
 | `id` | `BIGINT` | PK, AUTO_INCREMENT | 여행 기록 식별자 |
 | `member_id` | `BIGINT` | NOT NULL, FK → `member.id` | 기록 소유 회원 |
 | `region_id` | `BIGINT` | NOT NULL, FK → `region.id` | 기록 대상 Region |
-| `title` | `VARCHAR(200)` | NOT NULL | 제목, 빈 문자열 허용 |
-| `content` | `TEXT` | NOT NULL | 본문, 빈 문자열 허용 |
+| `title` | `VARCHAR(200)` | NOT NULL | 제목, 애플리케이션에서 공백 입력을 금지하고 최대 200자로 제한 |
+| `content` | `TEXT` | NOT NULL | 선택 본문, 요청의 `null`은 애플리케이션에서 빈 문자열로 정규화 |
 | `start_date` | `DATE` | NOT NULL | 여행 시작일 |
 | `end_date` | `DATE` | NULL | 여행 종료일 |
 | `created_at` | `DATETIME` | NOT NULL | 생성 시각 |
