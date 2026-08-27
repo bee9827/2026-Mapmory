@@ -29,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -55,18 +56,22 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.photo.PhotoLibraryActionsFactory
+import com.mapmory.shared.presentation.photo.PhotoLoadingProgress
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
 import com.mapmory.shared.presentation.date.PlatformDatePicker
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+import com.mapmory.shared.preview.PreviewSurface
+import com.mapmory.shared.preview.previewLocations
 
 private const val StartDatePickerTarget = "start"
 private const val EndDatePickerTarget = "end"
@@ -100,14 +105,22 @@ fun TripRecordEditorScreen(
     onEndDateChanged: (String) -> Unit,
     onPhotosAdded: (List<SelectedPhoto>) -> Unit = {},
     onPhotoRemoved: (String) -> Unit = {},
+    onPhotoLoadingChanged: (Boolean) -> Unit = {},
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
     onMapClick: () -> Unit = {},
     onRecordClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    photoLibraryActionsFactory: PhotoLibraryActionsFactory = { onPicked, onRecommended, onMessage ->
-        rememberPhotoLibraryActions(onPicked, onRecommended, onMessage)
-    },
+    photoLibraryActionsFactory: PhotoLibraryActionsFactory =
+        { onPicked, onRecommended, onMessage, onLoadingChanged, onLoadingProgressChanged ->
+            rememberPhotoLibraryActions(
+                onPicked,
+                onRecommended,
+                onMessage,
+                onLoadingChanged,
+                onLoadingProgressChanged,
+            )
+        },
     modifier: Modifier = Modifier,
 ) {
     val selectableLocations = remember(locations) {
@@ -123,6 +136,7 @@ fun TripRecordEditorScreen(
     var knownRecommendationIds by remember { mutableStateOf(emptySet<String>()) }
     var showRecommendationSheet by remember { mutableStateOf(false) }
     var isPreparingRecommendationPhotos by remember { mutableStateOf(false) }
+    var photoLoadingProgress by remember { mutableStateOf<PhotoLoadingProgress?>(null) }
     var datePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
     val dismissKeyboardOnTap = rememberDismissKeyboardOnTapModifier()
     val photoLibrary = photoLibraryActionsFactory(
@@ -145,6 +159,11 @@ fun TripRecordEditorScreen(
             }
         },
         { photoMessage = it },
+        { isLoading ->
+            photoLoadingProgress = null
+            onPhotoLoadingChanged(isLoading)
+        },
+        { progress -> photoLoadingProgress = progress },
     )
     val locationResultsListState = rememberLazyListState()
     val filteredLocations = remember(locationSearchQuery, selectableLocations) {
@@ -203,6 +222,8 @@ fun TripRecordEditorScreen(
                             },
                             onRemoveClick = onPhotoRemoved,
                             recommendationsAvailable = photoLibrary.recommendationsAvailable,
+                            isLoading = uiState.isPhotoLoading,
+                            loadingProgress = photoLoadingProgress,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 18.dp),
@@ -413,8 +434,10 @@ fun TripRecordEditorScreen(
                         val selectedPhotos = recommendedPhotos
                             .filter { it.id in selectedRecommendationIds }
                         isPreparingRecommendationPhotos = true
+                        onPhotoLoadingChanged(true)
                         photoLibrary.prepareForAdding(selectedPhotos) { preparedPhotos ->
                             isPreparingRecommendationPhotos = false
+                            onPhotoLoadingChanged(false)
                             if (preparedPhotos.isEmpty()) {
                                 photoMessage = "선택한 사진의 원본을 읽지 못했어요."
                             } else {
@@ -533,6 +556,8 @@ private fun PhotoSection(
     onRecommendClick: () -> Unit,
     onRemoveClick: (String) -> Unit,
     recommendationsAvailable: Boolean,
+    isLoading: Boolean,
+    loadingProgress: PhotoLoadingProgress? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
@@ -554,7 +579,7 @@ private fun PhotoSection(
             Spacer(Modifier.width(10.dp))
             TextButton(
                 onClick = onRecommendClick,
-                enabled = recommendationsAvailable,
+                enabled = recommendationsAvailable && !isLoading,
                 contentPadding = PaddingValues(horizontal = 9.dp, vertical = 2.dp),
                 modifier = Modifier
                     .height(36.dp)
@@ -566,18 +591,41 @@ private fun PhotoSection(
                         shape = RoundedCornerShape(6.dp),
                     ),
             ) {
-                Text(
-                    text = "위치 기반 사진\n불러오기",
-                    color = TripRecordPalette.photoRecommendText,
-                    fontSize = 9.sp,
-                    lineHeight = 11.sp,
-                )
+                if (isLoading) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(13.dp),
+                            color = TripRecordPalette.photoRecommendText,
+                            strokeWidth = 1.5.dp,
+                        )
+                        Text(
+                            text = loadingProgress?.let { progress ->
+                                progress.percentage?.let { percentage ->
+                                    "${progress.processed}/${progress.total} ($percentage%)"
+                                }
+                            } ?: "불러오는 중",
+                            color = TripRecordPalette.photoRecommendText,
+                            fontSize = 9.sp,
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "위치 기반 사진\n불러오기",
+                        color = TripRecordPalette.photoRecommendText,
+                        fontSize = 9.sp,
+                        lineHeight = 11.sp,
+                    )
+                }
             }
         }
         PhotoEditor(
             photos = photos,
             onAddClick = onAddClick,
             onRemoveClick = onRemoveClick,
+            isAddEnabled = !isLoading,
             modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
         )
     }
@@ -725,22 +773,31 @@ private fun TripRecordEditorUiState.errorMessageFor(target: TripRecordEditorErro
 
 @Composable
 private fun CompanionChips(modifier: Modifier = Modifier) {
+    val companions = remember { listOf("가족", "애인", "친구", "혼자") }
+    var selectedCompanion by remember { mutableStateOf<String?>(null) }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        listOf("가족", "애인", "친구", "혼자").forEach { companion ->
+        companions.forEach { companion ->
+            val selected = selectedCompanion == companion
             Text(
                 text = companion,
-                color = TripRecordPalette.text,
+                color = if (selected) TripRecordPalette.primary else TripRecordPalette.text,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50.dp))
-                    .background(TripRecordPalette.surface)
+                    .background(
+                        if (selected) TripRecordPalette.primarySoft else TripRecordPalette.surface,
+                    )
                     .border(1.dp, TripRecordPalette.line, RoundedCornerShape(50.dp))
+                    .clickable {
+                        selectedCompanion = if (selected) null else companion
+                    }
                     .padding(horizontal = 11.dp, vertical = 7.dp),
             )
         }
@@ -793,6 +850,7 @@ private fun PhotoEditor(
     photos: List<TripRecordPhotoUiState>,
     onAddClick: () -> Unit,
     onRemoveClick: (String) -> Unit,
+    isAddEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -802,7 +860,7 @@ private fun PhotoEditor(
             .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        PhotoActionButton(onClick = onAddClick)
+        PhotoActionButton(onClick = onAddClick, enabled = isAddEnabled)
         photos.forEach { photo ->
             Box {
                 PhotoPreview(photo = photo, modifier = Modifier.size(112.dp, 84.dp))
@@ -825,12 +883,12 @@ private fun PhotoEditor(
 }
 
 @Composable
-private fun PhotoActionButton(onClick: () -> Unit) {
+private fun PhotoActionButton(onClick: () -> Unit, enabled: Boolean) {
     Column(
         modifier = Modifier
             .size(112.dp, 84.dp)
             .clip(RoundedCornerShape(14.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .background(TripRecordPalette.photoGalleryBackground)
             .border(1.dp, TripRecordPalette.photoGalleryBorder, RoundedCornerShape(14.dp)),
         verticalArrangement = Arrangement.Center,
@@ -1002,6 +1060,90 @@ private fun LocationSearchResult(
                 fontWeight = FontWeight.Bold,
             )
         }
+    }
+}
+
+@Preview(
+    name = "여행 기록 작성",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun TripRecordEditorScreenPreview() {
+    PreviewSurface {
+        TripRecordEditorScreen(
+            uiState = TripRecordEditorUiState(
+                selectedLocation = previewLocations[1],
+                title = "봄날의 서울",
+                content = "천천히 걸으며 발견한 서울의 새로운 모습",
+                startDate = "2026-04-12",
+                endDate = "2026-04-14",
+            ),
+            locations = previewLocations,
+            onLocationSelected = {},
+            onTitleChanged = {},
+            onContentChanged = {},
+            onStartDateChanged = {},
+            onEndDateChanged = {},
+            onSaveClick = {},
+            onBackClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 작성 빈 상태",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun EmptyTripRecordEditorScreenPreview() {
+    PreviewSurface {
+        TripRecordEditorScreen(
+            uiState = TripRecordEditorUiState(),
+            locations = previewLocations,
+            onLocationSelected = {},
+            onTitleChanged = {},
+            onContentChanged = {},
+            onStartDateChanged = {},
+            onEndDateChanged = {},
+            onSaveClick = {},
+            onBackClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 작성 오류",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun ErrorTripRecordEditorScreenPreview() {
+    PreviewSurface {
+        TripRecordEditorScreen(
+            uiState = TripRecordEditorUiState(
+                dirtyFields = setOf(
+                    TripRecordEditorErrorTarget.LOCATION,
+                    TripRecordEditorErrorTarget.TITLE,
+                ),
+                fieldErrors = mapOf(
+                    TripRecordEditorErrorTarget.LOCATION to "여행 장소를 선택해 주세요.",
+                    TripRecordEditorErrorTarget.TITLE to "제목을 입력해 주세요.",
+                ),
+            ),
+            locations = previewLocations,
+            onLocationSelected = {},
+            onTitleChanged = {},
+            onContentChanged = {},
+            onStartDateChanged = {},
+            onEndDateChanged = {},
+            onSaveClick = {},
+            onBackClick = {},
+        )
     }
 }
 

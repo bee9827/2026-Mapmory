@@ -33,21 +33,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.presentation.triprecord.state.TripRecordFilterUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
+import com.mapmory.shared.preview.PreviewSurface
+import com.mapmory.shared.preview.previewUiRecords
 
 @Composable
 fun TripRecordListScreen(
     uiState: TripRecordListUiState,
     filter: TripRecordFilterUiState,
-    locations: List<Location>,
-    onKeywordChanged: (String) -> Unit,
-    onLocationChanged: (Long?) -> Unit,
-    onSearchClick: () -> Unit,
     onPreviousPageClick: () -> Unit,
     onNextPageClick: () -> Unit,
     onCreateClick: () -> Unit,
@@ -91,7 +89,7 @@ fun TripRecordListScreen(
                     is TripRecordListUiState.Success -> {
                         if (uiState.records.isEmpty()) {
                             EmptyTripRecords(
-                                hasFilter = filter.keyword.isNotBlank() || filter.locationId != null,
+                                hasFilter = filter.locationId != null,
                                 modifier = Modifier.weight(1f),
                             )
                         } else {
@@ -380,6 +378,90 @@ private fun PageControls(
                 enabled = page + 1 < totalPages,
                 onClick = onNextPageClick,
             ),
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 목록",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun TripRecordListScreenPreview() {
+    PreviewSurface {
+        TripRecordListScreen(
+            uiState = TripRecordListUiState.Success(previewUiRecords, page = 0, totalPages = 3),
+            filter = TripRecordFilterUiState(),
+            onPreviousPageClick = {},
+            onNextPageClick = {},
+            onCreateClick = {},
+            onMapClick = {},
+            onRecordClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 없음",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun EmptyTripRecordListScreenPreview() {
+    PreviewSurface {
+        TripRecordListScreen(
+            uiState = TripRecordListUiState.Success(emptyList(), page = 0, totalPages = 0),
+            filter = TripRecordFilterUiState(),
+            onPreviousPageClick = {},
+            onNextPageClick = {},
+            onCreateClick = {},
+            onMapClick = {},
+            onRecordClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 목록 로딩",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun LoadingTripRecordListScreenPreview() {
+    PreviewSurface {
+        TripRecordListScreen(
+            uiState = TripRecordListUiState.Loading,
+            filter = TripRecordFilterUiState(),
+            onPreviousPageClick = {},
+            onNextPageClick = {},
+            onCreateClick = {},
+            onMapClick = {},
+            onRecordClick = {},
+        )
+    }
+}
+
+@Preview(
+    name = "여행 기록 목록 오류",
+    showBackground = true,
+    widthDp = 412,
+    heightDp = 900,
+)
+@Composable
+fun ErrorTripRecordListScreenPreview() {
+    PreviewSurface {
+        TripRecordListScreen(
+            uiState = TripRecordListUiState.Error("여행 기록을 불러오지 못했어요."),
+            filter = TripRecordFilterUiState(),
+            onPreviousPageClick = {},
+            onNextPageClick = {},
+            onCreateClick = {},
+            onMapClick = {},
+            onRecordClick = {},
         )
     }
 }

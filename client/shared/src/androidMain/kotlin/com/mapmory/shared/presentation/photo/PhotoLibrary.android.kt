@@ -45,21 +45,34 @@ actual fun rememberPhotoLibraryActions(
     onPhotosPicked: (List<SelectedPhoto>) -> Unit,
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
+    onLoadingChanged: (Boolean) -> Unit,
+    onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
 ): PhotoLibraryActions {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val latestPicked by rememberUpdatedState(onPhotosPicked)
     val latestRecommended by rememberUpdatedState(onPhotosRecommended)
     val latestMessage by rememberUpdatedState(onMessage)
+    val latestLoadingChanged by rememberUpdatedState(onLoadingChanged)
+    val latestLoadingProgressChanged by rememberUpdatedState(onLoadingProgressChanged)
     var pendingRecommendation by remember { mutableStateOf<Pair<Location, String?>?>(null) }
 
     fun loadRecommendations(target: Location, parentName: String?) {
+        latestLoadingChanged(true)
         scope.launch {
-            val result = withContext(Dispatchers.IO) {
-                runCatching { context.recommendPhotos(target, parentName) }
-            }
-            result.onSuccess(latestRecommended).onFailure {
-                latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        context.recommendPhotos(target, parentName) { progress ->
+                            latestLoadingProgressChanged(progress)
+                        }
+                    }
+                }
+                result.onSuccess(latestRecommended).onFailure {
+                    latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+                }
+            } finally {
+                latestLoadingChanged(false)
             }
         }
     }
@@ -84,8 +97,12 @@ actual fun rememberPhotoLibraryActions(
     val galleryPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(),
     ) { uris ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        if (uris.isEmpty()) {
+            latestLoadingChanged(false)
+            return@rememberLauncherForActivityResult
+        }
         scope.launch {
+            try {
             val photos = withContext(Dispatchers.IO) {
                 Trace.beginAsyncSection("photo.pick.total", TraceCookie.Pick)
                 val startedAt = SystemClock.elapsedRealtime()
@@ -103,10 +120,13 @@ actual fun rememberPhotoLibraryActions(
                     Trace.endAsyncSection("photo.pick.total", TraceCookie.Pick)
                 }
             }
-            if (photos.isEmpty()) {
-                latestMessage("선택한 사진을 읽지 못했어요.")
-            } else {
-                latestPicked(photos)
+                if (photos.isEmpty()) {
+                    latestMessage("선택한 사진을 읽지 못했어요.")
+                } else {
+                    latestPicked(photos)
+                }
+            } finally {
+                latestLoadingChanged(false)
             }
         }
     }
@@ -114,6 +134,7 @@ actual fun rememberPhotoLibraryActions(
     return remember(context, galleryPicker, galleryPermissionLauncher) {
         PhotoLibraryActions(
             pickFromGallery = {
+                latestLoadingChanged(true)
                 galleryPicker.launch(
                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
                 )
@@ -186,6 +207,7 @@ private fun requiredRecommendationPermissions(): Array<String> = buildList {
 private suspend fun Context.recommendPhotos(
     target: Location,
     parentName: String?,
+    onProgress: (PhotoLoadingProgress) -> Unit,
 ): List<SelectedPhoto> {
     Trace.beginAsyncSection("photo.recommend.total", TraceCookie.Recommend)
     val totalStartedAt = SystemClock.elapsedRealtime()
@@ -199,7 +221,7 @@ private suspend fun Context.recommendPhotos(
         } ?: return emptyList()
         val boundaryLoadMillis = SystemClock.elapsedRealtime() - boundaryStartedAt
         val syncStartedAt = SystemClock.elapsedRealtime()
-        val syncResult = syncPhotoMetadata()
+        val syncResult = syncPhotoMetadata(onProgress)
         val syncMillis = SystemClock.elapsedRealtime() - syncStartedAt
         val regionFilterStartedAt = SystemClock.elapsedRealtime()
         val matchedPhotos = traceSection("photo.recommend.region_filter") {
@@ -241,7 +263,9 @@ private suspend fun Context.recommendPhotos(
     }
 }
 
-private suspend fun Context.syncPhotoMetadata(): PhotoMetadataSyncResult {
+private suspend fun Context.syncPhotoMetadata(
+    onProgress: (PhotoLoadingProgress) -> Unit,
+): PhotoMetadataSyncResult {
     val dao = PhotoMetadataDatabase.getInstance(this).photoMetadataDao()
     return PhotoMetadataSync(
         readPrevious = {
@@ -256,10 +280,12 @@ private suspend fun Context.syncPhotoMetadata(): PhotoMetadataSyncResult {
                 dao.replaceSnapshot(photos, scanId)
             }
         },
-    ).sync()
+    ).sync { processed, total ->
+        onProgress(PhotoLoadingProgress(processed, total))
+    }
 }
 
-private fun Context.queryPhotoMetadataSnapshot(): List<PhotoMetadataCandidate>? {
+internal fun Context.queryPhotoMetadataSnapshot(): List<PhotoMetadataCandidate>? {
     val projection = arrayOf(
         MediaStore.Images.Media._ID,
         MediaStore.Images.Media.DISPLAY_NAME,
@@ -368,7 +394,7 @@ private fun logPhotoPickPerformance(
     )
 }
 
-private fun Context.readPhoto(
+internal fun Context.readPhoto(
     uri: Uri,
     knownName: String? = null,
     knownCoordinates: Pair<Double, Double>? = null,
@@ -545,7 +571,7 @@ private fun Context.queryPhotoMetadata(uri: Uri): Pair<String?, Long?> {
     } ?: (null to null)
 }
 
-private fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = runCatching {
+internal fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = runCatching {
     val metadataUri = if (
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
         ContextCompat.checkSelfPermission(
@@ -575,8 +601,8 @@ private fun formatDate(epochMillis: Long?): String? = epochMillis?.let {
     SimpleDateFormat("yyyy.MM.dd", Locale.KOREA).format(Date(it))
 }
 
-private const val PreviewSizePx = 2048
-private const val PreviewJpegQuality = 96
+private const val PreviewSizePx = 1280
+private const val PreviewJpegQuality = 85
 private const val OriginalJpegQuality = 100
 private const val PhotoPerformanceTag = "MapmoryPhotoPerf"
 private const val FullGalleryAccessMessage =

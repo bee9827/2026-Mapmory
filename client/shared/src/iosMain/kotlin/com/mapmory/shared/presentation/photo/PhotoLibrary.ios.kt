@@ -65,12 +65,15 @@ actual fun rememberPhotoLibraryActions(
     onPhotosPicked: (List<SelectedPhoto>) -> Unit,
     onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
     onMessage: (String) -> Unit,
+    onLoadingChanged: (Boolean) -> Unit,
+    @Suppress("UNUSED_PARAMETER") onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
 ): PhotoLibraryActions {
     val scope = rememberCoroutineScope()
     val controller = remember(scope) { IosPhotoLibraryController(scope) }
     controller.onPhotosPicked = onPhotosPicked
     controller.onPhotosRecommended = onPhotosRecommended
     controller.onMessage = onMessage
+    controller.onLoadingChanged = onLoadingChanged
 
     return remember(controller) {
         PhotoLibraryActions(
@@ -87,6 +90,7 @@ private class IosPhotoLibraryController(
     var onPhotosPicked: (List<SelectedPhoto>) -> Unit = {}
     var onPhotosRecommended: (List<SelectedPhoto>) -> Unit = {}
     var onMessage: (String) -> Unit = {}
+    var onLoadingChanged: (Boolean) -> Unit = {}
     private var recommendationJob: Job? = null
     private var recommendationGeneration = 0
 
@@ -100,6 +104,7 @@ private class IosPhotoLibraryController(
             selectionLimit = 0
         }
         val picker = PHPickerViewController(configuration)
+        onLoadingChanged(true)
         picker.delegate = this
         presenter.presentViewController(picker, animated = true, completion = null)
     }
@@ -107,7 +112,10 @@ private class IosPhotoLibraryController(
     override fun picker(picker: PHPickerViewController, didFinishPicking: List<*>) {
         picker.dismissViewControllerAnimated(true, completion = null)
         val results = didFinishPicking.filterIsInstance<PHPickerResult>()
-        if (results.isEmpty()) return
+        if (results.isEmpty()) {
+            onLoadingChanged(false)
+            return
+        }
 
         val loaded = MutableList<SelectedPhoto?>(results.size) { null }
         var remaining = results.size
@@ -122,6 +130,7 @@ private class IosPhotoLibraryController(
                     } else {
                         onPhotosPicked(photos)
                     }
+                    onLoadingChanged(false)
                 }
             }
         }
@@ -153,12 +162,14 @@ private class IosPhotoLibraryController(
     private fun findRecommendations(location: Location) {
         recommendationJob?.cancel()
         val generation = ++recommendationGeneration
+        onLoadingChanged(true)
         recommendationJob = scope.launch {
             val region = withContext(Dispatchers.Default) {
                 runCatching { location.photoRecommendationRegion() }.getOrNull()
             }
             if (region == null) {
                 onMessage("선택한 장소의 경계를 확인하지 못했어요.")
+                onLoadingChanged(false)
                 return@launch
             }
             val matchingAssets = withContext(Dispatchers.Default) {
@@ -167,10 +178,12 @@ private class IosPhotoLibraryController(
             if (generation != recommendationGeneration) return@launch
             if (matchingAssets.isEmpty()) {
                 onPhotosRecommended(emptyList())
+                onLoadingChanged(false)
             } else {
                 loadAssetPreviews(matchingAssets) { photos ->
                     if (generation == recommendationGeneration) {
                         onPhotosRecommended(photos)
+                        onLoadingChanged(false)
                     }
                 }
             }
@@ -240,7 +253,7 @@ private class IosPhotoLibraryController(
                 loaded[index] = photo
                 remaining -= 1
                 val available = loaded.filterNotNull()
-                if (available.isNotEmpty() || remaining == 0) {
+                if (remaining == 0) {
                     completion(available)
                 }
             }
@@ -428,7 +441,7 @@ private fun onMain(block: () -> Unit) {
     dispatch_async(dispatch_get_main_queue(), block)
 }
 
-private const val PreviewSizePx = 2048
-private const val PreviewJpegQuality = 0.96
+private const val PreviewSizePx = 1280
+private const val PreviewJpegQuality = 0.85
 private const val FullGalleryAccessMessage =
     "위치 기반 사진 추천을 사용하려면 전체 갤러리 접근 권한을 허용해 주세요."

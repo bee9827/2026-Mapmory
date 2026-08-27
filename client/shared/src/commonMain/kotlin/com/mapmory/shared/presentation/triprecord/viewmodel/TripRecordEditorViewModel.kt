@@ -3,11 +3,16 @@ package com.mapmory.shared.presentation.triprecord.viewmodel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
 import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.model.TripRecordMediaDraft
 import com.mapmory.shared.domain.model.dateValidationError
+import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
+import com.mapmory.shared.domain.usecase.GetTripRecordUseCase
 import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
@@ -17,12 +22,57 @@ import com.mapmory.shared.presentation.triprecord.state.toTripRecordPhotoUiState
 class TripRecordEditorViewModel(
     private val createTripRecord: CreateTripRecordUseCase,
     private val updateTripRecord: UpdateTripRecordUseCase,
-) {
+    private val getTripRecord: GetTripRecordUseCase? = null,
+    private val regionCatalog: RegionCatalog? = null,
+    private val onTripRecordsChanged: () -> Unit = {},
+) : ViewModel() {
+    private var isRouteInitialized = false
+
     var uiState by mutableStateOf(TripRecordEditorUiState())
+        private set
+
+    var savedRecordId: Long? = null
         private set
 
     fun reset() {
         uiState = TripRecordEditorUiState()
+        savedRecordId = null
+        isRouteInitialized = false
+    }
+
+    suspend fun initialize(
+        recordId: Long?,
+        selectedLocation: Location?,
+    ) {
+        if (isRouteInitialized) return
+        isRouteInitialized = true
+        if (recordId == null) {
+            startCreating(selectedLocation)
+        } else {
+            load(recordId)
+        }
+    }
+
+    fun startCreating(location: Location?) {
+        uiState = TripRecordEditorUiState(selectedLocation = location)
+        savedRecordId = null
+    }
+
+    suspend fun load(recordId: Long): Boolean {
+        val getRecord = getTripRecord ?: return false
+        return getRecord(recordId).fold(
+            onSuccess = { record ->
+                val location = regionCatalog?.findById(record.locationId) ?: return@fold false
+                startEditing(record, location)
+                true
+            },
+            onFailure = { error ->
+                uiState = uiState.copy(
+                    generalErrorMessage = error.message ?: "여행 기록을 불러오지 못했습니다.",
+                )
+                false
+            },
+        )
     }
 
     fun startEditing(record: TripRecordData, location: Location) {
@@ -31,7 +81,7 @@ class TripRecordEditorViewModel(
             selectedLocation = location,
             title = record.title,
             content = record.content,
-            startDate = record.startDate.orEmpty(),
+            startDate = record.startDate,
             endDate = record.endDate.orEmpty(),
             mediaObjectKeys = record.media.map { it.objectKey },
             selectedPhotos = record.media.map { media ->
@@ -39,6 +89,10 @@ class TripRecordEditorViewModel(
                     id = media.objectKey,
                     displayName = media.objectKey.substringAfterLast('/'),
                     previewBytes = media.previewBytes,
+                    originalBytes = media.originalBytes,
+                    latitude = media.latitude,
+                    longitude = media.longitude,
+                    capturedAt = media.capturedAt,
                 ).toTripRecordPhotoUiState(media.sortOrder)
             },
         )
@@ -93,6 +147,26 @@ class TripRecordEditorViewModel(
         ).revalidatedAfterChange()
     }
 
+    fun addPhotos(photos: List<SelectedPhoto>) {
+        val merged = buildList {
+            addAll(uiState.selectedPhotos)
+            photos.forEach { photo ->
+                if (none { existing -> existing.id == photo.id }) {
+                    add(photo.toTripRecordPhotoUiState(sortOrder = size))
+                }
+            }
+        }
+        uiState = uiState.copy(
+            selectedPhotos = merged,
+            mediaObjectKeys = merged.map { it.id },
+            fieldErrors = uiState.fieldErrors - TripRecordEditorErrorTarget.PHOTOS,
+        ).revalidatedAfterChange()
+    }
+
+    fun setPhotoLoading(isLoading: Boolean) {
+        uiState = uiState.copy(isPhotoLoading = isLoading)
+    }
+
     fun removeMediaObjectKey(objectKey: String) {
         uiState = uiState.copy(
             mediaObjectKeys = uiState.mediaObjectKeys - objectKey,
@@ -103,6 +177,7 @@ class TripRecordEditorViewModel(
 
     suspend fun save(): Boolean {
         val state = uiState
+        if (state.isPhotoLoading || state.isSaving) return false
         val validationErrors = state.validationErrors()
         if (validationErrors.isNotEmpty()) return fail(validationErrors)
 
@@ -115,13 +190,27 @@ class TripRecordEditorViewModel(
             startDate = state.startDate.ifBlank { null },
             endDate = state.endDate.ifBlank { null },
             mediaObjectKeys = state.mediaObjectKeys,
+            localMedia = state.selectedPhotos.mapIndexed { index, photo ->
+                TripRecordMediaDraft(
+                    objectKey = photo.id,
+                    sortOrder = index,
+                    previewBytes = photo.previewBytes?.bytesForDecoding(),
+                    originalBytes = photo.originalBytes?.bytesForDecoding(),
+                    fileName = photo.displayName,
+                    latitude = photo.latitude,
+                    longitude = photo.longitude,
+                    capturedAt = photo.capturedAt,
+                )
+            },
         )
         uiState = state.copy(isSaving = true, fieldErrors = emptyMap(), generalErrorMessage = null)
         val result = state.recordId?.let { updateTripRecord(it, draft) }
             ?: createTripRecord(draft)
 
         return result.fold(
-            onSuccess = {
+            onSuccess = { record ->
+                savedRecordId = record.id
+                onTripRecordsChanged()
                 uiState = uiState.copy(isSaving = false)
                 true
             },
@@ -180,9 +269,16 @@ private fun TripRecordEditorUiState.validationErrors(
 ): Map<TripRecordEditorErrorTarget, String> = buildMap {
     if (selectedLocation == null) {
         put(TripRecordEditorErrorTarget.LOCATION, "장소를 선택해 주세요.")
+    } else if (
+        selectedLocation.type == LocationType.PROVINCE &&
+        selectedLocation.regionCode.startsWith(KoreanProvincePrefix)
+    ) {
+        put(TripRecordEditorErrorTarget.LOCATION, "대한민국은 시·군·구까지 선택해 주세요.")
     }
     if (title.isBlank()) {
         put(TripRecordEditorErrorTarget.TITLE, "제목을 입력해 주세요.")
+    } else if (title.length > MaxTitleLength) {
+        put(TripRecordEditorErrorTarget.TITLE, "제목은 200자 이하여야 합니다.")
     }
 
     val dateError = TripRecordDraft(
@@ -195,6 +291,7 @@ private fun TripRecordEditorUiState.validationErrors(
     ).dateValidationError()
     if (dateError != null) {
         val target = when (dateError) {
+            "시작일을 입력해 주세요." -> TripRecordEditorErrorTarget.START_DATE
             "올바른 시작일을 입력해 주세요." -> TripRecordEditorErrorTarget.START_DATE
             "올바른 종료일을 입력해 주세요." -> TripRecordEditorErrorTarget.END_DATE
             else -> dateRangeErrorTarget
@@ -202,3 +299,6 @@ private fun TripRecordEditorUiState.validationErrors(
         put(target, dateError)
     }
 }
+
+private const val MaxTitleLength = 200
+private const val KoreanProvincePrefix = "KR-"
