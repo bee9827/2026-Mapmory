@@ -2,7 +2,7 @@
 
 - 상태: 채택
 - 날짜: 2026-08-10
-- 관련: `V2__create_location.sql`, `V7__insert_location_province.sql`, `V8__insert_location_district.sql`
+- 관련: `V2__create_location.sql`, `V7__insert_location_province.sql`, `V8__insert_location_district.sql`, `V18__canonicalize_city_district_regions.sql`
 
 ---
 
@@ -90,9 +90,22 @@ ISO 갱신 전이므로 기존 코드 `29`(광주) / `46`(전남)을 그대로 �
 - 행정구역이 다시 개편되어도 데이터만 추가하면 된다.
 - 대신 **접두사 유추 금지를 팀이 계속 인지해야 한다.** `V2__create_location.sql` 상단 주석에 명시했다.
 
+### 2026-08-28 보완 결정
+
+서비스의 대한민국 여행 기록 단위를 다음과 같이 고정한다.
+
+- 서울·광역시: 자치구·군
+- 세종: 세종시
+- 제주: 제주시·서귀포시
+- 일반 도: 시·군
+
+일반 도의 시 산하 일반구는 별도 여행 기록 Region으로 사용하지 않는다.
+V18에서 39개 일반구 Region을 13개 canonical 시 Region으로 통합하고 기존 여행 기록도 시 Region으로 이관한다.
+Region 타입은 기존 3단계 계층을 유지하기 위해 시와 구 모두 `DISTRICT`를 사용한다.
+
 ---
 
 ## 미해결 사항
 
 - **표시 명칭**: 통합 이후 사용자에게 `광주광역시` / `전라남도`로 보일지, 다른 명칭을 쓸지 기획 확정 필요.
-- **지도 리소스 대조**: 안드로이드가 네이티브로 지도를 렌더링하므로, SVG/GeoJSON의 지역 식별자와 `region_code` 256건을 대조해야 한다. 인천 제물포구·서해구, 화성시 4개 구 등 개편 반영 여부에 따라 어긋날 수 있다.
+- **지도 리소스 대조**: 안드로이드가 네이티브로 지도를 렌더링하므로, SVG/GeoJSON의 지역 식별자와 최종 canonical `region_code`를 계속 대조해야 한다. 일반 도의 일반구 경계는 클라이언트에서 시 단위로 병합한다.

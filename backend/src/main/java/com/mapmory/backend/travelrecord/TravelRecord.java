@@ -53,7 +53,7 @@ public class TravelRecord extends BaseEntity {
         this.member = member;
         this.region = region;
         this.title = title;
-        this.content = content;
+        this.content = normalizeContent(content);
         this.startDate = startDate;
         this.endDate = endDate;
     }
@@ -78,9 +78,13 @@ public class TravelRecord extends BaseEntity {
     ) {
         this.region = region;
         this.title = title;
-        this.content = content;
+        this.content = normalizeContent(content);
         this.startDate = startDate;
         this.endDate = endDate;
+    }
+
+    private static String normalizeContent(String content) {
+        return content == null ? "" : content;
     }
 
     public Long getId() {

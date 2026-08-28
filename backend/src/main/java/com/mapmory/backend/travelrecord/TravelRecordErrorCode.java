@@ -17,11 +17,23 @@ public enum TravelRecordErrorCode implements ErrorCode {
             "요청 값이 올바르지 않습니다.",
             "지역 코드 형식이 올바르지 않습니다."
     ),
+    INVALID_REGION_TYPE(
+            ErrorKind.INVALID_INPUT,
+            "INVALID_REGION_TYPE",
+            "지역 선택 단위가 올바르지 않습니다.",
+            "대한민국은 시군구 단위, 해외는 국가 단위로 선택해야 합니다."
+    ),
     INVALID_PAGINATION(
             ErrorKind.INVALID_INPUT,
             "VALIDATION_ERROR",
             "요청 값이 올바르지 않습니다.",
             "페이지 번호 또는 페이지 크기가 올바르지 않습니다."
+    ),
+    INVALID_TRAVEL_DATE_RANGE(
+            ErrorKind.INVALID_INPUT,
+            "INVALID_TRAVEL_DATE_RANGE",
+            "여행 날짜가 올바르지 않습니다.",
+            "종료일은 시작일보다 빠를 수 없으며 미래 날짜를 입력할 수 없습니다."
     ),
     TRAVEL_RECORD_NOT_FOUND(
             ErrorKind.NOT_FOUND,

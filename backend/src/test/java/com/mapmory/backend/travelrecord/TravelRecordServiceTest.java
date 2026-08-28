@@ -29,8 +29,11 @@ import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
+import com.mapmory.backend.upload.service.UploadedObjectVerifier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,7 +41,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -50,6 +52,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class TravelRecordServiceTest {
+
+    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
+    private static final LocalDate TODAY = LocalDate.of(2026, 8, 27);
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            TODAY.atStartOfDay(SERVICE_ZONE).toInstant(),
+            SERVICE_ZONE
+    );
 
     @Mock
     private TravelRecordRepository travelRecordRepository;
@@ -69,10 +78,11 @@ class TravelRecordServiceTest {
     @Mock
     private RecordMediaUrlService recordMediaUrlService;
 
+    @Mock
+    private UploadedObjectVerifier uploadedObjectVerifier;
     @Spy
     private OperationTimer operationTimer = new OperationTimer(new SimpleMeterRegistry());
 
-    @InjectMocks
     private TravelRecordService travelRecordService;
 
     private Member member;
@@ -86,6 +96,17 @@ class TravelRecordServiceTest {
                         "https://download.example/" + invocation.getArgument(0),
                         300L
                 ));
+        travelRecordService = new TravelRecordService(
+                travelRecordRepository,
+                regionResolver,
+                recordMediaRepository,
+                travelRecordTagService,
+                tagService,
+                operationTimer,
+                recordMediaUrlService,
+                FIXED_CLOCK,
+                uploadedObjectVerifier
+        );
     }
 
     @Test
@@ -105,6 +126,99 @@ class TravelRecordServiceTest {
         verify(regionResolver).resolve("JP", null, null);
         verify(travelRecordRepository).save(any(TravelRecord.class));
         verify(travelRecordTagService).replace(member, result, List.of(1L));
+    }
+
+    @Test
+    void 본문이_null이면_빈_문자열로_정규화해_여행_일지를_생성한다() {
+        Region japan = mock(Region.class);
+        TravelRecordRequest request = new TravelRecordRequest(
+                "JP", null, null, "일본 여행", null, LocalDate.of(2026, 8, 11), null, List.of(), List.of()
+        );
+
+        when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
+        when(travelRecordRepository.save(any(TravelRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        TravelRecord result = travelRecordService.create(member, request);
+
+        assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    void 종료일이_시작일보다_빠르면_여행_일지를_생성하지_않는다() {
+        LocalDate startDate = TODAY.minusDays(1);
+        TravelRecordRequest request = createRequest(startDate, startDate.minusDays(1));
+
+        assertInvalidTravelDates(request);
+    }
+
+    @Test
+    void 시작일이_미래이면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest(
+                TODAY.plusDays(1),
+                null
+        );
+
+        assertInvalidTravelDates(request);
+    }
+
+    @Test
+    void 종료일이_미래이면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest(
+                TODAY,
+                TODAY.plusDays(1)
+        );
+
+        assertInvalidTravelDates(request);
+    }
+
+    @Test
+    void 시작일과_종료일이_오늘이면_여행_일지를_생성한다() {
+        Region japan = mock(Region.class);
+        TravelRecordRequest request = createRequest(TODAY, TODAY);
+        when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
+        when(travelRecordRepository.save(any(TravelRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        TravelRecord result = travelRecordService.create(member, request);
+
+        assertThat(result.getStartDate()).isEqualTo(TODAY);
+        assertThat(result.getEndDate()).isEqualTo(TODAY);
+    }
+
+    @Test
+    void 대한민국_여행에_시도가_없으면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest("KR", null, null);
+
+        assertInvalidRegion(request, "REGION_REQUIRED");
+    }
+
+    @Test
+    void 대한민국_여행에_시군구가_없으면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest("KR", "49", null);
+
+        assertInvalidRegion(request, "REGION_REQUIRED");
+    }
+
+    @Test
+    void 해외_여행에_하위_지역이_있으면_여행_일지를_생성하지_않는다() {
+        TravelRecordRequest request = createRequest("JP", "13", null);
+
+        assertInvalidRegion(request, "INVALID_REGION_TYPE");
+    }
+
+    @Test
+    void 대한민국_시군구_단위_여행_일지를_생성한다() {
+        Region jejuCity = mock(Region.class);
+        TravelRecordRequest request = createRequest("KR", "49", "50110");
+        when(regionResolver.resolve("KR", "49", "50110")).thenReturn(jejuCity);
+        when(travelRecordRepository.save(any(TravelRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        TravelRecord result = travelRecordService.create(member, request);
+
+        assertThat(result.getRegion()).isEqualTo(jejuCity);
+        verify(travelRecordRepository).save(result);
     }
 
     @Test
@@ -155,6 +269,53 @@ class TravelRecordServiceTest {
                 .containsExactly(0, 1);
         verify(recordMediaUrlService).createViewUrl("mapmory/travel-records/a.jpg");
         verify(recordMediaUrlService).createViewUrl("mapmory/travel-records/b.jpg");
+    }
+
+    private TravelRecordRequest createRequest(LocalDate startDate, LocalDate endDate) {
+        return new TravelRecordRequest(
+                "JP",
+                null,
+                null,
+                "일본 여행",
+                "",
+                startDate,
+                endDate,
+                List.of(),
+                List.of()
+        );
+    }
+
+    private TravelRecordRequest createRequest(
+            String countryCode,
+            String provinceCode,
+            String districtCode
+    ) {
+        return new TravelRecordRequest(
+                countryCode,
+                provinceCode,
+                districtCode,
+                "여행",
+                "",
+                TODAY,
+                null,
+                List.of(),
+                List.of()
+        );
+    }
+
+    private void assertInvalidTravelDates(TravelRecordRequest request) {
+        assertThatThrownBy(() -> travelRecordService.create(member, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode().code())
+                                .isEqualTo("INVALID_TRAVEL_DATE_RANGE"));
+        verify(travelRecordRepository, never()).save(any(TravelRecord.class));
+    }
+
+    private void assertInvalidRegion(TravelRecordRequest request, String errorCode) {
+        assertThatThrownBy(() -> travelRecordService.create(member, request))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode().code()).isEqualTo(errorCode));
+        verify(travelRecordRepository, never()).save(any(TravelRecord.class));
     }
 
     @Test

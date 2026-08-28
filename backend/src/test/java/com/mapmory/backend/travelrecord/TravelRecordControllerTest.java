@@ -1,15 +1,21 @@
 package com.mapmory.backend.travelrecord;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.mapmory.backend.auth.security.LoginMember;
+import com.mapmory.backend.common.ProblemDetailFactory;
+import com.mapmory.backend.common.handler.ValidationExceptionHandler;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.RegionDetailResponse;
@@ -26,6 +32,8 @@ import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -62,6 +70,7 @@ class TravelRecordControllerTest {
     // 검증하고, 실제 인증(401 등)은 SecurityIntegrationTest가 담당한다.
     private MockMvc mockMvcWithLoginMember() {
         return MockMvcBuilders.standaloneSetup(travelRecordController)
+                .setControllerAdvice(new ValidationExceptionHandler(new ProblemDetailFactory()))
                 .setCustomArgumentResolvers(new HandlerMethodArgumentResolver() {
                     @Override
                     public boolean supportsParameter(MethodParameter parameter) {
@@ -113,6 +122,145 @@ class TravelRecordControllerTest {
                 TravelRecordResponse.of(new CreateTravelRecordResponse(1L))
         );
         verify(travelRecordService).create(MEMBER, request);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "   "})
+    void 제목이_비어_있으면_여행_일지를_생성하지_않는다(String title) throws Exception {
+        String requestBody = validCreateRequestBody(title, "본문");
+
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("title"));
+
+        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
+    @Test
+    void 제목이_누락되면_여행_일지를_생성하지_않는다() throws Exception {
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "countryCode": "JP",
+                                  "content": "본문",
+                                  "startDate": "2026-08-11",
+                                  "objectKeys": []
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("title"));
+
+        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
+    @Test
+    void 제목이_200자를_초과하면_여행_일지를_생성하지_않는다() throws Exception {
+        String requestBody = validCreateRequestBody("가".repeat(201), "본문");
+
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestBody))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("title"));
+
+        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "kr", "KOR"})
+    void 국가_코드_형식이_올바르지_않으면_여행_일지를_생성하지_않는다(String countryCode) throws Exception {
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestBody(countryCode, null, null)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("countryCode"));
+
+        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
+    @Test
+    void 시도_코드가_공백이면_여행_일지를_생성하지_않는다() throws Exception {
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestBody("KR", " ", "50110")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("provinceCode"));
+
+        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
+    @Test
+    void 시군구_코드가_공백이면_여행_일지를_생성하지_않는다() throws Exception {
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createRequestBody("KR", "49", " ")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.errors[0].field").value("districtCode"));
+
+        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
+    @Test
+    void 본문이_null이면_여행_일지를_생성한다() throws Exception {
+        TravelRecord travelRecord = TravelRecord.of(
+                null,
+                null,
+                "일본 여행",
+                null,
+                LocalDate.of(2026, 8, 11),
+                null
+        );
+        ReflectionTestUtils.setField(travelRecord, "id", 1L);
+        when(travelRecordService.create(eq(MEMBER), any(TravelRecordRequest.class)))
+                .thenReturn(travelRecord);
+
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "countryCode": "JP",
+                                  "title": "일본 여행",
+                                  "content": null,
+                                  "startDate": "2026-08-11",
+                                  "objectKeys": []
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value(1L));
+
+        verify(travelRecordService).create(eq(MEMBER), any(TravelRecordRequest.class));
+    }
+
+    @Test
+    void 제목이_200자이고_본문이_빈_문자열이면_여행_일지를_생성한다() throws Exception {
+        TravelRecord travelRecord = TravelRecord.of(
+                null,
+                null,
+                "가".repeat(200),
+                "",
+                LocalDate.of(2026, 8, 11),
+                null
+        );
+        ReflectionTestUtils.setField(travelRecord, "id", 1L);
+        when(travelRecordService.create(eq(MEMBER), any(TravelRecordRequest.class)))
+                .thenReturn(travelRecord);
+
+        mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateRequestBody("가".repeat(200), "")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value(1L));
+
+        verify(travelRecordService).create(eq(MEMBER), any(TravelRecordRequest.class));
     }
 
     @Test
@@ -247,5 +395,39 @@ class TravelRecordControllerTest {
                 null,
                 null
         );
+    }
+
+    private String validCreateRequestBody(String title, String content) {
+        return """
+                {
+                  "countryCode": "JP",
+                  "title": "%s",
+                  "content": "%s",
+                  "startDate": "2026-08-11",
+                  "objectKeys": []
+                }
+                """.formatted(title, content);
+    }
+
+    private String createRequestBody(String countryCode, String provinceCode, String districtCode) {
+        return """
+                {
+                  "countryCode": "%s",
+                  "provinceCode": %s,
+                  "districtCode": %s,
+                  "title": "여행",
+                  "content": "",
+                  "startDate": "2026-08-11",
+                  "objectKeys": []
+                }
+                """.formatted(
+                countryCode,
+                nullableJsonString(provinceCode),
+                nullableJsonString(districtCode)
+        );
+    }
+
+    private String nullableJsonString(String value) {
+        return value == null ? "null" : "\"%s\"".formatted(value);
     }
 }
