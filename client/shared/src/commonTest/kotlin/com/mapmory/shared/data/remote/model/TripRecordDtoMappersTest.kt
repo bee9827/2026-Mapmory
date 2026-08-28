@@ -11,6 +11,22 @@ class ApiDtoMappersTest {
     private val catalog = StaticRegionCatalog()
 
     @Test
+    fun `목록_썸네일_URL과_만료_시간을_도메인으로_매핑한다`() {
+        val result = TripRecordListItemDto(
+            id = 101,
+            title = "제주 여행",
+            regionName = "제주시",
+            startDate = "2026-08-27",
+            endDate = null,
+            thumbnailUrl = "https://bucket.example.com/photo.jpg?signature=fresh",
+            thumbnailUrlExpiresIn = 300L,
+        ).toDomain()
+
+        assertEquals("https://bucket.example.com/photo.jpg?signature=fresh", result.thumbnailUrl)
+        assertEquals(300L, result.thumbnailUrlExpiresIn)
+    }
+
+    @Test
     fun `상세_지역_코드와_Object_Key를_로컬_도메인으로_매핑한다`() {
         val result = TripRecordDetailDto(
             id = 101,
@@ -31,6 +47,42 @@ class ApiDtoMappersTest {
         assertEquals(catalog.requireByCode("50110").id, result.locationId)
         assertEquals("travel-records/guest/a.jpg", result.media.single().objectKey)
         assertEquals(0, result.media.single().sortOrder)
+    }
+
+    @Test
+    fun `조회용_URL이_포함된_미디어_응답을_Object_Key와_함께_매핑한다`() {
+        val result = TripRecordDetailDto(
+            id = 101,
+            title = "제주 여행",
+            content = "",
+            region = TripRecordRegionDto(
+                country = RegionCodeDto("KR", "대한민국"),
+                province = RegionCodeDto("49", "제주특별자치도"),
+                district = RegionCodeDto("50110", "제주시"),
+            ),
+            startDate = "2026-08-11",
+            endDate = null,
+            objectKeys = listOf("이 값보다 media를 우선한다"),
+            media = listOf(
+                TripRecordMediaDto(
+                    id = 55,
+                    objectKey = "travel-records/10/photo.jpg",
+                    viewUrl = "https://bucket.example.com/photo.jpg?signature=first",
+                    viewUrlExpiresIn = 300,
+                    sortOrder = 2,
+                ),
+            ),
+            createdAt = "2026-08-14T10:30:00",
+            updatedAt = "2026-08-15T09:00:00",
+        ).toDomain(catalog)
+
+        assertEquals(55, result.media.single().id)
+        assertEquals("travel-records/10/photo.jpg", result.media.single().objectKey)
+        assertEquals(2, result.media.single().sortOrder)
+        assertEquals(
+            "https://bucket.example.com/photo.jpg?signature=first",
+            result.media.single().url,
+        )
     }
 
     @Test
