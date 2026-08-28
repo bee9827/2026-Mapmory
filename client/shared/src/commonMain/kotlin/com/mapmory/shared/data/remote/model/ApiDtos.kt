@@ -85,6 +85,7 @@ data class TripRecordListItemDto(
     val startDate: String,
     val endDate: String?,
     val thumbnailUrl: String? = null,
+    val thumbnailUrlExpiresIn: Long? = null,
 )
 
 @Serializable
@@ -109,8 +110,18 @@ data class TripRecordDetailDto(
     val startDate: String,
     val endDate: String?,
     val objectKeys: List<String> = emptyList(),
+    val media: List<TripRecordMediaDto> = emptyList(),
     val createdAt: String,
     val updatedAt: String,
+)
+
+@Serializable
+data class TripRecordMediaDto(
+    val id: Long,
+    val objectKey: String,
+    val viewUrl: String,
+    val viewUrlExpiresIn: Long,
+    val sortOrder: Int,
 )
 
 @Serializable

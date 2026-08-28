@@ -148,6 +148,53 @@ class AppContainerTest {
     }
 
     @Test
+    fun `조회용_URL은_Object_Key_캐시를_사용해_S3에서_한_번만_읽는다`() = runBlocking {
+        var requestCount = 0
+        val client = HttpClient(MockEngine) {
+            configureCommonHttpClient()
+            engine {
+                addHandler { request ->
+                    requestCount += 1
+                    when (requestCount) {
+                        1 -> respondJson(
+                            """{"data":{"accessToken":"guest-access","refreshToken":"guest-refresh","isNewMember":true}}""",
+                        )
+
+                        2 -> {
+                            assertEquals("Bearer guest-access", request.headers[HttpHeaders.Authorization])
+                            respondJson(detailResponseWithViewUrl("signature=first"))
+                        }
+
+                        3 -> {
+                            assertEquals("bucket.example.com", request.url.host)
+                            assertEquals(null, request.headers[HttpHeaders.Authorization])
+                            respond(
+                                content = ByteReadChannel(byteArrayOf(0x01, 0x02, 0x03)),
+                                status = HttpStatusCode.OK,
+                            )
+                        }
+
+                        else -> respondJson(detailResponseWithViewUrl("signature=rotated"))
+                    }
+                }
+            }
+        }
+        val container = createGuestRemoteAppContainer(
+            client = client,
+            apiBaseUrl = "https://api.example.com/api/v1",
+            tokenStore = TestAuthTokenStore(),
+        )
+
+        val first = container.tripRecordRepository.getTripRecord(101).getOrThrow()
+        val second = container.tripRecordRepository.getTripRecord(101).getOrThrow()
+
+        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), first.media.single().previewBytes)
+        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), second.media.single().previewBytes)
+        assertEquals(4, requestCount)
+        container.close()
+    }
+
+    @Test
     fun `토큰_공급자로_원격_컨테이너를_구성할_수_있다`() {
         val container = createRemoteAppContainer(
             apiBaseUrl = "https://api.example.com/api/v1",
@@ -248,3 +295,6 @@ private fun io.ktor.client.engine.mock.MockRequestHandleScope.respondJson(
 
 private fun detailResponse(objectKey: String): String =
     """{"data":{"id":101,"title":"제주 서버 여행","content":"","region":{"country":{"code":"KR","name":"대한민국"},"province":{"code":"49","name":"제주특별자치도"},"district":{"code":"50110","name":"제주시"}},"startDate":"2026-08-26","endDate":null,"objectKeys":["$objectKey"],"createdAt":"2026-08-26T13:00:00","updatedAt":"2026-08-26T13:00:00"}}"""
+
+private fun detailResponseWithViewUrl(signature: String): String =
+    """{"data":{"id":101,"title":"제주 서버 여행","content":"","region":{"country":{"code":"KR","name":"대한민국"},"province":{"code":"49","name":"제주특별자치도"},"district":{"code":"50110","name":"제주시"}},"startDate":"2026-08-26","endDate":null,"objectKeys":["travel-records/10/photo.jpg"],"media":[{"id":55,"objectKey":"travel-records/10/photo.jpg","viewUrl":"https://bucket.example.com/photo.jpg?$signature","viewUrlExpiresIn":300,"sortOrder":0}],"createdAt":"2026-08-26T13:00:00","updatedAt":"2026-08-26T13:00:00"}}"""

@@ -72,4 +72,32 @@ internal class GuestSessionManager(
             onFailure = Result.Companion::failure,
         )
     }
+
+    /**
+     * 보호 API가 401을 반환했을 때 회전형 Refresh Token으로 세션을 한 번 갱신한다.
+     *
+     * 여러 요청이 같은 만료 Access Token으로 동시에 실패해도 첫 요청만 실제 갱신을
+     * 수행한다. 뒤늦게 Mutex를 얻은 요청은 이미 바뀐 Access Token을 그대로 사용한다.
+     */
+    suspend fun refreshAfterUnauthorized(failedAccessToken: String): Result<Unit> =
+        authenticationMutex.withLock {
+            val currentTokens = tokens
+                ?: return@withLock Result.failure(
+                    IllegalStateException("갱신할 인증 토큰이 없습니다."),
+                )
+
+            if (currentTokens.accessToken != failedAccessToken) {
+                return@withLock Result.success(Unit)
+            }
+
+            gateway.refresh(currentTokens.refreshToken).fold(
+                onSuccess = { issuedTokens ->
+                    tokenStore.save(issuedTokens)
+                    tokens = issuedTokens
+                    isAuthenticated = true
+                    Result.success(Unit)
+                },
+                onFailure = Result.Companion::failure,
+            )
+        }
 }

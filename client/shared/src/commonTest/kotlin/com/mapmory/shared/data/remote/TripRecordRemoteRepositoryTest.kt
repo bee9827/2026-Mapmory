@@ -33,7 +33,7 @@ class TripRecordRemoteRepositoryTest {
             assertEquals("0", request.url.parameters["page"])
             assertEquals("20", request.url.parameters["size"])
             jsonResponse(
-                """{"data":{"items":[{"id":101,"title":"제주 여행","regionName":"제주특별자치도","startDate":"2026-08-11","endDate":null,"thumbnailUrl":null}],"page":0,"size":20,"totalElements":1,"totalPages":1,"hasNext":false}}""",
+                """{"data":{"items":[{"id":101,"title":"제주 여행","regionName":"제주특별자치도","startDate":"2026-08-11","endDate":null,"thumbnailUrl":"https://bucket.example.com/photo.jpg?signature=fresh","thumbnailUrlExpiresIn":300}],"page":0,"size":20,"totalElements":1,"totalPages":1,"hasNext":false}}""",
             )
         }
 
@@ -42,6 +42,11 @@ class TripRecordRemoteRepositoryTest {
         ).getOrThrow()
 
         assertEquals("제주특별자치도", page.records.single().regionName)
+        assertEquals(
+            "https://bucket.example.com/photo.jpg?signature=fresh",
+            page.records.single().thumbnailUrl,
+        )
+        assertEquals(300L, page.records.single().thumbnailUrlExpiresIn)
         client.close()
     }
 

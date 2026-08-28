@@ -1,16 +1,77 @@
 package com.mapmory.shared.presentation.triprecord.viewmodel
 
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
+import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.model.TripRecordPage
 import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.domain.model.TripRecordSummary
+import com.mapmory.shared.domain.repository.TripRecordRepository
 import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
+import com.mapmory.shared.presentation.triprecord.thumbnail.TripRecordThumbnailLoadResult
+import com.mapmory.shared.presentation.triprecord.thumbnail.TripRecordThumbnailLoader
 import com.mapmory.shared.runSuspend
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class TripRecordListViewModelTest {
+    @Test
+    fun `목록_본문을_먼저_표시하고_썸네일은_완료되는_대로_채운다`() = runBlocking {
+        val thumbnailGate = CompletableDeferred<Unit>()
+        val repository = ThumbnailListRepository()
+        val viewModel = TripRecordListViewModel(
+            getTripRecords = GetTripRecordsUseCase(repository),
+            thumbnailLoader = TripRecordThumbnailLoader {
+                thumbnailGate.await()
+                TripRecordThumbnailLoadResult.Success(byteArrayOf(0x01, 0x02))
+            },
+        )
+
+        val loadJob = launch { viewModel.load() }
+        yield()
+
+        val beforeThumbnail = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
+        assertEquals("여행 1", beforeThumbnail.records.single().title)
+        assertEquals(0, beforeThumbnail.records.single().photos.size)
+
+        thumbnailGate.complete(Unit)
+        loadJob.join()
+
+        val afterThumbnail = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
+        assertContentEquals(
+            byteArrayOf(0x01, 0x02),
+            afterThumbnail.records.single().photos.single().previewBytes?.bytesForDecoding(),
+        )
+    }
+
+    @Test
+    fun `여러_썸네일_URL이_만료돼도_목록은_한_번만_갱신한다`() = runBlocking {
+        val repository = ThumbnailListRepository(recordCount = 2, expiresFirstResponse = true)
+        val viewModel = TripRecordListViewModel(
+            getTripRecords = GetTripRecordsUseCase(repository),
+            thumbnailLoader = TripRecordThumbnailLoader { record ->
+                if ("expired" in requireNotNull(record.thumbnailUrl)) {
+                    TripRecordThumbnailLoadResult.UrlExpired
+                } else {
+                    TripRecordThumbnailLoadResult.Success(byteArrayOf(record.id.toByte()))
+                }
+            },
+        )
+
+        viewModel.load()
+
+        assertEquals(2, repository.listRequestCount)
+        val state = assertIs<TripRecordListUiState.Success>(viewModel.uiState)
+        assertEquals(2, state.records.count { it.photos.singleOrNull()?.previewBytes != null })
+    }
+
     @Test
     fun `새로고침은_기록_변경_후_현재_필터를_다시_조회한다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
@@ -102,4 +163,49 @@ class TripRecordListViewModelTest {
             assertIs<TripRecordListUiState.Error>(viewModel.uiState)
         }
     }
+}
+
+private class ThumbnailListRepository(
+    private val recordCount: Int = 1,
+    private val expiresFirstResponse: Boolean = false,
+) : TripRecordRepository {
+    var listRequestCount = 0
+        private set
+
+    override suspend fun getTripRecords(query: TripRecordQuery): Result<TripRecordPage> {
+        listRequestCount += 1
+        val signature = if (expiresFirstResponse && listRequestCount == 1) "expired" else "fresh"
+        return Result.success(
+            TripRecordPage(
+                records = (1..recordCount).map { id ->
+                    TripRecordSummary(
+                        id = id.toLong(),
+                        title = "여행 $id",
+                        startDate = "2026-08-27",
+                        endDate = null,
+                        thumbnailUrl =
+                            "https://bucket.example.com/travel-records/10/$id.jpg?$signature",
+                    )
+                },
+                page = query.page,
+                size = query.size,
+                totalElements = recordCount.toLong(),
+                totalPages = 1,
+            ),
+        )
+    }
+
+    override suspend fun getTripRecord(id: Long): Result<TripRecordData> =
+        Result.failure(UnsupportedOperationException())
+
+    override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> =
+        Result.failure(UnsupportedOperationException())
+
+    override suspend fun updateTripRecord(
+        id: Long,
+        draft: TripRecordDraft,
+    ): Result<TripRecordData> = Result.failure(UnsupportedOperationException())
+
+    override suspend fun deleteTripRecord(id: Long): Result<Unit> =
+        Result.failure(UnsupportedOperationException())
 }
