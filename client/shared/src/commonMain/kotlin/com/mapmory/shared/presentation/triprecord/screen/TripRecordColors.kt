@@ -52,6 +52,17 @@ internal data class TripMapColors(
     val tagText: Color,
     val tagSelectedText: Color,
     val dashboardBadgeText: Color,
+    val globeBackground: Color,
+    val globeOuterGlow: Color,
+    val globeGradientCenter: Color,
+    val globeGradientMiddle: Color,
+    val globeGradientEdge: Color,
+    val globeVisitedFill: Color,
+    val globeUnvisitedFill: Color,
+    val globeVisitedOutline: Color,
+    val globeUnvisitedOutline: Color,
+    val globeHighlightCenter: Color,
+    val globeHighlightMiddle: Color,
 )
 
 @Immutable
@@ -97,6 +108,14 @@ private val LightTripMapColors = TripMapColors(
     scopeSelectedBackground = Color.White, scopeSelectedText = Color(0xFF2D4539),
     scopeUnselectedText = Color(0xFF7A8880), tagBackground = Color(0xFFF7FAF8),
     tagText = Color(0xFF6B786F), tagSelectedText = Color.White, dashboardBadgeText = Color(0xFF4A896B),
+    globeBackground = Color(0xFFFAFCFB), globeOuterGlow = Color(0xFF789587).copy(alpha = 0.08f),
+    globeGradientCenter = Color(0xFFF8FAF8), globeGradientMiddle = Color(0xFFF0F4F1),
+    globeGradientEdge = Color(0xFFE7EDE9), globeVisitedFill = Color(0xFF4D9272),
+    globeUnvisitedFill = Color(0xFFDCE4DF),
+    globeVisitedOutline = Color(0xFF2F7659).copy(alpha = 0.72f),
+    globeUnvisitedOutline = Color(0xFFB8C6BD).copy(alpha = 0.72f),
+    globeHighlightCenter = Color.White.copy(alpha = 0.34f),
+    globeHighlightMiddle = Color.White.copy(alpha = 0.12f),
 )
 
 private val DarkTripMapColors = TripMapColors(
@@ -104,6 +123,14 @@ private val DarkTripMapColors = TripMapColors(
     scopeSelectedBackground = Color(0xFF2A3832), scopeSelectedText = Color(0xFFEEF7F1),
     scopeUnselectedText = Color(0xFF92A09A), tagBackground = Color(0xFF1A2421),
     tagText = Color(0xFFBDC8C2), tagSelectedText = Color(0xFF072118), dashboardBadgeText = Color(0xFF9CE6BF),
+    globeBackground = Color(0xFF121518), globeOuterGlow = Color(0xFF7F9ABA).copy(alpha = 0.055f),
+    globeGradientCenter = Color(0xFF2A3747), globeGradientMiddle = Color(0xFF1B2533),
+    globeGradientEdge = Color(0xFF111923), globeVisitedFill = Color(0xFF35C987),
+    globeUnvisitedFill = Color(0xFF2B3546),
+    globeVisitedOutline = Color(0xFF8AEBC1).copy(alpha = 0.82f),
+    globeUnvisitedOutline = Color(0xFF7C8FAA).copy(alpha = 0.54f),
+    globeHighlightCenter = Color.White.copy(alpha = 0.09f),
+    globeHighlightMiddle = Color.White.copy(alpha = 0.025f),
 )
 
 private val LightTripStatisticsColors = TripStatisticsColors(
