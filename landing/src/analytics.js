@@ -2,6 +2,24 @@ const environment = import.meta.env ?? {};
 const measurementId = environment.VITE_GA_MEASUREMENT_ID?.trim()
   || (environment.PROD ? "G-MC93CZWLZF" : "");
 const landingVersion = environment.VITE_LANDING_VERSION?.trim() || "v2";
+const posthogKey = environment.VITE_POSTHOG_KEY?.trim() || "";
+const posthogHost = environment.VITE_POSTHOG_HOST?.trim() || "";
+const capturePosthogLocally = environment.VITE_POSTHOG_CAPTURE_LOCAL === "true";
+const isLocalBrowser = typeof window !== "undefined"
+  && ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+export const POSTHOG_CAPTURE_CONFIG = Object.freeze({
+  defaults: "2026-05-30",
+  autocapture: false,
+  capture_pageview: false,
+  capture_pageleave: false,
+  disable_session_recording: true,
+  disable_surveys: true,
+  person_profiles: "never",
+  persistence: "memory",
+  advanced_disable_feature_flags: true,
+  advanced_disable_feature_flags_on_first_load: true,
+});
 
 export const ANALYTICS_EVENTS = Object.freeze({
   EXPERIENCE_CTA_CLICK: "experience_cta_click",
@@ -41,12 +59,50 @@ const supportedParameters = new Set([
   "transport_type",
 ]);
 
-let initialized = false;
+let gaInitialized = false;
+let posthogInitialization = null;
+
+function initializePostHog() {
+  const shouldInitialize = posthogKey
+    && posthogHost
+    && (!isLocalBrowser || capturePosthogLocally)
+    && typeof window !== "undefined";
+
+  if (!shouldInitialize) return null;
+  if (posthogInitialization) return posthogInitialization;
+
+  posthogInitialization = import("posthog-js/dist/module.no-external")
+    .then(({ default: posthog }) => {
+      posthog.init(posthogKey, {
+        ...POSTHOG_CAPTURE_CONFIG,
+        api_host: posthogHost,
+      });
+      posthog.register({
+        $geoip_disable: true,
+      });
+      posthog.capture("$pageview", {
+        landing_version: landingVersion,
+        $pathname: window.location.pathname,
+        $geoip_disable: true,
+      });
+      return posthog;
+    })
+    .catch((error) => {
+      if (capturePosthogLocally) {
+        console.warn("PostHog analytics initialization failed.", error);
+      }
+      return null;
+    });
+
+  return posthogInitialization;
+}
 
 export function initializeAnalytics() {
-  if (!measurementId || initialized || typeof window === "undefined") return;
+  void initializePostHog();
 
-  initialized = true;
+  if (!measurementId || gaInitialized || typeof window === "undefined") return;
+
+  gaInitialized = true;
   window.dataLayer = window.dataLayer || [];
   window.gtag = function gtag() {
     window.dataLayer.push(arguments);
@@ -88,7 +144,24 @@ export function isSupportedEvent(name) {
 
 export function trackEvent(name, parameters = {}) {
   if (!isSupportedEvent(name)) return false;
-  if (!measurementId || typeof window === "undefined" || typeof window.gtag !== "function") return false;
-  window.gtag("event", name, buildEventParameters(parameters));
-  return true;
+  const eventParameters = buildEventParameters(parameters);
+  let tracked = false;
+
+  if (measurementId && typeof window !== "undefined" && typeof window.gtag === "function") {
+    window.gtag("event", name, eventParameters);
+    tracked = true;
+  }
+
+  const posthogClient = initializePostHog();
+  if (posthogClient) {
+    tracked = true;
+    void posthogClient.then((posthog) => {
+      posthog?.capture(name, {
+        ...eventParameters,
+        $geoip_disable: true,
+      });
+    });
+  }
+
+  return tracked;
 }

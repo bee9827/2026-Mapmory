@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   ANALYTICS_EVENTS,
+  POSTHOG_CAPTURE_CONFIG,
   buildEventParameters,
   isSupportedEvent,
 } from "../src/analytics.js";
@@ -62,6 +63,24 @@ test("keeps exact experience duration and distinct-memory parameters", () => {
       active_duration_ms: 23740,
       unique_memories_opened: 3,
       last_completed_step: "memory_open",
+    },
+  );
+});
+
+test("keeps PostHog limited to anonymous explicit product events", () => {
+  assert.deepEqual(
+    POSTHOG_CAPTURE_CONFIG,
+    {
+      defaults: "2026-05-30",
+      autocapture: false,
+      capture_pageview: false,
+      capture_pageleave: false,
+      disable_session_recording: true,
+      disable_surveys: true,
+      person_profiles: "never",
+      persistence: "memory",
+      advanced_disable_feature_flags: true,
+      advanced_disable_feature_flags_on_first_load: true,
     },
   );
 });
