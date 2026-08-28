@@ -36,6 +36,7 @@ import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,16 +62,18 @@ actual fun rememberPhotoLibraryActions(
         latestLoadingChanged(true)
         scope.launch {
             try {
-                val result = withContext(Dispatchers.IO) {
-                    runCatching {
-                        context.recommendPhotos(target, parentName) { progress ->
-                            latestLoadingProgressChanged(progress)
-                        }
+                val photos = withContext(Dispatchers.IO) {
+                    context.recommendPhotos(target, parentName) { progress ->
+                        latestLoadingProgressChanged(progress)
                     }
                 }
-                result.onSuccess(latestRecommended).onFailure {
-                    latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
-                }
+                latestRecommended(photos)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: PhotoRecommendationRegionNotFoundException) {
+                latestMessage(PhotoRecommendationRegionNotFoundMessage)
+            } catch (error: Exception) {
+                latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
             } finally {
                 latestLoadingChanged(false)
             }
@@ -218,7 +221,7 @@ private suspend fun Context.recommendPhotos(
             cookie = TraceCookie.BoundaryLoad,
         ) {
             target.photoRecommendationRegion()
-        } ?: return emptyList()
+        }
         val boundaryLoadMillis = SystemClock.elapsedRealtime() - boundaryStartedAt
         val syncStartedAt = SystemClock.elapsedRealtime()
         val syncResult = syncPhotoMetadata(onProgress)
@@ -399,7 +402,7 @@ internal fun Context.readPhoto(
     knownName: String? = null,
     knownCoordinates: Pair<Double, Double>? = null,
     knownCapturedAtMillis: Long? = null,
-): SelectedPhoto? = runCatching {
+): SelectedPhoto? = try {
     val metadata = traceSection("photo.read.metadata") {
         if (knownName == null && knownCapturedAtMillis == null) {
             queryPhotoMetadata(uri)
@@ -428,15 +431,23 @@ internal fun Context.readPhoto(
         capturedAt = formatDate(knownCapturedAtMillis ?: metadata.second),
         originalBytes = encodedBytes,
     )
-}.getOrNull()
+} catch (error: CancellationException) {
+    throw error
+} catch (error: Exception) {
+    null
+}
 
 private fun ByteArray.normalizeOrientation(): ByteArray {
-    val orientation = runCatching {
+    val orientation = try {
         ExifInterface(ByteArrayInputStream(this)).getAttributeInt(
             ExifInterface.TAG_ORIENTATION,
             ExifInterface.ORIENTATION_NORMAL,
         )
-    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        ExifInterface.ORIENTATION_NORMAL
+    }
     if (orientation == ExifInterface.ORIENTATION_NORMAL ||
         orientation == ExifInterface.ORIENTATION_UNDEFINED
     ) {
@@ -571,7 +582,7 @@ private fun Context.queryPhotoMetadata(uri: Uri): Pair<String?, Long?> {
     } ?: (null to null)
 }
 
-internal fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = runCatching {
+internal fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = try {
     val metadataUri = if (
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
         ContextCompat.checkSelfPermission(
@@ -586,7 +597,11 @@ internal fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = runCatch
     contentResolver.openInputStream(metadataUri)?.use { input ->
         ExifInterface(input).latLong?.let { it[0] to it[1] }
     }
-}.getOrNull()
+} catch (error: CancellationException) {
+    throw error
+} catch (error: Exception) {
+    null
+}
 
 private fun Cursor.getStringOrNull(columnName: String): String? =
     getColumnIndex(columnName).takeIf { it >= 0 }?.let(::getString)

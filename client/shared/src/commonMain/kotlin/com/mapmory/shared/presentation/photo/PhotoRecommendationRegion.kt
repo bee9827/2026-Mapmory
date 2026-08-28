@@ -2,6 +2,7 @@ package com.mapmory.shared.presentation.photo
 
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.domain.model.KoreanSelectableDistrictCodes
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaDistrictMapData
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.data.GeneratedWorldMapData
@@ -50,7 +51,13 @@ internal fun <T> selectPhotosInRegion(
         .toList()
 }
 
-internal suspend fun Location.photoRecommendationRegion(): PhotoRecommendationRegion? {
+internal class PhotoRecommendationRegionNotFoundException(
+    location: Location,
+) : IllegalStateException(
+    "사진 추천 지역 경계를 찾지 못했습니다: code=${location.regionCode}, type=${location.type}",
+)
+
+internal suspend fun Location.photoRecommendationRegion(): PhotoRecommendationRegion {
     val boundary = when {
         countryId != KoreaCountryId -> GeneratedWorldMapData.countries
             .firstOrNull { country -> country.code == regionCode }
@@ -60,11 +67,17 @@ internal suspend fun Location.photoRecommendationRegion(): PhotoRecommendationRe
             .firstOrNull { province -> province.code == regionCode }
             ?.let { province -> province.code to province.rings }
 
-        else -> GeneratedKoreaDistrictMapData
-            .forProvince(regionCode.take(KoreanProvinceCodeLength))
+        else -> KoreanSelectableDistrictCodes
             .firstOrNull { district -> district.code == regionCode }
+            ?.provinceCode
+            ?.let { provinceCode -> GeneratedKoreaDistrictMapData.forProvince(provinceCode) }
+            ?.firstOrNull { district -> district.code == regionCode }
             ?.let { district -> district.code to district.rings }
-    } ?: return null
+    } ?: throw PhotoRecommendationRegionNotFoundException(this)
+
+    if (boundary.second.none { ring -> ring.size >= MinimumRingPointCount }) {
+        throw PhotoRecommendationRegionNotFoundException(this)
+    }
 
     return PhotoRecommendationRegion(boundary.first, boundary.second)
 }
@@ -125,7 +138,7 @@ private fun pointOnSegment(point: GeoPoint, start: GeoPoint, end: GeoPoint): Boo
 }
 
 internal const val MaxRecommendedPhotos = 12
+internal const val PhotoRecommendationRegionNotFoundMessage = "선택한 장소의 경계를 확인하지 못했어요."
 private const val KoreaCountryId = 1L
-private const val KoreanProvinceCodeLength = 2
 private const val MinimumRingPointCount = 3
 private const val BoundaryEpsilon = 0.000001f

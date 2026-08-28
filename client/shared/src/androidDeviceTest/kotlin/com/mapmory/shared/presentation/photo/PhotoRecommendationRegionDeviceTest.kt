@@ -4,6 +4,7 @@ import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.runBlocking
 
 class PhotoRecommendationRegionDeviceTest {
@@ -18,7 +19,20 @@ class PhotoRecommendationRegionDeviceTest {
             type = LocationType.DISTRICT,
         )
 
-        assertEquals("11680", gangnam.photoRecommendationRegion()?.code)
+        assertEquals("11680", gangnam.photoRecommendationRegion().code)
+    }
+
+    @Test
+    fun `제주와_세종은_명시된_상위_시도_경계를_조회한다`() = runBlocking {
+        val locations = listOf(
+            Location(50110L, 1L, 19L, "50110", "제주시", LocationType.DISTRICT),
+            Location(50130L, 1L, 19L, "50130", "서귀포시", LocationType.DISTRICT),
+            Location(36110L, 1L, 10L, "36110", "세종시", LocationType.DISTRICT),
+        )
+
+        locations.forEach { location ->
+            assertEquals(location.regionCode, location.photoRecommendationRegion().code)
+        }
     }
 
     @Test
@@ -32,6 +46,9 @@ class PhotoRecommendationRegionDeviceTest {
             type = LocationType.DISTRICT,
         )
 
-        assertEquals(null, unknownDistrict.photoRecommendationRegion())
+        assertFailsWith<PhotoRecommendationRegionNotFoundException> {
+            unknownDistrict.photoRecommendationRegion()
+        }
+        Unit
     }
 }
