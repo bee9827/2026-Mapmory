@@ -231,7 +231,7 @@ fun TripRecordEditorScreen(
                         photoMessage?.let { message ->
                             Text(
                                 text = message,
-                                color = TripRecordPalette.muted,
+                                color = TripRecordPalette.current.muted,
                                 fontSize = 11.sp,
                                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                             )
@@ -311,8 +311,8 @@ fun TripRecordEditorScreen(
         ModalBottomSheet(
             onDismissRequest = { showLocationSheet = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = TripRecordPalette.background,
-            contentColor = TripRecordPalette.text,
+            containerColor = TripRecordPalette.current.background,
+            contentColor = TripRecordPalette.current.text,
         ) {
             Column(
                 modifier = Modifier
@@ -324,13 +324,13 @@ fun TripRecordEditorScreen(
             ) {
                 Text(
                     text = "장소 선택",
-                    color = TripRecordPalette.text,
+                    color = TripRecordPalette.current.text,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
                     text = "국가, 시·도, 시·군·구를 검색해 보세요",
-                    color = TripRecordPalette.muted,
+                    color = TripRecordPalette.current.muted,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 6.dp),
                 )
@@ -340,13 +340,13 @@ fun TripRecordEditorScreen(
                     placeholder = { Text("장소명 또는 코드 검색") },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = TripRecordPalette.text,
-                        unfocusedTextColor = TripRecordPalette.text,
-                        cursorColor = TripRecordPalette.accent,
-                        focusedBorderColor = TripRecordPalette.accent,
-                        unfocusedBorderColor = TripRecordPalette.line,
-                        focusedPlaceholderColor = TripRecordPalette.muted,
-                        unfocusedPlaceholderColor = TripRecordPalette.muted,
+                        focusedTextColor = TripRecordPalette.current.text,
+                        unfocusedTextColor = TripRecordPalette.current.text,
+                        cursorColor = TripRecordPalette.current.accent,
+                        focusedBorderColor = TripRecordPalette.current.accent,
+                        unfocusedBorderColor = TripRecordPalette.current.line,
+                        focusedPlaceholderColor = TripRecordPalette.current.muted,
+                        unfocusedPlaceholderColor = TripRecordPalette.current.muted,
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
@@ -356,7 +356,7 @@ fun TripRecordEditorScreen(
                 if (filteredLocations.isEmpty()) {
                     Text(
                         text = "검색 결과가 없습니다.",
-                        color = TripRecordPalette.muted,
+                        color = TripRecordPalette.current.muted,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(vertical = 28.dp),
                     )
@@ -391,8 +391,8 @@ fun TripRecordEditorScreen(
         ModalBottomSheet(
             onDismissRequest = { showRecommendationSheet = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = TripRecordPalette.background,
-            contentColor = TripRecordPalette.text,
+            containerColor = TripRecordPalette.current.background,
+            contentColor = TripRecordPalette.current.text,
         ) {
             Column(
                 modifier = Modifier
@@ -403,7 +403,7 @@ fun TripRecordEditorScreen(
                 Text("이 장소에서 찍은 사진", fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(
                     "사진의 EXIF GPS가 선택한 행정구역과 일치하는 결과예요.",
-                    color = TripRecordPalette.muted,
+                    color = TripRecordPalette.current.muted,
                     fontSize = 12.sp,
                     modifier = Modifier.padding(top = 6.dp),
                 )
@@ -457,7 +457,7 @@ fun TripRecordEditorScreen(
                         } else {
                             "선택한 사진 추가"
                         },
-                        color = TripRecordPalette.accent,
+                        color = TripRecordPalette.current.accent,
                         fontWeight = FontWeight.Bold,
                     )
                 }
@@ -516,14 +516,14 @@ private fun EditorTopBar(
             ) {
                 Text(
                     text = "←",
-                    color = TripRecordPalette.text,
+                    color = TripRecordPalette.current.text,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Light,
                 )
             }
             Text(
                 text = title,
-                color = TripRecordPalette.text,
+                color = TripRecordPalette.current.text,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.align(Alignment.Center),
@@ -538,7 +538,7 @@ private fun EditorTopBar(
             ) {
                 Text(
                     text = if (isSaving) "저장 중" else "저장",
-                    color = if (isSaveEnabled) TripRecordPalette.accent else TripRecordPalette.muted,
+                    color = if (isSaveEnabled) TripRecordPalette.current.accent else TripRecordPalette.current.muted,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                 )
@@ -569,7 +569,7 @@ private fun PhotoSection(
         ) {
             Text(
                 text = "$locationName · 여행 일정과 가까운 사진",
-                color = TripRecordPalette.text,
+                color = TripRecordPalette.current.text,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
@@ -584,10 +584,10 @@ private fun PhotoSection(
                 modifier = Modifier
                     .height(36.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(TripRecordPalette.photoRecommendBackground)
+                    .background(TripRecordPalette.current.photoRecommendBackground)
                     .border(
                         width = 1.dp,
-                        color = TripRecordPalette.photoRecommendBorder,
+                        color = TripRecordPalette.current.photoRecommendBorder,
                         shape = RoundedCornerShape(6.dp),
                     ),
             ) {
@@ -598,7 +598,7 @@ private fun PhotoSection(
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(13.dp),
-                            color = TripRecordPalette.photoRecommendText,
+                            color = TripRecordPalette.current.photoRecommendText,
                             strokeWidth = 1.5.dp,
                         )
                         Text(
@@ -607,14 +607,14 @@ private fun PhotoSection(
                                     "${progress.processed}/${progress.total} ($percentage%)"
                                 }
                             } ?: "불러오는 중",
-                            color = TripRecordPalette.photoRecommendText,
+                            color = TripRecordPalette.current.photoRecommendText,
                             fontSize = 9.sp,
                         )
                     }
                 } else {
                     Text(
                         text = "위치 기반 사진\n불러오기",
-                        color = TripRecordPalette.photoRecommendText,
+                        color = TripRecordPalette.current.photoRecommendText,
                         fontSize = 9.sp,
                         lineHeight = 11.sp,
                     )
@@ -642,17 +642,17 @@ private fun EditorTitleField(
         onValueChange = onValueChange,
         singleLine = true,
         textStyle = TextStyle(
-            color = TripRecordPalette.text,
+            color = TripRecordPalette.current.text,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
         ),
-        cursorBrush = SolidColor(TripRecordPalette.accent),
+        cursorBrush = SolidColor(TripRecordPalette.current.accent),
         decorationBox = { innerTextField ->
             Box(contentAlignment = Alignment.CenterStart) {
                 if (value.isBlank()) {
                     Text(
                         text = "여행의 제목을 적어주세요",
-                        color = TripRecordPalette.muted,
+                        color = TripRecordPalette.current.muted,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                     )
@@ -706,7 +706,7 @@ private fun DateField(
     Column(modifier) {
         Text(
             text = label,
-            color = TripRecordPalette.muted,
+            color = TripRecordPalette.current.muted,
             fontSize = 9.sp,
             fontWeight = FontWeight.SemiBold,
         )
@@ -726,7 +726,7 @@ private fun DateField(
             ) {
                 Text(
                     text = value.ifBlank { "연도. 월. 일." },
-                    color = if (value.isBlank()) TripRecordPalette.muted else TripRecordPalette.text,
+                    color = if (value.isBlank()) TripRecordPalette.current.muted else TripRecordPalette.current.text,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,
                 )
@@ -740,7 +740,7 @@ private fun DateField(
             ) {
                 Text(
                     text = "▦",
-                    color = TripRecordPalette.muted,
+                    color = TripRecordPalette.current.muted,
                     fontSize = 16.sp,
                 )
             }
@@ -760,7 +760,7 @@ private fun EditorErrorMessage(
     message ?: return
     Text(
         text = message,
-        color = TripRecordPalette.danger,
+        color = TripRecordPalette.current.danger,
         fontSize = 11.sp,
         modifier = modifier,
     )
@@ -786,15 +786,15 @@ private fun CompanionChips(modifier: Modifier = Modifier) {
             val selected = selectedCompanion == companion
             Text(
                 text = companion,
-                color = if (selected) TripRecordPalette.primary else TripRecordPalette.text,
+                color = if (selected) TripRecordPalette.current.primary else TripRecordPalette.current.text,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .clip(RoundedCornerShape(50.dp))
                     .background(
-                        if (selected) TripRecordPalette.primarySoft else TripRecordPalette.surface,
+                        if (selected) TripRecordPalette.current.primarySoft else TripRecordPalette.current.surface,
                     )
-                    .border(1.dp, TripRecordPalette.line, RoundedCornerShape(50.dp))
+                    .border(1.dp, TripRecordPalette.current.line, RoundedCornerShape(50.dp))
                     .clickable {
                         selectedCompanion = if (selected) null else companion
                     }
@@ -814,17 +814,17 @@ private fun EditorContentField(
         value = value,
         onValueChange = onValueChange,
         textStyle = TextStyle(
-            color = TripRecordPalette.text,
+            color = TripRecordPalette.current.text,
             fontSize = 12.sp,
             lineHeight = 18.sp,
         ),
-        cursorBrush = SolidColor(TripRecordPalette.accent),
+        cursorBrush = SolidColor(TripRecordPalette.current.accent),
         decorationBox = { innerTextField ->
             Box {
                 if (value.isBlank()) {
                     Text(
                         text = "이곳에서의 추억을 자유롭게 남겨보세요. (선택)",
-                        color = TripRecordPalette.muted,
+                        color = TripRecordPalette.current.muted,
                         fontSize = 12.sp,
                     )
                 }
@@ -841,7 +841,7 @@ private fun EditorDivider(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxWidth()
             .height(1.dp)
-            .background(TripRecordPalette.line.copy(alpha = 0.55f)),
+            .background(TripRecordPalette.current.line.copy(alpha = 0.55f)),
     )
 }
 
@@ -866,7 +866,7 @@ private fun PhotoEditor(
                 PhotoPreview(photo = photo, modifier = Modifier.size(112.dp, 84.dp))
                 Text(
                     text = "×",
-                    color = TripRecordPalette.text,
+                    color = TripRecordPalette.current.text,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
@@ -874,7 +874,7 @@ private fun PhotoEditor(
                         .padding(5.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .clickable { onRemoveClick(photo.id) }
-                        .background(TripRecordPalette.background.copy(alpha = 0.8f))
+                        .background(TripRecordPalette.current.background.copy(alpha = 0.8f))
                         .padding(horizontal = 7.dp, vertical = 1.dp),
                 )
             }
@@ -889,20 +889,20 @@ private fun PhotoActionButton(onClick: () -> Unit, enabled: Boolean) {
             .size(112.dp, 84.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(enabled = enabled, onClick = onClick)
-            .background(TripRecordPalette.photoGalleryBackground)
-            .border(1.dp, TripRecordPalette.photoGalleryBorder, RoundedCornerShape(14.dp)),
+            .background(TripRecordPalette.current.photoGalleryBackground)
+            .border(1.dp, TripRecordPalette.current.photoGalleryBorder, RoundedCornerShape(14.dp)),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             text = "사진첩",
-            color = TripRecordPalette.text,
+            color = TripRecordPalette.current.text,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             text = "전체 보기",
-            color = TripRecordPalette.muted,
+            color = TripRecordPalette.current.muted,
             fontSize = 9.sp,
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -925,19 +925,19 @@ private fun RecommendedPhoto(
             if (selected) {
                 Text(
                     "✓",
-                    color = TripRecordPalette.text,
+                    color = TripRecordPalette.current.text,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(7.dp)
-                        .background(TripRecordPalette.accent, RoundedCornerShape(20.dp))
+                        .background(TripRecordPalette.current.accent, RoundedCornerShape(20.dp))
                         .padding(horizontal = 7.dp, vertical = 3.dp),
                 )
             }
         }
         Text(
             text = photo.capturedAt ?: photo.displayName,
-            color = TripRecordPalette.muted,
+            color = TripRecordPalette.current.muted,
             fontSize = 10.sp,
             maxLines = 1,
             modifier = Modifier.padding(top = 5.dp),
@@ -984,7 +984,7 @@ private fun LocationSelector(
             } else {
                 "해외 여행"
             },
-            color = TripRecordPalette.accent,
+            color = TripRecordPalette.current.accent,
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
         )
@@ -996,20 +996,20 @@ private fun LocationSelector(
         ) {
             Text(
                 text = "⊙",
-                color = TripRecordPalette.muted,
+                color = TripRecordPalette.current.muted,
                 fontSize = 12.sp,
             )
             Spacer(Modifier.width(12.dp))
             Text(
                 text = selectedLocation?.displayName(locations) ?: "여행 장소를 선택해 주세요",
-                color = if (selectedLocation == null) TripRecordPalette.muted else TripRecordPalette.text,
+                color = if (selectedLocation == null) TripRecordPalette.current.muted else TripRecordPalette.current.text,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f),
             )
             Text(
                 text = "⌄",
-                color = TripRecordPalette.muted,
+                color = TripRecordPalette.current.muted,
                 fontSize = 14.sp,
             )
         }
@@ -1034,20 +1034,20 @@ private fun LocationSearchResult(
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .background(if (selected) TripRecordPalette.accentSoft else TripRecordPalette.surface)
+            .background(if (selected) TripRecordPalette.current.accentSoft else TripRecordPalette.current.surface)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
             Text(
                 text = location.name,
-                color = TripRecordPalette.text,
+                color = TripRecordPalette.current.text,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
                 text = "${locationTypeLabel(location)} · ${locationContext(location, locations)}",
-                color = TripRecordPalette.muted,
+                color = TripRecordPalette.current.muted,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 4.dp),
             )
@@ -1055,7 +1055,7 @@ private fun LocationSearchResult(
         if (selected) {
             Text(
                 text = "선택됨",
-                color = TripRecordPalette.accent,
+                color = TripRecordPalette.current.accent,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
             )

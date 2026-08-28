@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,10 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -38,9 +35,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,113 +45,6 @@ import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
 import com.mapmory.shared.preview.PreviewSurface
 import org.jetbrains.compose.resources.decodeToImageBitmap
-
-internal object TripRecordPalette {
-    val background = Color(0xFF111518)
-    val surface = Color(0xFF1A1E22)
-    val surfaceElevated = Color(0xFF102A32)
-    val line = Color(0xFF1B363E)
-    val text = Color(0xFFE9F4F2)
-    val muted = Color(0xFF81999E)
-    val accent = Color(0xFF35C988)
-    val accentSoft = Color(0xFF123E3A)
-    val danger = Color(0xFFFF6264)
-    val photoRecommendText = Color.White
-    val photoRecommendBackground = Color(0xFF382125)
-    val photoRecommendBorder = Color(0xFF99555D)
-    val photoGalleryBackground = Color(0xFF1B2D26)
-    val photoGalleryBorder = Color(0xFF3E7960)
-
-    // Shared tokens used by the map, journal, and statistics dashboards.
-    val pageBackground = Color(0xFF121518)
-    val softSurface = Color(0xFF1C2124)
-    val border = Color(0xFF2B3135)
-    val primary = Color(0xFF35C987)
-    val primarySoft = Color(0xFF173B2D)
-    val secondaryAccent = Color(0xFF67D9A2)
-    val onPrimary = Color(0xFF071B12)
-    val headingText = Color(0xFFF1F5F3)
-    val bodyText = Color(0xFFBDC6C2)
-    val secondaryText = Color(0xFF89938F)
-    val navigationDivider = Color(0xFF2C3431)
-    val navigationUnselected = Color(0xFF77827D)
-    val navigationSelectedLabel = Color(0xFFA2ADA7)
-    val contentOnMedia = Color.White
-    val mediaScrim = Color.Black.copy(alpha = 0.62f)
-    val metadataDateBackground = Color(0xFF24292D)
-}
-
-internal object TripMapPalette {
-    val logoText = Color(0xFFF4F8F5)
-    val scopeBackground = Color(0xFF151C19)
-    val scopeBorder = Color(0xFF2D3A34)
-    val scopeSelectedBackground = Color(0xFF2A3832)
-    val scopeSelectedText = Color(0xFFEEF7F1)
-    val scopeUnselectedText = Color(0xFF92A09A)
-    val tagBackground = Color(0xFF1A2421)
-    val tagText = Color(0xFFBDC8C2)
-    val tagSelectedText = Color(0xFF072118)
-    val dashboardBadgeText = Color(0xFF9CE6BF)
-}
-
-internal object TripStatisticsPalette {
-    val divider = Color(0xFF30363A)
-    val mapBorder = Color(0xFF343B40)
-    val mapLand = Color(0xFF293039)
-    val mapOutline = Color(0xFF424B53)
-}
-
-@Composable
-internal fun rememberDismissKeyboardOnTapModifier(): Modifier {
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    return Modifier.pointerInput(focusManager, keyboardController) {
-        detectTapGestures {
-            focusManager.clearFocus(force = true)
-            keyboardController?.hide()
-        }
-    }
-}
-
-@Composable
-internal fun TripRecordTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = darkColorScheme(
-            primary = TripRecordPalette.accent,
-            onPrimary = TripRecordPalette.background,
-            secondary = TripRecordPalette.muted,
-            background = TripRecordPalette.background,
-            onBackground = TripRecordPalette.text,
-            surface = TripRecordPalette.surface,
-            onSurface = TripRecordPalette.text,
-            surfaceVariant = TripRecordPalette.surfaceElevated,
-            onSurfaceVariant = TripRecordPalette.muted,
-            outline = TripRecordPalette.line,
-            error = TripRecordPalette.danger,
-        ),
-        content = content,
-    )
-}
-
-@Composable
-internal fun TripRecordBackground(
-    modifier: Modifier = Modifier,
-    backgroundColor: Color = TripRecordPalette.background,
-    content: @Composable () -> Unit,
-) {
-    TripRecordTheme {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = backgroundColor,
-        ) {
-            Box(
-                modifier = modifier.fillMaxSize(),
-            ) {
-                content()
-            }
-        }
-    }
-}
 
 @Composable
 internal fun TripRecordTopBar(
@@ -185,7 +72,7 @@ internal fun TripRecordTopBar(
         }
         Text(
             text = title,
-            color = TripRecordPalette.text,
+            color = TripRecordPalette.current.text,
             fontSize = 19.sp,
             fontWeight = FontWeight.Bold,
         )
@@ -200,8 +87,8 @@ internal fun TripIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    containerColor: Color = TripRecordPalette.surface,
-    contentColor: Color = TripRecordPalette.text,
+    containerColor: Color = TripRecordPalette.current.surface,
+    contentColor: Color = TripRecordPalette.current.text,
 ) {
     Box(
         modifier = modifier
@@ -231,7 +118,7 @@ internal fun TripSectionLabel(
 ) {
     Text(
         text = text,
-        color = TripRecordPalette.muted,
+        color = TripRecordPalette.current.muted,
         fontSize = 12.sp,
         fontWeight = FontWeight.SemiBold,
         modifier = modifier,
@@ -245,11 +132,11 @@ internal fun TripBottomBar(
     onMapClick: () -> Unit = {},
     onCreateClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    backgroundColor: Color = TripRecordPalette.background,
-    dividerColor: Color = TripRecordPalette.line,
-    selectedIconColor: Color = TripRecordPalette.accent,
-    selectedLabelColor: Color = TripRecordPalette.accent,
-    unselectedColor: Color = TripRecordPalette.muted,
+    backgroundColor: Color = TripRecordPalette.current.background,
+    dividerColor: Color = TripRecordPalette.current.line,
+    selectedIconColor: Color = TripRecordPalette.current.accent,
+    selectedLabelColor: Color = TripRecordPalette.current.accent,
+    unselectedColor: Color = TripRecordPalette.current.muted,
     modifier: Modifier = Modifier,
 ) {
     Row(
