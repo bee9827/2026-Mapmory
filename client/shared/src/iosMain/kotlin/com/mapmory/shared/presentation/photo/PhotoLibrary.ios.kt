@@ -58,6 +58,7 @@ import platform.UIKit.UIWindow
 import platform.darwin.NSObject
 import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -182,15 +183,29 @@ private class IosPhotoLibraryController(
         val startedAtMillis = nowMillis()
         onLoadingChanged(true)
         recommendationJob = scope.launch {
-            val region = withContext(Dispatchers.Default) {
-                runCatching { location.photoRecommendationRegion() }.getOrNull()
-            }
-            if (region == null) {
-                logPhotoPerformance(
-                    "recommend_total_ms=${elapsedMillis(startedAtMillis)} recommended_photos=0",
-                )
-                onMessage("선택한 장소의 경계를 확인하지 못했어요.")
-                onLoadingChanged(false)
+            val region = try {
+                withContext(Dispatchers.Default) {
+                    location.photoRecommendationRegion()
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: PhotoRecommendationRegionNotFoundException) {
+                if (generation == recommendationGeneration) {
+                    logPhotoPerformance(
+                        "recommend_total_ms=${elapsedMillis(startedAtMillis)} recommended_photos=0",
+                    )
+                    onMessage(PhotoRecommendationRegionNotFoundMessage)
+                    onLoadingChanged(false)
+                }
+                return@launch
+            } catch (error: Exception) {
+                if (generation == recommendationGeneration) {
+                    logPhotoPerformance(
+                        "recommend_total_ms=${elapsedMillis(startedAtMillis)} recommended_photos=0",
+                    )
+                    onMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+                    onLoadingChanged(false)
+                }
                 return@launch
             }
             val matchingAssets = withContext(Dispatchers.Default) {
