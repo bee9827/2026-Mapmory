@@ -1196,13 +1196,7 @@ function App() {
   }, [isWorldMemoryOpen]);
 
   useEffect(() => {
-    let hasSeenGuide = false;
-    try {
-      hasSeenGuide = sessionStorage.getItem("mapmory-globe-guide-seen-v2") === "true";
-    } catch {
-      hasSeenGuide = false;
-    }
-    if (hasSeenGuide || !experienceRef.current) return undefined;
+    if (!experienceRef.current) return undefined;
 
     const observer = new IntersectionObserver(([entry]) => {
       if (!entry.isIntersecting || entry.intersectionRatio < 0.45) return;
@@ -1215,11 +1209,6 @@ function App() {
 
   const dismissGlobeGuide = () => {
     setIsGlobeGuideVisible(false);
-    try {
-      sessionStorage.setItem("mapmory-globe-guide-seen-v2", "true");
-    } catch {
-      // The guide can still be dismissed when session storage is unavailable.
-    }
   };
 
   const closeWorldMemory = () => {
