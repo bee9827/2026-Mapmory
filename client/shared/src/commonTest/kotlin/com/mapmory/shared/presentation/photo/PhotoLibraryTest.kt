@@ -1,9 +1,13 @@
 package com.mapmory.shared.presentation.photo
 
+import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.GeoPoint
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -69,6 +73,23 @@ class PhotoLibraryTest {
 
         assertTrue(region.contains(latitude = 37.56, longitude = 126.98))
         assertFalse(region.contains(latitude = 37.40, longitude = 127.20))
+    }
+
+    @Test
+    fun `경계가_없는_지역은_빈_추천이_아니라_예외를_발생시킨다`() = runBlocking {
+        val unknown = Location(
+            id = -1,
+            countryId = 1,
+            parentId = null,
+            regionCode = "99999",
+            name = "알 수 없는 지역",
+            type = LocationType.DISTRICT,
+        )
+
+        assertFailsWith<PhotoRecommendationRegionNotFoundException> {
+            unknown.photoRecommendationRegion()
+        }
+        Unit
     }
 
     @Test
