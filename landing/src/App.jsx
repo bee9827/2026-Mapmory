@@ -1164,6 +1164,7 @@ function App() {
   const [isWorldSelecting, setIsWorldSelecting] = useState(false);
   const experienceRef = useRef(null);
   const experienceStageRef = useRef(null);
+  const globePanelRef = useRef(null);
   const worldSelectionTimerRef = useRef(null);
   const globeAnalytics = useExperienceAnalytics("globe");
 
@@ -1196,14 +1197,14 @@ function App() {
   }, [isWorldMemoryOpen]);
 
   useEffect(() => {
-    if (!experienceRef.current) return undefined;
+    if (!globePanelRef.current) return undefined;
 
     const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting || entry.intersectionRatio < 0.45) return;
+      if (!entry.isIntersecting || entry.intersectionRatio < 0.25) return;
       setIsGlobeGuideVisible(true);
       observer.disconnect();
-    }, { threshold: [0.45] });
-    observer.observe(experienceRef.current);
+    }, { threshold: [0.25] });
+    observer.observe(globePanelRef.current);
     return () => observer.disconnect();
   }, []);
 
@@ -1245,7 +1246,7 @@ function App() {
             <div><p className="eyebrow">01 · 세계</p><h2>지구본을 돌려 기억을 찾아요.</h2></div>
           </div>
           <div className={`experience-stage ${isWorldMemoryOpen ? "is-memory-open" : ""}`} ref={experienceStageRef}>
-            <article className="globe-panel" id="globe-demo">
+            <article className="globe-panel" id="globe-demo" ref={globePanelRef}>
               <header><span><GlobeHemisphereEast size={19} weight="duotone" />3D 기억 지도</span></header>
               <InteractiveGlobe selected={selectedMemory} focusRequest={globeFocusRequest} onSelect={handleWorldSelect} onInteract={globeAnalytics.startExperience} theme={theme} guideVisible={isGlobeGuideVisible} onGuideDismiss={dismissGlobeGuide} isSelecting={isWorldSelecting} />
               <LocationSelector selected={selectedMemory} onSelect={handleWorldSelect} disabled={isWorldSelecting} />
