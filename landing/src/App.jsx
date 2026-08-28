@@ -1103,10 +1103,9 @@ function HeroSection({ onExperienceEntry }) {
     let frame = 0;
     const updatePhotoStep = () => {
       frame = 0;
-      const heroTop = heroRef.current?.offsetTop ?? 0;
-      const distance = Math.max(0, window.scrollY - heroTop + 20);
-      const nextStep = distance >= 170 ? 2 : distance >= 70 ? 1 : 0;
-      setPhotoStep((current) => Math.max(current, nextStep));
+      const distance = Math.max(0, window.scrollY);
+      const nextStep = distance >= 120 ? 2 : distance >= 30 ? 1 : 0;
+      setPhotoStep(nextStep);
     };
     const handleScroll = () => {
       if (frame) return;
@@ -1136,7 +1135,7 @@ function HeroSection({ onExperienceEntry }) {
 
         <div className={`hero-photo-cluster photo-step-${photoStep}`} aria-label="스크롤하며 하나씩 더해지는 Mapmory 개발팀의 실제 장소 기록 세 장">
           <figure className="hero-photo hero-photo-main">
-            <img src="/assets/team-jeju-coast.jpg" alt="해 질 무렵 검은 바위 사이로 파도가 밀려오는 제주 바닷가" loading="eager" fetchPriority="high" decoding="async" />
+            <img src="/assets/team-jeju-coast-hero.jpg" alt="해 질 무렵 검은 바위 사이로 파도가 밀려오는 제주 바닷가" loading="eager" fetchPriority="high" decoding="auto" />
             <figcaption><span><MapPin size={16} weight="fill" /><span className="hero-photo-handwriting">파도 소리가 남은 저녁</span></span><small>Mapmory 개발팀 촬영</small></figcaption>
           </figure>
           <figure className="hero-photo hero-photo-left">
