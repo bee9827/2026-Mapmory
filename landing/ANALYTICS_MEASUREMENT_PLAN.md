@@ -58,7 +58,7 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 
 ## 4. 이벤트 사전
 
-`page_view`는 GA4가 자동 수집한다. 아래 이벤트는 코드에서 명시적으로 전송한다.
+`page_view`는 GA4가 자동 수집하고 PostHog에는 `$pageview`로 한 번 전송한다. 아래 이벤트는 하나의 허용 목록을 통해 GA4와 PostHog에 동일하게 전송한다.
 
 | 이벤트 | 발생 조건 | 주요 파라미터 | 중복 방지 |
 | --- | --- | --- | --- |
@@ -76,7 +76,7 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 | `waitlist_submit_error` | 클라이언트 검증, 네트워크, 서버 또는 응답 오류 | `error_type`, `validation_field` | 오류 발생마다 기록 |
 | `download_click` | 공개 출시 후 Google Play CTA 클릭 | `cta_placement` | 클릭마다 기록 |
 
-모든 커스텀 이벤트에는 `landing_version`이 자동으로 포함된다. 이벤트 이름은 허용 목록으로 제한하고, `email`, `phone`, `name`, `address`, 자유 입력문 등 직접 식별 가능 정보로 보이는 파라미터는 분석 모듈에서 제거한다.
+모든 커스텀 이벤트에는 `landing_version`이 자동으로 포함된다. 이벤트 이름은 허용 목록으로 제한하고, `email`, `phone`, `name`, `address`, 자유 입력문 등 직접 식별 가능 정보로 보이는 파라미터는 분석 모듈에서 제거한다. PostHog은 자동 클릭 수집, 개인 프로필, 영구 식별자, 세션 녹화를 사용하지 않고 GeoIP 보강도 거부한다. PostHog SDK가 브라우저·기기·페이지 같은 표준 진단 속성을 추가할 수 있으며, 프로젝트 설정에서는 `Discard client IP data`를 사용한다.
 
 ### 파라미터 허용값
 
@@ -122,7 +122,21 @@ GA4 관리자 화면에서 `waitlist_submit` 중 `result=subscribed`인 이벤�
 
 단계별 이탈률은 별도 이탈 이벤트를 만들지 않고 같은 세션의 순차 퍼널에서 `1 - 다음 단계 사용자 수 ÷ 현재 단계 사용자 수`로 계산한다. 정확한 체험시간은 단순 페이지 체류시간이 아니라 `experience_end.active_duration_ms`를 사용한다.
 
-## 6. 실측 업데이트 절차
+## 6. PostHog 운영 대시보드
+
+GA4는 유입·캠페인·최종 전환을 판단하는 원천으로 유지하고, PostHog은 제품 체험의 흐름을 매주 한 화면에서 진단하는 용도로 사용한다. 대시보드의 정확한 생성 순서는 `POSTHOG_DASHBOARD_SETUP.md`에 기록한다.
+
+초기 대시보드는 다음 다섯 항목으로 제한한다.
+
+1. `$pageview → experience_view → experience_start → memory_open(open_index=1) → waitlist_form_view → waitlist_submit_attempt → waitlist_submit` 순차 퍼널
+2. `experience_end.active_duration_ms`의 중앙값과 25·75 백분위
+3. `experience_end.unique_memories_opened`의 0개·1개·2개 이상 분포
+4. `memory_open(open_index=1).time_since_start_ms`의 중앙값
+5. `waitlist_submit_error`의 `error_type`, `validation_field` 분포
+
+모든 타일에는 공통으로 `landing_version`, 기기 유형, 유입 소스 필터를 둔다. PostHog 수치와 GA4 수치가 완전히 같을 필요는 없으며 광고 차단, 저장 방식, 세션 정의 차이를 감안한다. 최종 신규 신청자 수는 계속 백엔드 DB를 원천으로 사용한다.
+
+## 7. 실측 업데이트 절차
 
 매주 같은 기간과 유입 조건을 사용해 아래 순서로 이 문서의 `현재 실측`과 `차이/판정`을 갱신한다.
 
