@@ -8,6 +8,56 @@ const capturePosthogLocally = environment.VITE_POSTHOG_CAPTURE_LOCAL === "true";
 const isLocalBrowser = typeof window !== "undefined"
   && ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
+export const INTERNAL_TRAFFIC_STORAGE_KEY = "mapmory_internal_traffic_v1";
+
+export function resolveTrafficType({ search = "", storage = null } = {}) {
+  const internalMode = new URLSearchParams(search).get("internal");
+
+  if (internalMode === "1") {
+    try {
+      storage?.setItem(INTERNAL_TRAFFIC_STORAGE_KEY, "1");
+    } catch {
+      // The current visit is still marked internal when storage is unavailable.
+    }
+    return "internal";
+  }
+
+  if (internalMode === "0") {
+    try {
+      storage?.removeItem(INTERNAL_TRAFFIC_STORAGE_KEY);
+    } catch {
+      // The explicit reset still applies to the current visit.
+    }
+    return "external";
+  }
+
+  try {
+    return storage?.getItem(INTERNAL_TRAFFIC_STORAGE_KEY) === "1"
+      ? "internal"
+      : "external";
+  } catch {
+    return "external";
+  }
+}
+
+function resolveBrowserTrafficType() {
+  if (typeof window === "undefined") return "external";
+
+  let storage = null;
+  try {
+    storage = window.localStorage;
+  } catch {
+    // Storage can be unavailable in privacy-restricted browser contexts.
+  }
+
+  return resolveTrafficType({
+    search: window.location.search,
+    storage,
+  });
+}
+
+const trafficType = resolveBrowserTrafficType();
+
 export const POSTHOG_CAPTURE_CONFIG = Object.freeze({
   defaults: "2026-05-30",
   autocapture: false,
@@ -79,9 +129,11 @@ function initializePostHog() {
       });
       posthog.register({
         $geoip_disable: true,
+        traffic_type: trafficType,
       });
       posthog.capture("$pageview", {
         landing_version: landingVersion,
+        traffic_type: trafficType,
         $pathname: window.location.pathname,
         $geoip_disable: true,
       });
@@ -113,6 +165,7 @@ export function initializeAnalytics() {
     anonymize_ip: true,
     send_page_view: true,
     landing_version: landingVersion,
+    traffic_type: trafficType,
   });
 
   const script = document.createElement("script");
@@ -134,6 +187,7 @@ export function buildEventParameters(parameters = {}) {
 
   return {
     landing_version: landingVersion,
+    traffic_type: trafficType,
     ...safeParameters,
   };
 }
