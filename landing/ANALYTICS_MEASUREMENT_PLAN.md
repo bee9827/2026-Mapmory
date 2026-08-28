@@ -76,13 +76,23 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 | `waitlist_submit_error` | 클라이언트 검증, 네트워크, 서버 또는 응답 오류 | `error_type`, `validation_field` | 오류 발생마다 기록 |
 | `download_click` | 공개 출시 후 Google Play CTA 클릭 | `cta_placement` | 클릭마다 기록 |
 
-모든 커스텀 이벤트에는 `landing_version`이 자동으로 포함된다. 이벤트 이름은 허용 목록으로 제한하고, `email`, `phone`, `name`, `address`, 자유 입력문 등 직접 식별 가능 정보로 보이는 파라미터는 분석 모듈에서 제거한다. PostHog은 자동 클릭 수집, 개인 프로필, 영구 식별자, 세션 녹화를 사용하지 않고 GeoIP 보강도 거부한다. PostHog SDK가 브라우저·기기·페이지 같은 표준 진단 속성을 추가할 수 있으며, 프로젝트 설정에서는 `Discard client IP data`를 사용한다.
+모든 이벤트에는 `landing_version`과 `traffic_type`이 자동으로 포함된다. 이벤트 이름은 허용 목록으로 제한하고, `email`, `phone`, `name`, `address`, 자유 입력문 등 직접 식별 가능 정보로 보이는 파라미터는 분석 모듈에서 제거한다. PostHog은 자동 클릭 수집, 개인 프로필, 영구 식별자, 세션 녹화를 사용하지 않고 GeoIP 보강도 거부한다. PostHog SDK가 브라우저·기기·페이지 같은 표준 진단 속성을 추가할 수 있으며, 프로젝트 설정에서는 `Discard client IP data`를 사용한다.
+
+### 내부 테스트 트래픽
+
+- 팀원은 브라우저·기기마다 한 번 `https://map-mory.com/?internal=1`로 접속한다.
+- 해당 브라우저는 이후 일반 주소로 접속해도 `traffic_type=internal`을 전송한다.
+- 일반 방문으로 되돌릴 때는 `https://map-mory.com/?internal=0`을 사용한다.
+- 이 값은 분석 구분용 로컬 플래그일 뿐 인증이나 접근 제어로 사용하지 않는다.
+- 시크릿 모드나 브라우저 저장소 삭제 후에는 다시 설정해야 한다.
+- 이미 수집된 QA 이벤트는 삭제하지 않고, 알려진 테스트 시간대·세션을 운영 분석에서 제외한다.
 
 ### 파라미터 허용값
 
 | 파라미터 | 허용값 |
 | --- | --- |
 | `landing_version` | `v2`부터 시작하는 안정적인 배포 버전. 자동 `page_view`에도 포함 |
+| `traffic_type` | `external`, `internal`. 자동 `page_view`와 모든 허용 이벤트에 포함 |
 | `experience_type` | `globe`, `korea_detail` |
 | `interaction_type` | `place_select`, `memory_add`, `globe_drag`, `globe_zoom` |
 | `memory_id` | `jeju-coast`, `shanghai`, `tokyo`, `usa-west`, `hapjeong`, `yeosu`, `jeju` |
@@ -103,7 +113,7 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 
 GA4에서 다음 문자열 파라미터를 이벤트 범위 맞춤 측정기준으로 등록한다.
 
-`landing_version`, `experience_type`, `interaction_type`, `memory_id`, `selection_source`, `cta_placement`, `last_completed_step`, `exit_reason`, `result`, `error_type`, `validation_field`
+`landing_version`, `traffic_type`, `experience_type`, `interaction_type`, `memory_id`, `selection_source`, `cta_placement`, `last_completed_step`, `exit_reason`, `result`, `error_type`, `validation_field`
 
 다음 숫자 파라미터는 이벤트 범위 맞춤 측정항목으로 등록한다.
 
@@ -134,7 +144,7 @@ GA4는 유입·캠페인·최종 전환을 판단하는 원천으로 유지하�
 4. `memory_open(open_index=1).time_since_start_ms`의 중앙값
 5. `waitlist_submit_error`의 `error_type`, `validation_field` 분포
 
-모든 타일에는 공통으로 `landing_version`, 기기 유형, 유입 소스 필터를 둔다. PostHog 수치와 GA4 수치가 완전히 같을 필요는 없으며 광고 차단, 저장 방식, 세션 정의 차이를 감안한다. 최종 신규 신청자 수는 계속 백엔드 DB를 원천으로 사용한다.
+모든 운영 타일에는 공통으로 `traffic_type != internal`을 적용하고, 필요할 때 `landing_version`, 기기 유형, 유입 소스로 나눈다. PostHog 수치와 GA4 수치가 완전히 같을 필요는 없으며 광고 차단, 저장 방식, 세션 정의 차이를 감안한다. 최종 신규 신청자 수는 계속 백엔드 DB를 원천으로 사용한다.
 
 ## 7. 실측 업데이트 절차
 

@@ -13,7 +13,7 @@ GA4에서 여러 탐색 보고서를 반복해서 만들지 않고, 랜딩의 �
 - 현재 단계: `$pageview → experience_view → experience_start → memory_open`
 - 집계: 고유 사용자, 순차 퍼널, 전환 창 1일
 
-현재 차트의 값에는 로컬 연결 QA가 포함되어 있으므로 성과 판정에는 사용하지 않는다. 운영 배포 후 폼 이벤트가 들어오면 아래 설계대로 `waitlist_form_view → waitlist_submit_attempt → waitlist_submit`을 확장하고 나머지 네 타일을 추가한다.
+현재 차트의 값에는 초기 연결 QA가 포함되어 있으므로 성과 판정에는 사용하지 않는다. 운영 분석에는 `traffic_type != internal` 공통 필터를 적용하고, 초기 QA 이벤트는 알려진 테스트 시간대·세션으로 별도 제외한다.
 
 ## 1. 프로젝트 연결
 
@@ -39,9 +39,11 @@ VITE_POSTHOG_CAPTURE_LOCAL=false
 
 페이지 진입은 코드가 `$pageview`를 한 번 명시적으로 전송한다. 모든 이벤트는 GeoIP 보강을 거부한다. PostHog SDK가 브라우저·기기·페이지 같은 표준 진단 속성을 추가할 수 있지만, Mapmory의 커스텀 속성에는 출시 알림 이메일, 개인정보 동의값, 만 14세 확인값을 보내지 않는다. 프로젝트 설정의 `Discard client IP data`도 켜서 서버 측 IP 저장을 막는다.
 
+팀 내부 검수 브라우저는 한 번 `https://map-mory.com/?internal=1`로 접속해 분석 전용 로컬 표시를 저장한다. 이후 모든 이벤트에 `traffic_type=internal`이 붙는다. `?internal=0`으로 해제할 수 있으며, 이 URL은 인증이나 보안 경계가 아니다.
+
 ## 2. 대시보드 만들기
 
-대시보드 이름은 `Landing · Product Experience v2`로 한다. 기본 기간은 최근 14일, 공통 필터는 `landing_version = v2`로 시작한다.
+대시보드 이름은 `Landing · Product Experience v2`로 한다. 기본 기간은 최근 14일, 운영 공통 필터는 `landing_version = v2`, `traffic_type != internal`로 시작한다.
 
 ### 타일 A · 전체 순차 퍼널
 
@@ -86,6 +88,7 @@ $pageview
 모든 타일에서 필요한 경우에만 다음 기준으로 나눈다.
 
 - `landing_version`
+- `traffic_type` (`external`, `internal`)
 - 모바일·데스크톱
 - `experience_type`
 - 유입 소스와 캠페인
@@ -99,6 +102,8 @@ $pageview
 - [ ] 개인정보·쿠키 안내에 실제 사용하는 분석 사업자와 처리 내용을 반영
 - [ ] PostHog Live Events에서 `$pageview`, `experience_start`, `memory_open`, `experience_end` 수신 확인
 - [ ] 이벤트 속성에 이메일·동의값·자유 입력이 없는지 확인
+- [ ] 팀 검수 기기에서 `?internal=1`을 한 번 열고 `traffic_type=internal` 수신 확인
+- [ ] 운영 대시보드에 `traffic_type != internal` 공통 필터 적용
 - [ ] GA4 DebugView와 PostHog Live Events에서 동일 조작의 이벤트 순서 비교
 - [ ] 위 다섯 타일을 만들고 팀 대시보드로 공유
 

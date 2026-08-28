@@ -2,10 +2,31 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   ANALYTICS_EVENTS,
+  INTERNAL_TRAFFIC_STORAGE_KEY,
   POSTHOG_CAPTURE_CONFIG,
   buildEventParameters,
   isSupportedEvent,
+  resolveTrafficType,
 } from "../src/analytics.js";
+
+function createMemoryStorage(initialValue = null) {
+  const values = new Map();
+  if (initialValue !== null) {
+    values.set(INTERNAL_TRAFFIC_STORAGE_KEY, initialValue);
+  }
+
+  return {
+    getItem(key) {
+      return values.get(key) ?? null;
+    },
+    setItem(key, value) {
+      values.set(key, value);
+    },
+    removeItem(key) {
+      values.delete(key);
+    },
+  };
+}
 
 test("declares the agreed landing funnel events", () => {
   assert.deepEqual(
@@ -39,6 +60,7 @@ test("adds the landing version and removes direct personal information", () => {
     }),
     {
       landing_version: "v2",
+      traffic_type: "external",
       cta_placement: "hero",
     },
   );
@@ -59,12 +81,29 @@ test("keeps exact experience duration and distinct-memory parameters", () => {
     }),
     {
       landing_version: "v2",
+      traffic_type: "external",
       experience_type: "globe",
       active_duration_ms: 23740,
       unique_memories_opened: 3,
       last_completed_step: "memory_open",
     },
   );
+});
+
+test("persists and clears the analytics-only internal traffic marker", () => {
+  const storage = createMemoryStorage();
+
+  assert.equal(resolveTrafficType({ search: "?internal=1", storage }), "internal");
+  assert.equal(resolveTrafficType({ storage }), "internal");
+  assert.equal(resolveTrafficType({ search: "?internal=0", storage }), "external");
+  assert.equal(resolveTrafficType({ storage }), "external");
+});
+
+test("ignores unsupported internal query values", () => {
+  const storage = createMemoryStorage("1");
+
+  assert.equal(resolveTrafficType({ search: "?internal=true", storage }), "internal");
+  assert.equal(resolveTrafficType({ search: "?internal=false", storage }), "internal");
 });
 
 test("keeps PostHog limited to anonymous explicit product events", () => {
