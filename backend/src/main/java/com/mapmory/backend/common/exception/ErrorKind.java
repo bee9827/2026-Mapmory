@@ -1,0 +1,11 @@
+package com.mapmory.backend.common.exception;
+
+public enum ErrorKind {
+    INVALID_INPUT,
+    AUTHENTICATION_REQUIRED,
+    ACCESS_DENIED,
+    NOT_FOUND,
+    CONFLICT,
+    TOO_MANY_REQUESTS,
+    SERVICE_UNAVAILABLE
+}
