@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun TripRecordDetailRoute(
     recordId: Long,
+    tripRecordRevision: Long,
     viewModel: TripRecordDetailViewModel,
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
@@ -23,7 +24,7 @@ internal fun TripRecordDetailRoute(
 ) {
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(viewModel, recordId) {
+    LaunchedEffect(viewModel, recordId, tripRecordRevision) {
         viewModel.load(recordId)
     }
 

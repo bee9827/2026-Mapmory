@@ -23,10 +23,6 @@ class TripRecordListViewModel(
     var query by mutableStateOf(TripRecordQuery())
         private set
 
-    fun updateKeyword(keyword: String) {
-        query = query.copy(keyword = keyword.ifBlank { null }, page = 0)
-    }
-
     fun filterByLocation(locationId: Long?) {
         query = query.copy(locationId = locationId, page = 0)
     }
@@ -38,6 +34,17 @@ class TripRecordListViewModel(
         load()
     }
 
+    suspend fun refresh(locationId: Long?) {
+        if (!isRouteInitialized) {
+            initialize(locationId)
+            return
+        }
+        if (query.locationId != locationId) {
+            filterByLocation(locationId)
+        }
+        load()
+    }
+
     suspend fun load(query: TripRecordQuery = this.query) {
         this.query = query
         uiState = TripRecordListUiState.Loading
@@ -46,7 +53,9 @@ class TripRecordListViewModel(
                 TripRecordListUiState.Success(
                     records = page.records.map { record ->
                         record.toTripRecordItemUiState(
-                            locationName = regionCatalog?.findById(record.locationId)?.name ?: "여행지",
+                            locationName = record.regionName
+                                ?: record.locationId?.let { regionCatalog?.findById(it)?.name }
+                                ?: "여행지",
                         )
                     },
                     page = page.page,
