@@ -1,9 +1,9 @@
-# Android 모니터링 기준
+# 모바일 모니터링 기준
 
 ## 목적
 
-Mapmory Android 앱의 기능 오류와 성능 저하를 같은 기준으로 확인한다.
-현재는 Firebase 같은 원격 SDK를 추가하지 않고, CI·Android Vitals·Logcat·System Trace를 조합한다.
+Mapmory Android·iOS 앱의 기능 오류와 성능 저하를 같은 기준으로 확인한다.
+현재는 Firebase 같은 원격 SDK를 추가하지 않고, CI·Android Vitals·Logcat·Xcode Console·System Trace를 조합한다.
 
 모니터링은 사용자 행동 분석과 구분한다.
 
@@ -14,11 +14,13 @@ Mapmory Android 앱의 기능 오류와 성능 저하를 같은 기준으로 확
 
 - PR 단계의 CI 검증 방법을 정의했다.
 - 사진 추천 흐름의 기존 `MapmoryPhotoPerf` 로그와 측정 문서를 연결했다.
+- iOS 사진 선택·추천 흐름에도 동일한 `MapmoryPhotoPerf` 측정 로그를 추가했다.
+- Android 앱 시작 시간을 cold start와 hot start로 반복 측정하는 로컬 스크립트를 추가했다.
 - 지도 선택 정확성, 사진 추천, 기록 저장을 우선 모니터링 대상으로 정했다.
 - 개인정보를 포함하지 않는 로그 규칙을 정했다.
 - Firebase와 같은 원격 SDK는 현재 범위에서 제외했다.
 
-이 문서는 현재 MVP의 개발·출시 전 검증 기준이다. Macrobenchmark와 원격 오류 수집은 실제 필요성이 확인된 뒤 별도 작업으로 추가한다.
+이 문서는 현재 MVP의 개발·출시 전 검증 기준이다. 지도 전환을 자동 반복하는 Macrobenchmark와 원격 오류 수집은 별도 도입 조건이 충족될 때 추가한다.
 
 ## 모니터링 계층
 
@@ -26,6 +28,7 @@ Mapmory Android 앱의 기능 오류와 성능 저하를 같은 기준으로 확
 | --- | --- | --- |
 | PR 병합 전 | GitHub Actions CI | 테스트, Lint, Debug 빌드 |
 | 개발 중 | `MapmoryPhotoPerf`, Logcat, `android.os.Trace` | 사진 조회·EXIF·추천 단계별 시간 |
+| iOS 개발 중 | `MapmoryPhotoPerf`, Xcode Console | PHPicker·PhotoKit 사진 선택·추천 시간 |
 | 성능 조사 | System Trace·Perfetto·Macrobenchmark | 앱 시작, 지도 전환, UI 응답성 |
 | Play 배포 후 | Play Console Android Vitals | 크래시, ANR, 시작 시간, 렌더링, 메모리 |
 
@@ -106,6 +109,46 @@ adb -s <serial> logcat -v time -s MapmoryPhotoPerf:D
 - 위도·경도 원본 좌표
 - 회원 식별 정보
 
+## iOS 사진 성능 로그
+
+iOS의 `PHPicker`와 `PhotoKit` 흐름도 Debug 빌드에서만 `MapmoryPhotoPerf` 로그를 남긴다. 로그에는 사진 데이터나 좌표를 포함하지 않고 처리 시간과 개수만 포함한다.
+
+Xcode에서는 Debug Console에서 `MapmoryPhotoPerf`를 검색한다. 부팅된 Simulator에서는 다음 명령으로 같은 로그를 확인할 수 있다.
+
+```bash
+xcrun simctl spawn booted log stream --style compact \
+  --predicate 'eventMessage contains "MapmoryPhotoPerf"'
+```
+
+직접 사진 선택을 완료하거나 취소하면 다음 형식이 출력된다.
+
+```text
+MapmoryPhotoPerf pick_total_ms=... requested_photos=... loaded_photos=...
+```
+
+위치 기반 추천을 완료하거나 빈 결과가 나오면 다음 형식이 출력된다.
+
+```text
+MapmoryPhotoPerf recommend_total_ms=... recommended_photos=...
+```
+
+Android 로그와 iOS 로그는 플랫폼별 API 차이를 숨기지 않고 같은 측정 이름을 사용한다. 따라서 같은 사진 수·같은 기기 조건에서 플랫폼별 처리 시간과 성공 개수를 비교할 수 있다.
+
+## Android 앱 시작 시간 측정
+
+`adb shell am start -W`를 사용해 앱 시작 시간을 반복 측정한다. `cold`는 매 회 앱 프로세스를 종료한 뒤 실행하고, `hot`은 실행 중인 앱을 다시 여는 조건이다.
+
+`client` 디렉터리에서 실행한다.
+
+```bash
+bash tools/monitoring/measure_android_startup.sh <adb-serial>
+
+# 반복 횟수 변경
+RUNS=10 bash tools/monitoring/measure_android_startup.sh <adb-serial>
+```
+
+스크립트는 각 회의 `total_ms`와 평균·중앙값·최댓값을 출력한다. 같은 기기와 같은 Debug APK에서 측정하고, 변경 전후 중앙값과 최댓값을 비교한다. 이 스크립트는 성능 기준선을 수집하는 로컬 도구이며 CI의 통과·실패를 결정하지 않는다.
+
 ## 실행 주기
 
 | 시점 | 실행 항목 |
@@ -114,10 +157,10 @@ adb -s <serial> logcat -v time -s MapmoryPhotoPerf:D
 | 사진·Room 수정 | 사진 메타데이터 자동화 테스트와 실기기 로그 확인 |
 | 지도 렌더링·탐색 수정 | 지도 선택 계측 테스트와 System Trace 확인 |
 | PR 생성·수정 | CI의 테스트·Lint·Debug 빌드 |
-| 릴리스 전 | 대표 기기 스모크 테스트와 Play Console 사전 출시 보고서 확인 |
+| 릴리스 전 | 대표 기기 스모크 테스트, Android 시작 시간 측정, Play Console 사전 출시 보고서 확인 |
 | 릴리스 후 | Android Vitals에서 크래시·ANR·성능 이상 확인 |
 
-## Firebase 도입 판단
+## 원격 모니터링 도입 판단
 
 Firebase는 백엔드 API나 데이터베이스를 대신하지 않는다.
 
@@ -126,13 +169,13 @@ Firebase는 백엔드 API나 데이터베이스를 대신하지 않는다.
 - Analytics: 기능 사용 흐름을 분석한다.
 - Performance: 앱 시작과 네트워크 등 성능을 원격으로 수집한다.
 
-현재 MVP에서는 Play Console Android Vitals와 기존 로컬 로그로 시작한다.
-실제 사용자 환경의 오류 원인을 원격으로 추적해야 할 때 Crashlytics 도입을 별도 결정한다.
-도입하면 개인정보처리방침과 Play Console 데이터 보안 응답을 함께 갱신한다.
+현재 MVP에는 Firebase 프로젝트 설정과 원격 오류 수집 동의가 없으므로 Firebase SDK를 추가하지 않는다. Play 배포 후 Android는 Android Vitals, 개발 중 Android·iOS는 로컬 로그로 확인한다.
+
+실제 사용자 환경에서 재현되지 않는 오류를 원격으로 추적해야 할 때 Crashlytics 도입을 별도 결정한다. 도입하면 Firebase 설정 파일, CI 비밀값, 개인정보처리방침과 Play Console 데이터 보안 응답을 함께 갱신해야 한다.
 
 ## 후속 작업
 
-1. 이 기준으로 현재 사진 추천 로그를 다시 측정해 기준선을 만든다.
-2. 앱 시작과 지도 전환에 Macrobenchmark를 추가한다.
+1. 이 기준으로 Android·iOS 사진 추천 로그를 같은 데이터 조건에서 측정해 기준선을 만든다.
+2. 지도 전환 지연이 반복적으로 확인되고 전용 테스트 기기 환경을 운영할 수 있을 때 Macrobenchmark를 추가한다.
 3. 비공개·프로덕션 테스트에서 Android Vitals를 주기적으로 확인한다.
 4. 원격 오류 추적이 필요해지는 시점에만 Crashlytics를 검토한다.
