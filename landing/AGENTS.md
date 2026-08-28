@@ -25,6 +25,7 @@ When implementing from a selected generated mock, treat that image as the source
 - Keep the globe and photo preview concise. The next product-proof step must use the real app's 대한민국/전세계 scope pattern and the same 17-region boundary data as the Kotlin client.
 - Do not pin, lock, or hijack scrolling in the globe experience. The globe CTA should align the complete experience stage cleanly in the viewport, and the section title should stay on one line where the viewport allows it.
 - Confine the first-use globe instruction overlay to the globe canvas; never dim or block the entire landing viewport.
+- Show the globe instruction once on the first 3D experience entry of every page load. Dismiss it for the current page only; never persist its dismissal in session or local storage.
 - On mobile, keep the globe as the only default world-experience surface. Let the selected country's gold color and raised polygon motion finish before replacing the globe in-place with the separate memory panel. Make the return-to-globe control unmistakable, and never advance to the Korea experience without an explicit user action.
 - The Korea experience is hierarchical in one surface: 17-province map (level 2) → the selected province's real city/county/district boundary map (level 3) → back to the province map. Reuse the client district JSON instead of drawing approximate boundaries.
 - Do not show a fake editor, collection form, or recording workflow that differs from the shipping client.
