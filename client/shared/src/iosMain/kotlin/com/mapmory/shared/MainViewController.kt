@@ -8,7 +8,9 @@ import com.mapmory.shared.app.createGuestRemoteAppContainer
 import com.mapmory.shared.data.auth.IosAuthTokenStore
 import com.mapmory.shared.data.media.IosPhotoPreviewCache
 
-fun MainViewController() = createGuestRemoteAppContainer(
+fun MainViewController(
+    onThemeChanged: (Boolean) -> Unit,
+) = createGuestRemoteAppContainer(
     tokenStore = IosAuthTokenStore(),
     photoPreviewCache = IosPhotoPreviewCache(),
 ).let { container ->
@@ -16,9 +18,11 @@ fun MainViewController() = createGuestRemoteAppContainer(
         DisposableEffect(container) {
             onDispose(container::close)
         }
+
         MapmoryApp(
             container = container,
             contentWindowInsets = WindowInsets.safeDrawing,
+            onThemeChanged = onThemeChanged,
         )
     }
 }
