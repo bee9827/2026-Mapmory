@@ -2,8 +2,10 @@ package com.mapmory.android
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.photo.PhotoLibraryActions
@@ -114,6 +116,34 @@ class PhotoRecommendationFlowTest {
         composeRule.onNodeWithText("사진을 추천받으려면 장소를 먼저 선택해 주세요.")
             .assertIsDisplayed()
         composeRule.runOnIdle { assertEquals(0, recommendationCalls) }
+    }
+
+    @Test
+    fun `기록_여행지는_국내_시도를_제외하고_시군구만_선택할_수_있다`() {
+        val seoul = province()
+        val gangnam = district(parentId = seoul.id)
+        var selectedLocation: Location? = null
+
+        composeRule.setContent {
+            TripRecordEditorScreen(
+                uiState = TripRecordEditorUiState(),
+                locations = listOf(seoul, gangnam),
+                onLocationSelected = { selectedLocation = it },
+                onTitleChanged = {},
+                onContentChanged = {},
+                onStartDateChanged = {},
+                onEndDateChanged = {},
+                onSaveClick = {},
+                onBackClick = {},
+            )
+        }
+
+        composeRule.onNodeWithText("여행 장소를 선택해 주세요").performClick()
+
+        assertEquals(0, composeRule.onAllNodesWithText("서울특별시").fetchSemanticsNodes().size)
+        composeRule.onNodeWithText("장소명 또는 코드 검색").performTextInput("서울특별시")
+        composeRule.onNodeWithText("강남구").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(gangnam, selectedLocation) }
     }
 
     private fun province() = Location(

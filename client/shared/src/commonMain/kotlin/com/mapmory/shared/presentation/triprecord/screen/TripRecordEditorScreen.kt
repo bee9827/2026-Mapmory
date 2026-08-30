@@ -70,6 +70,7 @@ import com.mapmory.shared.presentation.date.PlatformDatePicker
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+import com.mapmory.shared.presentation.triprecord.selectableTripRecordDestinations
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewLocations
 
@@ -124,9 +125,7 @@ fun TripRecordEditorScreen(
     modifier: Modifier = Modifier,
 ) {
     val selectableLocations = remember(locations) {
-        locations
-            .filter { it.type == LocationType.PROVINCE || it.type == LocationType.DISTRICT }
-            .distinctBy(Location::regionCode)
+        locations.selectableTripRecordDestinations()
     }
     var showLocationSheet by remember { mutableStateOf(false) }
     var locationSearchQuery by rememberSaveable { mutableStateOf("") }
@@ -166,10 +165,11 @@ fun TripRecordEditorScreen(
         { progress -> photoLoadingProgress = progress },
     )
     val locationResultsListState = rememberLazyListState()
-    val filteredLocations = remember(locationSearchQuery, selectableLocations) {
+    val filteredLocations = remember(locationSearchQuery, selectableLocations, locations) {
         selectableLocations.filter { location ->
             locationSearchQuery.isBlank() ||
                 location.name.contains(locationSearchQuery, ignoreCase = true) ||
+                location.displayName(locations).contains(locationSearchQuery, ignoreCase = true) ||
                 location.regionCode.contains(locationSearchQuery, ignoreCase = true)
         }
     }
@@ -329,7 +329,7 @@ fun TripRecordEditorScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "국가, 시·도, 시·군·구를 검색해 보세요",
+                    text = "해외 국가 또는 국내 시·군·구를 검색해 보세요",
                     color = TripRecordPalette.current.muted,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 6.dp),
