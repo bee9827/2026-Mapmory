@@ -20,6 +20,7 @@ actual fun PlatformDatePicker(
     visible: Boolean,
     initialDate: String?,
     minimumDate: String?,
+    maximumDate: String?,
     onDateSelected: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -28,7 +29,7 @@ actual fun PlatformDatePicker(
     val latestOnDismiss by rememberUpdatedState(onDismiss)
     var dialog by remember { mutableStateOf<DatePickerDialog?>(null) }
 
-    DisposableEffect(visible, initialDate, minimumDate) {
+    DisposableEffect(visible, initialDate, minimumDate, maximumDate) {
         if (!visible) {
             onDispose { }
         } else {
@@ -52,6 +53,10 @@ actual fun PlatformDatePicker(
                 .toDatePickerLocalDate()
                 ?.toDatePickerEpochMillis()
                 ?.let { picker.datePicker.minDate = it }
+            maximumDate
+                .toDatePickerLocalDate()
+                ?.toDatePickerEpochMillis()
+                ?.let { picker.datePicker.maxDate = it }
             picker.setOnDismissListener {
                 if (!callbackSent) latestOnDismiss()
                 if (dialog === picker) dialog = null
