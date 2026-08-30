@@ -72,7 +72,7 @@ class PhotoLibraryTest {
     }
 
     @Test
-    fun `추천_결과는_최신_입력_순서를_유지하고_열두_개에서_멈춘다`() {
+    fun `추천_결과는_최신_입력_순서를_유지하고_모든_일치_사진을_반환한다`() {
         val region = PhotoRecommendationRegion(
             code = "test",
             rings = listOf(square(left = 0f, bottom = 0f, right = 10f, top = 10f)),
@@ -86,7 +86,7 @@ class PhotoLibraryTest {
 
         val selected = selectPhotosInRegion(candidates, region)
 
-        assertEquals((1..12).map { "inside-$it" }, selected)
+        assertEquals((1..20).map { "inside-$it" }, selected)
     }
 
     @Test

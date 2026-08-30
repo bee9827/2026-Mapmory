@@ -40,14 +40,13 @@ internal data class LocatedPhoto<T>(
 internal fun <T> selectPhotosInRegion(
     candidatesNewestFirst: Sequence<LocatedPhoto<T>>,
     region: PhotoRecommendationRegion,
-    limit: Int = MaxRecommendedPhotos,
+    limit: Int? = null,
 ): List<T> {
-    if (limit <= 0) return emptyList()
-    return candidatesNewestFirst
+    if (limit != null && limit <= 0) return emptyList()
+    val matchingPhotos = candidatesNewestFirst
         .filter { candidate -> region.contains(candidate.latitude, candidate.longitude) }
         .map(LocatedPhoto<T>::value)
-        .take(limit)
-        .toList()
+    return if (limit == null) matchingPhotos.toList() else matchingPhotos.take(limit).toList()
 }
 
 internal suspend fun Location.photoRecommendationRegion(): PhotoRecommendationRegion? {
@@ -124,7 +123,6 @@ private fun pointOnSegment(point: GeoPoint, start: GeoPoint, end: GeoPoint): Boo
         point.latitude in minOf(start.latitude, end.latitude)..maxOf(start.latitude, end.latitude)
 }
 
-internal const val MaxRecommendedPhotos = 12
 private const val KoreaCountryId = 1L
 private const val KoreanProvinceCodeLength = 2
 private const val MinimumRingPointCount = 3

@@ -63,10 +63,11 @@ import kotlinx.coroutines.withContext
 @Composable
 actual fun rememberPhotoLibraryActions(
     onPhotosPicked: (List<SelectedPhoto>) -> Unit,
-    onPhotosRecommended: (List<SelectedPhoto>) -> Unit,
+    onPhotosRecommended: (PhotoRecommendationPage) -> Unit,
     onMessage: (String) -> Unit,
     onLoadingChanged: (Boolean) -> Unit,
     @Suppress("UNUSED_PARAMETER") onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
+    onRecommendationLoadingChanged: (Boolean) -> Unit,
 ): PhotoLibraryActions {
     val scope = rememberCoroutineScope()
     val controller = remember(scope) { IosPhotoLibraryController(scope) }
@@ -74,25 +75,53 @@ actual fun rememberPhotoLibraryActions(
     controller.onPhotosRecommended = onPhotosRecommended
     controller.onMessage = onMessage
     controller.onLoadingChanged = onLoadingChanged
+    controller.onRecommendationLoadingChanged = onRecommendationLoadingChanged
 
     return remember(controller) {
         PhotoLibraryActions(
             pickFromGallery = controller::presentPicker,
             recommendForLocation = controller::recommend,
+            loadNextRecommendationPage = controller::loadNextRecommendationPage,
             prepareForAdding = controller::prepareForAdding,
+            cancelRecommendation = controller::cancelRecommendation,
         )
     }
+}
+
+private data class IosRecommendationSession(
+    val generation: Int,
+    val assets: List<PHAsset>,
+    val nextIndex: Int = 0,
+) {
+    val hasMore: Boolean
+        get() = nextIndex < assets.size
+}
+
+private data class IosRecommendationPage(
+    val generation: Int,
+    val photos: List<SelectedPhoto>,
+    val nextIndex: Int,
+    val hasMore: Boolean,
+) {
+    fun asPublicPage(): PhotoRecommendationPage = PhotoRecommendationPage(
+        generation = generation,
+        photos = photos,
+        hasMore = hasMore,
+    )
 }
 
 private class IosPhotoLibraryController(
     private val scope: CoroutineScope,
 ) : NSObject(), PHPickerViewControllerDelegateProtocol {
     var onPhotosPicked: (List<SelectedPhoto>) -> Unit = {}
-    var onPhotosRecommended: (List<SelectedPhoto>) -> Unit = {}
+    var onPhotosRecommended: (PhotoRecommendationPage) -> Unit = {}
     var onMessage: (String) -> Unit = {}
     var onLoadingChanged: (Boolean) -> Unit = {}
+    var onRecommendationLoadingChanged: (Boolean) -> Unit = {}
     private var recommendationJob: Job? = null
     private var recommendationGeneration = 0
+    private var recommendationSession: IosRecommendationSession? = null
+    private var isRecommendationPageLoading = false
 
     fun presentPicker() {
         val presenter = topViewController() ?: run {
@@ -162,6 +191,9 @@ private class IosPhotoLibraryController(
     private fun findRecommendations(location: Location) {
         recommendationJob?.cancel()
         val generation = ++recommendationGeneration
+        recommendationSession = null
+        isRecommendationPageLoading = true
+        onRecommendationLoadingChanged(true)
         onLoadingChanged(true)
         recommendationJob = scope.launch {
             val region = withContext(Dispatchers.Default) {
@@ -169,25 +201,57 @@ private class IosPhotoLibraryController(
             }
             if (region == null) {
                 onMessage("선택한 장소의 경계를 확인하지 못했어요.")
-                onLoadingChanged(false)
+                if (generation == recommendationGeneration) {
+                    finishRecommendationLoading()
+                }
                 return@launch
             }
             val matchingAssets = withContext(Dispatchers.Default) {
                 findAssetsInRegion(region)
             }
             if (generation != recommendationGeneration) return@launch
-            if (matchingAssets.isEmpty()) {
-                onPhotosRecommended(emptyList())
-                onLoadingChanged(false)
-            } else {
-                loadAssetPreviews(matchingAssets) { photos ->
-                    if (generation == recommendationGeneration) {
-                        onPhotosRecommended(photos)
-                        onLoadingChanged(false)
-                    }
+            val session = IosRecommendationSession(generation, matchingAssets)
+            recommendationSession = session
+            loadRecommendationPage(session) { page ->
+                if (generation == recommendationGeneration) {
+                    recommendationSession = session.copy(nextIndex = page.nextIndex)
+                    onPhotosRecommended(page.asPublicPage())
+                    finishRecommendationLoading()
                 }
             }
         }
+    }
+
+    fun loadNextRecommendationPage() {
+        val session = recommendationSession ?: return
+        if (!session.hasMore || isRecommendationPageLoading) return
+        val generation = session.generation
+        isRecommendationPageLoading = true
+        onRecommendationLoadingChanged(true)
+        onLoadingChanged(true)
+        recommendationJob = scope.launch {
+            loadRecommendationPage(session) { page ->
+                if (generation == recommendationGeneration) {
+                    recommendationSession = session.copy(nextIndex = page.nextIndex)
+                    onPhotosRecommended(page.asPublicPage())
+                    finishRecommendationLoading()
+                }
+            }
+        }
+    }
+
+    fun cancelRecommendation() {
+        ++recommendationGeneration
+        recommendationJob?.cancel()
+        recommendationJob = null
+        finishRecommendationLoading()
+    }
+
+    private fun finishRecommendationLoading() {
+        isRecommendationPageLoading = false
+        recommendationJob = null
+        onRecommendationLoadingChanged(false)
+        onLoadingChanged(false)
     }
 
     private fun findAssetsInRegion(region: PhotoRecommendationRegion): List<PHAsset> {
@@ -203,8 +267,25 @@ private class IosPhotoLibraryController(
                     region.contains(latitude = latitude, longitude = longitude)
                 }
                 if (matches) add(asset)
-                if (size >= MaxRecommendedPhotos) break
             }
+        }
+    }
+
+    private fun loadRecommendationPage(
+        session: IosRecommendationSession,
+        completion: (IosRecommendationPage) -> Unit,
+    ) {
+        val startIndex = session.nextIndex
+        val endIndex = (startIndex + PhotoRecommendationPageSize).coerceAtMost(session.assets.size)
+        loadAssetPreviews(session.assets.subList(startIndex, endIndex)) { photos ->
+            completion(
+                IosRecommendationPage(
+                    generation = session.generation,
+                    photos = photos,
+                    nextIndex = endIndex,
+                    hasMore = endIndex < session.assets.size,
+                ),
+            )
         }
     }
 
@@ -246,6 +327,10 @@ private class IosPhotoLibraryController(
         assets: List<PHAsset>,
         completion: (List<SelectedPhoto>) -> Unit,
     ) {
+        if (assets.isEmpty()) {
+            completion(emptyList())
+            return
+        }
         val loaded = MutableList<SelectedPhoto?>(assets.size) { null }
         var remaining = assets.size
         assets.forEachIndexed { index, asset ->
