@@ -81,7 +81,13 @@ private class IosDatePickerPresenter {
         minimumDate: String?,
         maximumDate: String?,
     ): Boolean {
-        if (controller != null) return true
+        controller?.let { existingController ->
+            existingController.updateDateBounds(
+                minimumDate = minimumDate.toIosDate(),
+                maximumDate = maximumDate.toIosDate(),
+            )
+            return true
+        }
 
         val presenter = topViewControllerForDatePicker() ?: return false
         val pickerController = IosDatePickerViewController(
@@ -171,6 +177,11 @@ private class IosDatePickerViewController(
     fun dismissSilently() {
         didFinish = true
         dismissViewControllerAnimated(true, completion = null)
+    }
+
+    fun updateDateBounds(minimumDate: NSDate?, maximumDate: NSDate?) {
+        datePicker.minimumDate = minimumDate
+        datePicker.maximumDate = maximumDate
     }
 
     override fun viewDidDisappear(animated: Boolean) {

@@ -27,6 +27,31 @@ class TripRecordDateSelectionTest {
     }
 
     @Test
+    fun `시작일은_종료일과_오늘_중_빠른_날짜까지_선택할_수_있다`() {
+        assertEquals(
+            "2026-08-10",
+            startDatePickerMaximumDate(
+                endDate = "2026-08-10",
+                today = "2026-08-28",
+            ),
+        )
+        assertEquals(
+            "2026-08-28",
+            startDatePickerMaximumDate(
+                endDate = "2026-09-03",
+                today = "2026-08-28",
+            ),
+        )
+        assertEquals(
+            "2026-08-28",
+            startDatePickerMaximumDate(
+                endDate = null,
+                today = "2026-08-28",
+            ),
+        )
+    }
+
+    @Test
     fun `피커_초기값은_시작일과_오늘_사이로_보정한다`() {
         assertEquals(
             "2026-08-20",

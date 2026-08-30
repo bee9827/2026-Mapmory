@@ -13,6 +13,17 @@ internal fun endDatePickerMinimumDate(
     return minOf(todayDate, selectedStartDate).toString()
 }
 
+internal fun startDatePickerMaximumDate(
+    endDate: String?,
+    today: String,
+): String {
+    val todayDate = requireNotNull(today.toDatePickerLocalDate()) {
+        "오늘 날짜 형식이 올바르지 않습니다: $today"
+    }
+    val selectedEndDate = endDate.toDatePickerLocalDate()
+    return minOf(todayDate, selectedEndDate ?: todayDate).toString()
+}
+
 internal fun initialSelectableTripRecordDate(
     selectedDate: String?,
     fallbackDate: String,

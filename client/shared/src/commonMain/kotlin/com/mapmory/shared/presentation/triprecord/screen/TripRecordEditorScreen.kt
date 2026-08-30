@@ -69,6 +69,7 @@ import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
 import com.mapmory.shared.presentation.date.PlatformDatePicker
 import com.mapmory.shared.presentation.triprecord.endDatePickerMinimumDate
 import com.mapmory.shared.presentation.triprecord.initialSelectableTripRecordDate
+import com.mapmory.shared.presentation.triprecord.startDatePickerMaximumDate
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
@@ -484,6 +485,11 @@ fun TripRecordEditorScreen(
     } else {
         null
     }
+    val maximumDate = if (activeDatePickerTarget == StartDatePickerTarget) {
+        startDatePickerMaximumDate(uiState.endDate, today)
+    } else {
+        today
+    }
     val selectedDate = when (activeDatePickerTarget) {
         StartDatePickerTarget -> uiState.startDate
         EndDatePickerTarget -> uiState.endDate
@@ -495,10 +501,10 @@ fun TripRecordEditorScreen(
             selectedDate = selectedDate,
             fallbackDate = today,
             minimumDate = minimumDate,
-            maximumDate = today,
+            maximumDate = maximumDate,
         ),
         minimumDate = minimumDate,
-        maximumDate = today,
+        maximumDate = maximumDate,
         onDateSelected = { date ->
             if (isStartDatePicker) {
                 onStartDateChanged(date)

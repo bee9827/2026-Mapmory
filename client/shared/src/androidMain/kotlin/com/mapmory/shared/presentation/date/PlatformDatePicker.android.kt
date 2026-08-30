@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
@@ -51,11 +52,11 @@ actual fun PlatformDatePicker(
             )
             minimumDate
                 .toDatePickerLocalDate()
-                ?.toDatePickerEpochMillis()
+                ?.toDatePickerLocalEpochMillis()
                 ?.let { picker.datePicker.minDate = it }
             maximumDate
                 .toDatePickerLocalDate()
-                ?.toDatePickerEpochMillis()
+                ?.toDatePickerLocalEpochMillis()
                 ?.let { picker.datePicker.maxDate = it }
             picker.setOnDismissListener {
                 if (!callbackSent) latestOnDismiss()
@@ -73,3 +74,6 @@ actual fun PlatformDatePicker(
         }
     }
 }
+
+private fun LocalDate.toDatePickerLocalEpochMillis(): Long =
+    atStartOfDayIn(TimeZone.currentSystemDefault()).toEpochMilliseconds()
