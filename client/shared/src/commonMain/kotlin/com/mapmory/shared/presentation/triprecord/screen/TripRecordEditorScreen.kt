@@ -67,12 +67,17 @@ import com.mapmory.shared.presentation.photo.PhotoLoadingProgress
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
 import com.mapmory.shared.presentation.date.PlatformDatePicker
+import com.mapmory.shared.presentation.triprecord.endDatePickerMinimumDate
+import com.mapmory.shared.presentation.triprecord.initialSelectableTripRecordDate
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
 import com.mapmory.shared.presentation.triprecord.selectableTripRecordDestinations
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewLocations
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 private const val StartDatePickerTarget = "start"
 private const val EndDatePickerTarget = "end"
@@ -468,18 +473,32 @@ fun TripRecordEditorScreen(
 
     val activeDatePickerTarget = datePickerTarget
     val isStartDatePicker = activeDatePickerTarget == StartDatePickerTarget
+    val today = remember(activeDatePickerTarget) {
+        Clock.System.now()
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+            .toString()
+    }
+    val minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
+        endDatePickerMinimumDate(uiState.startDate, today)
+    } else {
+        null
+    }
+    val selectedDate = when (activeDatePickerTarget) {
+        StartDatePickerTarget -> uiState.startDate
+        EndDatePickerTarget -> uiState.endDate
+        else -> null
+    }
     PlatformDatePicker(
         visible = activeDatePickerTarget != null,
-        initialDate = when {
-            isStartDatePicker -> uiState.startDate
-            activeDatePickerTarget == EndDatePickerTarget -> uiState.endDate
-            else -> null
-        },
-        minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
-            uiState.startDate
-        } else {
-            null
-        },
+        initialDate = initialSelectableTripRecordDate(
+            selectedDate = selectedDate,
+            fallbackDate = today,
+            minimumDate = minimumDate,
+            maximumDate = today,
+        ),
+        minimumDate = minimumDate,
+        maximumDate = today,
         onDateSelected = { date ->
             if (isStartDatePicker) {
                 onStartDateChanged(date)
