@@ -70,7 +70,7 @@ fun TripRecordDetailScreen(
                     TripRecordDetailUiState.Loading,
                     TripRecordDetailUiState.Deleting,
                     -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = TripRecordPalette.accent)
+                        CircularProgressIndicator(color = TripRecordPalette.current.accent)
                     }
 
                     is TripRecordDetailUiState.Error -> Column(
@@ -80,7 +80,7 @@ fun TripRecordDetailScreen(
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(uiState.message, color = TripRecordPalette.danger)
+                        Text(uiState.message, color = TripRecordPalette.current.danger)
                         TextButton(onClick = onBackClick) { Text("목록으로") }
                     }
 
@@ -110,7 +110,7 @@ fun TripRecordDetailScreen(
                         onDeleteClick()
                     },
                 ) {
-                    Text("삭제", color = TripRecordPalette.danger)
+                    Text("삭제", color = TripRecordPalette.current.danger)
                 }
             },
             dismissButton = {
@@ -223,7 +223,7 @@ private fun PhotoPageIndicator(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
             .background(
-                color = TripRecordPalette.background.copy(alpha = 0.72f),
+                color = TripRecordPalette.current.background.copy(alpha = 0.72f),
                 shape = RoundedCornerShape(12.dp),
             )
             .padding(horizontal = 9.dp, vertical = 7.dp),
@@ -234,9 +234,9 @@ private fun PhotoPageIndicator(
                     .size(if (page == currentPage) 7.dp else 5.dp)
                     .background(
                         color = if (page == currentPage) {
-                            TripRecordPalette.accent
+                            TripRecordPalette.current.accent
                         } else {
-                            TripRecordPalette.muted.copy(alpha = 0.7f)
+                            TripRecordPalette.current.muted.copy(alpha = 0.7f)
                         },
                         shape = CircleShape,
                     ),
@@ -275,8 +275,8 @@ private fun DetailBackButton(
         label = "←",
         contentDescription = "뒤로가기",
         onClick = onClick,
-        containerColor = TripRecordPalette.surface.copy(alpha = 0.5f),
-        contentColor = TripRecordPalette.contentOnMedia,
+        containerColor = TripRecordPalette.current.surface.copy(alpha = 0.5f),
+        contentColor = TripRecordPalette.current.contentOnMedia,
         modifier = modifier,
     )
 }
@@ -294,8 +294,8 @@ private fun DetailMoreButton(
             label = "•••",
             contentDescription = "더보기",
             onClick = { expanded = true },
-            containerColor = TripRecordPalette.surface.copy(alpha = 0.5f),
-            contentColor = TripRecordPalette.contentOnMedia,
+            containerColor = TripRecordPalette.current.surface.copy(alpha = 0.5f),
+            contentColor = TripRecordPalette.current.contentOnMedia,
         )
         DropdownMenu(
             expanded = expanded,
@@ -309,7 +309,7 @@ private fun DetailMoreButton(
                 },
             )
             DropdownMenuItem(
-                text = { Text("삭제", color = TripRecordPalette.danger) },
+                text = { Text("삭제", color = TripRecordPalette.current.danger) },
                 onClick = {
                     expanded = false
                     onDeleteClick()
@@ -332,7 +332,7 @@ private fun TripRecordBottomCard(
     Column(
         modifier = modifier
             .background(
-                color = TripRecordPalette.surface,
+                color = TripRecordPalette.current.surface,
                 shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
             )
             .verticalScroll(scrollState)
@@ -348,28 +348,28 @@ private fun TripRecordBottomCard(
             RecordMetadataChip(
                 text = record.locationName,
                 icon = RecordMetadataIcon.Location,
-                containerColor = TripRecordPalette.accentSoft,
-                contentColor = TripRecordPalette.accent,
+                containerColor = TripRecordPalette.current.accentSoft,
+                contentColor = TripRecordPalette.current.accent,
                 modifier = Modifier.weight(weight = 1f, fill = false),
             )
             dateRange?.let {
                 RecordMetadataChip(
                     text = it,
                     icon = RecordMetadataIcon.Date,
-                    containerColor = TripRecordPalette.metadataDateBackground,
-                    contentColor = TripRecordPalette.text,
+                    containerColor = TripRecordPalette.current.metadataDateBackground,
+                    contentColor = TripRecordPalette.current.text,
                 )
             }
         }
         Text(
             text = record.title,
-            color = TripRecordPalette.text,
+            color = TripRecordPalette.current.text,
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
         )
         Text(
             text = record.content,
-            color = TripRecordPalette.muted,
+            color = TripRecordPalette.current.muted,
             fontSize = 14.sp,
             modifier = Modifier.padding(top = 8.dp),
         )

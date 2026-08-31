@@ -3,6 +3,7 @@ package com.mapmory.android
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.mapmory.shared.data.auth.AndroidAuthTokenStore
+import com.mapmory.shared.data.media.AndroidPhotoPreviewCache
 import com.mapmory.shared.app.AppContainer
 import com.mapmory.shared.app.MAPMORY_API_BASE_URL
 import com.mapmory.shared.app.createGuestRemoteAppContainer
@@ -15,6 +16,7 @@ class MapmoryAppViewModel(application: Application) : AndroidViewModel(applicati
     val container: AppContainer = createGuestRemoteAppContainer(
         apiBaseUrl = configuredApiBaseUrl,
         tokenStore = AndroidAuthTokenStore(application),
+        photoPreviewCache = AndroidPhotoPreviewCache(application),
     )
 
     override fun onCleared() {

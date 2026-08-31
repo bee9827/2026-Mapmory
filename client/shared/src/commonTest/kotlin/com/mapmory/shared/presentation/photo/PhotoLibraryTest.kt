@@ -1,9 +1,13 @@
 package com.mapmory.shared.presentation.photo
 
+import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.GeoPoint
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -72,7 +76,24 @@ class PhotoLibraryTest {
     }
 
     @Test
-    fun `추천_결과는_최신_입력_순서를_유지하고_모든_일치_사진을_반환한다`() {
+    fun `경계가_없는_지역은_빈_추천이_아니라_예외를_발생시킨다`() = runBlocking {
+        val unknown = Location(
+            id = -1,
+            countryId = 1,
+            parentId = null,
+            regionCode = "99999",
+            name = "알 수 없는 지역",
+            type = LocationType.DISTRICT,
+        )
+
+        assertFailsWith<PhotoRecommendationRegionNotFoundException> {
+            unknown.photoRecommendationRegion()
+        }
+        Unit
+    }
+
+    @Test
+    fun `추천_결과는_최신_입력_순서를_유지하고_열두_개에서_멈춘다`() {
         val region = PhotoRecommendationRegion(
             code = "test",
             rings = listOf(square(left = 0f, bottom = 0f, right = 10f, top = 10f)),

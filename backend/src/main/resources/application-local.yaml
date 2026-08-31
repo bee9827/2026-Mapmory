@@ -1,0 +1,21 @@
+spring:
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/local-migration
+  datasource:
+    url: jdbc:mysql://localhost:3306/mapmory?serverTimezone=UTC&characterEncoding=UTF-8
+    username: root
+    password: local
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 5
+
+jwt:
+  # 로컬 개발 전용 키. 운영에는 절대 사용하지 말 것. (HS256: 최소 32바이트)
+  secret: local-development-only-secret-key-change-me-0123456789
+
+management:
+  metrics:
+    tags:
+      environment: local

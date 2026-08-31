@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
+import com.mapmory.shared.LocalMapmoryTheme
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.GeoPoint
 import com.mapmory.shared.presentation.map.domain.ProvincePolygon
@@ -56,8 +57,9 @@ fun KoreaMapArtwork(
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val currentOnRegionClick by rememberUpdatedState(onRegionClick)
     val textMeasurer = rememberTextMeasurer()
+    val isDark = LocalMapmoryTheme.current.isDark
     val labelStyle = TextStyle(
-        color = Color(0xFF7085A8),
+        color = if (isDark) Color(0xFF7085A8) else Color(0xFF6B786F),
         fontSize = when {
             regions.size >= 35 -> 7.sp
             regions.size >= 25 -> 8.sp
@@ -72,11 +74,20 @@ fun KoreaMapArtwork(
     var zoom by remember(regions) { mutableStateOf(1f) }
     var pan by remember(regions) { mutableStateOf(Offset.Zero) }
     val currentTransform = rememberUpdatedState(MapTransform(zoom, pan))
+    val backgroundColor = if (isDark) Color(0xFF121518) else Color(0xFFFAFCFB)
+    val visitedFillColor = if (isDark) Color(0xFF35C987) else Color(0xFF4D9272)
+    val unvisitedFillColor = if (isDark) Color(0xFF1B2536) else Color(0xFFEDF2EE)
+    val visitedOutlineColor = if (isDark) {
+        Color(0xFF8AEBC1).copy(alpha = 0.82f)
+    } else {
+        Color(0xFF2F7659).copy(alpha = 0.72f)
+    }
+    val unvisitedOutlineColor = if (isDark) Color(0xFF4B5870) else Color(0xFFCAD6CE)
 
     Canvas(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF121518))
+            .background(backgroundColor)
             .onSizeChanged { viewportSize = it }
             .pointerInput(viewportSize, projection) {
                 detectTransformGestures(
@@ -125,12 +136,8 @@ fun KoreaMapArtwork(
 
         regions.forEach { region ->
             val isVisited = region.code in visitedRegionCodes
-            val fillColor = if (isVisited) Color(0xFF35C987) else Color(0xFF1B2536)
-            val outlineColor = if (isVisited) {
-                Color(0xFF8AEBC1).copy(alpha = 0.82f)
-            } else {
-                Color(0xFF4B5870)
-            }
+            val fillColor = if (isVisited) visitedFillColor else unvisitedFillColor
+            val outlineColor = if (isVisited) visitedOutlineColor else unvisitedOutlineColor
 
             region.rings.forEach { ring ->
                 if (ring.size < 3) return@forEach

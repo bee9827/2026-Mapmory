@@ -23,6 +23,8 @@ data class TripRecordSummary(
     val startDate: String,
     val endDate: String?,
     val thumbnailUrl: String? = null,
+    val thumbnailUrlExpiresIn: Long? = null,
+    val thumbnailPreviewBytes: ByteArray? = null,
     // 로컬 저장소에서는 기존 사진 표시를 유지하기 위해 아래 값을 함께 보존한다.
     val locationId: Long? = null,
     val content: String = "",

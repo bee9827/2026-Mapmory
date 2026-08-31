@@ -36,6 +36,7 @@ import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -321,6 +322,7 @@ private suspend fun Context.prepareRecommendationSession(
                 val latitude = photo.latitude ?: return@mapNotNull null
                 val longitude = photo.longitude ?: return@mapNotNull null
                 LocatedPhoto(photo, latitude, longitude)
+
             }
         selectPhotosInRegion(candidates, region)
     }
@@ -510,6 +512,7 @@ internal fun Context.readPhoto(
     knownCapturedAtMillis: Long? = null,
     includeOriginalBytes: Boolean = true,
 ): SelectedPhoto? = runCatching {
+
     val metadata = traceSection("photo.read.metadata") {
         if (knownName == null && knownCapturedAtMillis == null) {
             queryPhotoMetadata(uri)
@@ -538,7 +541,11 @@ internal fun Context.readPhoto(
         capturedAt = formatDate(knownCapturedAtMillis ?: metadata.second),
         originalBytes = encodedBytes.takeIf { includeOriginalBytes },
     )
-}.getOrNull()
+} catch (error: CancellationException) {
+    throw error
+} catch (error: Exception) {
+    null
+}
 
 private fun Context.readOriginalBytes(uri: Uri): ByteArray? = runCatching {
     contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
@@ -546,12 +553,16 @@ private fun Context.readOriginalBytes(uri: Uri): ByteArray? = runCatching {
 }.getOrNull()
 
 private fun ByteArray.normalizeOrientation(): ByteArray {
-    val orientation = runCatching {
+    val orientation = try {
         ExifInterface(ByteArrayInputStream(this)).getAttributeInt(
             ExifInterface.TAG_ORIENTATION,
             ExifInterface.ORIENTATION_NORMAL,
         )
-    }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    } catch (error: CancellationException) {
+        throw error
+    } catch (error: Exception) {
+        ExifInterface.ORIENTATION_NORMAL
+    }
     if (orientation == ExifInterface.ORIENTATION_NORMAL ||
         orientation == ExifInterface.ORIENTATION_UNDEFINED
     ) {
@@ -686,7 +697,7 @@ private fun Context.queryPhotoMetadata(uri: Uri): Pair<String?, Long?> {
     } ?: (null to null)
 }
 
-internal fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = runCatching {
+internal fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = try {
     val metadataUri = if (
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
         ContextCompat.checkSelfPermission(
@@ -701,7 +712,11 @@ internal fun Context.readCoordinates(uri: Uri): Pair<Double, Double>? = runCatch
     contentResolver.openInputStream(metadataUri)?.use { input ->
         ExifInterface(input).latLong?.let { it[0] to it[1] }
     }
-}.getOrNull()
+} catch (error: CancellationException) {
+    throw error
+} catch (error: Exception) {
+    null
+}
 
 private fun Cursor.getStringOrNull(columnName: String): String? =
     getColumnIndex(columnName).takeIf { it >= 0 }?.let(::getString)

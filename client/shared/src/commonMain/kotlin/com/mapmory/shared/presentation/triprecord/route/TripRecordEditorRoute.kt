@@ -119,7 +119,7 @@ internal fun TripRecordEditorRoute(
             title = "작성 중인 기록이 있어요",
             message = "지금 나가면 작성한 내용이 사라집니다. 그래도 나갈까요?",
             confirmLabel = "나가기",
-            confirmColor = TripRecordPalette.danger,
+            confirmColor = TripRecordPalette.current.danger,
             onConfirm = {
                 pendingEditorExit = null
                 exit()
@@ -138,9 +138,9 @@ internal fun TripRecordEditorRoute(
             },
             confirmLabel = if (isPhotoLoadingSaveConfirmation) "현재 내용 저장" else "나가기",
             confirmColor = if (isPhotoLoadingSaveConfirmation) {
-                TripRecordPalette.accent
+                TripRecordPalette.current.accent
             } else {
-                TripRecordPalette.danger
+                TripRecordPalette.current.danger
             },
             onConfirm = {
                 pendingPhotoLoadingAction = null
@@ -167,9 +167,9 @@ private fun EditorConfirmationDialog(
             dismissOnClickOutside = true,
         ),
         shape = RoundedCornerShape(20.dp),
-        containerColor = TripRecordPalette.surface,
-        titleContentColor = TripRecordPalette.text,
-        textContentColor = TripRecordPalette.bodyText,
+        containerColor = TripRecordPalette.current.surface,
+        titleContentColor = TripRecordPalette.current.text,
+        textContentColor = TripRecordPalette.current.bodyText,
         title = { Text(title) },
         text = { Text(message) },
         confirmButton = {
@@ -179,7 +179,7 @@ private fun EditorConfirmationDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("계속 작성", color = TripRecordPalette.accent)
+                Text("계속 작성", color = TripRecordPalette.current.accent)
             }
         },
     )
