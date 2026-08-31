@@ -2,8 +2,6 @@ package com.mapmory.backend.tag;
 
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.Member;
-import com.mapmory.backend.tag.dto.TagRequest;
-import com.mapmory.backend.tag.dto.TagResponse;
 import java.util.List;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
