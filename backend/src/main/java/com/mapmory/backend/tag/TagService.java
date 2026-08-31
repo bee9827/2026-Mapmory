@@ -21,32 +21,31 @@ public class TagService {
     }
 
     @Transactional
-    public TagResponse create(Member member, TagRequest request) {
-        Tag tag = Tag.of(member, request.name());
+    public Tag create(Member member, String name) {
+        Tag tag = Tag.of(member, name);
 
         validateTagLimit(member.getId());
         validateUniqueNameForCreate(member.getId(), tag.getNameKey());
 
-        return TagResponse.from(saveTag(tag));
+        return saveTag(tag);
     }
 
     @Transactional(readOnly = true)
-    public List<TagResponse> findAll(Member member) {
+    public List<Tag> findAll(Member member) {
         return tagRepository.findAllByMemberIdOrderByCreatedAtAscIdAsc(member.getId()).stream()
-                .map(TagResponse::from)
                 .toList();
     }
 
     @Transactional
-    public TagResponse update(Member member, Long tagId, TagRequest request) {
+    public Tag update(Member member, Long tagId, String name) {
         Tag tag = findOwnedTag(member, tagId);
 
-        String nameKey = Tag.nameKeyOf(request.name());
+        String nameKey = Tag.nameKeyOf(name);
         validateUniqueNameForUpdate(member.getId(), nameKey, tagId);
-        tag.rename(request.name());
+        tag.rename(name);
 
         flushTagChanges();
-        return TagResponse.from(tag);
+        return tag;
     }
 
     @Transactional
