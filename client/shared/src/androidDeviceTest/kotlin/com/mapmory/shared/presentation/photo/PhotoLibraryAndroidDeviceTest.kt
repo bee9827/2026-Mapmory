@@ -14,6 +14,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PhotoLibraryAndroidDeviceTest {
@@ -41,6 +42,14 @@ class PhotoLibraryAndroidDeviceTest {
             assertEquals("mapmory-test.jpg", selectedPhoto.displayName)
             assertTrue(selectedPhoto.originalBytes?.isNotEmpty() == true)
             assertTrue(selectedPhoto.previewBytes?.isNotEmpty() == true)
+
+            val previewOnlyPhoto = context.readPhoto(
+                uri = fixture.uri,
+                includeOriginalBytes = false,
+            )
+            assertNotNull(previewOnlyPhoto)
+            assertNull(previewOnlyPhoto.originalBytes)
+            assertTrue(previewOnlyPhoto.previewBytes?.isNotEmpty() == true)
         } finally {
             context.contentResolver.delete(fixture.uri, null, null)
             fixture.file.delete()
