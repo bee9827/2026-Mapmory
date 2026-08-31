@@ -276,12 +276,7 @@ public class TravelRecordService {
     }
 
     private void validateTravelDates(LocalDate startDate, LocalDate endDate) {
-        LocalDate today = LocalDate.now(clock);
-        if (startDate == null
-                || startDate.isAfter(today)
-                || (endDate != null && (endDate.isBefore(startDate) || endDate.isAfter(today)))) {
-            throw new BusinessException(TravelRecordErrorCode.INVALID_TRAVEL_DATE_RANGE);
-        }
+        TravelPeriod.of(startDate, endDate).validateNotAfter(LocalDate.now(clock));
     }
 
     private Pageable createPageable(int page, int size) {

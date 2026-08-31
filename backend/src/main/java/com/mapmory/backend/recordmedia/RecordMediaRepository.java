@@ -3,6 +3,8 @@ package com.mapmory.backend.recordmedia;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface RecordMediaRepository extends JpaRepository<RecordMedia, Long> {
 
@@ -12,5 +14,10 @@ public interface RecordMediaRepository extends JpaRepository<RecordMedia, Long> 
             Collection<Long> travelRecordIds
     );
 
-    List<RecordMedia> findByObjectKeyIn(Collection<String> objectKeys);
+    @Query("""
+            SELECT rm
+            FROM RecordMedia rm
+            WHERE rm.objectKey.value IN :objectKeys
+            """)
+    List<RecordMedia> findByObjectKeyIn(@Param("objectKeys") Collection<String> objectKeys);
 }

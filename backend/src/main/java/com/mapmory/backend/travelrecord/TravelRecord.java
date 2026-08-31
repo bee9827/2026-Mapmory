@@ -4,6 +4,7 @@ import com.mapmory.backend.common.entity.BaseEntity;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.region.Region;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -34,10 +35,8 @@ public class TravelRecord extends BaseEntity {
     @Column(nullable = false, columnDefinition = "text")
     private String content;
 
-    @Column(nullable = false)
-    private LocalDate startDate;
-
-    private LocalDate endDate;
+    @Embedded
+    private TravelPeriod period;
 
     protected TravelRecord() {
     }
@@ -54,8 +53,7 @@ public class TravelRecord extends BaseEntity {
         this.region = region;
         this.title = title;
         this.content = normalizeContent(content);
-        this.startDate = startDate;
-        this.endDate = endDate;
+        this.period = TravelPeriod.of(startDate, endDate);
     }
 
     public static TravelRecord of(
@@ -79,8 +77,7 @@ public class TravelRecord extends BaseEntity {
         this.region = region;
         this.title = title;
         this.content = normalizeContent(content);
-        this.startDate = startDate;
-        this.endDate = endDate;
+        this.period = TravelPeriod.of(startDate, endDate);
     }
 
     private static String normalizeContent(String content) {
@@ -104,10 +101,10 @@ public class TravelRecord extends BaseEntity {
     }
 
     public LocalDate getStartDate() {
-        return startDate;
+        return period.startDate();
     }
 
     public LocalDate getEndDate() {
-        return endDate;
+        return period.endDate();
     }
 }
