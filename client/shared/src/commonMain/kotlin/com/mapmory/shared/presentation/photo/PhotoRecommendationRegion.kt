@@ -41,14 +41,13 @@ internal data class LocatedPhoto<T>(
 internal fun <T> selectPhotosInRegion(
     candidatesNewestFirst: Sequence<LocatedPhoto<T>>,
     region: PhotoRecommendationRegion,
-    limit: Int = MaxRecommendedPhotos,
+    limit: Int? = null,
 ): List<T> {
-    if (limit <= 0) return emptyList()
-    return candidatesNewestFirst
+    if (limit != null && limit <= 0) return emptyList()
+    val matchingPhotos = candidatesNewestFirst
         .filter { candidate -> region.contains(candidate.latitude, candidate.longitude) }
         .map(LocatedPhoto<T>::value)
-        .take(limit)
-        .toList()
+    return if (limit == null) matchingPhotos.toList() else matchingPhotos.take(limit).toList()
 }
 
 internal class PhotoRecommendationRegionNotFoundException(

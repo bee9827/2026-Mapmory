@@ -107,7 +107,7 @@ class PhotoLibraryTest {
 
         val selected = selectPhotosInRegion(candidates, region)
 
-        assertEquals((1..12).map { "inside-$it" }, selected)
+        assertEquals((1..20).map { "inside-$it" }, selected)
     }
 
     @Test
