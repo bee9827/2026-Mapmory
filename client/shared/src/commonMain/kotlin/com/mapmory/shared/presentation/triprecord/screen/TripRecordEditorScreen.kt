@@ -456,7 +456,10 @@ fun TripRecordEditorScreen(
 
     if (showRecommendationSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showRecommendationSheet = false },
+            onDismissRequest = {
+                showRecommendationSheet = false
+                photoLibrary.cancelRecommendation()
+            },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = TripRecordPalette.current.background,
             contentColor = TripRecordPalette.current.text,
@@ -509,12 +512,12 @@ fun TripRecordEditorScreen(
                     ) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(14.dp),
-                            color = TripRecordPalette.accent,
+                            color = TripRecordPalette.current.accent,
                             strokeWidth = 1.5.dp,
                         )
                         Text(
                             text = "사진을 더 불러오는 중…",
-                            color = TripRecordPalette.muted,
+                            color = TripRecordPalette.current.muted,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(start = 6.dp),
                         )

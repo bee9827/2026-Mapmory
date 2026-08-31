@@ -145,8 +145,8 @@ private fun TripRecordLoadError(
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp),
             shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = TripRecordPalette.surface),
-            border = BorderStroke(1.dp, TripRecordPalette.border),
+            colors = CardDefaults.cardColors(containerColor = TripRecordPalette.current.surface),
+            border = BorderStroke(1.dp, TripRecordPalette.current.border),
         ) {
             Column(
                 modifier = Modifier
@@ -157,22 +157,22 @@ private fun TripRecordLoadError(
             ) {
                 Text(
                     text = "여행 기록을 불러오지 못했어요.",
-                    color = TripRecordPalette.headingText,
+                    color = TripRecordPalette.current.headingText,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                 )
                 Text(
                     text = "인터넷 연결을 확인한 뒤\n다시 시도해 주세요.",
-                    color = TripRecordPalette.bodyText,
+                    color = TripRecordPalette.current.bodyText,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center,
                 )
                 Button(
                     onClick = onRetryClick,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = TripRecordPalette.primary,
-                        contentColor = TripRecordPalette.onPrimary,
+                        containerColor = TripRecordPalette.current.primary,
+                        contentColor = TripRecordPalette.current.onPrimary,
                     ),
                 ) {
                     Text("다시 시도")

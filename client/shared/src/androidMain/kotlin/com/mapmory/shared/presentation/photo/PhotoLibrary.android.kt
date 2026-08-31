@@ -36,7 +36,6 @@ import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -511,7 +510,7 @@ internal fun Context.readPhoto(
     knownCoordinates: Pair<Double, Double>? = null,
     knownCapturedAtMillis: Long? = null,
     includeOriginalBytes: Boolean = true,
-): SelectedPhoto? = runCatching {
+): SelectedPhoto? = try {
 
     val metadata = traceSection("photo.read.metadata") {
         if (knownName == null && knownCapturedAtMillis == null) {

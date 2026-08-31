@@ -126,6 +126,8 @@ private class IosPhotoLibraryController(
     var onRecommendationLoadingChanged: (Boolean) -> Unit = {}
     private var recommendationJob: Job? = null
     private var recommendationGeneration = 0
+    private var recommendationSession: IosRecommendationSession? = null
+    private var isRecommendationPageLoading = false
 
     private var pickerStartedAtMillis: Long? = null
 
@@ -208,7 +210,9 @@ private class IosPhotoLibraryController(
     private fun findRecommendations(location: Location) {
         recommendationJob?.cancel()
         val generation = ++recommendationGeneration
-           finishRecommendationLoading()
+        recommendationSession = null
+        isRecommendationPageLoading = true
+        onRecommendationLoadingChanged(true)
         val startedAtMillis = nowMillis()
         onLoadingChanged(true)
         recommendationJob = scope.launch {
@@ -224,7 +228,7 @@ private class IosPhotoLibraryController(
                         "recommend_total_ms=${elapsedMillis(startedAtMillis)} recommended_photos=0",
                     )
                     onMessage(PhotoRecommendationRegionNotFoundMessage)
-                    onLoadingChanged(false)
+                    finishRecommendationLoading()
                 }
                 return@launch
             } catch (error: Exception) {
@@ -233,7 +237,7 @@ private class IosPhotoLibraryController(
                         "recommend_total_ms=${elapsedMillis(startedAtMillis)} recommended_photos=0",
                     )
                     onMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
-                    onLoadingChanged(false)
+                    finishRecommendationLoading()
                 }
                 return@launch
             }
@@ -242,22 +246,36 @@ private class IosPhotoLibraryController(
             }
             if (generation != recommendationGeneration) return@launch
 
-            if (matchingAssets.isEmpty()) {
-                logPhotoPerformance(
-                    "recommend_total_ms=${elapsedMillis(startedAtMillis)} recommended_photos=0",
-                )
-                onPhotosRecommended(emptyList())
-                onLoadingChanged(false)
-            } else {
-                loadAssetPreviews(matchingAssets) { photos ->
-                    if (generation == recommendationGeneration) {
-                        logPhotoPerformance(
-                            "recommend_total_ms=${elapsedMillis(startedAtMillis)} " +
-                                "recommended_photos=${photos.size}",
-                        )
-                        onPhotosRecommended(photos)
-                        onLoadingChanged(false)
-                    }
+            val session = IosRecommendationSession(generation, matchingAssets)
+            recommendationSession = session
+            loadRecommendationPage(session) { page ->
+                if (generation == recommendationGeneration) {
+                    recommendationSession = session.copy(nextIndex = page.nextIndex)
+                    logPhotoPerformance(
+                        "recommend_total_ms=${elapsedMillis(startedAtMillis)} " +
+                            "recommended_photos=${page.photos.size}",
+                    )
+                    onPhotosRecommended(page.asPublicPage())
+                    finishRecommendationLoading()
+                }
+            }
+        }
+    }
+
+    fun loadNextRecommendationPage() {
+        val session = recommendationSession ?: return
+        if (!session.hasMore || isRecommendationPageLoading) return
+
+        val generation = session.generation
+        isRecommendationPageLoading = true
+        onRecommendationLoadingChanged(true)
+        onLoadingChanged(true)
+        recommendationJob = scope.launch {
+            loadRecommendationPage(session) { page ->
+                if (generation == recommendationGeneration) {
+                    recommendationSession = session.copy(nextIndex = page.nextIndex)
+                    onPhotosRecommended(page.asPublicPage())
+                    finishRecommendationLoading()
                 }
             }
         }
@@ -267,6 +285,7 @@ private class IosPhotoLibraryController(
         ++recommendationGeneration
         recommendationJob?.cancel()
         recommendationJob = null
+        recommendationSession = null
         finishRecommendationLoading()
     }
 
