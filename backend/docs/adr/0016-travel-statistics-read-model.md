@@ -32,8 +32,6 @@
 - 집계 쿼리와 응답 조합은 `travelrecord.statistics` 패키지에 둔다.
 - Service는 HTTP 응답 DTO가 아닌 `TravelStatistics` 읽기 모델을 반환하고, Controller가 이를
   `TravelStatisticsResponse`로 변환한다.
-- 통계 조회는 중요한 내부 연산으로 측정하되 회원 ID 같은 고카디널리티 값은 메트릭 태그로 남기지
-  않는다.
 
 ### 필드별 집계 규칙
 

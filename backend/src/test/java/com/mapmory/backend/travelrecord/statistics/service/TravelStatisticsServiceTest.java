@@ -3,7 +3,6 @@ package com.mapmory.backend.travelrecord.statistics.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.travelrecord.statistics.model.TopRegionStatistics;
@@ -11,7 +10,6 @@ import com.mapmory.backend.travelrecord.statistics.model.TravelStatistics;
 import com.mapmory.backend.travelrecord.statistics.repository.TopRegionQueryResult;
 import com.mapmory.backend.travelrecord.statistics.repository.TravelStatisticsRepository;
 import com.mapmory.backend.travelrecord.statistics.repository.TravelStatisticsSummaryQueryResult;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,8 +26,6 @@ class TravelStatisticsServiceTest {
 
     @Mock
     private TravelStatisticsRepository travelStatisticsRepository;
-
-    private final OperationTimer operationTimer = new OperationTimer(new SimpleMeterRegistry());
 
     @Test
     @DisplayName("조회 결과를 국가 코드와 인기 지역을 포함한 응답으로 변환한다")
@@ -57,7 +53,7 @@ class TravelStatisticsServiceTest {
     }
 
     private TravelStatisticsService service() {
-        return new TravelStatisticsService(travelStatisticsRepository, operationTimer);
+        return new TravelStatisticsService(travelStatisticsRepository);
     }
 
     private static TravelStatisticsSummaryQueryResult summary(

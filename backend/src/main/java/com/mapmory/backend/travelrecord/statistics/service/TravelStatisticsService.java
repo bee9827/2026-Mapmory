@@ -1,7 +1,5 @@
 package com.mapmory.backend.travelrecord.statistics.service;
 
-import com.mapmory.backend.common.monitoring.MonitoredOperation;
-import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.travelrecord.statistics.model.TopRegionStatistics;
@@ -17,22 +15,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class TravelStatisticsService {
 
     private final TravelStatisticsRepository travelStatisticsRepository;
-    private final OperationTimer operationTimer;
 
-    public TravelStatisticsService(
-            TravelStatisticsRepository travelStatisticsRepository,
-            OperationTimer operationTimer
-    ) {
+    public TravelStatisticsService(TravelStatisticsRepository travelStatisticsRepository) {
         this.travelStatisticsRepository = travelStatisticsRepository;
-        this.operationTimer = operationTimer;
     }
 
     @Transactional(readOnly = true)
     public TravelStatistics getStatistics(Member member) {
-        return operationTimer.record(
-                MonitoredOperation.TRAVEL_STATISTICS_QUERY,
-                () -> getStatistics(member.getId())
-        );
+        return getStatistics(member.getId());
     }
 
     private TravelStatistics getStatistics(Long memberId) {
