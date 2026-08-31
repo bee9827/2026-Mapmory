@@ -320,7 +320,7 @@ class PhotoRecommendationFlowTest {
         composeRule.runOnIdle {
             onRecommendationLoadingChanged?.invoke(true)
         }
-        composeRule.onNodeWithText("불러오는 중").performClick()
+        composeRule.onNodeWithText("중단").performClick()
 
         composeRule.runOnIdle { assertEquals(1, cancelCalls) }
     }
