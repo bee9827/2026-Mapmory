@@ -1,3 +1,4 @@
+import FirebaseCore
 import Shared
 import SwiftUI
 
@@ -17,12 +18,23 @@ private let darkSystemBarColor = UIColor(
 @main
 struct MapmoryApp: App {
     @State private var isDarkTheme = false
+    private let analyticsLogger: FirebaseAnalyticsLogger
+
+    init() {
+        if FirebaseApp.app() == nil {
+            FirebaseApp.configure()
+        }
+        analyticsLogger = FirebaseAnalyticsLogger()
+    }
 
     var body: some Scene {
         WindowGroup {
             ZStack {
                 Color(uiColor: isDarkTheme ? darkSystemBarColor : lightSystemBarColor)
-                ComposeView(isDarkTheme: $isDarkTheme)
+                ComposeView(
+                    isDarkTheme: $isDarkTheme,
+                    analyticsLogger: analyticsLogger,
+                )
             }
             .ignoresSafeArea()
             .preferredColorScheme(isDarkTheme ? .dark : .light)
@@ -32,6 +44,7 @@ struct MapmoryApp: App {
 
 private struct ComposeView: UIViewControllerRepresentable {
     @Binding var isDarkTheme: Bool
+    let analyticsLogger: FirebaseAnalyticsLogger
 
     func makeCoordinator() -> Coordinator {
         Coordinator(isDarkTheme: $isDarkTheme)
@@ -39,9 +52,12 @@ private struct ComposeView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIViewController {
         let coordinator = context.coordinator
-        let viewController = MainViewControllerKt.MainViewController { isDark in
-            coordinator.updateTheme(isDark.boolValue)
-        }
+        let viewController = MainViewControllerKt.MainViewController(
+            onThemeChanged: { isDark in
+                coordinator.updateTheme(isDark.boolValue)
+            },
+            analytics: analyticsLogger,
+        )
         applyTheme(to: viewController)
         return viewController
     }

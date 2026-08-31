@@ -52,6 +52,8 @@ import com.mapmory.shared.presentation.triprecord.state.TripStatisticsUiState
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewStatistics
 import kotlin.math.abs
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 
 @Composable
 fun TripProfileScreen(
@@ -65,10 +67,14 @@ fun TripProfileScreen(
     var showSettings by remember { mutableStateOf(false) }
     val uriHandler = LocalUriHandler.current
     val theme = LocalMapmoryTheme.current
+    val analytics = LocalMapmoryAnalytics.current
 
     TripRecordBackground(modifier = modifier, backgroundColor = TripRecordPalette.current.pageBackground) {
         Column(Modifier.fillMaxSize().background(TripRecordPalette.current.pageBackground)) {
-            StatisticsHeader(onSettingsClick = { showSettings = true })
+            StatisticsHeader(onSettingsClick = {
+                analytics.logEvent(MapmoryAnalyticsEvent.SETTINGS_OPENED)
+                showSettings = true
+            })
 
             when (statisticsUiState) {
                 TripStatisticsUiState.Loading -> Box(
@@ -126,13 +132,25 @@ fun TripProfileScreen(
                         ThemeOption(
                             label = "라이트 모드",
                             selected = !theme.isDark,
-                            onClick = { theme.onThemeChange(false) },
+                            onClick = {
+                                analytics.logEvent(
+                                    MapmoryAnalyticsEvent.THEME_CHANGED,
+                                    mapOf("theme" to "light"),
+                                )
+                                theme.onThemeChange(false)
+                            },
                             modifier = Modifier.weight(1f),
                         )
                         ThemeOption(
                             label = "다크 모드",
                             selected = theme.isDark,
-                            onClick = { theme.onThemeChange(true) },
+                            onClick = {
+                                analytics.logEvent(
+                                    MapmoryAnalyticsEvent.THEME_CHANGED,
+                                    mapOf("theme" to "dark"),
+                                )
+                                theme.onThemeChange(true)
+                            },
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -148,7 +166,10 @@ fun TripProfileScreen(
             },
             confirmButton = {
                 if (PrivacyPolicy.URL.isNotBlank()) {
-                    TextButton(onClick = { uriHandler.openUri(PrivacyPolicy.URL) }) {
+                    TextButton(onClick = {
+                        analytics.logEvent(MapmoryAnalyticsEvent.PRIVACY_POLICY_OPENED)
+                        uriHandler.openUri(PrivacyPolicy.URL)
+                    }) {
                         Text("개인정보 처리방침", color = TripRecordPalette.current.primary)
                     }
                 }

@@ -14,6 +14,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.compose.rememberNavController
 import com.mapmory.shared.app.AppContainer
 import com.mapmory.shared.app.createInMemoryAppContainer
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalytics
+import com.mapmory.shared.analytics.NoOpMapmoryAnalytics
 import com.mapmory.shared.navigation.MapmoryBackHandlerRegistry
 import com.mapmory.shared.navigation.MapmoryNavHost
 import com.mapmory.shared.navigation.MapmoryNavigator
@@ -27,6 +30,7 @@ fun MapmoryApp(
     contentWindowInsets: WindowInsets = WindowInsets(0, 0, 0, 0),
     initialIsDarkTheme: Boolean = false,
     onThemeChanged: (Boolean) -> Unit = {},
+    analytics: MapmoryAnalytics = NoOpMapmoryAnalytics,
 ) {
     var isDarkTheme by rememberSaveable { mutableStateOf(initialIsDarkTheme) }
     val latestOnThemeChanged by rememberUpdatedState(onThemeChanged)
@@ -58,7 +62,10 @@ fun MapmoryApp(
         onDispose { ownedContainer?.close() }
     }
 
-    CompositionLocalProvider(LocalMapmoryTheme provides themeState) {
+    CompositionLocalProvider(
+        LocalMapmoryTheme provides themeState,
+        LocalMapmoryAnalytics provides analytics,
+    ) {
         ProvideTripRecordPalettes(isDark = isDarkTheme) {
             MapmoryNavHost(
                 navController = navController,
