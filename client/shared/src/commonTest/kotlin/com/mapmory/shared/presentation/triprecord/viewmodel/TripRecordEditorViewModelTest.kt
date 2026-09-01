@@ -174,7 +174,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun `국내_기록은_시군구_선택을_요구한다`() = runSuspend {
+    fun `국내_시도는_여행지로_선택되지_않는다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(repository),
@@ -184,9 +184,10 @@ class TripRecordEditorViewModelTest {
         viewModel.updateTitle("서울 여행")
         viewModel.updateStartDate("2026-08-01")
 
+        assertNull(viewModel.uiState.selectedLocation)
         assertFalse(viewModel.save())
         assertEquals(
-            "대한민국은 시·군·구까지 선택해 주세요.",
+            "장소를 선택해 주세요.",
             viewModel.uiState.fieldErrors[TripRecordEditorErrorTarget.LOCATION],
         )
     }
