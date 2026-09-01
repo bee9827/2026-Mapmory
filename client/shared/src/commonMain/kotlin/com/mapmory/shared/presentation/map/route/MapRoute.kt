@@ -64,6 +64,11 @@ internal fun MapRoute(
             else -> viewModel.visitedProvinceCodes.size
         },
         onMapScopeChange = viewModel::changeScope,
+        tags = uiState.tags,
+        selectedTagId = uiState.selectedTagId,
+        onTagSelected = { tagId ->
+            scope.launch { viewModel.selectTag(tagId) }
+        },
         mapContent = {
             when (uiState.scope) {
                 MapScope.WORLD -> MapArtwork(

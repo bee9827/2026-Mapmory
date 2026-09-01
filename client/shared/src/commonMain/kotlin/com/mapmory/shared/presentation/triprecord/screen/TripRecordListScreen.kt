@@ -24,10 +24,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mapmory.shared.domain.model.Tag
 import com.mapmory.shared.presentation.triprecord.state.TripRecordFilterUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
@@ -48,6 +45,7 @@ fun TripRecordListScreen(
     filter: TripRecordFilterUiState,
     onPreviousPageClick: () -> Unit,
     onNextPageClick: () -> Unit,
+    onTagClick: (Long?) -> Unit = {},
     onCreateClick: () -> Unit,
     onMapClick: () -> Unit,
     onRecordClick: (Long) -> Unit,
@@ -69,7 +67,11 @@ fun TripRecordListScreen(
                     .padding(horizontal = 18.dp),
             ) {
                 Spacer(Modifier.height(14.dp))
-                JournalTagFilters()
+                JournalTagFilters(
+                    tags = filter.tags,
+                    selectedTagId = filter.selectedTagId,
+                    onTagClick = onTagClick,
+                )
                 Spacer(Modifier.height(18.dp))
 
                 when (uiState) {
@@ -89,7 +91,7 @@ fun TripRecordListScreen(
                     is TripRecordListUiState.Success -> {
                         if (uiState.records.isEmpty()) {
                             EmptyTripRecords(
-                                hasFilter = filter.locationId != null,
+                                hasFilter = filter.locationId != null || filter.selectedTagId != null,
                                 modifier = Modifier.weight(1f),
                             )
                         } else {
@@ -169,43 +171,30 @@ private fun JournalHeader(recordCount: Int) {
 }
 
 @Composable
-private fun JournalTagFilters() {
-    val tags = remember { listOf("전체", "가족", "애인", "친구", "혼자") }
-    var selectedTag by remember { mutableStateOf(tags.first()) }
-
+private fun JournalTagFilters(
+    tags: List<Tag>,
+    selectedTagId: Long?,
+    onTagClick: (Long?) -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        TripTagChip(
+            text = "전체",
+            selected = selectedTagId == null,
+            onClick = { onTagClick(null) },
+        )
         tags.forEach { tag ->
-            TripFilterChip(
-                text = tag,
-                selected = selectedTag == tag,
-                onClick = { selectedTag = tag },
+            TripTagChip(
+                text = tag.name,
+                selected = selectedTagId == tag.id,
+                onClick = { onTagClick(tag.id) },
             )
         }
     }
-}
-
-@Composable
-private fun TripFilterChip(
-    text: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Text(
-        text = text,
-        color = if (selected) TripRecordPalette.current.primary else TripRecordPalette.current.secondaryText,
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier
-            .clip(RoundedCornerShape(9.dp))
-            .background(if (selected) TripRecordPalette.current.primarySoft else TripRecordPalette.current.softSurface)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-    )
 }
 
 @Composable
@@ -291,6 +280,17 @@ private fun TripRecordCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 7.dp),
                 )
+                if (record.tags.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 9.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        record.tags.forEach { tag -> TripTagChip(text = tag.name) }
+                    }
+                }
             }
         }
     }

@@ -21,10 +21,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mapmory.shared.domain.model.Tag
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.MapScope
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
@@ -51,6 +48,9 @@ fun TripMapScreen(
     mapScope: MapScope = MapScope.WORLD,
     visitedCount: Int = 0,
     onMapScopeChange: (MapScope) -> Unit = {},
+    tags: List<Tag> = emptyList(),
+    selectedTagId: Long? = null,
+    onTagSelected: (Long?) -> Unit = {},
     onBackClick: () -> Unit,
     mapDetailTitle: String? = null,
     mapDetailTotal: Int? = null,
@@ -74,6 +74,9 @@ fun TripMapScreen(
                 mapScope = mapScope,
                 visitedCount = visitedCount,
                 onMapScopeChange = onMapScopeChange,
+                tags = tags,
+                selectedTagId = selectedTagId,
+                onTagSelected = onTagSelected,
                 mapDetailTitle = mapDetailTitle,
                 mapDetailTotal = mapDetailTotal,
                 onMapDetailBackClick = onMapDetailBackClick,
@@ -146,6 +149,9 @@ private fun MapHeaderOverlay(
     mapScope: MapScope,
     visitedCount: Int,
     onMapScopeChange: (MapScope) -> Unit,
+    tags: List<Tag>,
+    selectedTagId: Long?,
+    onTagSelected: (Long?) -> Unit,
     mapDetailTitle: String?,
     mapDetailTotal: Int?,
     onMapDetailBackClick: () -> Unit,
@@ -188,7 +194,12 @@ private fun MapHeaderOverlay(
             modifier = Modifier.padding(horizontal = 12.dp),
         )
         Spacer(Modifier.height(14.dp))
-        MapTagFilter(modifier = Modifier.padding(horizontal = 18.dp))
+        MapTagFilter(
+            tags = tags,
+            selectedTagId = selectedTagId,
+            onTagSelected = onTagSelected,
+            modifier = Modifier.padding(horizontal = 18.dp),
+        )
     }
 }
 
@@ -246,30 +257,25 @@ private fun MapScopeChip(
 }
 
 @Composable
-private fun MapTagFilter(modifier: Modifier = Modifier) {
-    val tags = remember { listOf("전체", "가족", "애인", "친구", "혼자") }
-    var selectedTag by remember { mutableStateOf(tags.first()) }
-
+private fun MapTagFilter(
+    tags: List<Tag>,
+    selectedTagId: Long?,
+    onTagSelected: (Long?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
-        tags.forEach { tag ->
-            val selected = selectedTag == tag
-            Text(
-                text = tag,
-                color = if (selected) TripMapPalette.current.tagSelectedText else TripMapPalette.current.tagText,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(
-                        if (selected) TripRecordPalette.current.primary else TripMapPalette.current.tagBackground,
-                    )
-                    .clickable { selectedTag = tag }
-                    .padding(horizontal = 11.dp, vertical = 4.dp),
+        val filterTags = listOf<Tag?>(null) + tags
+        filterTags.forEach { tag ->
+            val selected = selectedTagId == tag?.id
+            TripTagChip(
+                text = tag?.name ?: "전체",
+                selected = selected,
+                onClick = { onTagSelected(tag?.id) },
             )
         }
     }
@@ -429,7 +435,11 @@ private fun MapScopeChipPreview() {
 @Preview
 @Composable
 private fun MapTagFilterPreview() {
-    MapTagFilter()
+    MapTagFilter(
+        tags = listOf(Tag(1L, "가족"), Tag(2L, "맛집")),
+        selectedTagId = 1L,
+        onTagSelected = {},
+    )
 }
 
 @Preview

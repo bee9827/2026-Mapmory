@@ -3,6 +3,7 @@ package com.mapmory.shared.presentation.triprecord.screen
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mapmory.shared.LocalMapmoryTheme
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
 import com.mapmory.shared.preview.PreviewSurface
 import org.jetbrains.compose.resources.decodeToImageBitmap
@@ -79,6 +81,38 @@ internal fun TripRecordTopBar(
         Spacer(Modifier.weight(1f))
         trailing?.invoke()
     }
+}
+
+@Composable
+internal fun TripTagChip(
+    text: String,
+    selected: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(50.dp)
+    val isDark = LocalMapmoryTheme.current.isDark
+
+    Text(
+        text = text,
+        color = if (selected) TripMapPalette.current.tagSelectedText else TripMapPalette.current.tagText,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        modifier = modifier
+            .clip(shape)
+            .background(
+                if (selected) TripRecordPalette.current.primary else TripMapPalette.current.tagBackground,
+            )
+            .then(
+                if (isDark) {
+                    Modifier
+                } else {
+                    Modifier.border(1.dp, TripRecordPalette.current.border, shape)
+                },
+            )
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 11.dp, vertical = 4.dp),
+    )
 }
 
 @Composable
