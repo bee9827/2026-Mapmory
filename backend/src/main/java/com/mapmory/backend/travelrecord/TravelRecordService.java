@@ -6,7 +6,6 @@ import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.recordmedia.ExpiringUrl;
 import com.mapmory.backend.recordmedia.RecordMedia;
-import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
@@ -37,7 +36,6 @@ public class TravelRecordService {
 
     private final TravelRecordRepository travelRecordRepository;
     private final RegionResolver regionResolver;
-    private final RecordMediaRepository recordMediaRepository;
     private final TravelRecordTagService travelRecordTagService;
     private final TagService tagService;
     private final OperationTimer operationTimer;
@@ -48,7 +46,6 @@ public class TravelRecordService {
     public TravelRecordService(
             TravelRecordRepository travelRecordRepository,
             RegionResolver regionResolver,
-            RecordMediaRepository recordMediaRepository,
             TravelRecordTagService travelRecordTagService,
             TagService tagService,
             OperationTimer operationTimer,
@@ -58,7 +55,6 @@ public class TravelRecordService {
     ) {
         this.travelRecordRepository = travelRecordRepository;
         this.regionResolver = regionResolver;
-        this.recordMediaRepository = recordMediaRepository;
         this.travelRecordTagService = travelRecordTagService;
         this.tagService = tagService;
         this.operationTimer = operationTimer;
@@ -72,6 +68,7 @@ public class TravelRecordService {
         validateTravelDates(request.startDate(), request.endDate());
         validateTravelRecordRegion(request);
         List<String> objectKeys = objectKeys(request);
+        TravelRecord.validateObjectKeys(objectKeys);
         uploadedObjectVerifier.verifyAllUploaded(objectKeys);
         Region region = resolveRegion(request);
 
@@ -83,21 +80,10 @@ public class TravelRecordService {
                 request.startDate(),
                 request.endDate()
         );
+        travelRecord.synchronizeMedia(objectKeys);
 
         TravelRecord savedTravelRecord = travelRecordRepository.save(travelRecord);
         travelRecordTagService.replace(member, savedTravelRecord, request.tagIds());
-
-        // TODO : save or saveAll 결정하고 적용하기
-        for (int index = 0; index < objectKeys.size(); index++) {
-            RecordMedia recordMedia = RecordMedia.of(
-                    savedTravelRecord,
-                    objectKeys.get(index),
-                    null,
-                    index
-            );
-
-            recordMediaRepository.save(recordMedia);
-        }
 
         return savedTravelRecord;
     }
@@ -106,12 +92,9 @@ public class TravelRecordService {
     public TravelRecordDetailResponse findById(Member member, Long travelRecordId) {
         TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, member.getId())
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
-        List<RecordMedia> recordMedia = recordMediaRepository
-                .findByTravelRecordIdOrderBySortOrderAsc(travelRecordId);
-
         return createDetailResponse(
                 travelRecord,
-                recordMedia,
+                travelRecord.getMedia(),
                 travelRecordTagService.findByTravelRecordId(travelRecordId)
         );
     }
@@ -127,12 +110,10 @@ public class TravelRecordService {
         TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, member.getId())
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
         List<String> objectKeys = objectKeys(request);
-        travelRecord.validateObjectKeys(objectKeys);
+        TravelRecord.validateObjectKeys(objectKeys);
 
         Region region = resolveRegion(request);
-        List<RecordMedia> existingMedia = recordMediaRepository
-                .findByTravelRecordIdOrderBySortOrderAsc(travelRecordId);
-        List<String> newObjectKeys = travelRecord.newObjectKeys(existingMedia, objectKeys);
+        List<String> newObjectKeys = travelRecord.newObjectKeys(objectKeys);
         validateObjectKeysAreAvailable(newObjectKeys);
         uploadedObjectVerifier.verifyAllUploaded(newObjectKeys);
 
@@ -147,11 +128,9 @@ public class TravelRecordService {
         List<RecordMedia> updatedMedia = operationTimer.record(
                 MonitoredOperation.MEDIA_SYNC,
                 () -> {
-                    List<RecordMedia> synchronizedMedia = applyMediaSynchronization(
-                            travelRecord.synchronizeMedia(existingMedia, objectKeys)
-                    );
+                    travelRecord.synchronizeMedia(objectKeys);
                     travelRecordRepository.flush();
-                    return synchronizedMedia;
+                    return travelRecord.getMedia();
                 }
         );
 
@@ -312,14 +291,9 @@ public class TravelRecordService {
 
     private void validateObjectKeysAreAvailable(List<String> newObjectKeys) {
         if (!newObjectKeys.isEmpty()
-                && !recordMediaRepository.findByObjectKeyIn(newObjectKeys).isEmpty()) {
+                && travelRecordRepository.existsMediaByObjectKeyIn(newObjectKeys)) {
             throw new BusinessException(TravelRecordErrorCode.INVALID_OBJECT_KEY);
         }
-    }
-
-    private List<RecordMedia> applyMediaSynchronization(MediaSynchronization synchronization) {
-        recordMediaRepository.deleteAll(synchronization.removed());
-        return recordMediaRepository.saveAll(synchronization.media());
     }
 
     private TravelRecordDetailResponse createDetailResponse(

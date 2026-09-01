@@ -6,6 +6,7 @@ import com.mapmory.backend.member.Member;
 import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.tag.TagErrorCode;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -14,9 +15,12 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,6 +53,10 @@ public class TravelRecord extends BaseEntity {
 
     @Embedded
     private TravelPeriod period;
+
+    @OneToMany(mappedBy = "travelRecord", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
+    private List<RecordMedia> media = new ArrayList<>();
 
     protected TravelRecord() {
     }
@@ -94,18 +102,30 @@ public class TravelRecord extends BaseEntity {
 
     /**
      * 한 일지 안에서 같은 Object Key를 두 번 가질 수 없다.
+     *
+     * <p>일지를 만들기 전에도 검증할 수 있어야 해서 정적 메서드다.
+     * 생성과 수정이 같은 시점에 같은 규칙을 적용한다.
      */
-    public void validateObjectKeys(List<String> objectKeys) {
+    public static void validateObjectKeys(List<String> objectKeys) {
         if (new HashSet<>(objectKeys).size() != objectKeys.size()) {
             throw new BusinessException(TravelRecordErrorCode.INVALID_OBJECT_KEY);
         }
     }
 
     /**
+     * 정렬 순서대로 정리한 이 일지의 미디어.
+     */
+    public List<RecordMedia> getMedia() {
+        return media.stream()
+                .sorted(Comparator.comparingInt(RecordMedia::getSortOrder))
+                .toList();
+    }
+
+    /**
      * 요청된 Object Key 중 이 일지가 아직 가지고 있지 않은 것들.
      */
-    public List<String> newObjectKeys(List<RecordMedia> currentMedia, List<String> objectKeys) {
-        Set<String> currentObjectKeys = currentMedia.stream()
+    public List<String> newObjectKeys(List<String> objectKeys) {
+        Set<String> currentObjectKeys = media.stream()
                 .map(RecordMedia::getObjectKey)
                 .collect(Collectors.toSet());
 
@@ -116,30 +136,30 @@ public class TravelRecord extends BaseEntity {
 
     /**
      * 요청된 Object Key 순서를 이 일지의 미디어 정렬 순서로 삼는다.
-     * 이미 가진 미디어는 순서만 바꾸고, 새 키는 미디어를 만들며, 빠진 것은 제거 대상이 된다.
+     * 이미 가진 미디어는 순서만 바꾸고, 새 키는 미디어를 만들며, 빠진 것은 컬렉션에서 떨어져
+     * orphanRemoval로 삭제된다.
      */
-    public MediaSynchronization synchronizeMedia(
-            List<RecordMedia> currentMedia,
-            List<String> objectKeys
-    ) {
+    public void synchronizeMedia(List<String> objectKeys) {
+        validateObjectKeys(objectKeys);
+
         Map<String, RecordMedia> unusedMedia = new LinkedHashMap<>();
-        for (RecordMedia recordMedia : currentMedia) {
+        for (RecordMedia recordMedia : media) {
             unusedMedia.put(recordMedia.getObjectKey(), recordMedia);
         }
 
-        List<RecordMedia> orderedMedia = new ArrayList<>();
+        List<RecordMedia> addedMedia = new ArrayList<>();
         for (int sortOrder = 0; sortOrder < objectKeys.size(); sortOrder++) {
             String objectKey = objectKeys.get(sortOrder);
             RecordMedia recordMedia = unusedMedia.remove(objectKey);
             if (recordMedia == null) {
-                recordMedia = RecordMedia.of(this, objectKey, null, sortOrder);
+                addedMedia.add(RecordMedia.of(this, objectKey, null, sortOrder));
             } else {
                 recordMedia.updateSortOrder(sortOrder);
             }
-            orderedMedia.add(recordMedia);
         }
 
-        return new MediaSynchronization(orderedMedia, List.copyOf(unusedMedia.values()));
+        media.removeAll(unusedMedia.values());
+        media.addAll(addedMedia);
     }
 
     /**

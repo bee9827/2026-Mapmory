@@ -18,7 +18,6 @@ import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.recordmedia.ExpiringUrl;
 import com.mapmory.backend.recordmedia.RecordMedia;
-import com.mapmory.backend.recordmedia.RecordMediaRepository;
 import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
@@ -67,9 +66,6 @@ class TravelRecordServiceTest {
     private RegionResolver regionResolver;
 
     @Mock
-    private RecordMediaRepository recordMediaRepository;
-
-    @Mock
     private TravelRecordTagService travelRecordTagService;
 
     @Mock
@@ -99,7 +95,6 @@ class TravelRecordServiceTest {
         travelRecordService = new TravelRecordService(
                 travelRecordRepository,
                 regionResolver,
-                recordMediaRepository,
                 travelRecordTagService,
                 tagService,
                 operationTimer,
@@ -235,14 +230,12 @@ class TravelRecordServiceTest {
                 LocalDate.of(2026, 8, 13)
         );
         ReflectionTestUtils.setField(travelRecord, "id", 101L);
-        List<RecordMedia> recordMedia = List.of(
-                RecordMedia.of(travelRecord, "mapmory/travel-records/a.jpg", null, 0),
-                RecordMedia.of(travelRecord, "mapmory/travel-records/b.jpg", null, 1)
-        );
+        travelRecord.synchronizeMedia(List.of(
+                "mapmory/travel-records/a.jpg",
+                "mapmory/travel-records/b.jpg"
+        ));
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
-        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
-                .thenReturn(recordMedia);
 
         TravelRecordDetailResponse result = travelRecordService.findById(member, 101L);
 
@@ -332,8 +325,6 @@ class TravelRecordServiceTest {
         ReflectionTestUtils.setField(travelRecord, "id", 102L);
         when(travelRecordRepository.findByIdAndMemberId(102L, 10L))
                 .thenReturn(Optional.of(travelRecord));
-        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(102L))
-                .thenReturn(List.of());
 
         TravelRecordDetailResponse result = travelRecordService.findById(member, 102L);
 
@@ -351,7 +342,6 @@ class TravelRecordServiceTest {
                 .thenReturn(Optional.empty());
 
         assertError(() -> travelRecordService.findById(member, 101L), "TRAVEL_RECORD_NOT_FOUND");
-        verify(recordMediaRepository, never()).findByTravelRecordIdOrderBySortOrderAsc(101L);
     }
 
     @Test
@@ -368,8 +358,8 @@ class TravelRecordServiceTest {
                 null
         );
         ReflectionTestUtils.setField(travelRecord, "id", 101L);
-        RecordMedia mediaA = RecordMedia.of(travelRecord, "travel-records/10/a.jpg", null, 0);
-        RecordMedia mediaB = RecordMedia.of(travelRecord, "travel-records/10/b.jpg", null, 1);
+        travelRecord.synchronizeMedia(List.of("travel-records/10/a.jpg", "travel-records/10/b.jpg"));
+        RecordMedia mediaB = travelRecord.getMedia().getLast();
         TravelRecordRequest request = new TravelRecordRequest(
                 "KR",
                 "49",
@@ -383,12 +373,8 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
         when(regionResolver.resolve("KR", "49", "50110")).thenReturn(district);
-        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
-                .thenReturn(List.of(mediaA, mediaB));
-        when(recordMediaRepository.findByObjectKeyIn(List.of("travel-records/10/c.jpg")))
-                .thenReturn(List.of());
-        when(recordMediaRepository.saveAll(anyList()))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(travelRecordRepository.existsMediaByObjectKeyIn(List.of("travel-records/10/c.jpg")))
+                .thenReturn(false);
 
         TravelRecordDetailResponse result = travelRecordService.update(member, 101L, request);
 
@@ -400,12 +386,9 @@ class TravelRecordServiceTest {
                 "travel-records/10/c.jpg"
         );
         assertThat(mediaB.getSortOrder()).isZero();
-        verify(recordMediaRepository).deleteAll(org.mockito.ArgumentMatchers.argThat(records -> {
-            java.util.Iterator<? extends RecordMedia> iterator = records.iterator();
-            return iterator.hasNext()
-                    && iterator.next() == mediaA
-                    && !iterator.hasNext();
-        }));
+        assertThat(travelRecord.getMedia())
+                .extracting(RecordMedia::getObjectKey)
+                .doesNotContain("travel-records/10/a.jpg");
         verify(operationTimer).record(eq(MonitoredOperation.MEDIA_SYNC), any());
     }
 
@@ -461,14 +444,12 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
         when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
-        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
-                .thenReturn(List.of());
-        when(recordMediaRepository.findByObjectKeyIn(List.of("travel-records/20/used.jpg")))
-                .thenReturn(List.of(mock(RecordMedia.class)));
+        when(travelRecordRepository.existsMediaByObjectKeyIn(List.of("travel-records/20/used.jpg")))
+                .thenReturn(true);
 
         assertError(() -> travelRecordService.update(member, 101L, request), "INVALID_OBJECT_KEY");
         assertThat(travelRecord.getTitle()).isEqualTo("일본 여행");
-        verify(recordMediaRepository, never()).saveAll(anyList());
+        assertThat(travelRecord.getMedia()).isEmpty();
     }
 
     @Test
@@ -482,12 +463,7 @@ class TravelRecordServiceTest {
                 LocalDate.of(2026, 8, 11),
                 null
         );
-        RecordMedia existingMedia = RecordMedia.of(
-                travelRecord,
-                "travel-records/10/a.jpg",
-                null,
-                0
-        );
+        travelRecord.synchronizeMedia(List.of("travel-records/10/a.jpg"));
         TravelRecordRequest request = new TravelRecordRequest(
                 "JP",
                 null,
@@ -501,18 +477,13 @@ class TravelRecordServiceTest {
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
         when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
-        when(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(101L))
-                .thenReturn(List.of(existingMedia));
-        when(recordMediaRepository.saveAll(anyList()))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+
 
         TravelRecordDetailResponse result = travelRecordService.update(member, 101L, request);
 
         assertThat(result.objectKeys()).isEmpty();
-        verify(recordMediaRepository).deleteAll(org.mockito.ArgumentMatchers.argThat(records ->
-                records.iterator().hasNext()
-        ));
-        verify(recordMediaRepository, never()).findByObjectKeyIn(anyList());
+        assertThat(travelRecord.getMedia()).isEmpty();
+        verify(travelRecordRepository, never()).existsMediaByObjectKeyIn(anyList());
     }
 
     @Test
@@ -532,7 +503,6 @@ class TravelRecordServiceTest {
 
         assertError(() -> travelRecordService.update(member, 101L, request), "TRAVEL_RECORD_NOT_FOUND");
         verify(regionResolver, never()).resolve("JP", null, null);
-        verify(recordMediaRepository, never()).findByTravelRecordIdOrderBySortOrderAsc(101L);
     }
 
     @Test

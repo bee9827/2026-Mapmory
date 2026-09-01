@@ -87,8 +87,9 @@ class TravelRecordRepositoryTest extends MySqlTestContainerSupport {
                 )
         );
 
-        Page<TravelRecord> result = travelRecordRepository.findByMemberId(
+        Page<TravelRecord> result = travelRecordRepository.findByMemberIdAndOptionalTagId(
                 member.getId(),
+                null,
                 PageRequest.of(
                         0, // 첫 페이지
                         20, // 최대 20개
@@ -157,7 +158,9 @@ class TravelRecordRepositoryTest extends MySqlTestContainerSupport {
                 .isPresent();
         assertThat(travelRecordRepository.findByIdAndMemberId(travelRecord.getId(), otherMember.getId()))
                 .isEmpty();
-        assertThat(recordMediaRepository.findByTravelRecordIdOrderBySortOrderAsc(travelRecord.getId()))
+        assertThat(travelRecordRepository.findByIdAndMemberId(travelRecord.getId(), owner.getId())
+                .orElseThrow()
+                .getMedia())
                 .extracting(RecordMedia::getObjectKey)
                 .containsExactly("mapmory/detail/a.jpg", "mapmory/detail/b.jpg");
         assertThat(recordMediaRepository.findByTravelRecordIdInOrderByTravelRecordIdAscSortOrderAscIdAsc(
@@ -165,11 +168,12 @@ class TravelRecordRepositoryTest extends MySqlTestContainerSupport {
         ))
                 .extracting(RecordMedia::getObjectKey)
                 .containsExactly("mapmory/detail/a.jpg", "mapmory/detail/b.jpg");
-        assertThat(recordMediaRepository.findByObjectKeyIn(
+        assertThat(travelRecordRepository.existsMediaByObjectKeyIn(
                 java.util.List.of("mapmory/detail/a.jpg")
-        ))
-                .extracting(RecordMedia::getObjectKey)
-                .containsExactly("mapmory/detail/a.jpg");
+        )).isTrue();
+        assertThat(travelRecordRepository.existsMediaByObjectKeyIn(
+                java.util.List.of("mapmory/detail/없는키.jpg")
+        )).isFalse();
     }
 
     @Test
