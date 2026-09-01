@@ -69,6 +69,8 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.collect
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.photo.PhotoLibraryActionsFactory
@@ -81,11 +83,18 @@ import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
 import com.mapmory.shared.presentation.photo.shouldLoadNextRecommendationPage
 import com.mapmory.shared.presentation.photo.toggleSelection
 import com.mapmory.shared.presentation.date.PlatformDatePicker
+import com.mapmory.shared.presentation.triprecord.endDatePickerMinimumDate
+import com.mapmory.shared.presentation.triprecord.initialSelectableTripRecordDate
+import com.mapmory.shared.presentation.triprecord.startDatePickerMaximumDate
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+import com.mapmory.shared.presentation.triprecord.selectableTripRecordDestinations
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewLocations
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 private const val StartDatePickerTarget = "start"
 private const val EndDatePickerTarget = "end"
@@ -147,10 +156,9 @@ fun TripRecordEditorScreen(
         },
     modifier: Modifier = Modifier,
 ) {
+    val analytics = LocalMapmoryAnalytics.current
     val selectableLocations = remember(locations) {
-        locations
-            .filter { it.type == LocationType.PROVINCE || it.type == LocationType.DISTRICT }
-            .distinctBy(Location::regionCode)
+        locations.selectableTripRecordDestinations()
     }
     var showLocationSheet by remember { mutableStateOf(false) }
     var locationSearchQuery by rememberSaveable { mutableStateOf("") }
@@ -165,6 +173,10 @@ fun TripRecordEditorScreen(
     val dismissKeyboardOnTap = rememberDismissKeyboardOnTapModifier()
     val photoLibrary = photoLibraryActionsFactory(
         { photos ->
+            analytics.logEvent(
+                MapmoryAnalyticsEvent.PHOTOS_ADDED,
+                mapOf("source" to "gallery", "count" to photos.size.toString()),
+            )
             photoMessage = null
             onPhotosAdded(photos)
         },
@@ -232,6 +244,7 @@ fun TripRecordEditorScreen(
         selectableLocations.filter { location ->
             locationSearchQuery.isBlank() ||
                 location.name.contains(locationSearchQuery, ignoreCase = true) ||
+                location.displayName(locations).contains(locationSearchQuery, ignoreCase = true) ||
                 location.regionCode.contains(locationSearchQuery, ignoreCase = true)
         }
     }
@@ -265,9 +278,13 @@ fun TripRecordEditorScreen(
                         PhotoSection(
                             locationName = uiState.selectedLocation?.name ?: "여행 장소",
                             photos = uiState.selectedPhotos,
-                            onAddClick = photoLibrary.pickFromGallery,
+                            onAddClick = {
+                                analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_PICKER_OPENED)
+                                photoLibrary.pickFromGallery()
+                            },
                             onRecommendClick = {
                                 if (isRecommendationLoading) {
+                                    analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_CANCELLED)
                                     photoLibrary.cancelRecommendation()
                                     photoMessage = "사진 불러오기를 중단했어요."
                                 } else {
@@ -275,6 +292,10 @@ fun TripRecordEditorScreen(
                                     if (selectedLocation == null) {
                                         photoMessage = "사진을 추천받으려면 장소를 먼저 선택해 주세요."
                                     } else {
+                                        analytics.logEvent(
+                                            MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_STARTED,
+                                            mapOf("location_type" to selectedLocation.type.name.lowercase()),
+                                        )
                                         photoMessage = "${selectedLocation.name}에서 촬영된 사진을 찾고 있어요."
                                         recommendationPagingState = PhotoRecommendationPagingState()
                                         lastAutoLoadTriggerKey = null
@@ -396,7 +417,7 @@ fun TripRecordEditorScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "국가, 시·도, 시·군·구를 검색해 보세요",
+                    text = "해외 국가 또는 국내 시·군·구를 검색해 보세요",
                     color = TripRecordPalette.current.muted,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 6.dp),
@@ -443,6 +464,13 @@ fun TripRecordEditorScreen(
                                 locations = locations,
                                 selected = uiState.selectedLocation?.regionCode == location.regionCode,
                                 onClick = {
+                                    analytics.logEvent(
+                                        MapmoryAnalyticsEvent.MAP_LOCATION_SELECTED,
+                                        mapOf(
+                                            "source" to "location_search",
+                                            "location_type" to location.type.name.lowercase(),
+                                        ),
+                                    )
                                     onLocationSelected(location)
                                     showLocationSheet = false
                                 },
@@ -535,6 +563,10 @@ fun TripRecordEditorScreen(
                             if (preparedPhotos.isEmpty()) {
                                 photoMessage = "선택한 사진의 원본을 읽지 못했어요."
                             } else {
+                                analytics.logEvent(
+                                    MapmoryAnalyticsEvent.PHOTOS_ADDED,
+                                    mapOf("source" to "recommendation", "count" to preparedPhotos.size.toString()),
+                                )
                                 onPhotosAdded(preparedPhotos)
                                 showRecommendationSheet = false
                                 photoMessage = null
@@ -562,18 +594,37 @@ fun TripRecordEditorScreen(
 
     val activeDatePickerTarget = datePickerTarget
     val isStartDatePicker = activeDatePickerTarget == StartDatePickerTarget
+    val today = remember(activeDatePickerTarget) {
+        Clock.System.now()
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+            .toString()
+    }
+    val minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
+        endDatePickerMinimumDate(uiState.startDate, today)
+    } else {
+        null
+    }
+    val maximumDate = if (activeDatePickerTarget == StartDatePickerTarget) {
+        startDatePickerMaximumDate(uiState.endDate, today)
+    } else {
+        today
+    }
+    val selectedDate = when (activeDatePickerTarget) {
+        StartDatePickerTarget -> uiState.startDate
+        EndDatePickerTarget -> uiState.endDate
+        else -> null
+    }
     PlatformDatePicker(
         visible = activeDatePickerTarget != null,
-        initialDate = when {
-            isStartDatePicker -> uiState.startDate
-            activeDatePickerTarget == EndDatePickerTarget -> uiState.endDate
-            else -> null
-        },
-        minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
-            uiState.startDate
-        } else {
-            null
-        },
+        initialDate = initialSelectableTripRecordDate(
+            selectedDate = selectedDate,
+            fallbackDate = today,
+            minimumDate = minimumDate,
+            maximumDate = maximumDate,
+        ),
+        minimumDate = minimumDate,
+        maximumDate = maximumDate,
         onDateSelected = { date ->
             if (isStartDatePicker) {
                 onStartDateChanged(date)
@@ -698,10 +749,8 @@ private fun PhotoSection(
                         )
                         Text(
                             text = loadingProgress?.let { progress ->
-                                progress.percentage?.let { percentage ->
-                                    "${progress.processed}/${progress.total} ($percentage%)"
-                                }
-                            } ?: "불러오는 중",
+                                progress.percentage?.let { percentage -> "중단 · $percentage%" }
+                            } ?: "중단",
                             color = TripRecordPalette.current.photoRecommendText,
                             fontSize = 9.sp,
                         )

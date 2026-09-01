@@ -39,6 +39,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.presentation.triprecord.state.TripRecordFilterUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
@@ -58,6 +60,7 @@ fun TripRecordListScreen(
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val analytics = LocalMapmoryAnalytics.current
     TripRecordBackground(
         modifier = modifier.then(rememberDismissKeyboardOnTapModifier()),
         backgroundColor = TripRecordPalette.current.pageBackground,
@@ -100,7 +103,10 @@ fun TripRecordListScreen(
                         } else {
                             TripRecordList(
                                 records = uiState.records,
-                                onRecordClick = onRecordClick,
+                                onRecordClick = { recordId ->
+                                    analytics.logEvent(MapmoryAnalyticsEvent.JOURNAL_RECORD_OPENED)
+                                    onRecordClick(recordId)
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -108,8 +114,20 @@ fun TripRecordListScreen(
                             PageControls(
                                 page = uiState.page,
                                 totalPages = uiState.totalPages,
-                                onPreviousPageClick = onPreviousPageClick,
-                                onNextPageClick = onNextPageClick,
+                                onPreviousPageClick = {
+                                    analytics.logEvent(
+                                        MapmoryAnalyticsEvent.JOURNAL_PAGE_CHANGED,
+                                        mapOf("direction" to "previous"),
+                                    )
+                                    onPreviousPageClick()
+                                },
+                                onNextPageClick = {
+                                    analytics.logEvent(
+                                        MapmoryAnalyticsEvent.JOURNAL_PAGE_CHANGED,
+                                        mapOf("direction" to "next"),
+                                    )
+                                    onNextPageClick()
+                                },
                             )
                         }
                     }
@@ -226,6 +244,7 @@ private fun JournalHeader(recordCount: Int) {
 
 @Composable
 private fun JournalTagFilters() {
+    val analytics = LocalMapmoryAnalytics.current
     val tags = remember { listOf("전체", "가족", "애인", "친구", "혼자") }
     var selectedTag by remember { mutableStateOf(tags.first()) }
 
@@ -239,7 +258,13 @@ private fun JournalTagFilters() {
             TripFilterChip(
                 text = tag,
                 selected = selectedTag == tag,
-                onClick = { selectedTag = tag },
+                onClick = {
+                    analytics.logEvent(
+                        MapmoryAnalyticsEvent.JOURNAL_FILTER_SELECTED,
+                        mapOf("tag" to tag),
+                    )
+                    selectedTag = tag
+                },
             )
         }
     }

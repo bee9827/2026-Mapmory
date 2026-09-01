@@ -3,7 +3,7 @@
 ## 목적
 
 Mapmory Android·iOS 앱의 기능 오류와 성능 저하를 같은 기준으로 확인한다.
-현재는 Firebase 같은 원격 SDK를 추가하지 않고, CI·Android Vitals·Logcat·Xcode Console·System Trace를 조합한다.
+CI·Android Vitals·Logcat·Xcode Console·System Trace를 기본으로 사용하고, Android·iOS의 사용자 행동은 Firebase Analytics로 보조 관측한다.
 
 모니터링은 사용자 행동 분석과 구분한다.
 
@@ -16,9 +16,16 @@ Mapmory Android·iOS 앱의 기능 오류와 성능 저하를 같은 기준으�
 - 사진 추천 흐름의 기존 `MapmoryPhotoPerf` 로그와 측정 문서를 연결했다.
 - iOS 사진 선택·추천 흐름에도 동일한 `MapmoryPhotoPerf` 측정 로그를 추가했다.
 - Android 앱 시작 시간을 cold start와 hot start로 반복 측정하는 로컬 스크립트를 추가했다.
+- Android·iOS 핵심 사용자 행동을 Firebase Analytics 이벤트로 기록하는 공통 인터페이스와 플랫폼별 구현을 연결했다.
 - 지도 선택 정확성, 사진 추천, 기록 저장을 우선 모니터링 대상으로 정했다.
 - 개인정보를 포함하지 않는 로그 규칙을 정했다.
-- Firebase와 같은 원격 SDK는 현재 범위에서 제외했다.
+- Android는 Firebase 설정 파일이 없는 개발·CI 환경에서 Analytics 어댑터가 no-op으로 동작한다. iOS는
+  `GoogleService-Info.plist`가 앱 번들에 포함되어야 Firebase 초기화를 검증할 수 있다.
+
+Firebase Analytics는 팀 공용 Firebase 프로젝트 `Mapmory Analytics`
+([콘솔](https://console.firebase.google.com/project/mapmory-analytics-b6a50/overview))에 연결했다.
+Android 앱은 `com.mapmory.android`, iOS 앱은 `com.mapmory.ios3`으로 등록되어 있으며, 두 앱의
+이벤트는 같은 프로젝트의 Analytics에서 앱별로 확인한다.
 
 이 문서는 현재 MVP의 개발·출시 전 검증 기준이다. 지도 전환을 자동 반복하는 Macrobenchmark와 원격 오류 수집은 별도 도입 조건이 충족될 때 추가한다.
 
@@ -28,6 +35,7 @@ Mapmory Android·iOS 앱의 기능 오류와 성능 저하를 같은 기준으�
 | --- | --- | --- |
 | PR 병합 전 | GitHub Actions CI | 테스트, Lint, Debug 빌드 |
 | 개발 중 | `MapmoryPhotoPerf`, Logcat, `android.os.Trace` | 사진 조회·EXIF·추천 단계별 시간 |
+| Android·iOS 사용자 행동 분석 | Firebase Analytics, DebugView, Analytics 대시보드 | 화면 진입, 지도 선택, 사진 추천, 기록 저장, 하단 탭 사용 |
 | iOS 개발 중 | `MapmoryPhotoPerf`, Xcode Console | PHPicker·PhotoKit 사진 선택·추천 시간 |
 | 성능 조사 | System Trace·Perfetto·Macrobenchmark | 앱 시작, 지도 전환, UI 응답성 |
 | Play 배포 후 | Play Console Android Vitals | 크래시, ANR, 시작 시간, 렌더링, 메모리 |
@@ -109,6 +117,71 @@ adb -s <serial> logcat -v time -s MapmoryPhotoPerf:D
 - 위도·경도 원본 좌표
 - 회원 식별 정보
 
+## Firebase Analytics 사용자 행동 이벤트
+
+Firebase Analytics는 기능 사용 여부와 전환 흐름을 확인하기 위한 용도로만 사용한다. 모든
+`Modifier.clickable`을 기록하지 않고, 제품 판단에 필요한 의미 있는 행동을 한 번씩 기록한다.
+
+| 이벤트 | 기록 시점 | 주요 파라미터 |
+| --- | --- | --- |
+| `screen_view` | 지도·기록 작성 화면 진입 | `screen_name` |
+| `bottom_nav_clicked` | 하단 지도·일지·통계 탭 클릭 | `from_tab`, `to_tab` |
+| `map_scope_changed` | 대한민국·전세계 전환 | `scope` |
+| `map_province_selected` | 대한민국 시·도 선택 | `province_code` |
+| `map_location_selected` | 지도 또는 장소 검색에서 지역 선택 | `location_type`, `has_records` |
+| `record_create_started` | 지도 FAB 클릭 | `source` |
+| `photo_recommendation_started` | 위치 기반 사진 추천 시작 | `location_type` |
+| `photo_recommendation_cancelled` | 사진 추천 중단 | 없음 |
+| `photos_added` | 갤러리·추천 사진을 기록에 추가 | `source`, `count` |
+| `record_save_started` | 기록 저장 시작 | `mode` |
+| `record_save_completed` | 기록 저장 성공 | `mode` |
+| `record_save_failed` | 기록 저장 실패 또는 검증 실패 | `mode` |
+| `journal_record_opened` | 일지에서 기록 선택 | 없음 |
+| `journal_filter_selected` | 일지 태그 필터 선택 | `tag` |
+
+기록 제목·본문, 사진 파일명·원본, GPS 좌표, 회원 식별자와 같은 개인정보 또는 원본 데이터는
+이벤트 파라미터로 보내지 않는다. `count`도 사진 내용이 아니라 처리된 개수만 의미한다.
+
+### DebugView로 Android 이벤트 확인
+
+Debug 빌드에서 대상 기기를 지정하고 앱을 다시 실행한다.
+
+```bash
+adb -s <serial> shell setprop debug.firebase.analytics.app com.mapmory.android
+```
+
+Firebase Console의 `Analytics > DebugView`에서 이벤트를 즉시 확인한다. 확인이 끝나면 다음 명령으로
+해당 기기의 DebugView 모드를 해제한다.
+
+```bash
+adb -s <serial> shell setprop debug.firebase.analytics.app .none.
+```
+
+Android 프로젝트의 `google-services.json`은 `client/androidApp/google-services.json`에 두고,
+앱 시작 시 `FirebaseApp.initializeApp()`으로 Firebase Analytics를 초기화한다. 설정 파일이 없는
+개발·CI 환경에서는 Analytics 어댑터가 no-op으로 동작하므로 빌드와 공통 테스트를 막지 않는다.
+
+### DebugView로 iOS 이벤트 확인
+
+Debug 빌드의 Scheme > Run > Arguments Passed On Launch에 `-FIRAnalyticsDebugEnabled`를 추가한 뒤
+Simulator 또는 실제 기기에서 앱을 실행한다. Firebase Console의 `Analytics > DebugView`에서
+`screen_view`, `map_location_selected` 등의 이벤트가 들어오는지 확인한다. 확인이 끝나면 해당
+실행 인자를 제거하거나 `-FIRAnalyticsDebugDisabled`를 사용해 DebugView를 해제한다.
+
+iOS 설정 파일은 `client/iosApp/GoogleService-Info.plist`에 두고, `MapmoryApp` 초기화 시
+`FirebaseApp.configure()`를 호출한다. Firebase Analytics 이벤트는 Swift 어댑터가 공통
+`MapmoryAnalytics` 인터페이스를 구현해 전달한다.
+
+### 현재 연결 확인 결과
+
+- Android Debug 빌드에서 새 Firebase App ID로 초기화되고 `screen_view`,
+  `record_create_started` 이벤트가 Logcat에 기록되며 업로드 응답 `204`를 확인했다.
+- iOS Simulator Debug 빌드에서 새 Firebase App ID로 초기화되고 Analytics 수집이 활성화되는 것을
+  확인했다. Simulator의 키체인 제약 때문에 Installation ID와 실제 이벤트 수신은 iOS 실기기에서
+  추가 확인한다.
+- DebugView는 이벤트 전송 후 콘솔에 반영되기까지 지연될 수 있으므로, 즉시 확인할 때는 기기 로그와
+  DebugView를 함께 확인한다.
+
 ## iOS 사진 성능 로그
 
 iOS의 `PHPicker`와 `PhotoKit` 흐름도 Debug 빌드에서만 `MapmoryPhotoPerf` 로그를 남긴다. 로그에는 사진 데이터나 좌표를 포함하지 않고 처리 시간과 개수만 포함한다.
@@ -169,13 +242,19 @@ Firebase는 백엔드 API나 데이터베이스를 대신하지 않는다.
 - Analytics: 기능 사용 흐름을 분석한다.
 - Performance: 앱 시작과 네트워크 등 성능을 원격으로 수집한다.
 
-현재 MVP에는 Firebase 프로젝트 설정과 원격 오류 수집 동의가 없으므로 Firebase SDK를 추가하지 않는다. Play 배포 후 Android는 Android Vitals, 개발 중 Android·iOS는 로컬 로그로 확인한다.
+현재 구현은 Android·iOS 앱에 Firebase Analytics 어댑터와 이벤트 호출을 연결했다. Android는
+`google-services.json`, iOS는 `GoogleService-Info.plist`가 포함된 빌드에서 이벤트를 전송한다.
+Android는 설정 파일이 없으면 no-op으로 동작하지만, iOS는 `GoogleService-Info.plist`가 앱 번들에
+포함되어야 한다. Firebase Analytics를 실제 출시 빌드에서 활성화하면 개인정보처리방침과 Play
+Console 데이터 보안 응답을 최종 배포 빌드 기준으로 갱신해야 한다.
 
-실제 사용자 환경에서 재현되지 않는 오류를 원격으로 추적해야 할 때 Crashlytics 도입을 별도 결정한다. 도입하면 Firebase 설정 파일, CI 비밀값, 개인정보처리방침과 Play Console 데이터 보안 응답을 함께 갱신해야 한다.
+실제 사용자 환경에서 재현되지 않는 오류를 원격으로 추적해야 할 때 Crashlytics 도입을 별도 결정한다.
+Crashlytics와 Performance Monitoring은 현재 연결하지 않았다.
 
 ## 후속 작업
 
 1. 이 기준으로 Android·iOS 사진 추천 로그를 같은 데이터 조건에서 측정해 기준선을 만든다.
 2. 지도 전환 지연이 반복적으로 확인되고 전용 테스트 기기 환경을 운영할 수 있을 때 Macrobenchmark를 추가한다.
 3. 비공개·프로덕션 테스트에서 Android Vitals를 주기적으로 확인한다.
-4. 원격 오류 추적이 필요해지는 시점에만 Crashlytics를 검토한다.
+4. Android·iOS DebugView에서 이벤트 수신을 각각 확인하고, 개인정보처리방침과 Play Console 데이터 보안 응답을 함께 검토한다.
+5. 원격 오류 추적이 필요해지는 시점에만 Crashlytics를 검토한다.
