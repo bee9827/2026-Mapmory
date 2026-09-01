@@ -69,6 +69,8 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.collect
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.photo.PhotoLibraryActionsFactory
@@ -154,6 +156,7 @@ fun TripRecordEditorScreen(
         },
     modifier: Modifier = Modifier,
 ) {
+    val analytics = LocalMapmoryAnalytics.current
     val selectableLocations = remember(locations) {
         locations.selectableTripRecordDestinations()
     }
@@ -170,6 +173,10 @@ fun TripRecordEditorScreen(
     val dismissKeyboardOnTap = rememberDismissKeyboardOnTapModifier()
     val photoLibrary = photoLibraryActionsFactory(
         { photos ->
+            analytics.logEvent(
+                MapmoryAnalyticsEvent.PHOTOS_ADDED,
+                mapOf("source" to "gallery", "count" to photos.size.toString()),
+            )
             photoMessage = null
             onPhotosAdded(photos)
         },
@@ -271,9 +278,13 @@ fun TripRecordEditorScreen(
                         PhotoSection(
                             locationName = uiState.selectedLocation?.name ?: "여행 장소",
                             photos = uiState.selectedPhotos,
-                            onAddClick = photoLibrary.pickFromGallery,
+                            onAddClick = {
+                                analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_PICKER_OPENED)
+                                photoLibrary.pickFromGallery()
+                            },
                             onRecommendClick = {
                                 if (isRecommendationLoading) {
+                                    analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_CANCELLED)
                                     photoLibrary.cancelRecommendation()
                                     photoMessage = "사진 불러오기를 중단했어요."
                                 } else {
@@ -281,6 +292,10 @@ fun TripRecordEditorScreen(
                                     if (selectedLocation == null) {
                                         photoMessage = "사진을 추천받으려면 장소를 먼저 선택해 주세요."
                                     } else {
+                                        analytics.logEvent(
+                                            MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_STARTED,
+                                            mapOf("location_type" to selectedLocation.type.name.lowercase()),
+                                        )
                                         photoMessage = "${selectedLocation.name}에서 촬영된 사진을 찾고 있어요."
                                         recommendationPagingState = PhotoRecommendationPagingState()
                                         lastAutoLoadTriggerKey = null
@@ -449,6 +464,13 @@ fun TripRecordEditorScreen(
                                 locations = locations,
                                 selected = uiState.selectedLocation?.regionCode == location.regionCode,
                                 onClick = {
+                                    analytics.logEvent(
+                                        MapmoryAnalyticsEvent.MAP_LOCATION_SELECTED,
+                                        mapOf(
+                                            "source" to "location_search",
+                                            "location_type" to location.type.name.lowercase(),
+                                        ),
+                                    )
                                     onLocationSelected(location)
                                     showLocationSheet = false
                                 },
@@ -541,6 +563,10 @@ fun TripRecordEditorScreen(
                             if (preparedPhotos.isEmpty()) {
                                 photoMessage = "선택한 사진의 원본을 읽지 못했어요."
                             } else {
+                                analytics.logEvent(
+                                    MapmoryAnalyticsEvent.PHOTOS_ADDED,
+                                    mapOf("source" to "recommendation", "count" to preparedPhotos.size.toString()),
+                                )
                                 onPhotosAdded(preparedPhotos)
                                 showRecommendationSheet = false
                                 photoMessage = null
