@@ -5,7 +5,6 @@ import com.mapmory.backend.common.monitoring.MonitoredOperation;
 import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.recordmedia.ExpiringUrl;
-import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
@@ -19,6 +18,7 @@ import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
 import com.mapmory.backend.upload.service.UploadedObjectVerifier;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
@@ -200,7 +200,7 @@ public class TravelRecordService {
         Map<Long, List<Tag>> tagsByTravelRecordId =
                 travelRecordTagService.findByTravelRecordIds(travelRecordIds);
         Map<Long, ExpiringUrl> thumbnailUrlsByTravelRecordId =
-                recordMediaUrlService.createThumbnailUrls(travelRecordIds);
+                createThumbnailUrls(travelRecordIds);
         return TravelRecordListResponse.from(
                 travelRecords,
                 tagsByTravelRecordId,
@@ -294,6 +294,21 @@ public class TravelRecordService {
                 && travelRecordRepository.existsMediaByObjectKeyIn(newObjectKeys)) {
             throw new BusinessException(TravelRecordErrorCode.INVALID_OBJECT_KEY);
         }
+    }
+
+    private Map<Long, ExpiringUrl> createThumbnailUrls(List<Long> travelRecordIds) {
+        if (travelRecordIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, ExpiringUrl> thumbnailUrls = new HashMap<>();
+        for (RecordMedia recordMedia : travelRecordRepository.findMediaByTravelRecordIdIn(travelRecordIds)) {
+            thumbnailUrls.computeIfAbsent(
+                    recordMedia.travelRecordId(),
+                    ignored -> recordMediaUrlService.createViewUrl(recordMedia.getThumbnailObjectKey())
+            );
+        }
+        return Map.copyOf(thumbnailUrls);
     }
 
     private TravelRecordDetailResponse createDetailResponse(

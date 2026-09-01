@@ -189,6 +189,12 @@ travelrecord/
 `RecordMedia`(엔티티)는 TravelRecord 애그리거트 내부이므로 `travelrecord` 패키지로 옮긴다.
 `RecordMediaUrlService`(presigned URL 발급)는 인프라 관심사이므로 `recordmedia`에 남는다.
 
+**엔티티를 옮기는 것만으로는 순환 참조가 끊기지 않는다.** `RecordMediaUrlService`가 목록 썸네일을
+만들기 위해 `RecordMedia`와 그 리포지토리를 쓰고 있어서, 엔티티를 옮기면 방향만 뒤집힐 뿐이다.
+썸네일 조회를 루트 리포지토리로 올리고 URL 서비스가 **Object Key 하나를 URL로 바꾸는 일만** 하도록
+줄여야 끊긴다. 그 결과 `recordmedia`에는 `ExpiringUrl`과 `RecordMediaUrlService`만 남고,
+`RecordMediaRepository`는 사라진다.
+
 ### 7. 단계적으로 적용한다
 
 경계를 먼저 확정하고(이 ADR), 코드는 되돌리기 쉬운 것부터 바꾼다.
@@ -199,13 +205,14 @@ travelrecord/
 | 1 | VO 추출 — `TravelPeriod`, `ObjectKey` | 낮음 | 쉬움 | 중 |
 | 2 | 불변식을 애그리거트로 — `syncMedia`, 태그 개수 제한 | 중간 | 보통 | **높음** |
 | 3 | 리포지토리 정리 — 미디어 컬렉션 소유, 죽은 메서드 제거, 생성 경로 검증 정합 | 중간 | 어려움 | 중 |
-| 4 | `RecordMedia` 패키지 이동 | 낮음 | 쉬움 | 낮음 |
+| 4 | `RecordMedia` 패키지 이동과 순환 참조 해소 | 중간 | 보통 | 낮음 |
 
 1단계를 먼저 두는 이유는 `TagName`이라는 선례가 이미 있어 판단 기준이 서 있고,
 `validateTravelDates`가 `TravelPeriod`로 들어가면 응용 서비스에서 검증 메서드가 통째로 빠지기 때문이다.
 
 2단계가 실질 이득의 대부분이다. 3단계는 쿼리 실행 계획에 영향을 주므로 측정을 동반한다.
-4단계는 순수 이동이라 리뷰는 쉽지만 diff가 크므로, 진행 중인 다른 작업이 없을 때 한다.
+4단계는 파일 이동이 대부분이라 리뷰는 쉽지만 diff가 크므로, 진행 중인 다른 작업이 없을 때 한다.
+순수 이동만으로 끝나지 않는다는 점은 결정 6에 적었다.
 
 3단계에서 함께 정리할 항목은 다음과 같다.
 
@@ -276,3 +283,20 @@ travelrecord/
   클라이언트가 수정 직후 화면을 다시 그리지 않아도 된다면 응답을 줄이는 편이 구조상 유리하다. 기획·안드로이드 확인 필요.
 - **폴더 분리 재검토 시점.** 팀이 `domain` / `application` 폴더를 명시적으로 원하면 4단계 이후 언제든 가능하다.
 - **태그 개수 제한(회원 10개, 기록 5개)** 은 ADR 0013대로 여전히 잠정값이다. 2단계에서 위치만 옮기고 값은 바꾸지 않는다.
+
+---
+
+## 2026-09-01 보완: 4단계 실측 결과
+
+썸네일 조회를 `RecordMediaRepository`의 파생 쿼리에서 `TravelRecordRepository`의 명시 쿼리로
+옮겼다. 생성 SQL은 컬럼·WHERE·ORDER BY까지 이전과 같다.
+
+```sql
+select rm1_0.id, rm1_0.created_at, rm1_0.object_key,
+       rm1_0.sort_order, rm1_0.thumb_key, rm1_0.travel_record_id
+from record_media rm1_0
+where rm1_0.travel_record_id in (?)
+order by rm1_0.travel_record_id, rm1_0.sort_order, rm1_0.id
+```
+
+4단계까지 마치면 패키지 의존은 `travelrecord → recordmedia` 한 방향만 남는다.

@@ -1,6 +1,7 @@
 package com.mapmory.backend.travelrecord;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,19 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, Long
         WHERE rm.objectKey.value IN :objectKeys
     """)
     boolean existsMediaByObjectKeyIn(@Param("objectKeys") Collection<String> objectKeys);
+
+    /**
+     * 목록 화면의 썸네일용. 일지별로 정렬 순서가 가장 앞선 미디어를 고르기 위해 정렬해서 가져온다.
+     */
+    @Query("""
+        SELECT rm
+        FROM RecordMedia rm
+        WHERE rm.travelRecord.id IN :travelRecordIds
+        ORDER BY rm.travelRecord.id ASC, rm.sortOrder ASC, rm.id ASC
+    """)
+    List<RecordMedia> findMediaByTravelRecordIdIn(
+            @Param("travelRecordIds") Collection<Long> travelRecordIds
+    );
 
     @Query("""
         SELECT tr

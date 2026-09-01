@@ -1,4 +1,4 @@
-package com.mapmory.backend.recordmedia;
+package com.mapmory.backend.travelrecord;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;

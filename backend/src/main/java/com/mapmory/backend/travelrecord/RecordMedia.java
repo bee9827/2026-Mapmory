@@ -1,6 +1,5 @@
-package com.mapmory.backend.recordmedia;
+package com.mapmory.backend.travelrecord;
 
-import com.mapmory.backend.travelrecord.TravelRecord;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;

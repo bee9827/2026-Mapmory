@@ -1,9 +1,8 @@
-package com.mapmory.backend.recordmedia;
+package com.mapmory.backend.travelrecord;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
-import com.mapmory.backend.travelrecord.TravelRecord;
 import org.junit.jupiter.api.Test;
 
 class RecordMediaTest {
