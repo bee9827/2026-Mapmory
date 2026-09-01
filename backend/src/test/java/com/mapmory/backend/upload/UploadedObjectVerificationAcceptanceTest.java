@@ -16,6 +16,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.recordmedia.ExpiringUrl;
+import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.upload.storage.UploadedObjectChecker;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -42,10 +44,15 @@ class UploadedObjectVerificationAcceptanceTest extends IntegrationTest {
     @MockitoBean
     private UploadedObjectChecker uploadedObjectChecker;
 
+    @MockitoBean
+    private RecordMediaUrlService recordMediaUrlService;
+
     @BeforeEach
     void setUp() {
         given(uploadedObjectChecker.exists(anyString())).willReturn(true);
         given(uploadedObjectChecker.exists(MISSING_KEY)).willReturn(false);
+        given(recordMediaUrlService.createViewUrl(anyString()))
+                .willReturn(new ExpiringUrl("https://download.example/image.jpg", 300L));
     }
 
     @Test

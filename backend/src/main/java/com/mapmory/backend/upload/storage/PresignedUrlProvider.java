@@ -11,4 +11,9 @@ public interface PresignedUrlProvider {
             long contentLength,
             Duration expiration
     );
+
+    URI createPresignedGetUrl(
+            String objectKey,
+            Duration expiration
+    );
 }
