@@ -94,7 +94,11 @@ internal fun MapRoute(
                     scope = MapScope.WORLD,
                     visitedCountryCodes = viewModel.visitedCountryCodes,
                     onCountryClick = { countryCode ->
-                        regionCatalog.findByCode(countryCode)?.let(::openLocation)
+                        if (countryCode == KoreaCountryCode) {
+                            viewModel.changeScope(MapScope.KOREA)
+                        } else {
+                            regionCatalog.findByCode(countryCode)?.let(::openLocation)
+                        }
                     },
                 )
 
@@ -160,3 +164,5 @@ private fun KoreaMapUiState.provinceCodeOrNull(): String? = when (this) {
     is KoreaMapUiState.Error -> provinceCode
     KoreaMapUiState.ProvinceOverview -> null
 }
+
+private const val KoreaCountryCode = "KR"
