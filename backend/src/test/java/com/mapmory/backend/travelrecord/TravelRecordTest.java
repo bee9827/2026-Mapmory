@@ -24,69 +24,66 @@ class TravelRecordTest {
     @Test
     void 요청_순서를_미디어_정렬_순서로_삼는다() {
         TravelRecord travelRecord = travelRecord();
-        RecordMedia mediaA = RecordMedia.of(travelRecord, KEY_A, null, 0);
-        RecordMedia mediaB = RecordMedia.of(travelRecord, KEY_B, null, 1);
+        travelRecord.synchronizeMedia(List.of(KEY_A, KEY_B));
 
-        MediaSynchronization result = travelRecord.synchronizeMedia(
-                List.of(mediaA, mediaB),
-                List.of(KEY_B, KEY_A)
-        );
+        travelRecord.synchronizeMedia(List.of(KEY_B, KEY_A));
 
-        assertThat(result.media()).containsExactly(mediaB, mediaA);
-        assertThat(mediaB.getSortOrder()).isZero();
-        assertThat(mediaA.getSortOrder()).isEqualTo(1);
-        assertThat(result.removed()).isEmpty();
+        assertThat(travelRecord.getMedia())
+                .extracting(RecordMedia::getObjectKey)
+                .containsExactly(KEY_B, KEY_A);
+        assertThat(travelRecord.getMedia())
+                .extracting(RecordMedia::getSortOrder)
+                .containsExactly(0, 1);
     }
 
     @Test
-    void 요청에_없는_미디어는_제거_대상이_된다() {
+    void 요청에_없는_미디어는_컬렉션에서_떨어진다() {
         TravelRecord travelRecord = travelRecord();
-        RecordMedia mediaA = RecordMedia.of(travelRecord, KEY_A, null, 0);
-        RecordMedia mediaB = RecordMedia.of(travelRecord, KEY_B, null, 1);
+        travelRecord.synchronizeMedia(List.of(KEY_A, KEY_B));
 
-        MediaSynchronization result = travelRecord.synchronizeMedia(
-                List.of(mediaA, mediaB),
-                List.of(KEY_B)
-        );
+        travelRecord.synchronizeMedia(List.of(KEY_B));
 
-        assertThat(result.media()).containsExactly(mediaB);
-        assertThat(result.removed()).containsExactly(mediaA);
+        assertThat(travelRecord.getMedia())
+                .extracting(RecordMedia::getObjectKey)
+                .containsExactly(KEY_B);
     }
 
     @Test
     void 새_Object_Key는_미디어를_만들어_붙인다() {
         TravelRecord travelRecord = travelRecord();
-        RecordMedia mediaA = RecordMedia.of(travelRecord, KEY_A, null, 0);
+        travelRecord.synchronizeMedia(List.of(KEY_A));
 
-        MediaSynchronization result = travelRecord.synchronizeMedia(
-                List.of(mediaA),
-                List.of(KEY_A, KEY_C)
-        );
+        travelRecord.synchronizeMedia(List.of(KEY_A, KEY_C));
 
-        assertThat(result.media()).hasSize(2);
-        assertThat(result.media())
+        assertThat(travelRecord.getMedia())
                 .extracting(RecordMedia::getObjectKey)
                 .containsExactly(KEY_A, KEY_C);
-        assertThat(result.media().getLast().getSortOrder()).isEqualTo(1);
-        assertThat(result.removed()).isEmpty();
+        assertThat(travelRecord.getMedia().getLast().getSortOrder()).isEqualTo(1);
     }
 
     @Test
-    void 빈_Object_Key_목록은_모든_미디어를_제거_대상으로_삼는다() {
+    void 빈_Object_Key_목록은_모든_미디어를_떼어낸다() {
         TravelRecord travelRecord = travelRecord();
-        RecordMedia mediaA = RecordMedia.of(travelRecord, KEY_A, null, 0);
+        travelRecord.synchronizeMedia(List.of(KEY_A));
 
-        MediaSynchronization result = travelRecord.synchronizeMedia(List.of(mediaA), List.of());
+        travelRecord.synchronizeMedia(List.of());
 
-        assertThat(result.media()).isEmpty();
-        assertThat(result.removed()).containsExactly(mediaA);
+        assertThat(travelRecord.getMedia()).isEmpty();
     }
 
     @Test
     void 한_일지_안에서_Object_Key가_중복되면_거부한다() {
+        assertThatThrownBy(() -> TravelRecord.validateObjectKeys(List.of(KEY_A, KEY_A)))
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("INVALID_OBJECT_KEY");
+    }
+
+    @Test
+    void 동기화도_중복_Object_Key를_거부한다() {
         TravelRecord travelRecord = travelRecord();
 
-        assertThatThrownBy(() -> travelRecord.validateObjectKeys(List.of(KEY_A, KEY_A)))
+        assertThatThrownBy(() -> travelRecord.synchronizeMedia(List.of(KEY_A, KEY_A)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
                 .isEqualTo("INVALID_OBJECT_KEY");
@@ -95,12 +92,9 @@ class TravelRecordTest {
     @Test
     void 이미_가진_Object_Key는_새_키가_아니다() {
         TravelRecord travelRecord = travelRecord();
-        RecordMedia mediaA = RecordMedia.of(travelRecord, KEY_A, null, 0);
+        travelRecord.synchronizeMedia(List.of(KEY_A));
 
-        List<String> newObjectKeys = travelRecord.newObjectKeys(
-                List.of(mediaA),
-                List.of(KEY_A, KEY_C)
-        );
+        List<String> newObjectKeys = travelRecord.newObjectKeys(List.of(KEY_A, KEY_C));
 
         assertThat(newObjectKeys).containsExactly(KEY_C);
     }
