@@ -20,4 +20,4 @@ Mapmory 백엔드의 주요 설계 결정을 기록한다.
 | [0014](0014-application-logging-and-metrics.md) | 애플리케이션 로그와 메트릭 공통 관측 규칙 | 채택 |
 | [0015](0015-guest-login.md) | 게스트 로그인의 인증 파이프라인 재사용과 회원 승격 | 채택 |
 | [0016](0016-travel-statistics-read-model.md) | 여행 통계 읽기 모델과 지역 집계 단계 | 채택 |
-| [0017](0017-domain-layering-and-aggregate-boundaries.md) | 도메인 계층 구조와 애그리거트 경계 | 제안 |
+| [0017](0017-domain-layering-and-aggregate-boundaries.md) | 도메인 계층 구조와 애그리거트 경계 | 채택 |
