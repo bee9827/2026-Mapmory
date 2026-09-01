@@ -27,9 +27,11 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.colorResource
 import com.mapmory.shared.MapmoryApp
 import com.mapmory.shared.MapmoryNavigation
+import com.mapmory.android.analytics.FirebaseAnalyticsLogger
 
 class MainActivity : ComponentActivity() {
     private val appViewModel: MapmoryAppViewModel by viewModels()
+    private val analyticsLogger by lazy { FirebaseAnalyticsLogger(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +68,7 @@ class MainActivity : ComponentActivity() {
                     MapmoryApp(
                         container = appViewModel.container,
                         navigation = navigation,
+                        analytics = analyticsLogger,
                         contentWindowInsets = WindowInsets.safeDrawing,
                         initialIsDarkTheme = isDarkTheme,
                         onThemeChanged = { isDarkTheme = it },
