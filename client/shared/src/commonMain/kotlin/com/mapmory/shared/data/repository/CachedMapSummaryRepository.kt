@@ -38,24 +38,28 @@ internal class CachedMapSummaryRepository(
 ) : MapSummaryRepository {
     private var snapshot = cache.read() ?: MapSummarySnapshot()
 
-    override fun getCachedRootRegions(): List<MapRegionSummary>? =
-        snapshot.roots.takeIf { roots -> roots.isNotEmpty() }
+    override fun getCachedRootRegions(tagId: Long?): List<MapRegionSummary>? =
+        if (tagId == null) snapshot.roots.takeIf { roots -> roots.isNotEmpty() } else null
 
-    override fun getCachedChildRegions(regionId: Long): List<MapRegionSummary>? =
-        snapshot.childrenByRegionId[regionId]
+    override fun getCachedChildRegions(regionId: Long, tagId: Long?): List<MapRegionSummary>? =
+        if (tagId == null) snapshot.childrenByRegionId[regionId] else null
 
-    override suspend fun getRootRegions(): Result<List<MapRegionSummary>> =
-        delegate.getRootRegions().onSuccess { roots ->
-            snapshot = snapshot.copy(roots = roots)
-            runCatching { cache.write(snapshot) }
+    override suspend fun getRootRegions(tagId: Long?): Result<List<MapRegionSummary>> =
+        delegate.getRootRegions(tagId).onSuccess { roots ->
+            if (tagId == null) {
+                snapshot = snapshot.copy(roots = roots)
+                runCatching { cache.write(snapshot) }
+            }
         }
 
-    override suspend fun getChildRegions(regionId: Long): Result<List<MapRegionSummary>> =
-        delegate.getChildRegions(regionId).onSuccess { children ->
-            snapshot = snapshot.copy(
-                childrenByRegionId = snapshot.childrenByRegionId + (regionId to children),
-            )
-            runCatching { cache.write(snapshot) }
+    override suspend fun getChildRegions(regionId: Long, tagId: Long?): Result<List<MapRegionSummary>> =
+        delegate.getChildRegions(regionId, tagId).onSuccess { children ->
+            if (tagId == null) {
+                snapshot = snapshot.copy(
+                    childrenByRegionId = snapshot.childrenByRegionId + (regionId to children),
+                )
+                runCatching { cache.write(snapshot) }
+            }
         }
 
     fun invalidate() {

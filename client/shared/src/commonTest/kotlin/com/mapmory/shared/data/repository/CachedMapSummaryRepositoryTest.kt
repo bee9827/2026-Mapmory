@@ -40,9 +40,9 @@ private class StaticMapSummaryRepository(
     private val roots: List<MapRegionSummary>,
     private val children: Map<Long, List<MapRegionSummary>>,
 ) : MapSummaryRepository {
-    override suspend fun getRootRegions(): Result<List<MapRegionSummary>> = Result.success(roots)
+    override suspend fun getRootRegions(tagId: Long?): Result<List<MapRegionSummary>> = Result.success(roots)
 
-    override suspend fun getChildRegions(regionId: Long): Result<List<MapRegionSummary>> =
+    override suspend fun getChildRegions(regionId: Long, tagId: Long?): Result<List<MapRegionSummary>> =
         Result.success(children[regionId].orEmpty())
 }
 
