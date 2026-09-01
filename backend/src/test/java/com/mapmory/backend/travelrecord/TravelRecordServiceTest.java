@@ -411,7 +411,15 @@ class TravelRecordServiceTest {
 
     @Test
     void 수정_요청의_중복_Object_Key를_거부한다() {
-        TravelRecord travelRecord = mock(TravelRecord.class);
+        Region japan = Region.of(null, null, "JP", "일본", RegionType.COUNTRY);
+        TravelRecord travelRecord = TravelRecord.of(
+                mock(Member.class),
+                japan,
+                "일본 여행",
+                "본문",
+                LocalDate.of(2026, 8, 11),
+                null
+        );
         TravelRecordRequest request = new TravelRecordRequest(
                 "JP",
                 null,

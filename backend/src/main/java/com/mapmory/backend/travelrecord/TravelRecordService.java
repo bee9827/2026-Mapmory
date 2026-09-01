@@ -20,13 +20,8 @@ import com.mapmory.backend.travelrecordtag.TravelRecordTagService;
 import com.mapmory.backend.upload.service.UploadedObjectVerifier;
 import java.time.Clock;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -132,12 +127,12 @@ public class TravelRecordService {
         TravelRecord travelRecord = travelRecordRepository.findByIdAndMemberId(travelRecordId, member.getId())
                 .orElseThrow(() -> new BusinessException(TravelRecordErrorCode.TRAVEL_RECORD_NOT_FOUND));
         List<String> objectKeys = objectKeys(request);
-        validateUniqueObjectKeys(objectKeys);
+        travelRecord.validateObjectKeys(objectKeys);
 
         Region region = resolveRegion(request);
         List<RecordMedia> existingMedia = recordMediaRepository
                 .findByTravelRecordIdOrderBySortOrderAsc(travelRecordId);
-        List<String> newObjectKeys = newObjectKeys(objectKeys, existingMedia);
+        List<String> newObjectKeys = travelRecord.newObjectKeys(existingMedia, objectKeys);
         validateObjectKeysAreAvailable(newObjectKeys);
         uploadedObjectVerifier.verifyAllUploaded(newObjectKeys);
 
@@ -152,10 +147,8 @@ public class TravelRecordService {
         List<RecordMedia> updatedMedia = operationTimer.record(
                 MonitoredOperation.MEDIA_SYNC,
                 () -> {
-                    List<RecordMedia> synchronizedMedia = synchronizeMedia(
-                            travelRecord,
-                            existingMedia,
-                            objectKeys
+                    List<RecordMedia> synchronizedMedia = applyMediaSynchronization(
+                            travelRecord.synchronizeMedia(existingMedia, objectKeys)
                     );
                     travelRecordRepository.flush();
                     return synchronizedMedia;
@@ -276,12 +269,7 @@ public class TravelRecordService {
     }
 
     private void validateTravelDates(LocalDate startDate, LocalDate endDate) {
-        LocalDate today = LocalDate.now(clock);
-        if (startDate == null
-                || startDate.isAfter(today)
-                || (endDate != null && (endDate.isBefore(startDate) || endDate.isAfter(today)))) {
-            throw new BusinessException(TravelRecordErrorCode.INVALID_TRAVEL_DATE_RANGE);
-        }
+        TravelPeriod.of(startDate, endDate).validateNotAfter(LocalDate.now(clock));
     }
 
     private Pageable createPageable(int page, int size) {
@@ -318,26 +306,8 @@ public class TravelRecordService {
         }
     }
 
-    private void validateUniqueObjectKeys(List<String> objectKeys) {
-        if (new HashSet<>(objectKeys).size() != objectKeys.size()) {
-            throw new BusinessException(TravelRecordErrorCode.INVALID_OBJECT_KEY);
-        }
-    }
-
     private static List<String> objectKeys(TravelRecordRequest request) {
         return request.objectKeys() == null ? List.of() : request.objectKeys();
-    }
-
-    private static List<String> newObjectKeys(
-            List<String> objectKeys,
-            List<RecordMedia> existingMedia
-    ) {
-        Set<String> existingObjectKeys = existingMedia.stream()
-                .map(RecordMedia::getObjectKey)
-                .collect(Collectors.toSet());
-        return objectKeys.stream()
-                .filter(objectKey -> !existingObjectKeys.contains(objectKey))
-                .toList();
     }
 
     private void validateObjectKeysAreAvailable(List<String> newObjectKeys) {
@@ -347,30 +317,9 @@ public class TravelRecordService {
         }
     }
 
-    private List<RecordMedia> synchronizeMedia(
-            TravelRecord travelRecord,
-            List<RecordMedia> existingMedia,
-            List<String> objectKeys
-    ) {
-        Map<String, RecordMedia> existingMediaByObjectKey = new HashMap<>();
-        for (RecordMedia recordMedia : existingMedia) {
-            existingMediaByObjectKey.put(recordMedia.getObjectKey(), recordMedia);
-        }
-
-        List<RecordMedia> updatedMedia = new ArrayList<>();
-        for (int index = 0; index < objectKeys.size(); index++) {
-            String objectKey = objectKeys.get(index);
-            RecordMedia recordMedia = existingMediaByObjectKey.remove(objectKey);
-            if (recordMedia == null) {
-                recordMedia = RecordMedia.of(travelRecord, objectKey, null, index);
-            } else {
-                recordMedia.updateSortOrder(index);
-            }
-            updatedMedia.add(recordMedia);
-        }
-
-        recordMediaRepository.deleteAll(existingMediaByObjectKey.values());
-        return recordMediaRepository.saveAll(updatedMedia);
+    private List<RecordMedia> applyMediaSynchronization(MediaSynchronization synchronization) {
+        recordMediaRepository.deleteAll(synchronization.removed());
+        return recordMediaRepository.saveAll(synchronization.media());
     }
 
     private TravelRecordDetailResponse createDetailResponse(
