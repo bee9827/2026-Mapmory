@@ -150,3 +150,22 @@ data class MapRegionSummaryDto(
     val count: Long,
     val level: String,
 )
+
+@Serializable
+data class TripStatisticsDto(
+    val recordCount: Long,
+    val mediaCount: Long,
+    val visitedCountryCount: Long,
+    val visitedKoreaDistrictCount: Long,
+    val visitedCountryCodes: List<String>,
+    val topRegions: List<TopRegionStatisticsDto>,
+)
+
+@Serializable
+data class TopRegionStatisticsDto(
+    val regionId: Long,
+    val code: String,
+    val regionType: String,
+    val name: String,
+    val recordCount: Long,
+)

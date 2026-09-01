@@ -20,6 +20,7 @@ import kotlinx.coroutines.runBlocking
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
+import com.mapmory.shared.presentation.triprecord.state.TripStatisticsUiState
 import com.mapmory.shared.runSuspend
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -203,6 +204,7 @@ class AppContainerTest {
 
         assertIs<TripRecordRemoteRepository>(container.tripRecordRepository)
         assertIs<MapSummaryRemoteRepository>(container.mapSummaryRepository)
+        assertEquals(null, container.tripStatisticsRepository.getCachedStatistics())
         container.close()
     }
 
@@ -240,7 +242,12 @@ class AppContainerTest {
             ),
         )
 
+        val initialStatistics = container.viewModelFactory.createTripStatisticsViewModel()
+        initialStatistics.refresh()
+        assertTrue(container.tripStatisticsRepository.getCachedStatistics() != null)
+
         assertTrue(editor.save())
+        assertEquals(null, container.tripStatisticsRepository.getCachedStatistics())
 
         val list = container.viewModelFactory.createTripRecordListViewModel()
         list.load()
@@ -264,8 +271,19 @@ class AppContainerTest {
             detailState.record.photos.single().previewBytes?.bytesForDecoding(),
         )
 
+        val statistics = container.viewModelFactory.createTripStatisticsViewModel()
+        statistics.refresh()
+        val statisticsState = assertIs<TripStatisticsUiState.Success>(statistics.uiState).statistics
+        assertEquals(1, statisticsState.recordCount)
+        assertEquals(1, statisticsState.photoCount)
+        assertEquals(1, statisticsState.koreaVisitedCount)
+
         assertNotSame(list, container.viewModelFactory.createTripRecordListViewModel())
         assertNotSame(detail, container.viewModelFactory.createTripRecordDetailViewModel())
+        assertNotSame(
+            container.viewModelFactory.createTripStatisticsViewModel(),
+            container.viewModelFactory.createTripStatisticsViewModel(),
+        )
     }
 }
 

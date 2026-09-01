@@ -97,8 +97,13 @@ internal fun MapmoryNavHost(
         }
 
         composable<ProfileRoute> {
+            val viewModel = viewModel {
+                container.viewModelFactory.createTripStatisticsViewModel()
+            }
             TripProfileRoute(
                 modifier = Modifier.windowInsetsPadding(contentWindowInsets),
+                viewModel = viewModel,
+                tripRecordRevision = tripRecordRevision,
                 onOpenMap = navigator::navigateToMap,
                 onOpenRecords = navigator::navigateToRecords,
                 onOpenEditor = { navigator.navigateToEditor() },
