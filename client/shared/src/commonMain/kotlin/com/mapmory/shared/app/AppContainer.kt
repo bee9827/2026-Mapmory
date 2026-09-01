@@ -20,9 +20,12 @@ import com.mapmory.shared.data.repository.AuthenticatedMapSummaryRepository
 import com.mapmory.shared.data.repository.AuthenticatedTripRecordRepository
 import com.mapmory.shared.data.repository.AuthenticatedTripStatisticsRepository
 import com.mapmory.shared.data.repository.CachedMediaTripRecordRepository
+import com.mapmory.shared.data.repository.CachedMapSummaryRepository
 import com.mapmory.shared.data.repository.CachedTripStatisticsRepository
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.data.repository.MemoryTripStatisticsCache
+import com.mapmory.shared.data.repository.MapSummaryCache
+import com.mapmory.shared.data.repository.MemoryMapSummaryCache
 import com.mapmory.shared.data.repository.TripStatisticsCache
 import com.mapmory.shared.data.repository.UploadingTripRecordRepository
 import com.mapmory.shared.domain.region.RegionCatalog
@@ -130,6 +133,7 @@ private class DefaultAppContainer(
         regionCatalog = regionCatalog,
         thumbnailLoader = thumbnailLoader,
         onTripRecordsChanged = {
+            (mapSummaryRepository as? CachedMapSummaryRepository)?.invalidate()
             (tripStatisticsRepository as? CachedTripStatisticsRepository)?.invalidate()
             mutableTripRecordRevision.update { revision -> revision + 1 }
         },
@@ -143,6 +147,7 @@ fun createAppContainer(
     mapSummaryRepository: MapSummaryRepository = requireNotNull(
         tripRecordRepository as? MapSummaryRepository,
     ) { "지도 요약 Repository를 함께 전달해 주세요." },
+    mapSummaryCache: MapSummaryCache = MemoryMapSummaryCache(),
     tripStatisticsRepository: TripStatisticsRepository = requireNotNull(
         tripRecordRepository as? TripStatisticsRepository,
     ) { "여행 통계 Repository를 함께 전달해 주세요." },
@@ -155,10 +160,14 @@ fun createAppContainer(
         delegate = tripStatisticsRepository,
         cache = tripStatisticsCache,
     )
+    val cachedMapSummary = CachedMapSummaryRepository(
+        delegate = mapSummaryRepository,
+        cache = mapSummaryCache,
+    )
     return DefaultAppContainer(
         regionCatalog = regionCatalog,
         tripRecordRepository = tripRecordRepository,
-        mapSummaryRepository = mapSummaryRepository,
+        mapSummaryRepository = cachedMapSummary,
         tripStatisticsRepository = cachedTripStatistics,
         thumbnailLoader = thumbnailLoader,
         onClose = onClose,
@@ -213,6 +222,7 @@ fun createGuestRemoteAppContainer(
     apiBaseUrl: String = MAPMORY_API_BASE_URL,
     regionCatalog: RegionCatalog = StaticRegionCatalog(),
     photoPreviewCache: PhotoPreviewCache = MemoryPhotoPreviewCache(),
+    mapSummaryCache: MapSummaryCache = MemoryMapSummaryCache(),
     tripStatisticsCache: TripStatisticsCache = MemoryTripStatisticsCache(),
 ): AppContainer {
     val client = createHttpClient()
@@ -222,6 +232,7 @@ fun createGuestRemoteAppContainer(
         tokenStore = tokenStore,
         regionCatalog = regionCatalog,
         photoPreviewCache = photoPreviewCache,
+        mapSummaryCache = mapSummaryCache,
         tripStatisticsCache = tripStatisticsCache,
         onClose = client::close,
     )
@@ -233,10 +244,12 @@ internal fun createGuestRemoteAppContainer(
     tokenStore: AuthTokenStore,
     regionCatalog: RegionCatalog = StaticRegionCatalog(),
     photoPreviewCache: PhotoPreviewCache = MemoryPhotoPreviewCache(),
+    mapSummaryCache: MapSummaryCache = MemoryMapSummaryCache(),
     tripStatisticsCache: TripStatisticsCache = MemoryTripStatisticsCache(),
     onClose: () -> Unit = client::close,
 ): AppContainer {
     if (tokenStore.load() == null) {
+        mapSummaryCache.clear()
         tripStatisticsCache.clear()
     }
     val session = GuestSessionManager(
@@ -283,6 +296,7 @@ internal fun createGuestRemoteAppContainer(
     return createAppContainer(
         tripRecordRepository = AuthenticatedTripRecordRepository(session, cachedMediaTripRecords),
         mapSummaryRepository = AuthenticatedMapSummaryRepository(session, remoteMapSummary),
+        mapSummaryCache = mapSummaryCache,
         tripStatisticsRepository = AuthenticatedTripStatisticsRepository(session, remoteTripStatistics),
         tripStatisticsCache = tripStatisticsCache,
         regionCatalog = regionCatalog,

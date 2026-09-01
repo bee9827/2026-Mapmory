@@ -4,7 +4,6 @@ import com.mapmory.shared.data.local.StaticRegionCatalog
 import com.mapmory.shared.data.auth.AuthTokenStore
 import com.mapmory.shared.data.auth.AuthTokens
 import com.mapmory.shared.data.remote.AccessTokenProvider
-import com.mapmory.shared.data.remote.MapSummaryRemoteRepository
 import com.mapmory.shared.data.remote.TripRecordRemoteRepository
 import com.mapmory.shared.data.remote.configureCommonHttpClient
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
@@ -203,7 +202,7 @@ class AppContainerTest {
         )
 
         assertIs<TripRecordRemoteRepository>(container.tripRecordRepository)
-        assertIs<MapSummaryRemoteRepository>(container.mapSummaryRepository)
+        assertEquals(null, container.mapSummaryRepository.getCachedRootRegions())
         assertEquals(null, container.tripStatisticsRepository.getCachedStatistics())
         container.close()
     }
@@ -218,7 +217,7 @@ class AppContainerTest {
         )
 
         assertSame(repository, container.tripRecordRepository)
-        assertSame(repository, container.mapSummaryRepository)
+        assertEquals(null, container.mapSummaryRepository.getCachedRootRegions())
     }
 
     @Test
