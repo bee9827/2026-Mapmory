@@ -300,3 +300,32 @@ order by rm1_0.travel_record_id, rm1_0.sort_order, rm1_0.id
 ```
 
 4단계까지 마치면 패키지 의존은 `travelrecord → recordmedia` 한 방향만 남는다.
+
+### 뒤늦게 확인한 3단계의 대가: 삭제 SQL
+
+3단계에서 목록·상세·동기화·존재 확인은 측정했으나 **삭제 경로를 빠뜨렸다.**
+4단계 병합 직전에 다시 재보니 문장 수가 늘어 있었다.
+
+```sql
+-- 이전: DB의 ON DELETE CASCADE 가 처리한다
+delete from travel_record where id=?
+
+-- 이후: JPA cascade 가 처리한다
+select ... from record_media where travel_record_id=?   -- 컬렉션 로딩
+delete from record_media where id=?                      -- 미디어마다 한 문장
+delete from travel_record where id=?
+```
+
+1문장에서 **N+2문장**이 됐다. 애그리거트가 컬렉션을 소유하면 JPA가 삭제를 관리하므로
+되돌리려면 소유 자체를 포기해야 한다. 즉 결정 1의 대가이지 버그가 아니다.
+
+**수용한다.** N이 일지당 사진 수로 묶여 있고 삭제는 드문 연산이다.
+`record_media`의 `ON DELETE CASCADE`는 안전망으로 남는다.
+
+다만 다음 두 경우에는 다시 검토한다.
+
+- 일지를 대량으로 지우는 배치가 생길 때
+- 일지당 미디어 수 상한이 크게 늘 때
+
+**측정에서 얻은 교훈:** 애그리거트 소유 관계를 바꿀 때는 조회뿐 아니라 **삭제 경로도 함께**
+측정한다. 조회는 LAZY로 막을 수 있지만 삭제는 cascade가 반드시 개입한다.
