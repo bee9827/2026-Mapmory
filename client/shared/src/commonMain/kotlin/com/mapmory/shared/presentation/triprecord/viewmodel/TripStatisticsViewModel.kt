@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.mapmory.shared.domain.repository.TripStatisticsRepository
+import com.mapmory.shared.logging.mapmoryDebugLog
 import com.mapmory.shared.presentation.triprecord.state.TopLocationUiModel
 import com.mapmory.shared.presentation.triprecord.state.TripStatisticsUiModel
 import com.mapmory.shared.presentation.triprecord.state.TripStatisticsUiState
@@ -23,23 +24,54 @@ class TripStatisticsViewModel(
     )
         private set
 
+    init {
+        cachedStatistics?.let { statistics ->
+            mapmoryDebugLog(
+                StatisticsLogTag,
+                "cache " +
+                    "visitedCountryCount=${statistics.visitedCountryCount}, " +
+                    "visitedKoreaDistrictCount=${statistics.visitedKoreaDistrictCount}",
+            )
+        }
+    }
+
     suspend fun refresh() {
         val generation = ++loadGeneration
         val hasVisibleStatistics = uiState is TripStatisticsUiState.Success
+        mapmoryDebugLog(
+            StatisticsLogTag,
+            "refresh start generation=$generation, hasCachedState=$hasVisibleStatistics",
+        )
         if (!hasVisibleStatistics) {
             uiState = TripStatisticsUiState.Loading
         }
 
         val result = tripStatisticsRepository.getStatistics()
-        if (generation != loadGeneration) return
+        if (generation != loadGeneration) {
+            mapmoryDebugLog(StatisticsLogTag, "refresh ignored generation=$generation")
+            return
+        }
         val statistics = result.getOrElse { error ->
+            mapmoryDebugLog(
+                StatisticsLogTag,
+                "refresh failed, retainedCache=$hasVisibleStatistics: " +
+                    "${error::class.simpleName}: ${error.message}",
+            )
             if (!hasVisibleStatistics) {
                 uiState = error.toUiState("여행 통계를 불러오지 못했습니다.")
             }
             return
         }
 
-        uiState = statistics.toUiState()
+        val nextState = statistics.toUiState()
+        uiState = nextState
+        mapmoryDebugLog(
+            StatisticsLogTag,
+            "ui state " +
+                "worldVisitedCount=${nextState.statistics.worldVisitedCount}, " +
+                "koreaVisitedCount=${nextState.statistics.koreaVisitedCount}, " +
+                "recordCount=${nextState.statistics.recordCount}",
+        )
     }
 
     private fun Throwable.toUiState(fallbackMessage: String) = TripStatisticsUiState.Error(
@@ -68,3 +100,4 @@ private fun com.mapmory.shared.domain.model.TripStatistics.toUiState() =
 private fun Long.toUiCount(): Int = coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
 
 private const val DefaultTravelerName = "여행자"
+private const val StatisticsLogTag = "MapmoryStatistics"
