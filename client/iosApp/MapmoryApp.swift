@@ -21,9 +21,7 @@ struct MapmoryApp: App {
     private let analyticsLogger: FirebaseAnalyticsLogger
 
     init() {
-        if FirebaseApp.app() == nil {
-            FirebaseApp.configure()
-        }
+        FirebaseApp.configure()
         analyticsLogger = FirebaseAnalyticsLogger()
     }
 

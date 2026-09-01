@@ -22,6 +22,11 @@ CI·Android Vitals·Logcat·Xcode Console·System Trace를 기본으로 사용�
 - Android는 Firebase 설정 파일이 없는 개발·CI 환경에서 Analytics 어댑터가 no-op으로 동작한다. iOS는
   `GoogleService-Info.plist`가 앱 번들에 포함되어야 Firebase 초기화를 검증할 수 있다.
 
+Firebase Analytics는 팀 공용 Firebase 프로젝트 `Mapmory Analytics`
+([콘솔](https://console.firebase.google.com/project/mapmory-analytics-b6a50/overview))에 연결했다.
+Android 앱은 `com.mapmory.android`, iOS 앱은 `com.mapmory.ios3`으로 등록되어 있으며, 두 앱의
+이벤트는 같은 프로젝트의 Analytics에서 앱별로 확인한다.
+
 이 문서는 현재 MVP의 개발·출시 전 검증 기준이다. 지도 전환을 자동 반복하는 Macrobenchmark와 원격 오류 수집은 별도 도입 조건이 충족될 때 추가한다.
 
 ## 모니터링 계층
@@ -166,6 +171,16 @@ Simulator 또는 실제 기기에서 앱을 실행한다. Firebase Console의 `A
 iOS 설정 파일은 `client/iosApp/GoogleService-Info.plist`에 두고, `MapmoryApp` 초기화 시
 `FirebaseApp.configure()`를 호출한다. Firebase Analytics 이벤트는 Swift 어댑터가 공통
 `MapmoryAnalytics` 인터페이스를 구현해 전달한다.
+
+### 현재 연결 확인 결과
+
+- Android Debug 빌드에서 새 Firebase App ID로 초기화되고 `screen_view`,
+  `record_create_started` 이벤트가 Logcat에 기록되며 업로드 응답 `204`를 확인했다.
+- iOS Simulator Debug 빌드에서 새 Firebase App ID로 초기화되고 Analytics 수집이 활성화되는 것을
+  확인했다. Simulator의 키체인 제약 때문에 Installation ID와 실제 이벤트 수신은 iOS 실기기에서
+  추가 확인한다.
+- DebugView는 이벤트 전송 후 콘솔에 반영되기까지 지연될 수 있으므로, 즉시 확인할 때는 기기 로그와
+  DebugView를 함께 확인한다.
 
 ## iOS 사진 성능 로그
 
