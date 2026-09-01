@@ -5,6 +5,7 @@ import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.MapRegionLevel
 import com.mapmory.shared.domain.model.MapRegionSummary
 import com.mapmory.shared.domain.model.MapRegionType
+import com.mapmory.shared.domain.model.Tag
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMedia
@@ -22,7 +23,10 @@ fun TripRecordListItemDto.toDomain(): TripRecordSummary = TripRecordSummary(
     endDate = endDate,
     thumbnailUrl = thumbnailUrl,
     thumbnailUrlExpiresIn = thumbnailUrlExpiresIn,
+    tags = tags.map(TagDto::toDomain),
 )
+
+fun TagDto.toDomain(): Tag = Tag(id = id, name = name)
 
 fun TripRecordDetailDto.toDomain(regionCatalog: RegionCatalog): TripRecordData {
     val location = when {
@@ -67,6 +71,7 @@ fun TripRecordDetailDto.toDomain(regionCatalog: RegionCatalog): TripRecordData {
             },
         createdAt = createdAt,
         updatedAt = updatedAt,
+        tags = tags.map(TagDto::toDomain),
     )
 }
 
@@ -90,6 +95,10 @@ internal fun TripRecordDraft.toRequestDto(regionCatalog: RegionCatalog): TripRec
     require(mediaObjectKeys.distinct().size == mediaObjectKeys.size) {
         "사진 Object Key는 중복될 수 없습니다."
     }
+    require(tagIds.size <= MaxTagsPerRecord) { "태그는 기록당 최대 5개까지 선택할 수 있습니다." }
+    require(tagIds.distinct().size == tagIds.size && tagIds.all { it > 0 }) {
+        "태그 ID는 중복될 수 없으며 양수여야 합니다."
+    }
     val location = requireNotNull(regionCatalog.findById(locationId)) {
         "선택한 지역을 찾을 수 없습니다: $locationId"
     }
@@ -103,6 +112,7 @@ internal fun TripRecordDraft.toRequestDto(regionCatalog: RegionCatalog): TripRec
         startDate = requireNotNull(startDate),
         endDate = endDate,
         objectKeys = mediaObjectKeys,
+        tagIds = tagIds,
     )
 }
 
@@ -157,3 +167,4 @@ private const val KoreaCountryCode = "KR"
 private const val KoreanProvincePrefix = "KR-"
 private const val CountryCodeLength = 2
 private const val MaxTitleLength = 200
+private const val MaxTagsPerRecord = 5
