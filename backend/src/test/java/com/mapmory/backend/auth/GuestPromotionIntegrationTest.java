@@ -158,6 +158,8 @@ class GuestPromotionIntegrationTest extends IntegrationTest {
         String body = """
                 {
                   "countryCode": "KR",
+                  "provinceCode": "49",
+                  "districtCode": "50110",
                   "title": "%s",
                   "content": "기록 본문",
                   "startDate": "2026-08-01"

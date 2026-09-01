@@ -2,6 +2,7 @@ package com.mapmory.backend.recordmedia;
 
 import com.mapmory.backend.travelrecord.TravelRecord;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -25,8 +26,8 @@ public class RecordMedia {
     @JoinColumn(name = "travel_record_id", nullable = false)
     private TravelRecord travelRecord;
 
-    @Column(name = "object_key", nullable = false, unique = true, length = 500)
-    private String objectKey;
+    @Embedded
+    private ObjectKey objectKey;
 
     @Column(name = "thumb_key", length = 500)
     private String thumbKey;
@@ -43,7 +44,7 @@ public class RecordMedia {
 
     private RecordMedia(TravelRecord travelRecord, String objectKey, String thumbKey, int sortOrder) {
         this.travelRecord = travelRecord;
-        this.objectKey = objectKey;
+        this.objectKey = ObjectKey.from(objectKey);
         this.thumbKey = thumbKey;
         this.sortOrder = sortOrder;
     }
@@ -61,7 +62,7 @@ public class RecordMedia {
     }
 
     public String getObjectKey() {
-        return objectKey;
+        return objectKey.value();
     }
 
     public Long travelRecordId() {
@@ -70,7 +71,7 @@ public class RecordMedia {
 
     public String getThumbnailObjectKey() {
         if (thumbKey == null || thumbKey.isBlank()) {
-            return objectKey;
+            return getObjectKey();
         }
         return thumbKey;
     }

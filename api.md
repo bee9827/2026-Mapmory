@@ -1,6 +1,6 @@
 # Mapmory API 명세
 
-> 기준일: 2026-08-26 · 범위: 인증, 지역 선택, 지도 마킹, 여행 기록, 이미지 첨부, 사용자 생성 태그
+> 기준일: 2026-08-31 · 범위: 인증, 지역 선택, 지도 마킹, 여행 기록, 여행 통계, 이미지 첨부, 사용자 생성 태그
 
 이 문서는 Mapmory API의 기준 계약이다. API 목록의 `구현 전 설계` 항목은 구현에 앞서 합의한 목표 계약이며, 구현이 끝나면 `구현됨`으로 상태를 변경한다.
 
@@ -31,6 +31,7 @@
 | 구현됨 | `GET` | `/travel-records/{travelRecordId}` | 내 여행 기록 상세 조회 |
 | 구현됨 | `PUT` | `/travel-records/{travelRecordId}` | 내 여행 기록 전체 수정 |
 | 구현됨 | `DELETE` | `/travel-records/{travelRecordId}` | 내 여행 기록 삭제 |
+| 구현됨 | `GET` | `/travel-records/statistics` | 내 전체 여행 통계 조회 |
 | 구현됨 | `GET` | `/travel-records/map-summary/regions/roots` | 루트 Region별 지도 색칠 정보 조회 |
 | 구현됨 | `GET` | `/travel-records/map-summary/regions/{regionId}/children` | 직속 하위 Region별 지도 색칠 정보 조회 |
 | 구현 전 설계 | `POST` | `/tags` | 내 태그 생성 |
@@ -392,6 +393,7 @@ Authorization: Bearer {게스트 accessToken}
 | 대한민국 시·군·구 | `countryCode`, `provinceCode`, `districtCode` | `DISTRICT` |
 
 - `countryCode = KR`이면 `provinceCode`, `districtCode`가 모두 필수다.
+- `countryCode`는 대문자 2자리이며, 하위 지역 코드는 입력하는 경우 공백 없이 20자 이하여야 한다.
 - `provinceCode`는 선택 국가의 직접 자식 `PROVINCE`여야 한다.
 - `districtCode`는 선택 시도의 직접 자식 `DISTRICT`여야 한다.
 - 해외에서는 MVP 기준 국가 단위만 허용한다.
@@ -437,17 +439,21 @@ Authorization: Bearer {게스트 accessToken}
 
 | 필드 | 타입 | 필수 | 제약조건 |
 | --- | --- | --- | --- |
-| `countryCode` | String | 예 | 존재하는 ISO 3166-1 alpha-2 코드 |
-| `provinceCode` | String | 조건부 | `KR`이면 필수 |
-| `districtCode` | String | 조건부 | `KR`이면 필수 |
-| `title` | String | 예 | 최대 200자, 빈 문자열·공백 허용 |
-| `content` | String | 예 | 빈 문자열·공백 허용 |
-| `startDate` | LocalDate | 예 | `YYYY-MM-DD` |
-| `endDate` | LocalDate | 아니요 | 시작일보다 빠를 수 없음 |
+| `countryCode` | String | 예 | 대문자 2자리이며 존재하는 ISO 3166-1 alpha-2 코드 |
+| `provinceCode` | String | 조건부 | `KR`이면 필수, 입력 시 공백 없이 최대 20자 |
+| `districtCode` | String | 조건부 | `KR`이면 필수, 입력 시 공백 없이 최대 20자 |
+| `title` | String | 예 | 공백이 아닌 문자를 포함해야 하며 최대 200자 |
+| `content` | String | 아니요 | `null`, 빈 문자열·공백 허용 |
+| `startDate` | LocalDate | 예 | `YYYY-MM-DD`, 오늘 또는 과거 |
+| `endDate` | LocalDate | 아니요 | 오늘 또는 과거이며 시작일과 같거나 이후 |
 | `objectKeys` | String[] | 아니요 | 업로드 완료된 Object Key 목록 |
 | `tagIds` | Long[] | 아니요 | 빈 배열 허용, 최대 5개, 중복 불가, 모두 현재 회원 소유 |
 
 `objectKeys`는 배열 순서대로 `record_media.sort_order`를 0부터 부여해 저장한다. 값이 없거나 `null`이면 미디어를 생성하지 않는다.
+
+`content`가 없거나 `null`이면 서버는 빈 문자열로 정규화해 저장한다.
+
+여행 날짜는 `Asia/Seoul`의 오늘을 기준으로 검증한다. 시작일과 종료일 모두 미래일 수 없으며 오늘은 허용한다. 종료일을 입력했다면 시작일보다 빠를 수 없다. 생성과 수정에 같은 규칙을 적용한다.
 
 `tagIds`가 없거나 `null`이면 태그를 연결하지 않는다. 새 태그를 입력한 클라이언트는 먼저 `POST /tags`로 태그를 생성한 뒤 반환된 ID를 여행 기록 요청에 포함한다. 여행 기록과 태그 연결은 같은 트랜잭션에서 저장한다.
 
@@ -466,8 +472,8 @@ Authorization: Bearer {게스트 accessToken}
 | `400` | `REGION_REQUIRED` | 한국 기록에 시도 또는 시군구가 없음 |
 | `404` | `REGION_NOT_FOUND` | 요청한 국가·시도·시군구가 존재하지 않음 |
 | `400` | `INVALID_REGION_HIERARCHY` | 요청 지역의 부모 관계가 맞지 않음 |
-| `400` | `INVALID_REGION_TYPE` | 한국 기록의 최종 지역이 `DISTRICT`가 아님 |
-| `400` | `INVALID_TRAVEL_DATE_RANGE` | 종료일이 시작일보다 빠름 |
+| `400` | `INVALID_REGION_TYPE` | 대한민국이 시군구 단위가 아니거나 해외 요청에 하위 지역이 포함됨 |
+| `400` | `INVALID_TRAVEL_DATE_RANGE` | 시작일·종료일이 미래이거나 종료일이 시작일보다 빠름 |
 | `400` | `INVALID_OBJECT_KEY` | Object Key 형식 또는 소유자가 올바르지 않음 |
 | `409` | `OBJECT_NOT_UPLOADED` | S3 업로드가 확인되지 않음 |
 | `400` | `TOO_MANY_TAGS` | 임시 기록당 태그 5개 제한 초과 |
@@ -625,7 +631,7 @@ Access Token에서 식별한 현재 회원의 기록만 반환한다.
 | `400` | `INVALID_OBJECT_KEY` | Object Key가 중복되거나 다른 기록에서 사용 중임 |
 | `404` | `TRAVEL_RECORD_NOT_FOUND` | 기록이 없거나 현재 회원의 기록이 아님 |
 
-Region 관련 오류는 생성 API와 동일하게 처리한다.
+날짜와 Region 관련 오류는 생성 API와 동일하게 처리한다.
 
 ### 여행 기록 삭제
 
@@ -741,12 +747,67 @@ Authorization: Bearer {accessToken}
 - 기존 `count`와 `level` 계약은 유지한다. 태그 필터 적용 후의 `count`를 현재 `LevelPolicy` 기준으로 `NONE`, `LOW`, `MEDIUM`, `HIGH`로 변환한다.
 - 데이터 규모와 응답 시간을 측정하기 전에는 별도 태그–지역 집계 테이블을 만들지 않는다. 원본 관계를 실시간 집계해 기록·태그 변경과 지도 결과의 동기화 문제를 피한다.
 
-## 7. 구현 전 확인 사항
+## 7. 여행 통계 API
+
+여행 통계는 현재 회원이 작성한 전체 기간의 여행 기록을 기준으로 실시간 집계한다. 별도 통계
+테이블을 두지 않으므로 여행 기록과 미디어가 변경되면 다음 조회부터 바로 반영된다.
+
+### 내 전체 여행 통계 조회
+
+`GET /api/v1/travel-records/statistics`
+
+#### Response `200 OK`
+
+```json
+{
+  "data": {
+    "recordCount": 24,
+    "mediaCount": 138,
+    "visitedCountryCount": 3,
+    "visitedKoreaDistrictCount": 8,
+    "visitedCountryCodes": ["JP", "KR", "US"],
+    "topRegions": [
+      {
+        "regionId": 10,
+        "code": "11",
+        "regionType": "PROVINCE",
+        "name": "서울특별시",
+        "recordCount": 7
+      },
+      {
+        "regionId": 2,
+        "code": "JP",
+        "regionType": "COUNTRY",
+        "name": "일본",
+        "recordCount": 4
+      }
+    ]
+  }
+}
+```
+
+| 필드 | 설명 |
+| --- | --- |
+| `recordCount` | 현재 회원의 전체 여행 기록 수 |
+| `mediaCount` | 현재 회원의 여행 기록에 연결된 전체 미디어 수 |
+| `visitedCountryCount` | 기록이 하나 이상 있는 고유 국가 수 |
+| `visitedKoreaDistrictCount` | 기록이 하나 이상 있는 대한민국 고유 시·군·구 수 |
+| `visitedCountryCodes` | 방문 국가 ISO 코드의 오름차순 목록. 길이는 `visitedCountryCount`와 같음 |
+| `topRegions` | 현재 표시 단계로 합산한 기록 수 상위 3개 |
+
+`topRegions`는 `recordCount DESC, regionId ASC`로 정렬한다. 대한민국 `DISTRICT` 기록은 직속
+`PROVINCE`로 올려 합산하고, 해외 기록은 `COUNTRY`로 합산한다. 따라서 현재 응답은 대한민국 시·도와
+해외 국가가 함께 포함될 수 있다. 기록이 없으면 모든 숫자는 `0`, 목록은 빈 배열이다.
+
+이 집계 단계는 대한민국은 시·군·구, 해외는 국가 단위로 저장하는 현재 MVP 계약에 맞춘 것이다.
+해외 행정구역 저장을 지원할 때 필드와 집계 단계, API 버전을 함께 재검토해야 한다. 자세한 결정과
+변경 조건은 [ADR 0016](backend/docs/adr/0016-travel-statistics-read-model.md)을 참고한다.
+
+## 8. 구현 전 확인 사항
 
 - `tag`, `travel_record_tag` Flyway 마이그레이션과 JPA 모델 추가
 - 태그 이름 정규화 규칙을 서버와 클라이언트에서 동일하게 적용
 - 여행 기록 생성·수정 시 태그 소유권 검증과 연결 변경을 같은 트랜잭션에서 처리
 - 지도 요약 Repository에 선택적 `tagId` 조건을 추가하고 MySQL 실행 계획 검증
 - 목록·상세 응답에 `tags`를 추가한 뒤 KMP DTO 계약 갱신
-- 현재 구현에서 누락된 `title` 최대 200자 검증, `content` null 검증, 여행 날짜 범위 검증 보완
 - 여행 기록 생성에서도 Object Key 중복·소유권·업로드 완료 검증을 문서 계약과 일치시킴

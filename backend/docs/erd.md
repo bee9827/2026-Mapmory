@@ -151,6 +151,8 @@ erDiagram
 
 계층은 코드 접두사가 아닌 `parent_id`로만 판단한다. `root_id`는 국가별 필터와 집계를 빠르게 처리하기 위한 보조 컬럼이다.
 
+여행 기록 요청의 국가 코드는 대문자 2자리로 제한한다. 시도·시군구 코드는 입력하는 경우 공백 없이 20자 이하인지 확인한 뒤, `(parent_id, region_type, region_code)` 경로로 존재 여부와 직접 부모 관계를 검증한다. 대한민국 기록은 `DISTRICT`, 해외 기록은 `COUNTRY` Region만 참조한다.
+
 현재 인덱스:
 
 - `INDEX(parent_id)`
@@ -165,10 +167,10 @@ erDiagram
 | `id` | `BIGINT` | PK, AUTO_INCREMENT | 여행 기록 식별자 |
 | `member_id` | `BIGINT` | NOT NULL, FK → `member.id` | 기록 소유 회원 |
 | `region_id` | `BIGINT` | NOT NULL, FK → `region.id` | 기록 대상 Region |
-| `title` | `VARCHAR(200)` | NOT NULL | 제목, 빈 문자열 허용 |
-| `content` | `TEXT` | NOT NULL | 본문, 빈 문자열 허용 |
-| `start_date` | `DATE` | NOT NULL | 여행 시작일 |
-| `end_date` | `DATE` | NULL | 여행 종료일 |
+| `title` | `VARCHAR(200)` | NOT NULL | 제목, 애플리케이션에서 공백 입력을 금지하고 최대 200자로 제한 |
+| `content` | `TEXT` | NOT NULL | 선택 본문, 요청의 `null`은 애플리케이션에서 빈 문자열로 정규화 |
+| `start_date` | `DATE` | NOT NULL | 여행 시작일, 애플리케이션에서 미래 날짜 금지 |
+| `end_date` | `DATE` | NULL | 여행 종료일, 미래 날짜 및 시작일 이전 날짜 금지 |
 | `created_at` | `DATETIME` | NOT NULL | 생성 시각 |
 | `updated_at` | `DATETIME` | NOT NULL | 마지막 수정 시각 |
 
