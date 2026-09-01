@@ -34,6 +34,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.domain.model.Tag
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.MapScope
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
@@ -61,6 +63,7 @@ fun TripMapScreen(
     modifier: Modifier = Modifier,
 ) {
     val palette = TripRecordPalette.current
+    val analytics = LocalMapmoryAnalytics.current
     TripRecordBackground(
         modifier = modifier,
         backgroundColor = palette.pageBackground,
@@ -102,7 +105,13 @@ fun TripMapScreen(
                         .size(44.dp)
                         .clip(CircleShape)
                         .background(palette.primary)
-                        .clickable(onClick = onCreateClick)
+                        .clickable {
+                            analytics.logEvent(
+                                MapmoryAnalyticsEvent.RECORD_CREATE_STARTED,
+                                mapOf("source" to "map_fab"),
+                            )
+                            onCreateClick()
+                        }
                         .semantics { contentDescription = "새 기록 작성" },
                     contentAlignment = Alignment.Center,
                 ) {

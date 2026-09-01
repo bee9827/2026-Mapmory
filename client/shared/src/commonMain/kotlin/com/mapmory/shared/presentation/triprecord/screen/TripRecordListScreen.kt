@@ -22,17 +22,22 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.domain.model.Tag
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.presentation.triprecord.state.TripRecordFilterUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordListUiState
@@ -49,9 +54,11 @@ fun TripRecordListScreen(
     onCreateClick: () -> Unit,
     onMapClick: () -> Unit,
     onRecordClick: (Long) -> Unit,
+    onRetryClick: () -> Unit,
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val analytics = LocalMapmoryAnalytics.current
     TripRecordBackground(
         modifier = modifier.then(rememberDismissKeyboardOnTapModifier()),
         backgroundColor = TripRecordPalette.current.pageBackground,
@@ -82,6 +89,7 @@ fun TripRecordListScreen(
                         modifier = Modifier.padding(top = 20.dp),
                     )
 
+
                     is TripRecordListUiState.Error -> Text(
                         text = uiState.message,
                         color = TripRecordPalette.current.danger,
@@ -97,7 +105,10 @@ fun TripRecordListScreen(
                         } else {
                             TripRecordList(
                                 records = uiState.records,
-                                onRecordClick = onRecordClick,
+                                onRecordClick = { recordId ->
+                                    analytics.logEvent(MapmoryAnalyticsEvent.JOURNAL_RECORD_OPENED)
+                                    onRecordClick(recordId)
+                                },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -105,8 +116,20 @@ fun TripRecordListScreen(
                             PageControls(
                                 page = uiState.page,
                                 totalPages = uiState.totalPages,
-                                onPreviousPageClick = onPreviousPageClick,
-                                onNextPageClick = onNextPageClick,
+                                onPreviousPageClick = {
+                                    analytics.logEvent(
+                                        MapmoryAnalyticsEvent.JOURNAL_PAGE_CHANGED,
+                                        mapOf("direction" to "previous"),
+                                    )
+                                    onPreviousPageClick()
+                                },
+                                onNextPageClick = {
+                                    analytics.logEvent(
+                                        MapmoryAnalyticsEvent.JOURNAL_PAGE_CHANGED,
+                                        mapOf("direction" to "next"),
+                                    )
+                                    onNextPageClick()
+                                },
                             )
                         }
                     }
@@ -124,6 +147,57 @@ fun TripRecordListScreen(
                 selectedLabelColor = TripRecordPalette.current.navigationSelectedLabel,
                 unselectedColor = TripRecordPalette.current.navigationUnselected,
             )
+        }
+    }
+}
+
+@Composable
+private fun TripRecordLoadError(
+    onRetryClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = TripRecordPalette.current.surface),
+            border = BorderStroke(1.dp, TripRecordPalette.current.border),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "여행 기록을 불러오지 못했어요.",
+                    color = TripRecordPalette.current.headingText,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    text = "인터넷 연결을 확인한 뒤\n다시 시도해 주세요.",
+                    color = TripRecordPalette.current.bodyText,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                )
+                Button(
+                    onClick = onRetryClick,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = TripRecordPalette.current.primary,
+                        contentColor = TripRecordPalette.current.onPrimary,
+                    ),
+                ) {
+                    Text("다시 시도")
+                }
+            }
         }
     }
 }
@@ -176,6 +250,7 @@ private fun JournalTagFilters(
     selectedTagId: Long?,
     onTagClick: (Long?) -> Unit,
 ) {
+    val analytics = LocalMapmoryAnalytics.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -185,13 +260,25 @@ private fun JournalTagFilters(
         TripTagChip(
             text = "전체",
             selected = selectedTagId == null,
-            onClick = { onTagClick(null) },
+            onClick = {
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.JOURNAL_FILTER_SELECTED,
+                    mapOf("tag" to "전체"),
+                )
+                onTagClick(null)
+            },
         )
         tags.forEach { tag ->
             TripTagChip(
                 text = tag.name,
                 selected = selectedTagId == tag.id,
-                onClick = { onTagClick(tag.id) },
+                onClick = {
+                    analytics.logEvent(
+                        MapmoryAnalyticsEvent.JOURNAL_FILTER_SELECTED,
+                        mapOf("tag" to tag.name),
+                    )
+                    onTagClick(tag.id)
+                },
             )
         }
     }
@@ -399,6 +486,7 @@ fun TripRecordListScreenPreview() {
             onCreateClick = {},
             onMapClick = {},
             onRecordClick = {},
+            onRetryClick = {},
         )
     }
 }
@@ -420,6 +508,7 @@ fun EmptyTripRecordListScreenPreview() {
             onCreateClick = {},
             onMapClick = {},
             onRecordClick = {},
+            onRetryClick = {},
         )
     }
 }
@@ -441,6 +530,7 @@ fun LoadingTripRecordListScreenPreview() {
             onCreateClick = {},
             onMapClick = {},
             onRecordClick = {},
+            onRetryClick = {},
         )
     }
 }
@@ -462,6 +552,7 @@ fun ErrorTripRecordListScreenPreview() {
             onCreateClick = {},
             onMapClick = {},
             onRecordClick = {},
+            onRetryClick = {},
         )
     }
 }

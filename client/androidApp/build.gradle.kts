@@ -5,6 +5,10 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 val localProperties = Properties().apply {
     val localPropertiesFile = rootProject.file("local.properties")
     if (localPropertiesFile.exists()) {
@@ -50,6 +54,8 @@ dependencies {
     implementation("org.jetbrains.compose.material3:material3:1.9.0")
     implementation("androidx.compose.ui:ui-tooling-preview:${libs.versions.androidxCompose.get()}")
     debugImplementation("androidx.compose.ui:ui-tooling:${libs.versions.androidxCompose.get()}")
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
     implementation(libs.ktor.client.core)
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")

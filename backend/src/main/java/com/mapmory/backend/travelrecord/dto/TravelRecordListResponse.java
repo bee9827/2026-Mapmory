@@ -1,5 +1,6 @@
 package com.mapmory.backend.travelrecord.dto;
 
+import com.mapmory.backend.recordmedia.ExpiringUrl;
 import com.mapmory.backend.tag.Tag;
 import com.mapmory.backend.travelrecord.TravelRecord;
 import java.util.List;
@@ -16,13 +17,15 @@ public record TravelRecordListResponse(
 ) {
     public static TravelRecordListResponse from(
             Page<TravelRecord> travelRecords,
-            Map<Long, List<Tag>> tagsByTravelRecordId
+            Map<Long, List<Tag>> tagsByTravelRecordId,
+            Map<Long, ExpiringUrl> thumbnailUrlsByTravelRecordId
     ) {
         return new TravelRecordListResponse(
                 travelRecords.getContent().stream()
                         .map(travelRecord -> TravelRecordListItemResponse.from(
                                 travelRecord,
-                                tagsByTravelRecordId.getOrDefault(travelRecord.getId(), List.of())
+                                tagsByTravelRecordId.getOrDefault(travelRecord.getId(), List.of()),
+                                thumbnailUrlsByTravelRecordId.get(travelRecord.getId())
                         ))
                         .toList(),
                 travelRecords.getNumber(),

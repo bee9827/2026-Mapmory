@@ -44,6 +44,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.LocalMapmoryTheme
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
 import com.mapmory.shared.preview.PreviewSurface
 import org.jetbrains.compose.resources.decodeToImageBitmap
@@ -173,6 +175,7 @@ internal fun TripBottomBar(
     unselectedColor: Color = TripRecordPalette.current.muted,
     modifier: Modifier = Modifier,
 ) {
+    val analytics = LocalMapmoryAnalytics.current
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -191,7 +194,16 @@ internal fun TripBottomBar(
         TripBottomItem(
             tab = TripBottomTab.MAP,
             selected = selected == TripBottomTab.MAP,
-            onClick = onMapClick,
+            onClick = {
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.BOTTOM_NAV_CLICKED,
+                    mapOf(
+                        "from_tab" to selected.name.lowercase(),
+                        "to_tab" to TripBottomTab.MAP.name.lowercase(),
+                    ),
+                )
+                onMapClick()
+            },
             selectedIconColor = selectedIconColor,
             selectedLabelColor = selectedLabelColor,
             unselectedColor = unselectedColor,
@@ -200,7 +212,16 @@ internal fun TripBottomBar(
         TripBottomItem(
             tab = TripBottomTab.RECORD,
             selected = selected == TripBottomTab.RECORD,
-            onClick = onRecordClick,
+            onClick = {
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.BOTTOM_NAV_CLICKED,
+                    mapOf(
+                        "from_tab" to selected.name.lowercase(),
+                        "to_tab" to TripBottomTab.RECORD.name.lowercase(),
+                    ),
+                )
+                onRecordClick()
+            },
             selectedIconColor = selectedIconColor,
             selectedLabelColor = selectedLabelColor,
             unselectedColor = unselectedColor,
@@ -209,7 +230,16 @@ internal fun TripBottomBar(
         TripBottomItem(
             tab = TripBottomTab.PROFILE,
             selected = selected == TripBottomTab.PROFILE,
-            onClick = onProfileClick,
+            onClick = {
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.BOTTOM_NAV_CLICKED,
+                    mapOf(
+                        "from_tab" to selected.name.lowercase(),
+                        "to_tab" to TripBottomTab.PROFILE.name.lowercase(),
+                    ),
+                )
+                onProfileClick()
+            },
             selectedIconColor = selectedIconColor,
             selectedLabelColor = selectedLabelColor,
             unselectedColor = unselectedColor,

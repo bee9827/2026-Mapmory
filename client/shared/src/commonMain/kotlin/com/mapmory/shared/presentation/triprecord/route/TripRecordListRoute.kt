@@ -46,6 +46,9 @@ internal fun TripRecordListRoute(
         onCreateClick = onOpenEditor,
         onMapClick = onOpenMap,
         onRecordClick = onOpenDetail,
+        onRetryClick = {
+            scope.launch { viewModel.refresh(initialLocationId) }
+        },
         onProfileClick = onOpenProfile,
     )
 }
