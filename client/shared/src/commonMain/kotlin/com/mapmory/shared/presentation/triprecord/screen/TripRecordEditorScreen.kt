@@ -81,11 +81,18 @@ import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
 import com.mapmory.shared.presentation.photo.shouldLoadNextRecommendationPage
 import com.mapmory.shared.presentation.photo.toggleSelection
 import com.mapmory.shared.presentation.date.PlatformDatePicker
+import com.mapmory.shared.presentation.triprecord.endDatePickerMinimumDate
+import com.mapmory.shared.presentation.triprecord.initialSelectableTripRecordDate
+import com.mapmory.shared.presentation.triprecord.startDatePickerMaximumDate
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+import com.mapmory.shared.presentation.triprecord.selectableTripRecordDestinations
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewLocations
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 private const val StartDatePickerTarget = "start"
 private const val EndDatePickerTarget = "end"
@@ -148,9 +155,7 @@ fun TripRecordEditorScreen(
     modifier: Modifier = Modifier,
 ) {
     val selectableLocations = remember(locations) {
-        locations
-            .filter { it.type == LocationType.PROVINCE || it.type == LocationType.DISTRICT }
-            .distinctBy(Location::regionCode)
+        locations.selectableTripRecordDestinations()
     }
     var showLocationSheet by remember { mutableStateOf(false) }
     var locationSearchQuery by rememberSaveable { mutableStateOf("") }
@@ -232,6 +237,7 @@ fun TripRecordEditorScreen(
         selectableLocations.filter { location ->
             locationSearchQuery.isBlank() ||
                 location.name.contains(locationSearchQuery, ignoreCase = true) ||
+                location.displayName(locations).contains(locationSearchQuery, ignoreCase = true) ||
                 location.regionCode.contains(locationSearchQuery, ignoreCase = true)
         }
     }
@@ -396,7 +402,7 @@ fun TripRecordEditorScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "국가, 시·도, 시·군·구를 검색해 보세요",
+                    text = "해외 국가 또는 국내 시·군·구를 검색해 보세요",
                     color = TripRecordPalette.current.muted,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 6.dp),
@@ -562,18 +568,37 @@ fun TripRecordEditorScreen(
 
     val activeDatePickerTarget = datePickerTarget
     val isStartDatePicker = activeDatePickerTarget == StartDatePickerTarget
+    val today = remember(activeDatePickerTarget) {
+        Clock.System.now()
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+            .toString()
+    }
+    val minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
+        endDatePickerMinimumDate(uiState.startDate, today)
+    } else {
+        null
+    }
+    val maximumDate = if (activeDatePickerTarget == StartDatePickerTarget) {
+        startDatePickerMaximumDate(uiState.endDate, today)
+    } else {
+        today
+    }
+    val selectedDate = when (activeDatePickerTarget) {
+        StartDatePickerTarget -> uiState.startDate
+        EndDatePickerTarget -> uiState.endDate
+        else -> null
+    }
     PlatformDatePicker(
         visible = activeDatePickerTarget != null,
-        initialDate = when {
-            isStartDatePicker -> uiState.startDate
-            activeDatePickerTarget == EndDatePickerTarget -> uiState.endDate
-            else -> null
-        },
-        minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
-            uiState.startDate
-        } else {
-            null
-        },
+        initialDate = initialSelectableTripRecordDate(
+            selectedDate = selectedDate,
+            fallbackDate = today,
+            minimumDate = minimumDate,
+            maximumDate = maximumDate,
+        ),
+        minimumDate = minimumDate,
+        maximumDate = maximumDate,
         onDateSelected = { date ->
             if (isStartDatePicker) {
                 onStartDateChanged(date)

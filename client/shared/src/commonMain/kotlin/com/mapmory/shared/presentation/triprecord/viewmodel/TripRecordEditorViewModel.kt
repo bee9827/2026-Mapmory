@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.mapmory.shared.domain.model.Location
-import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMediaDraft
@@ -15,6 +14,7 @@ import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTripRecordUseCase
 import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
 import com.mapmory.shared.presentation.photo.SelectedPhoto
+import com.mapmory.shared.presentation.triprecord.isSelectableTripRecordDestination
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.toTripRecordPhotoUiState
@@ -54,7 +54,9 @@ class TripRecordEditorViewModel(
     }
 
     fun startCreating(location: Location?) {
-        uiState = TripRecordEditorUiState(selectedLocation = location)
+        uiState = TripRecordEditorUiState(
+            selectedLocation = location?.takeIf(Location::isSelectableTripRecordDestination),
+        )
         savedRecordId = null
     }
 
@@ -99,6 +101,7 @@ class TripRecordEditorViewModel(
     }
 
     fun selectLocation(location: Location) {
+        if (!location.isSelectableTripRecordDestination()) return
         uiState = uiState.copy(
             selectedLocation = location,
         ).revalidatedAfterChange(TripRecordEditorErrorTarget.LOCATION)
@@ -269,11 +272,8 @@ private fun TripRecordEditorUiState.validationErrors(
 ): Map<TripRecordEditorErrorTarget, String> = buildMap {
     if (selectedLocation == null) {
         put(TripRecordEditorErrorTarget.LOCATION, "장소를 선택해 주세요.")
-    } else if (
-        selectedLocation.type == LocationType.PROVINCE &&
-        selectedLocation.regionCode.startsWith(KoreanProvincePrefix)
-    ) {
-        put(TripRecordEditorErrorTarget.LOCATION, "대한민국은 시·군·구까지 선택해 주세요.")
+    } else if (!selectedLocation.isSelectableTripRecordDestination()) {
+        put(TripRecordEditorErrorTarget.LOCATION, "장소를 선택해 주세요.")
     }
     if (title.isBlank()) {
         put(TripRecordEditorErrorTarget.TITLE, "제목을 입력해 주세요.")
@@ -301,4 +301,3 @@ private fun TripRecordEditorUiState.validationErrors(
 }
 
 private const val MaxTitleLength = 200
-private const val KoreanProvincePrefix = "KR-"
