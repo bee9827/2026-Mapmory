@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.TagRules
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMediaDraft
@@ -146,33 +147,30 @@ class TripRecordEditorViewModel(
                 tagErrorMessage = null,
                 isDirty = true,
             )
-            selected.size >= MaxTagsPerRecord -> uiState.copy(
-                tagErrorMessage = "태그는 기록당 최대 5개까지 선택할 수 있습니다.",
-            )
-            else -> uiState.copy(
-                selectedTagIds = selected + tagId,
-                tagErrorMessage = null,
-                isDirty = true,
+            else -> runCatching {
+                TagRules.requireCanAddToRecord(selected)
+                selected + tagId
+            }.fold(
+                onSuccess = { updatedSelection ->
+                    uiState.copy(
+                        selectedTagIds = updatedSelection,
+                        tagErrorMessage = null,
+                        isDirty = true,
+                    )
+                },
+                onFailure = { error -> uiState.copy(tagErrorMessage = error.message) },
             )
         }
     }
 
     suspend fun createAndSelectTag() {
         val create = createTag ?: return
-        val normalizedName = uiState.tagInput.trim().replace(Regex("\\s+"), " ")
-        when {
-            normalizedName.isEmpty() -> {
-                uiState = uiState.copy(tagErrorMessage = "태그 이름을 입력해 주세요.")
-                return
-            }
-            '#' in normalizedName -> {
-                uiState = uiState.copy(tagErrorMessage = "#은 빼고 태그 이름만 입력해 주세요.")
-                return
-            }
-            uiState.selectedTagIds.size >= MaxTagsPerRecord -> {
-                uiState = uiState.copy(tagErrorMessage = "태그는 기록당 최대 5개까지 선택할 수 있습니다.")
-                return
-            }
+        val normalizedName = runCatching {
+            TagRules.requireCanAddToRecord(uiState.selectedTagIds)
+            TagRules.normalizeAndValidateName(uiState.tagInput)
+        }.getOrElse { error ->
+            uiState = uiState.copy(tagErrorMessage = error.message)
+            return
         }
 
         uiState.availableTags.firstOrNull { it.name.equals(normalizedName, ignoreCase = true) }?.let { tag ->
@@ -186,7 +184,7 @@ class TripRecordEditorViewModel(
         }
 
         uiState = uiState.copy(isCreatingTag = true, tagErrorMessage = null)
-        create(normalizedName).fold(
+        create(normalizedName, uiState.availableTags).fold(
             onSuccess = { tag ->
                 uiState = uiState.copy(
                     availableTags = uiState.availableTags + tag,
@@ -409,4 +407,3 @@ private fun TripRecordEditorUiState.validationErrors(
 }
 
 private const val MaxTitleLength = 200
-private const val MaxTagsPerRecord = 5

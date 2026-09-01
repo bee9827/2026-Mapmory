@@ -7,6 +7,7 @@ import com.mapmory.shared.domain.model.MapRegionLevel
 import com.mapmory.shared.domain.model.MapRegionSummary
 import com.mapmory.shared.domain.model.MapRegionType
 import com.mapmory.shared.domain.model.Tag
+import com.mapmory.shared.domain.model.TagRules
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMedia
@@ -124,20 +125,12 @@ class FakeTripRecordRepository(
     override suspend fun getTags(): Result<List<Tag>> = Result.success(tags.toList())
 
     override suspend fun createTag(name: String): Result<Tag> = runCatching {
-        val normalizedName = name.trim().replace(Regex("\\s+"), " ")
-        require(normalizedName.isNotEmpty() && normalizedName.length <= MaxTagNameLength && '#' !in normalizedName) {
-            "태그 이름은 #을 제외한 1자 이상 30자 이하여야 합니다."
-        }
-        require(tags.size < MaxTagsPerMember) { "태그는 최대 10개까지 만들 수 있습니다." }
-        require(tags.none { it.name.equals(normalizedName, ignoreCase = true) }) {
-            "같은 이름의 태그가 있습니다."
-        }
+        val normalizedName = TagRules.normalizeAndValidateNewName(name, tags)
         Tag(nextTagId++, normalizedName).also(tags::add)
     }
 
     private fun tagsFor(tagIds: List<Long>): List<Tag> {
-        require(tagIds.size <= MaxTagsPerRecord) { "여행 일지에는 태그를 최대 5개까지 연결할 수 있습니다." }
-        require(tagIds.distinct().size == tagIds.size) { "태그 ID는 중복될 수 없습니다." }
+        TagRules.validateRecordTagIds(tagIds)
         val selectedTags = tags.filter { it.id in tagIds }
         require(selectedTags.size == tagIds.size) { "태그를 찾을 수 없습니다." }
         return selectedTags
@@ -228,6 +221,3 @@ private const val KoreaCountryCode = "KR"
 private const val KoreanProvincePrefix = "KR-"
 private const val CountryCodeLength = 2
 private const val MaxPageSize = 100
-private const val MaxTagNameLength = 30
-private const val MaxTagsPerMember = 10
-private const val MaxTagsPerRecord = 5

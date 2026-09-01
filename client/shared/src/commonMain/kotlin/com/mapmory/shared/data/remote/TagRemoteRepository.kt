@@ -31,7 +31,6 @@ class TagRemoteRepository(
     }
 
     override suspend fun createTag(name: String): Result<Tag> = apiCall {
-        require(name.isNotBlank()) { "태그 이름을 입력해 주세요." }
         client.post(tagsUrl) {
             authorizeWith(accessTokenProvider)
             contentType(ContentType.Application.Json)
