@@ -91,6 +91,11 @@ class UploadServiceTest {
             requests.add(new PresignRequest(objectKey, contentType, contentLength, expiration));
             return URI.create("https://upload.example/" + objectKey);
         }
+
+        @Override
+        public URI createPresignedGetUrl(String objectKey, Duration expiration) {
+            return URI.create("https://download.example/" + objectKey);
+        }
     }
 
     private record PresignRequest(
