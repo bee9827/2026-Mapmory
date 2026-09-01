@@ -17,7 +17,6 @@ import com.mapmory.backend.common.monitoring.MonitoredOperation;
 import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.recordmedia.ExpiringUrl;
-import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
@@ -34,7 +33,6 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -514,14 +512,9 @@ class TravelRecordServiceTest {
         Page<TravelRecord> expected = new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1);
         when(travelRecordRepository.findByMemberIdAndOptionalTagId(eq(10L), eq(null), any(Pageable.class)))
                 .thenReturn(expected);
-        when(recordMediaUrlService.createThumbnailUrls(List.of(101L)))
-                .thenReturn(Map.of(
-                        101L,
-                        new ExpiringUrl(
-                                "https://download.example/mapmory/travel-records/a.jpg",
-                                300L
-                        )
-                ));
+        RecordMedia thumbnailMedia = recordMedia(101L, "mapmory/travel-records/a.jpg");
+        when(travelRecordRepository.findMediaByTravelRecordIdIn(List.of(101L)))
+                .thenReturn(List.of(thumbnailMedia));
 
         TravelRecordListResponse result = travelRecordService.findAll(member, null, null, null, null, 0, 20);
 
@@ -532,7 +525,29 @@ class TravelRecordServiceTest {
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(travelRecordRepository).findByMemberIdAndOptionalTagId(eq(10L), eq(null), captor.capture());
         assertThat(captor.getValue().getPageSize()).isEqualTo(20);
-        verify(recordMediaUrlService).createThumbnailUrls(List.of(101L));
+        verify(recordMediaUrlService).createViewUrl("mapmory/travel-records/a.jpg");
+    }
+
+    @Test
+    void 일지마다_정렬이_가장_앞선_미디어만_썸네일로_쓴다() {
+        TravelRecord travelRecord = mock(TravelRecord.class);
+        Region region = mock(Region.class);
+        when(travelRecord.getId()).thenReturn(101L);
+        when(travelRecord.getRegion()).thenReturn(region);
+        Page<TravelRecord> expected = new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1);
+        when(travelRecordRepository.findByMemberIdAndOptionalTagId(eq(10L), eq(null), any(Pageable.class)))
+                .thenReturn(expected);
+        RecordMedia firstMedia = recordMedia(101L, "mapmory/first.jpg");
+        RecordMedia laterMedia = recordMedia(101L, "mapmory/later.jpg");
+        when(travelRecordRepository.findMediaByTravelRecordIdIn(List.of(101L)))
+                .thenReturn(List.of(firstMedia, laterMedia));
+
+        TravelRecordListResponse result = travelRecordService.findAll(member, null, null, null, null, 0, 20);
+
+        assertThat(result.items().getFirst().thumbnailUrl())
+                .isEqualTo("https://download.example/mapmory/first.jpg");
+        verify(recordMediaUrlService).createViewUrl("mapmory/first.jpg");
+        verify(recordMediaUrlService, never()).createViewUrl("mapmory/later.jpg");
     }
 
     @Test
@@ -544,13 +559,13 @@ class TravelRecordServiceTest {
         Page<TravelRecord> expected = new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1);
         when(travelRecordRepository.findByMemberIdAndOptionalTagId(eq(10L), eq(null), any(Pageable.class)))
                 .thenReturn(expected);
-        when(recordMediaUrlService.createThumbnailUrls(List.of(101L))).thenReturn(Map.of());
+        when(travelRecordRepository.findMediaByTravelRecordIdIn(List.of(101L))).thenReturn(List.of());
 
         TravelRecordListResponse result = travelRecordService.findAll(member, null, null, null, null, 0, 20);
 
         assertThat(result.items().getFirst().thumbnailUrl()).isNull();
         assertThat(result.items().getFirst().thumbnailUrlExpiresIn()).isNull();
-        verify(recordMediaUrlService).createThumbnailUrls(List.of(101L));
+        verify(recordMediaUrlService, never()).createViewUrl(anyString());
     }
 
     @Test
@@ -563,6 +578,7 @@ class TravelRecordServiceTest {
                 .thenReturn(expected);
 
         assertThat(travelRecordService.findAll(member, "KR", null, null, null, 0, 20).items()).isEmpty();
+        verify(travelRecordRepository, never()).findMediaByTravelRecordIdIn(anyList());
     }
 
     @Test
@@ -644,6 +660,13 @@ class TravelRecordServiceTest {
 
         assertError(() -> travelRecordService.delete(member, 101L), "TRAVEL_RECORD_NOT_FOUND");
         verify(travelRecordRepository, never()).delete(any(TravelRecord.class));
+    }
+
+    private RecordMedia recordMedia(Long travelRecordId, String thumbnailObjectKey) {
+        RecordMedia recordMedia = mock(RecordMedia.class);
+        lenient().when(recordMedia.travelRecordId()).thenReturn(travelRecordId);
+        lenient().when(recordMedia.getThumbnailObjectKey()).thenReturn(thumbnailObjectKey);
+        return recordMedia;
     }
 
     private Region region(Long id) {

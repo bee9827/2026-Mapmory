@@ -1,7 +1,6 @@
-package com.mapmory.backend.recordmedia;
+package com.mapmory.backend.travelrecord;
 
 import com.mapmory.backend.common.exception.BusinessException;
-import com.mapmory.backend.travelrecord.TravelRecordErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 

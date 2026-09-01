@@ -3,7 +3,6 @@ package com.mapmory.backend.travelrecord;
 import com.mapmory.backend.common.entity.BaseEntity;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.Member;
-import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.tag.TagErrorCode;
 import jakarta.persistence.CascadeType;

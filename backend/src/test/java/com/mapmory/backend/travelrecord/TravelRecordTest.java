@@ -7,7 +7,6 @@ import static org.mockito.Mockito.mock;
 
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.Member;
-import com.mapmory.backend.recordmedia.RecordMedia;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionType;
 import java.time.LocalDate;
