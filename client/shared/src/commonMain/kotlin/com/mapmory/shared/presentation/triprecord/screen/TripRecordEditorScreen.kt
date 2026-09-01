@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
@@ -128,6 +129,9 @@ fun TripRecordEditorScreen(
     onContentChanged: (String) -> Unit,
     onStartDateChanged: (String) -> Unit,
     onEndDateChanged: (String) -> Unit,
+    onTagInputChanged: (String) -> Unit = {},
+    onTagToggled: (Long) -> Unit = {},
+    onTagCreate: () -> Unit = {},
     onPhotosAdded: (List<SelectedPhoto>) -> Unit = {},
     onPhotoRemoved: (String) -> Unit = {},
     onPhotoLoadingChanged: (Boolean) -> Unit = {},
@@ -371,7 +375,11 @@ fun TripRecordEditorScreen(
                         )
                         EditorDivider(Modifier.padding(horizontal = 20.dp))
 
-                        CompanionChips(
+                        TagEditor(
+                            uiState = uiState,
+                            onInputChanged = onTagInputChanged,
+                            onTagToggled = onTagToggled,
+                            onCreate = onTagCreate,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                         )
 
@@ -916,34 +924,101 @@ private fun TripRecordEditorUiState.errorMessageFor(target: TripRecordEditorErro
     }
 
 @Composable
-private fun CompanionChips(modifier: Modifier = Modifier) {
-    val companions = remember { listOf("가족", "애인", "친구", "혼자") }
-    var selectedCompanion by remember { mutableStateOf<String?>(null) }
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        companions.forEach { companion ->
-            val selected = selectedCompanion == companion
+private fun TagEditor(
+    uiState: TripRecordEditorUiState,
+    onInputChanged: (String) -> Unit,
+    onTagToggled: (Long) -> Unit,
+    onCreate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(
-                text = companion,
-                color = if (selected) TripRecordPalette.current.primary else TripRecordPalette.current.text,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50.dp))
-                    .background(
-                        if (selected) TripRecordPalette.current.primarySoft else TripRecordPalette.current.surface,
-                    )
-                    .border(1.dp, TripRecordPalette.current.line, RoundedCornerShape(50.dp))
-                    .clickable {
-                        selectedCompanion = if (selected) null else companion
-                    }
-                    .padding(horizontal = 11.dp, vertical = 7.dp),
+                text = "태그",
+                color = TripRecordPalette.current.text,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
             )
+            Text(
+                text = "${uiState.selectedTagIds.size}/5",
+                color = TripRecordPalette.current.muted,
+                fontSize = 11.sp,
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = uiState.tagInput,
+                onValueChange = onInputChanged,
+                placeholder = { Text("직접 입력 (# 제외)") },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TripRecordPalette.current.text,
+                    unfocusedTextColor = TripRecordPalette.current.text,
+                    cursorColor = TripRecordPalette.current.accent,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    disabledBorderColor = Color.Transparent,
+                    errorBorderColor = Color.Transparent,
+                    focusedPlaceholderColor = TripRecordPalette.current.muted,
+                    unfocusedPlaceholderColor = TripRecordPalette.current.muted,
+                ),
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = onCreate,
+                enabled = uiState.tagInput.isNotBlank() && !uiState.isCreatingTag,
+            ) {
+                if (uiState.isCreatingTag) {
+                    CircularProgressIndicator(
+                        color = TripRecordPalette.current.accent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(18.dp),
+                    )
+                } else {
+                    Text("추가", color = TripRecordPalette.current.accent)
+                }
+            }
+        }
+
+        if (uiState.availableTags.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                uiState.availableTags.forEach { tag ->
+                    val selected = tag.id in uiState.selectedTagIds
+                    TripTagChip(
+                        text = tag.name,
+                        selected = selected,
+                        onClick = { onTagToggled(tag.id) },
+                    )
+                }
+            }
+        } else if (!uiState.isTagsLoading) {
+            Text(
+                text = "아직 태그가 없어요. 원하는 태그를 직접 만들어 보세요.",
+                color = TripRecordPalette.current.muted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+
+        uiState.tagErrorMessage?.let { message ->
+            EditorErrorMessage(message = message, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }

@@ -3,6 +3,7 @@ package com.mapmory.shared.presentation.triprecord.state
 import com.mapmory.shared.domain.TripRecord
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordSummary
+import com.mapmory.shared.domain.model.Tag
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 
 /** 화면에 필요한 여행 기록 표현. 도메인 모델과 플랫폼 사진 데이터를 UI 경계에서 분리한다. */
@@ -14,6 +15,7 @@ data class TripRecordItemUiState(
     val endDate: String?,
     val locationName: String,
     val photos: List<TripRecordPhotoUiState>,
+    val tags: List<Tag> = emptyList(),
 )
 
 data class TripRecordPhotoUiState(
@@ -68,6 +70,7 @@ fun TripRecordData.toTripRecordItemUiState(
     startDate = startDate,
     endDate = endDate,
     locationName = locationName,
+    tags = tags,
     photos = media
         .sortedBy { it.sortOrder }
         .map { media ->
@@ -93,6 +96,7 @@ fun TripRecordSummary.toTripRecordItemUiState(
     startDate = startDate,
     endDate = endDate,
     locationName = locationName,
+    tags = tags,
     photos = thumbnailPreviewBytes?.let { bytes ->
         listOf(
             TripRecordPhotoUiState(

@@ -12,21 +12,26 @@ import com.mapmory.shared.data.remote.AuthRemoteRepository
 import com.mapmory.shared.data.remote.MapSummaryRemoteRepository
 import com.mapmory.shared.data.remote.PhotoUploadRemoteRepository
 import com.mapmory.shared.data.remote.PresignedPhotoRemoteSource
+import com.mapmory.shared.data.remote.TagRemoteRepository
 import com.mapmory.shared.data.remote.TripRecordRemoteRepository
 import com.mapmory.shared.data.remote.createHttpClient
 import com.mapmory.shared.data.remote.installMapmoryAuthRetry
 import com.mapmory.shared.data.repository.AuthenticatedMapSummaryRepository
+import com.mapmory.shared.data.repository.AuthenticatedTagRepository
 import com.mapmory.shared.data.repository.AuthenticatedTripRecordRepository
 import com.mapmory.shared.data.repository.CachedMediaTripRecordRepository
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.data.repository.UploadingTripRecordRepository
 import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.domain.repository.MapSummaryRepository
+import com.mapmory.shared.domain.repository.TagRepository
 import com.mapmory.shared.domain.repository.TripRecordRepository
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
+import com.mapmory.shared.domain.usecase.CreateTagUseCase
 import com.mapmory.shared.domain.usecase.DeleteTripRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTripRecordUseCase
 import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
+import com.mapmory.shared.domain.usecase.GetTagsUseCase
 import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
 import com.mapmory.shared.presentation.map.viewmodel.MapViewModel
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordDetailViewModel
@@ -45,6 +50,7 @@ interface AppContainer {
     val regionCatalog: RegionCatalog
     val tripRecordRepository: TripRecordRepository
     val mapSummaryRepository: MapSummaryRepository
+    val tagRepository: TagRepository
     val viewModelFactory: MapmoryViewModelFactory
     val tripRecordRevision: StateFlow<Long>
 
@@ -64,6 +70,7 @@ interface MapmoryViewModelFactory {
 private class DefaultMapmoryViewModelFactory(
     private val repository: TripRecordRepository,
     private val mapSummaryRepository: MapSummaryRepository,
+    private val tagRepository: TagRepository,
     private val regionCatalog: RegionCatalog,
     private val thumbnailLoader: TripRecordThumbnailLoader?,
     private val onTripRecordsChanged: () -> Unit,
@@ -71,6 +78,7 @@ private class DefaultMapmoryViewModelFactory(
     override fun createMapViewModel(): MapViewModel = MapViewModel(
         mapSummaryRepository = mapSummaryRepository,
         regionCatalog = regionCatalog,
+        getTags = GetTagsUseCase(tagRepository),
     )
 
     override fun createTripRecordListViewModel(): TripRecordListViewModel =
@@ -78,6 +86,7 @@ private class DefaultMapmoryViewModelFactory(
             getTripRecords = GetTripRecordsUseCase(repository),
             regionCatalog = regionCatalog,
             thumbnailLoader = thumbnailLoader,
+            getTags = GetTagsUseCase(tagRepository),
         )
 
     override fun createTripRecordDetailViewModel(): TripRecordDetailViewModel =
@@ -95,6 +104,8 @@ private class DefaultMapmoryViewModelFactory(
             getTripRecord = GetTripRecordUseCase(repository),
             regionCatalog = regionCatalog,
             onTripRecordsChanged = onTripRecordsChanged,
+            getTags = GetTagsUseCase(tagRepository),
+            createTag = CreateTagUseCase(tagRepository),
         )
 }
 
@@ -102,6 +113,7 @@ private class DefaultAppContainer(
     override val regionCatalog: RegionCatalog,
     override val tripRecordRepository: TripRecordRepository,
     override val mapSummaryRepository: MapSummaryRepository,
+    override val tagRepository: TagRepository,
     private val thumbnailLoader: TripRecordThumbnailLoader?,
     private val onClose: () -> Unit,
 ) : AppContainer {
@@ -111,6 +123,7 @@ private class DefaultAppContainer(
     override val viewModelFactory: MapmoryViewModelFactory = DefaultMapmoryViewModelFactory(
         repository = tripRecordRepository,
         mapSummaryRepository = mapSummaryRepository,
+        tagRepository = tagRepository,
         regionCatalog = regionCatalog,
         thumbnailLoader = thumbnailLoader,
         onTripRecordsChanged = {
@@ -126,6 +139,9 @@ fun createAppContainer(
     mapSummaryRepository: MapSummaryRepository = requireNotNull(
         tripRecordRepository as? MapSummaryRepository,
     ) { "지도 요약 Repository를 함께 전달해 주세요." },
+    tagRepository: TagRepository = requireNotNull(
+        tripRecordRepository as? TagRepository,
+    ) { "태그 Repository를 함께 전달해 주세요." },
     regionCatalog: RegionCatalog = StaticRegionCatalog(),
     thumbnailLoader: TripRecordThumbnailLoader? = null,
     onClose: () -> Unit = {},
@@ -133,6 +149,7 @@ fun createAppContainer(
     regionCatalog = regionCatalog,
     tripRecordRepository = tripRecordRepository,
     mapSummaryRepository = mapSummaryRepository,
+    tagRepository = tagRepository,
     thumbnailLoader = thumbnailLoader,
     onClose = onClose,
 )
@@ -165,6 +182,11 @@ fun createRemoteAppContainer(
             regionCatalog = regionCatalog,
         ),
         mapSummaryRepository = MapSummaryRemoteRepository(
+            client = client,
+            apiBaseUrl = apiBaseUrl,
+            accessTokenProvider = accessTokenProvider,
+        ),
+        tagRepository = TagRemoteRepository(
             client = client,
             apiBaseUrl = apiBaseUrl,
             accessTokenProvider = accessTokenProvider,
@@ -219,6 +241,11 @@ internal fun createGuestRemoteAppContainer(
         apiBaseUrl = apiBaseUrl,
         accessTokenProvider = session,
     )
+    val remoteTags = TagRemoteRepository(
+        client = client,
+        apiBaseUrl = apiBaseUrl,
+        accessTokenProvider = session,
+    )
     val uploadingTripRecords = UploadingTripRecordRepository(
         uploader = PhotoUploadRemoteRepository(
             client = client,
@@ -239,6 +266,7 @@ internal fun createGuestRemoteAppContainer(
     return createAppContainer(
         tripRecordRepository = AuthenticatedTripRecordRepository(session, cachedMediaTripRecords),
         mapSummaryRepository = AuthenticatedMapSummaryRepository(session, remoteMapSummary),
+        tagRepository = AuthenticatedTagRepository(session, remoteTags),
         regionCatalog = regionCatalog,
         thumbnailLoader = CachedTripRecordThumbnailLoader(photoPreviewLoader),
         onClose = onClose,

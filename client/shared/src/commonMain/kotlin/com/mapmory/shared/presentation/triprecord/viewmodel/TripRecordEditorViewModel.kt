@@ -5,13 +5,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.TagRules
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMediaDraft
 import com.mapmory.shared.domain.model.dateValidationError
 import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
+import com.mapmory.shared.domain.usecase.CreateTagUseCase
 import com.mapmory.shared.domain.usecase.GetTripRecordUseCase
+import com.mapmory.shared.domain.usecase.GetTagsUseCase
 import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.triprecord.isSelectableTripRecordDestination
@@ -25,6 +28,8 @@ class TripRecordEditorViewModel(
     private val getTripRecord: GetTripRecordUseCase? = null,
     private val regionCatalog: RegionCatalog? = null,
     private val onTripRecordsChanged: () -> Unit = {},
+    private val getTags: GetTagsUseCase? = null,
+    private val createTag: CreateTagUseCase? = null,
 ) : ViewModel() {
     private var isRouteInitialized = false
 
@@ -46,6 +51,7 @@ class TripRecordEditorViewModel(
     ) {
         if (isRouteInitialized) return
         isRouteInitialized = true
+        loadTags()
         if (recordId == null) {
             startCreating(selectedLocation)
         } else {
@@ -56,6 +62,8 @@ class TripRecordEditorViewModel(
     fun startCreating(location: Location?) {
         uiState = TripRecordEditorUiState(
             selectedLocation = location?.takeIf(Location::isSelectableTripRecordDestination),
+            availableTags = uiState.availableTags,
+            tagErrorMessage = uiState.tagErrorMessage,
         )
         savedRecordId = null
     }
@@ -78,6 +86,7 @@ class TripRecordEditorViewModel(
     }
 
     fun startEditing(record: TripRecordData, location: Location) {
+        val allTags = (uiState.availableTags + record.tags).distinctBy { it.id }
         uiState = TripRecordEditorUiState(
             recordId = record.id,
             selectedLocation = location,
@@ -96,6 +105,100 @@ class TripRecordEditorViewModel(
                     longitude = media.longitude,
                     capturedAt = media.capturedAt,
                 ).toTripRecordPhotoUiState(media.sortOrder)
+            },
+            availableTags = allTags,
+            selectedTagIds = record.tags.mapTo(linkedSetOf()) { it.id },
+        )
+    }
+
+    private suspend fun loadTags() {
+        val loadTags = getTags ?: return
+        uiState = uiState.copy(isTagsLoading = true, tagErrorMessage = null)
+        loadTags().fold(
+            onSuccess = { tags ->
+                uiState = uiState.copy(
+                    availableTags = tags,
+                    isTagsLoading = false,
+                )
+            },
+            onFailure = { error ->
+                uiState = uiState.copy(
+                    isTagsLoading = false,
+                    tagErrorMessage = error.message ?: "태그를 불러오지 못했습니다.",
+                )
+            },
+        )
+    }
+
+    fun updateTagInput(value: String) {
+        uiState = uiState.copy(
+            tagInput = value,
+            tagErrorMessage = null,
+            isDirty = true,
+        )
+    }
+
+    fun toggleTag(tagId: Long) {
+        if (uiState.availableTags.none { it.id == tagId }) return
+        val selected = uiState.selectedTagIds
+        uiState = when {
+            tagId in selected -> uiState.copy(
+                selectedTagIds = selected - tagId,
+                tagErrorMessage = null,
+                isDirty = true,
+            )
+            else -> runCatching {
+                TagRules.requireCanAddToRecord(selected)
+                selected + tagId
+            }.fold(
+                onSuccess = { updatedSelection ->
+                    uiState.copy(
+                        selectedTagIds = updatedSelection,
+                        tagErrorMessage = null,
+                        isDirty = true,
+                    )
+                },
+                onFailure = { error -> uiState.copy(tagErrorMessage = error.message) },
+            )
+        }
+    }
+
+    suspend fun createAndSelectTag() {
+        val create = createTag ?: return
+        val normalizedName = runCatching {
+            TagRules.requireCanAddToRecord(uiState.selectedTagIds)
+            TagRules.normalizeAndValidateName(uiState.tagInput)
+        }.getOrElse { error ->
+            uiState = uiState.copy(tagErrorMessage = error.message)
+            return
+        }
+
+        uiState.availableTags.firstOrNull { it.name.equals(normalizedName, ignoreCase = true) }?.let { tag ->
+            uiState = uiState.copy(
+                selectedTagIds = uiState.selectedTagIds + tag.id,
+                tagInput = "",
+                tagErrorMessage = null,
+                isDirty = true,
+            )
+            return
+        }
+
+        uiState = uiState.copy(isCreatingTag = true, tagErrorMessage = null)
+        create(normalizedName, uiState.availableTags).fold(
+            onSuccess = { tag ->
+                uiState = uiState.copy(
+                    availableTags = uiState.availableTags + tag,
+                    selectedTagIds = uiState.selectedTagIds + tag.id,
+                    tagInput = "",
+                    isCreatingTag = false,
+                    isDirty = true,
+                )
+            },
+            onFailure = { error ->
+                uiState = uiState.copy(
+                    isCreatingTag = false,
+                    tagErrorMessage = error.message ?: "태그를 만들지 못했습니다.",
+                )
             },
         )
     }
@@ -205,6 +308,9 @@ class TripRecordEditorViewModel(
                     capturedAt = photo.capturedAt,
                 )
             },
+            tagIds = state.availableTags
+                .filter { it.id in state.selectedTagIds }
+                .map { it.id },
         )
         uiState = state.copy(isSaving = true, fieldErrors = emptyMap(), generalErrorMessage = null)
         val result = state.recordId?.let { updateTripRecord(it, draft) }

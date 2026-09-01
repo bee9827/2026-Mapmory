@@ -3,12 +3,30 @@ package com.mapmory.shared.presentation.map.viewmodel
 import com.mapmory.shared.data.local.StaticRegionCatalog
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.usecase.GetTagsUseCase
 import com.mapmory.shared.runSuspend
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class MapViewModelTest {
+    @Test
+    fun `선택한_태그가_연결된_지역만_지도에_표시한다`() = runSuspend {
+        val catalog = StaticRegionCatalog()
+        val repository = FakeTripRecordRepository(catalog) { "2026-08-31T00:00:00" }
+        val family = repository.createTag("가족").getOrThrow()
+        val solo = repository.createTag("혼자").getOrThrow()
+        repository.createTripRecord(draft(catalog.requireByCode("11680").id, "서울").copy(tagIds = listOf(family.id)))
+        repository.createTripRecord(draft(catalog.requireByCode("JP").id, "일본").copy(tagIds = listOf(solo.id)))
+        val viewModel = MapViewModel(repository, catalog, GetTagsUseCase(repository))
+
+        viewModel.refresh()
+        viewModel.selectTag(family.id)
+
+        assertEquals(setOf("KR"), viewModel.visitedCountryCodes)
+        assertEquals(family.id, viewModel.uiState.selectedTagId)
+    }
+
     @Test
     fun `새로고침은_기록_지역_변경_후_열린_시도를_다시_조회한다`() = runSuspend {
         val catalog = StaticRegionCatalog()

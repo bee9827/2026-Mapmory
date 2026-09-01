@@ -6,6 +6,8 @@ import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.MapRegionLevel
 import com.mapmory.shared.domain.model.MapRegionSummary
 import com.mapmory.shared.domain.model.MapRegionType
+import com.mapmory.shared.domain.model.Tag
+import com.mapmory.shared.domain.model.TagRules
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMedia
@@ -15,16 +17,19 @@ import com.mapmory.shared.domain.model.TripRecordSummary
 import com.mapmory.shared.domain.model.dateValidationError
 import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.domain.repository.MapSummaryRepository
+import com.mapmory.shared.domain.repository.TagRepository
 import com.mapmory.shared.domain.repository.TripRecordRepository
 
 /** 서버 API를 연결하기 전 기록 흐름을 확인하는 메모리 기반 구현이다. */
 class FakeTripRecordRepository(
     private val regionCatalog: RegionCatalog = StaticRegionCatalog(),
     private val now: () -> String,
-) : TripRecordRepository, MapSummaryRepository {
+) : TripRecordRepository, MapSummaryRepository, TagRepository {
     private val records = mutableListOf<TripRecordData>()
+    private val tags = mutableListOf<Tag>()
     private var nextRecordId = 1L
     private var nextMediaId = 1L
+    private var nextTagId = 1L
 
     override suspend fun getTripRecords(query: TripRecordQuery): Result<TripRecordPage> {
         if (query.page < 0 || query.size !in 1..MaxPageSize) {
@@ -32,7 +37,8 @@ class FakeTripRecordRepository(
         }
 
         val filteredRecords = records.filter { record ->
-            query.locationId == null || record.locationId == query.locationId
+            (query.locationId == null || record.locationId == query.locationId) &&
+                (query.tagId == null || record.tags.any { tag -> tag.id == query.tagId })
         }
         val totalPages = (filteredRecords.size + query.size - 1) / query.size
         val pageRecords = filteredRecords.drop(query.page * query.size).take(query.size)
@@ -65,6 +71,7 @@ class FakeTripRecordRepository(
             media = createMedia(draft),
             createdAt = timestamp,
             updatedAt = timestamp,
+            tags = tagsFor(draft.tagIds),
         )
         records += record
         return Result.success(record)
@@ -82,6 +89,7 @@ class FakeTripRecordRepository(
             startDate = requireNotNull(draft.startDate),
             endDate = draft.endDate,
             media = createMedia(draft),
+            tags = tagsFor(draft.tagIds),
             updatedAt = now(),
         )
         records[index] = updatedRecord
@@ -95,24 +103,41 @@ class FakeTripRecordRepository(
         return Result.success(Unit)
     }
 
-    override suspend fun getRootRegions(): Result<List<MapRegionSummary>> = runCatching {
-        records.groupBy { record ->
+    override suspend fun getRootRegions(tagId: Long?): Result<List<MapRegionSummary>> = runCatching {
+        recordsFor(tagId).groupBy { record ->
             rootLocation(regionCatalog.findById(record.locationId))
         }.mapNotNull { (location, records) ->
             location?.toSummary(records.size.toLong(), MapRegionType.COUNTRY)
         }.sortedBy(MapRegionSummary::code)
     }
 
-    override suspend fun getChildRegions(regionId: Long): Result<List<MapRegionSummary>> = runCatching {
+    override suspend fun getChildRegions(regionId: Long, tagId: Long?): Result<List<MapRegionSummary>> = runCatching {
         val parent = requireNotNull(regionCatalog.findById(regionId)) {
             "지역을 찾을 수 없습니다: $regionId"
         }
         when {
-            parent.regionCode == KoreaCountryCode -> koreanProvinceSummaries()
-            parent.regionCode.startsWith(KoreanProvincePrefix) -> koreanDistrictSummaries(parent)
+            parent.regionCode == KoreaCountryCode -> koreanProvinceSummaries(recordsFor(tagId))
+            parent.regionCode.startsWith(KoreanProvincePrefix) -> koreanDistrictSummaries(parent, recordsFor(tagId))
             else -> emptyList()
         }
     }
+
+    override suspend fun getTags(): Result<List<Tag>> = Result.success(tags.toList())
+
+    override suspend fun createTag(name: String): Result<Tag> = runCatching {
+        val normalizedName = TagRules.normalizeAndValidateNewName(name, tags)
+        Tag(nextTagId++, normalizedName).also(tags::add)
+    }
+
+    private fun tagsFor(tagIds: List<Long>): List<Tag> {
+        TagRules.validateRecordTagIds(tagIds)
+        val selectedTags = tags.filter { it.id in tagIds }
+        require(selectedTags.size == tagIds.size) { "태그를 찾을 수 없습니다." }
+        return selectedTags
+    }
+
+    private fun recordsFor(tagId: Long?): List<TripRecordData> =
+        if (tagId == null) records else records.filter { record -> record.tags.any { tag -> tag.id == tagId } }
 
     private fun createMedia(draft: TripRecordDraft): List<TripRecordMedia> {
         val localMediaByObjectKey = draft.localMedia.associateBy { it.objectKey }
@@ -139,7 +164,7 @@ class FakeTripRecordRepository(
         else -> regionCatalog.findById(location.countryId)
     }
 
-    private fun koreanProvinceSummaries(): List<MapRegionSummary> = records.groupBy { record ->
+    private fun koreanProvinceSummaries(source: List<TripRecordData>): List<MapRegionSummary> = source.groupBy { record ->
         val location = regionCatalog.findById(record.locationId)
         when {
             location?.countryId != KoreaCountryId -> null
@@ -151,7 +176,10 @@ class FakeTripRecordRepository(
             ?.copy(code = location.regionCode.removePrefix(KoreanProvincePrefix))
     }.sortedBy(MapRegionSummary::code)
 
-    private fun koreanDistrictSummaries(province: Location): List<MapRegionSummary> = records.groupBy { record ->
+    private fun koreanDistrictSummaries(
+        province: Location,
+        source: List<TripRecordData>,
+    ): List<MapRegionSummary> = source.groupBy { record ->
         regionCatalog.findById(record.locationId)?.takeIf { location ->
             location.type == LocationType.DISTRICT && location.parentId == province.id
         }
@@ -178,6 +206,7 @@ private fun TripRecordData.toSummary(): TripRecordSummary = TripRecordSummary(
     locationId = locationId,
     content = content,
     media = media,
+    tags = tags,
 )
 
 private fun Long.toLevel(): MapRegionLevel = when (this) {

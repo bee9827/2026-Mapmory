@@ -88,6 +88,11 @@ internal fun MapRoute(
             )
             viewModel.changeScope(selectedScope)
         },
+        tags = uiState.tags,
+        selectedTagId = uiState.selectedTagId,
+        onTagSelected = { tagId ->
+            scope.launch { viewModel.selectTag(tagId) }
+        },
         mapContent = {
             when (uiState.scope) {
                 MapScope.WORLD -> MapArtwork(
