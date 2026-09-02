@@ -3,6 +3,7 @@ package com.mapmory.shared.presentation.photo
 import android.Manifest
 import android.content.ContentUris
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.graphics.Bitmap
@@ -14,6 +15,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.os.Trace
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -53,6 +55,7 @@ actual fun rememberPhotoLibraryActions(
     onLoadingChanged: (Boolean) -> Unit,
     onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
     onRecommendationLoadingChanged: (Boolean) -> Unit,
+    onPermissionRequired: (PhotoLibraryPermissionIssue) -> Unit,
 ): PhotoLibraryActions {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -62,6 +65,7 @@ actual fun rememberPhotoLibraryActions(
     val latestLoadingChanged by rememberUpdatedState(onLoadingChanged)
     val latestLoadingProgressChanged by rememberUpdatedState(onLoadingProgressChanged)
     val latestRecommendationLoadingChanged by rememberUpdatedState(onRecommendationLoadingChanged)
+    val latestPermissionRequired by rememberUpdatedState(onPermissionRequired)
     var pendingRecommendation by remember { mutableStateOf<Pair<Location, String?>?>(null) }
     val recommendationJob = remember { mutableStateOf<Job?>(null) }
     val recommendationGeneration = remember { mutableStateOf(0) }
@@ -159,14 +163,26 @@ actual fun rememberPhotoLibraryActions(
         val hasGalleryAccess = context.canReadGallery()
         val canRecommend = context.canRecommendPhotos()
         val target = pendingRecommendation
-        pendingRecommendation = null
         when {
             target == null -> Unit
             !context.hasFullGalleryAccess() && hasGalleryAccess -> {
-                latestMessage(FullGalleryAccessMessage)
+                latestPermissionRequired(PhotoLibraryPermissionIssue.LIMITED)
             }
-            canRecommend -> loadRecommendations(target.first, target.second)
-            else -> latestMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
+            canRecommend -> {
+                pendingRecommendation = null
+                loadRecommendations(target.first, target.second)
+            }
+            else -> latestPermissionRequired(PhotoLibraryPermissionIssue.DENIED)
+        }
+    }
+
+    val settingsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) {
+        val target = pendingRecommendation
+        if (target != null && context.canRecommendPhotos()) {
+            pendingRecommendation = null
+            loadRecommendations(target.first, target.second)
         }
     }
 
@@ -207,7 +223,7 @@ actual fun rememberPhotoLibraryActions(
         }
     }
 
-    return remember(context, galleryPicker, galleryPermissionLauncher) {
+    return remember(context, galleryPicker, galleryPermissionLauncher, settingsLauncher) {
         PhotoLibraryActions(
             pickFromGallery = {
                 latestLoadingChanged(true)
@@ -230,8 +246,10 @@ actual fun rememberPhotoLibraryActions(
             },
             recommendForLocation = { location, parentName ->
                 if (!context.hasFullGalleryAccess() && context.canReadGallery()) {
-                    latestMessage(FullGalleryAccessMessage)
+                    pendingRecommendation = location to parentName
+                    latestPermissionRequired(PhotoLibraryPermissionIssue.LIMITED)
                 } else if (context.canRecommendPhotos()) {
+                    pendingRecommendation = null
                     loadRecommendations(location, parentName)
                 } else {
                     pendingRecommendation = location to parentName
@@ -239,6 +257,14 @@ actual fun rememberPhotoLibraryActions(
                 }
             },
             cancelRecommendation = ::cancelRecommendations,
+            openAppSettings = {
+                settingsLauncher.launch(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:${context.packageName}"),
+                    ),
+                )
+            },
         )
     }
 }
@@ -734,9 +760,6 @@ private const val PreviewSizePx = 1280
 private const val PreviewJpegQuality = 85
 private const val OriginalJpegQuality = 100
 private const val PhotoPerformanceTag = "MapmoryPhotoPerf"
-private const val FullGalleryAccessMessage =
-    "위치 기반 사진 추천을 사용하려면 전체 갤러리 접근 권한을 허용해 주세요."
-
 private object TraceCookie {
     const val Recommend = 1
     const val RoomRead = 2
