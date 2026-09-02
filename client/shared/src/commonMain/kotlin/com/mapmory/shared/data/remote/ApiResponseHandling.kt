@@ -34,7 +34,7 @@ private fun userFacingApiMessage(
     detail: String?,
 ): String = when (code) {
     "INVALID_OBJECT_KEY" ->
-        "사진을 저장하지 못했습니다. 문제가 있는 사진을 삭제한 뒤 다시 추가해 주세요."
+        "사진을 저장하지 못했습니다. 잠시 후 다시 저장해 주세요."
 
     "INVALID_ACCESS_TOKEN",
     "EXPIRED_ACCESS_TOKEN",

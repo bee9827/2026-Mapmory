@@ -1,5 +1,6 @@
 package com.mapmory.shared.data.repository
 
+import com.mapmory.shared.data.remote.MapmoryApiException
 import com.mapmory.shared.data.remote.PhotoUploadSource
 import com.mapmory.shared.data.remote.PhotoUploader
 import com.mapmory.shared.data.remote.UploadedPhoto
@@ -135,11 +136,51 @@ class UploadingTripRecordRepositoryTest {
         ).exceptionOrNull()
 
         assertEquals(
-            "사진 원본을 불러오지 못했습니다. 사진을 삭제한 뒤 다시 추가해 주세요.",
+            "사진 원본을 불러오지 못했습니다. 잠시 후 다시 저장해 주세요.",
             error?.message,
         )
         assertFalse(error?.message.orEmpty().contains(internalId))
         assertFalse(error?.message.orEmpty().contains("internal-file-name.jpg"))
+    }
+
+    @Test
+    fun invalidNewObjectKeyIsReissuedAndSavedOnceWithoutReselectingThePhoto() = runBlocking {
+        var uploadAttempt = 0
+        val uploader = PhotoUploader { sources ->
+            uploadAttempt += 1
+            Result.success(
+                sources.map { source ->
+                    UploadedPhoto(source, "travel-records/10/reissued-$uploadAttempt.jpg")
+                },
+            )
+        }
+        val savedDrafts = mutableListOf<TripRecordDraft>()
+        val baseDelegate = CapturingTripRecordRepository()
+        val delegate = object : TripRecordRepository by baseDelegate {
+            override suspend fun updateTripRecord(
+                id: Long,
+                draft: TripRecordDraft,
+            ): Result<TripRecordData> {
+                savedDrafts += draft
+                return if (savedDrafts.size == 1) {
+                    Result.failure(invalidObjectKeyError())
+                } else {
+                    Result.success(draft.toRecord(id))
+                }
+            }
+        }
+        val repository = UploadingTripRecordRepository(uploader, delegate)
+
+        val result = repository.updateTripRecord(
+            id = 101,
+            draft = draftWithPhotos("다시 선택하지 않는 기록", listOf(byteArrayOf(0x01, 0x02))),
+        ).getOrThrow()
+
+        assertEquals(2, uploadAttempt)
+        assertEquals(2, savedDrafts.size)
+        assertEquals("travel-records/10/reissued-1.jpg", savedDrafts[0].mediaObjectKeys.single())
+        assertEquals("travel-records/10/reissued-2.jpg", savedDrafts[1].mediaObjectKeys.single())
+        assertEquals("travel-records/10/reissued-2.jpg", result.media.single().objectKey)
     }
 
     @Test
@@ -247,6 +288,15 @@ private fun indexedUploader(): PhotoUploader = PhotoUploader { sources ->
         },
     )
 }
+
+private fun invalidObjectKeyError(): MapmoryApiException = MapmoryApiException(
+    statusCode = 400,
+    code = "INVALID_OBJECT_KEY",
+    title = "Object Key가 올바르지 않습니다.",
+    detail = "중복되거나 다른 여행 일지에서 사용 중인 Object Key가 포함되어 있습니다.",
+    instance = "/api/v1/travel-records/101",
+    errors = emptyList(),
+)
 
 private fun draftWithPhotos(
     title: String,

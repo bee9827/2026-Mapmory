@@ -106,7 +106,7 @@ class ApiCallTest {
         )
 
         assertEquals(
-            "사진을 저장하지 못했습니다. 문제가 있는 사진을 삭제한 뒤 다시 추가해 주세요.",
+            "사진을 저장하지 못했습니다. 잠시 후 다시 저장해 주세요.",
             error.message,
         )
     }
