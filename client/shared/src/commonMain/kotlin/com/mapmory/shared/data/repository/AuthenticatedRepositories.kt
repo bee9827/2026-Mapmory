@@ -7,9 +7,11 @@ import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordPage
 import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.domain.model.TripStatistics
 import com.mapmory.shared.domain.repository.MapSummaryRepository
 import com.mapmory.shared.domain.repository.TagRepository
 import com.mapmory.shared.domain.repository.TripRecordRepository
+import com.mapmory.shared.domain.repository.TripStatisticsRepository
 
 internal class AuthenticatedTripRecordRepository(
     private val session: GuestSessionManager,
@@ -74,4 +76,15 @@ internal class AuthenticatedTagRepository(
         onSuccess = { request() },
         onFailure = Result.Companion::failure,
     )
+}
+
+internal class AuthenticatedTripStatisticsRepository(
+    private val session: GuestSessionManager,
+    private val delegate: TripStatisticsRepository,
+) : TripStatisticsRepository {
+    override suspend fun getStatistics(): Result<TripStatistics> =
+        session.ensureAuthenticated().fold(
+            onSuccess = { delegate.getStatistics() },
+            onFailure = Result.Companion::failure,
+        )
 }
