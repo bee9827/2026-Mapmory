@@ -15,7 +15,7 @@ object TagRules {
     const val MaxTagsPerMember = 10
     const val MaxTagsPerRecord = 5
 
-    const val InvalidIdMessage = "태그 ID는 양수여야 합니다."
+    const val InvalidIdMessage = "선택한 태그 정보를 확인하지 못했습니다."
     const val EmptyNameMessage = "태그 이름을 입력해 주세요."
     const val HashNotAllowedMessage = "#은 빼고 태그 이름만 입력해 주세요."
     const val NameTooLongMessage = "태그 이름은 30자 이하여야 합니다."
@@ -23,7 +23,7 @@ object TagRules {
     const val MemberLimitMessage = "태그는 최대 10개까지 만들 수 있습니다."
     const val DuplicateNameMessage = "같은 이름의 태그가 있습니다."
     const val RecordLimitMessage = "태그는 기록당 최대 5개까지 선택할 수 있습니다."
-    const val DuplicateIdMessage = "태그 ID는 중복될 수 없습니다."
+    const val DuplicateIdMessage = "같은 태그를 중복해서 선택할 수 없습니다."
 
     fun normalizeName(value: String): String = value.trim().replace(Regex("\\s+"), " ")
 

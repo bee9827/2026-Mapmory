@@ -106,6 +106,43 @@ class UploadingTripRecordRepositoryTest {
     }
 
     @Test
+    fun missingLocalOriginalDoesNotExposeItsInternalIdentifier() = runBlocking {
+        val internalId = "content://media/external/images/media/12345"
+        val repository = UploadingTripRecordRepository(
+            uploader = indexedUploader(),
+            delegate = CapturingTripRecordRepository(),
+        )
+
+        val error = repository.updateTripRecord(
+            id = 101,
+            draft = TripRecordDraft(
+                locationId = 1,
+                title = "원본 없는 기록",
+                content = "",
+                startDate = "2026-08-26",
+                endDate = null,
+                mediaObjectKeys = listOf(internalId),
+                localMedia = listOf(
+                    TripRecordMediaDraft(
+                        objectKey = internalId,
+                        sortOrder = 0,
+                        previewBytes = byteArrayOf(0x01),
+                        originalBytes = null,
+                        fileName = "internal-file-name.jpg",
+                    ),
+                ),
+            ),
+        ).exceptionOrNull()
+
+        assertEquals(
+            "사진 원본을 불러오지 못했습니다. 사진을 삭제한 뒤 다시 추가해 주세요.",
+            error?.message,
+        )
+        assertFalse(error?.message.orEmpty().contains(internalId))
+        assertFalse(error?.message.orEmpty().contains("internal-file-name.jpg"))
+    }
+
+    @Test
     fun listCacheKeepsOnlyTheFirstPreviewAndNeverKeepsOriginalBytes() = runBlocking {
         val uploader = indexedUploader()
         val delegate = CapturingTripRecordRepository()

@@ -76,11 +76,15 @@ internal class UploadingTripRecordRepository(
             if (key in draft.uploadedMediaObjectKeys) return@forEachIndexed
             val media = mediaByLocalId[key]
                 ?: return Result.failure(
-                    IllegalStateException("업로드할 사진 데이터를 찾을 수 없습니다: $key"),
+                    IllegalStateException(
+                        "사진 정보를 확인하지 못했습니다. 사진을 삭제한 뒤 다시 추가해 주세요.",
+                    ),
                 )
             val bytes = media.originalBytes
                 ?: return Result.failure(
-                    IllegalStateException("사진 원본을 읽지 못했습니다: ${media.fileName ?: key}"),
+                    IllegalStateException(
+                        "사진 원본을 불러오지 못했습니다. 사진을 삭제한 뒤 다시 추가해 주세요.",
+                    ),
                 )
             val contentType = detectImageContentType(media.fileName, bytes)
                 ?: return Result.failure(

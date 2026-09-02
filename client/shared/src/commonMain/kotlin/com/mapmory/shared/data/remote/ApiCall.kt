@@ -17,6 +17,10 @@ internal class MapmoryConnectionException(
     cause: Throwable,
 ) : IllegalStateException(message, cause)
 
+internal class MapmoryRemoteRequestException(
+    cause: Throwable,
+) : IllegalStateException(RemoteRequestFailureMessage, cause)
+
 internal fun Throwable.toUserFriendlyRemoteFailure(): Throwable {
     if (this is MapmoryApiException || this is MapmoryConnectionException) return this
 
@@ -41,10 +45,18 @@ internal fun Throwable.toUserFriendlyRemoteFailure(): Throwable {
         error::class.simpleName in ConnectionExceptionNames ||
             error.message.containsAny(ConnectionMessageFragments)
     }
+    val isResponseParsingFailure = generateSequence(this) { error -> error.cause }.any { error ->
+        val name = error::class.simpleName.orEmpty()
+        name in ResponseParsingExceptionNames || name.endsWith("SerializationException")
+    }
     return if (isConnectionFailure) {
         MapmoryConnectionException(ServerConnectionFailureMessage, this)
-    } else {
+    } else if (isResponseParsingFailure) {
+        MapmoryRemoteRequestException(this)
+    } else if (this is IllegalArgumentException || this is MissingAccessTokenException) {
         this
+    } else {
+        MapmoryRemoteRequestException(this)
     }
 }
 
@@ -60,6 +72,11 @@ private val TimeoutExceptionNames = setOf(
     "SocketTimeoutException",
 )
 private val ConnectionExceptionNames = setOf("ConnectException", "ConnectionRefusedException")
+private val ResponseParsingExceptionNames = setOf(
+    "JsonConvertException",
+    "JsonDecodingException",
+    "NoTransformationFoundException",
+)
 private val NameResolutionMessageFragments = setOf(
     "unable to resolve host",
     "no address associated with hostname",
@@ -77,3 +94,5 @@ private const val ServerConnectionFailureMessage =
     "서버에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 잠시 후 다시 시도해 주세요."
 private const val ServerTimeoutMessage =
     "서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."
+private const val RemoteRequestFailureMessage =
+    "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
