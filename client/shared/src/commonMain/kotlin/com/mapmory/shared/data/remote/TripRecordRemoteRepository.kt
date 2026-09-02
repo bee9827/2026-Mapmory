@@ -37,12 +37,14 @@ class TripRecordRemoteRepository(
         apiCall {
             require(query.page >= 0) { "페이지 번호는 0 이상이어야 합니다." }
             require(query.size in 1..MaxPageSize) { "페이지 크기는 1 이상 100 이하여야 합니다." }
+            require(query.tagId == null || query.tagId > 0) { "태그 ID는 양수여야 합니다." }
             val region = query.toRegionQuery(regionCatalog)
             val response = client.get(recordsUrl) {
                 authorizeWith(accessTokenProvider)
                 region?.countryCode?.let { parameter("countryCode", it) }
                 region?.provinceCode?.let { parameter("provinceCode", it) }
                 region?.districtCode?.let { parameter("districtCode", it) }
+                query.tagId?.let { parameter("tagId", it) }
                 parameter("page", query.page)
                 parameter("size", query.size)
             }.requireSuccess()

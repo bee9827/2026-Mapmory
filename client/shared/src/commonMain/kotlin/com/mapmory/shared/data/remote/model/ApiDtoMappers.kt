@@ -5,12 +5,16 @@ import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.MapRegionLevel
 import com.mapmory.shared.domain.model.MapRegionSummary
 import com.mapmory.shared.domain.model.MapRegionType
+import com.mapmory.shared.domain.model.Tag
+import com.mapmory.shared.domain.model.TagRules
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordPage
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.model.TripRecordSummary
+import com.mapmory.shared.domain.model.TripStatistics
+import com.mapmory.shared.domain.model.TopRegionStatistics
 import com.mapmory.shared.domain.model.dateValidationError
 import com.mapmory.shared.domain.region.RegionCatalog
 
@@ -22,7 +26,10 @@ fun TripRecordListItemDto.toDomain(): TripRecordSummary = TripRecordSummary(
     endDate = endDate,
     thumbnailUrl = thumbnailUrl,
     thumbnailUrlExpiresIn = thumbnailUrlExpiresIn,
+    tags = tags.map(TagDto::toDomain),
 )
+
+fun TagDto.toDomain(): Tag = Tag(id = id, name = TagRules.normalizeAndValidateName(name))
 
 fun TripRecordDetailDto.toDomain(regionCatalog: RegionCatalog): TripRecordData {
     val location = when {
@@ -67,6 +74,7 @@ fun TripRecordDetailDto.toDomain(regionCatalog: RegionCatalog): TripRecordData {
             },
         createdAt = createdAt,
         updatedAt = updatedAt,
+        tags = tags.map(TagDto::toDomain),
     )
 }
 
@@ -90,6 +98,7 @@ internal fun TripRecordDraft.toRequestDto(regionCatalog: RegionCatalog): TripRec
     require(mediaObjectKeys.distinct().size == mediaObjectKeys.size) {
         "사진 Object Key는 중복될 수 없습니다."
     }
+    TagRules.validateRecordTagIds(tagIds)
     val location = requireNotNull(regionCatalog.findById(locationId)) {
         "선택한 지역을 찾을 수 없습니다: $locationId"
     }
@@ -103,6 +112,7 @@ internal fun TripRecordDraft.toRequestDto(regionCatalog: RegionCatalog): TripRec
         startDate = requireNotNull(startDate),
         endDate = endDate,
         objectKeys = mediaObjectKeys,
+        tagIds = tagIds,
     )
 }
 
@@ -151,6 +161,23 @@ fun MapRegionSummaryDto.toDomain(): MapRegionSummary = MapRegionSummary(
     name = name,
     count = count,
     level = MapRegionLevel.valueOf(level),
+)
+
+fun TripStatisticsDto.toDomain(): TripStatistics = TripStatistics(
+    recordCount = recordCount,
+    mediaCount = mediaCount,
+    visitedCountryCount = visitedCountryCount,
+    visitedKoreaDistrictCount = visitedKoreaDistrictCount,
+    visitedCountryCodes = visitedCountryCodes,
+    topRegions = topRegions.map { region ->
+        TopRegionStatistics(
+            regionId = region.regionId,
+            code = region.code,
+            type = MapRegionType.valueOf(region.regionType),
+            name = region.name,
+            recordCount = region.recordCount,
+        )
+    },
 )
 
 private const val KoreaCountryCode = "KR"
