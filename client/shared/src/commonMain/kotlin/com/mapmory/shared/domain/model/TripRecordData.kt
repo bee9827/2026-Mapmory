@@ -47,6 +47,14 @@ data class TripRecordDraft(
     val tagIds: List<Long> = emptyList(),
 )
 
+object TripRecordPhotoRules {
+    const val MaxPhotosPerRecord = 10
+    const val LimitMessage = "사진은 기록당 최대 10장까지 추가할 수 있습니다."
+
+    fun remainingSlots(currentPhotoCount: Int): Int =
+        (MaxPhotosPerRecord - currentPhotoCount).coerceAtLeast(0)
+}
+
 fun TripRecordDraft.dateValidationError(): String? = when {
     startDate == null -> "시작일을 입력해 주세요."
     !startDate.isValidIsoDate() -> "올바른 시작일을 입력해 주세요."

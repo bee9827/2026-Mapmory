@@ -10,6 +10,7 @@ import com.mapmory.shared.domain.model.TagRules
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMediaDraft
+import com.mapmory.shared.domain.model.TripRecordPhotoRules
 import com.mapmory.shared.domain.model.dateValidationError
 import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
@@ -254,25 +255,42 @@ class TripRecordEditorViewModel(
     fun addMediaObjectKey(objectKey: String) {
         val trimmedObjectKey = objectKey.trim()
         if (trimmedObjectKey.isBlank() || trimmedObjectKey in uiState.mediaObjectKeys) return
+        if (uiState.mediaObjectKeys.size >= TripRecordPhotoRules.MaxPhotosPerRecord) {
+            uiState = uiState.withPhotoLimitError()
+            return
+        }
 
         uiState = uiState.copy(
             mediaObjectKeys = uiState.mediaObjectKeys + trimmedObjectKey,
+            fieldErrors = uiState.fieldErrors - TripRecordEditorErrorTarget.PHOTOS,
         ).revalidatedAfterChange()
     }
 
     fun addPhotos(photos: List<SelectedPhoto>) {
+        val existingIds = uiState.selectedPhotos.mapTo(mutableSetOf()) { photo -> photo.id }
+        val newPhotos = photos
+            .filterNot { photo -> photo.id in existingIds }
+            .distinctBy(SelectedPhoto::id)
+        val acceptedPhotos = newPhotos.take(
+            TripRecordPhotoRules.remainingSlots(uiState.selectedPhotos.size),
+        )
         val merged = buildList {
             addAll(uiState.selectedPhotos)
-            photos.forEach { photo ->
-                if (none { existing -> existing.id == photo.id }) {
-                    add(photo.toTripRecordPhotoUiState(sortOrder = size))
-                }
+            acceptedPhotos.forEach { photo ->
+                add(photo.toTripRecordPhotoUiState(sortOrder = size))
             }
+        }
+        val photoErrors = when {
+            acceptedPhotos.size < newPhotos.size -> uiState.fieldErrors + (
+                TripRecordEditorErrorTarget.PHOTOS to TripRecordPhotoRules.LimitMessage
+            )
+            newPhotos.isNotEmpty() -> uiState.fieldErrors - TripRecordEditorErrorTarget.PHOTOS
+            else -> uiState.fieldErrors
         }
         uiState = uiState.copy(
             selectedPhotos = merged,
             mediaObjectKeys = merged.map { it.id },
-            fieldErrors = uiState.fieldErrors - TripRecordEditorErrorTarget.PHOTOS,
+            fieldErrors = photoErrors,
         ).revalidatedAfterChange()
     }
 
@@ -392,12 +410,27 @@ private fun TripRecordEditorUiState.revalidatedAfterChange(
     )
 }
 
+private fun TripRecordEditorUiState.withPhotoLimitError(): TripRecordEditorUiState = copy(
+    isDirty = true,
+    dirtyFields = dirtyFields + TripRecordEditorErrorTarget.PHOTOS,
+    fieldErrors = fieldErrors + (
+        TripRecordEditorErrorTarget.PHOTOS to TripRecordPhotoRules.LimitMessage
+    ),
+    generalErrorMessage = null,
+)
+
 private fun TripRecordEditorErrorTarget.isDateTarget(): Boolean =
     this == TripRecordEditorErrorTarget.START_DATE || this == TripRecordEditorErrorTarget.END_DATE
 
 private fun TripRecordEditorUiState.validationErrors(
     dateRangeErrorTarget: TripRecordEditorErrorTarget = TripRecordEditorErrorTarget.END_DATE,
 ): Map<TripRecordEditorErrorTarget, String> = buildMap {
+    if (
+        mediaObjectKeys.size > TripRecordPhotoRules.MaxPhotosPerRecord ||
+        selectedPhotos.size > TripRecordPhotoRules.MaxPhotosPerRecord
+    ) {
+        put(TripRecordEditorErrorTarget.PHOTOS, TripRecordPhotoRules.LimitMessage)
+    }
     if (selectedLocation == null) {
         put(TripRecordEditorErrorTarget.LOCATION, "장소를 선택해 주세요.")
     } else if (!selectedLocation.isSelectableTripRecordDestination()) {

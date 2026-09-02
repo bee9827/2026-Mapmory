@@ -7,6 +7,8 @@ import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.model.TripRecordMedia
+import com.mapmory.shared.domain.model.TripRecordPhotoRules
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.repository.TripRecordRepository
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
@@ -14,6 +16,7 @@ import com.mapmory.shared.domain.usecase.CreateTagUseCase
 import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
 import com.mapmory.shared.domain.usecase.GetTagsUseCase
 import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
+import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.runSuspend
 import kotlin.test.Test
@@ -240,6 +243,58 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
+    fun `기록_수정에서는_기존_사진을_포함해_최대_10장만_추가한다`() {
+        val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+        val location = Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT)
+        viewModel.startEditing(
+            record = TripRecordData(
+                id = 1,
+                locationId = location.id,
+                title = "서울 여행",
+                content = "",
+                startDate = "2026-08-01",
+                endDate = null,
+                media = (1..9).map { index ->
+                    TripRecordMedia(
+                        id = index.toLong(),
+                        objectKey = "records/1/existing-$index.jpg",
+                        sortOrder = index - 1,
+                        url = null,
+                    )
+                },
+                createdAt = "2026-08-01T00:00:00Z",
+                updatedAt = "2026-08-01T00:00:00Z",
+            ),
+            location = location,
+        )
+
+        viewModel.addPhotos(
+            listOf(
+                selectedPhoto("content://new/1"),
+                selectedPhoto("content://new/2"),
+            ),
+        )
+
+        assertEquals(TripRecordPhotoRules.MaxPhotosPerRecord, viewModel.uiState.selectedPhotos.size)
+        assertEquals(
+            TripRecordPhotoRules.LimitMessage,
+            viewModel.uiState.fieldErrors[TripRecordEditorErrorTarget.PHOTOS],
+        )
+        assertTrue(viewModel.uiState.selectedPhotos.any { photo -> photo.id == "content://new/1" })
+        assertTrue(viewModel.uiState.selectedPhotos.none { photo -> photo.id == "content://new/2" })
+
+        viewModel.removeMediaObjectKey("records/1/existing-1.jpg")
+        viewModel.addPhotos(listOf(selectedPhoto("content://new/2")))
+
+        assertEquals(TripRecordPhotoRules.MaxPhotosPerRecord, viewModel.uiState.selectedPhotos.size)
+        assertNull(viewModel.uiState.fieldErrors[TripRecordEditorErrorTarget.PHOTOS])
+    }
+
+    @Test
     fun `사진_업로드_제한_오류는_사진_컴포넌트의_오류로_분류한다`() {
         val error = MapmoryApiException(
             statusCode = 400,
@@ -317,3 +372,10 @@ class TripRecordEditorViewModelTest {
         )
     }
 }
+
+private fun selectedPhoto(id: String): SelectedPhoto = SelectedPhoto(
+    id = id,
+    displayName = id.substringAfterLast('/'),
+    previewBytes = null,
+    originalBytes = byteArrayOf(0x01),
+)
