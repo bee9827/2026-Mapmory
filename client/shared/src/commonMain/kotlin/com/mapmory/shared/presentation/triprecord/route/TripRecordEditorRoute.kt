@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.navigation.MapmoryBackHandlerRegistry
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordEditorScreen
@@ -39,6 +41,7 @@ internal fun TripRecordEditorRoute(
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
+    val analytics = LocalMapmoryAnalytics.current
     var pendingEditorExit by remember { mutableStateOf<(() -> Unit)?>(null) }
     var pendingPhotoLoadingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var isPhotoLoadingSaveConfirmation by remember { mutableStateOf(false) }
@@ -47,6 +50,13 @@ internal fun TripRecordEditorRoute(
         viewModel.initialize(
             recordId = recordId,
             selectedLocation = selectedLocationId?.let(regionCatalog::findById),
+        )
+    }
+
+    LaunchedEffect(Unit) {
+        analytics.logEvent(
+            MapmoryAnalyticsEvent.SCREEN_VIEW,
+            mapOf("screen_name" to "record_editor"),
         )
     }
 
@@ -63,10 +73,24 @@ internal fun TripRecordEditorRoute(
 
     fun save() {
         scope.launch {
+            val mode = if (recordId == null) "create" else "edit"
+            analytics.logEvent(
+                MapmoryAnalyticsEvent.RECORD_SAVE_STARTED,
+                mapOf("mode" to mode),
+            )
             if (viewModel.save()) {
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.RECORD_SAVE_COMPLETED,
+                    mapOf("mode" to mode),
+                )
                 viewModel.savedRecordId?.let { savedId ->
                     onSaved(recordId != null, savedId)
                 }
+            } else {
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.RECORD_SAVE_FAILED,
+                    mapOf("mode" to mode),
+                )
             }
         }
     }
@@ -94,6 +118,11 @@ internal fun TripRecordEditorRoute(
         onContentChanged = viewModel::updateContent,
         onStartDateChanged = viewModel::updateStartDate,
         onEndDateChanged = viewModel::updateEndDate,
+        onTagInputChanged = viewModel::updateTagInput,
+        onTagToggled = viewModel::toggleTag,
+        onTagCreate = {
+            scope.launch { viewModel.createAndSelectTag() }
+        },
         onPhotosAdded = viewModel::addPhotos,
         onPhotoRemoved = viewModel::removeMediaObjectKey,
         onPhotoLoadingChanged = viewModel::setPhotoLoading,

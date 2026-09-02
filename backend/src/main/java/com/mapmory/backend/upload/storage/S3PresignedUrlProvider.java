@@ -3,8 +3,10 @@ package com.mapmory.backend.upload.storage;
 import java.net.URI;
 import java.time.Duration;
 import org.springframework.stereotype.Component;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 @Component
@@ -40,5 +42,22 @@ public class S3PresignedUrlProvider implements PresignedUrlProvider {
                 .build();
 
         return URI.create(s3Presigner.presignPutObject(presignRequest).url().toString());
+    }
+
+    @Override
+    public URI createPresignedGetUrl(
+            String objectKey,
+            Duration expiration
+    ) {
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(objectKey)
+                .build();
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(expiration)
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        return URI.create(s3Presigner.presignGetObject(presignRequest).url().toString());
     }
 }

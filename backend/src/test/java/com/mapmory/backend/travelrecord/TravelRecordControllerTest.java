@@ -21,11 +21,15 @@ import com.mapmory.backend.travelrecord.dto.CreateTravelRecordResponse;
 import com.mapmory.backend.travelrecord.dto.RegionDetailResponse;
 import com.mapmory.backend.travelrecord.dto.RegionItemResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordDetailResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordListItemResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordListResponse;
+import com.mapmory.backend.travelrecord.dto.TravelRecordMediaResponse;
 import com.mapmory.backend.travelrecord.dto.TravelRecordRequest;
 import com.mapmory.backend.travelrecord.dto.TravelRecordResponse;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -286,7 +290,41 @@ class TravelRecordControllerTest {
                 .andExpect(jsonPath("$.data.region.country.code").value("KR"))
                 .andExpect(jsonPath("$.data.region.district.code").value("50110"))
                 .andExpect(jsonPath("$.data.objectKeys[0]")
-                        .value("mapmory/travel-records/a.jpg"));
+                        .value("mapmory/travel-records/a.jpg"))
+                .andExpect(jsonPath("$.data.media[0].objectKey")
+                        .value("mapmory/travel-records/a.jpg"))
+                .andExpect(jsonPath("$.data.media[0].viewUrl")
+                        .value("https://download.example/mapmory/travel-records/a.jpg"))
+                .andExpect(jsonPath("$.data.media[0].viewUrlExpiresIn").value(300L));
+    }
+
+    @Test
+    void 여행_일지_목록에_썸네일_URL을_반환한다() throws Exception {
+        TravelRecordListResponse list = new TravelRecordListResponse(
+                List.of(new TravelRecordListItemResponse(
+                        101L,
+                        "제주 여행",
+                        "제주시",
+                        LocalDate.of(2026, 8, 11),
+                        LocalDate.of(2026, 8, 13),
+                        "https://download.example/mapmory/travel-records/a.jpg",
+                        300L,
+                        List.of()
+                )),
+                0,
+                20,
+                1,
+                1,
+                false
+        );
+        when(travelRecordService.findAll(MEMBER, null, null, null, null, 0, 20))
+                .thenReturn(list);
+
+        mockMvcWithLoginMember().perform(get("/api/v1/travel-records"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].thumbnailUrl")
+                        .value("https://download.example/mapmory/travel-records/a.jpg"))
+                .andExpect(jsonPath("$.data.items[0].thumbnailUrlExpiresIn").value(300L));
     }
 
     @Test
@@ -318,7 +356,9 @@ class TravelRecordControllerTest {
                 .andExpect(jsonPath("$.data.title").value("수정된 제주 여행"))
                 .andExpect(jsonPath("$.data.region.district.code").value("50110"))
                 .andExpect(jsonPath("$.data.objectKeys[0]")
-                        .value("travel-records/10/b.jpg"));
+                        .value("travel-records/10/b.jpg"))
+                .andExpect(jsonPath("$.data.media[0].viewUrl")
+                        .value("https://download.example/travel-records/10/b.jpg"));
     }
 
     @Test
@@ -342,6 +382,16 @@ class TravelRecordControllerTest {
                 LocalDate.of(2026, 8, 11),
                 LocalDate.of(2026, 8, 13),
                 objectKeys,
+                IntStream.range(0, objectKeys.size())
+                        .mapToObj(index -> new TravelRecordMediaResponse(
+                                (long) index + 1,
+                                objectKeys.get(index),
+                                "https://download.example/" + objectKeys.get(index),
+                                300L,
+                                index
+                        ))
+                        .toList(),
+                List.of(),
                 null,
                 null
         );

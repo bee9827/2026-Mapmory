@@ -5,7 +5,9 @@ import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
+import com.mapmory.shared.domain.usecase.CreateTagUseCase
 import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
+import com.mapmory.shared.domain.usecase.GetTagsUseCase
 import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.runSuspend
@@ -16,6 +18,28 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class TripRecordEditorViewModelTest {
+    @Test
+    fun `직접_만든_태그를_선택해_기록에_저장한다`() = runSuspend {
+        val repository = FakeTripRecordRepository { "2026-08-31T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+            getTags = GetTagsUseCase(repository),
+            createTag = CreateTagUseCase(repository),
+        )
+
+        viewModel.initialize(recordId = null, selectedLocation = null)
+        viewModel.updateTagInput(" 라멘맛집 ")
+        viewModel.createAndSelectTag()
+        viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
+        viewModel.updateTitle("서울 여행")
+        viewModel.updateStartDate("2026-08-31")
+
+        assertTrue(viewModel.save())
+        assertEquals("라멘맛집", repository.getTags().getOrThrow().single().name)
+        assertEquals("라멘맛집", repository.getTripRecord(1).getOrThrow().tags.single().name)
+    }
+
     @Test
     fun `경로를_반복_초기화해도_작성_초안을_유지한다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
@@ -174,7 +198,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun `국내_기록은_시군구_선택을_요구한다`() = runSuspend {
+    fun `국내_시도는_여행지로_선택되지_않는다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(repository),
@@ -184,9 +208,10 @@ class TripRecordEditorViewModelTest {
         viewModel.updateTitle("서울 여행")
         viewModel.updateStartDate("2026-08-01")
 
+        assertNull(viewModel.uiState.selectedLocation)
         assertFalse(viewModel.save())
         assertEquals(
-            "대한민국은 시·군·구까지 선택해 주세요.",
+            "장소를 선택해 주세요.",
             viewModel.uiState.fieldErrors[TripRecordEditorErrorTarget.LOCATION],
         )
     }

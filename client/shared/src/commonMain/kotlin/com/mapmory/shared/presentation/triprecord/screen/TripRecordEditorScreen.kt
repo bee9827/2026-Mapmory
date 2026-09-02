@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
@@ -69,6 +70,8 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.flow.collect
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.photo.PhotoLibraryActionsFactory
@@ -81,11 +84,18 @@ import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
 import com.mapmory.shared.presentation.photo.shouldLoadNextRecommendationPage
 import com.mapmory.shared.presentation.photo.toggleSelection
 import com.mapmory.shared.presentation.date.PlatformDatePicker
+import com.mapmory.shared.presentation.triprecord.endDatePickerMinimumDate
+import com.mapmory.shared.presentation.triprecord.initialSelectableTripRecordDate
+import com.mapmory.shared.presentation.triprecord.startDatePickerMaximumDate
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+import com.mapmory.shared.presentation.triprecord.selectableTripRecordDestinations
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewLocations
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 private const val StartDatePickerTarget = "start"
 private const val EndDatePickerTarget = "end"
@@ -119,6 +129,9 @@ fun TripRecordEditorScreen(
     onContentChanged: (String) -> Unit,
     onStartDateChanged: (String) -> Unit,
     onEndDateChanged: (String) -> Unit,
+    onTagInputChanged: (String) -> Unit = {},
+    onTagToggled: (Long) -> Unit = {},
+    onTagCreate: () -> Unit = {},
     onPhotosAdded: (List<SelectedPhoto>) -> Unit = {},
     onPhotoRemoved: (String) -> Unit = {},
     onPhotoLoadingChanged: (Boolean) -> Unit = {},
@@ -147,10 +160,9 @@ fun TripRecordEditorScreen(
         },
     modifier: Modifier = Modifier,
 ) {
+    val analytics = LocalMapmoryAnalytics.current
     val selectableLocations = remember(locations) {
-        locations
-            .filter { it.type == LocationType.PROVINCE || it.type == LocationType.DISTRICT }
-            .distinctBy(Location::regionCode)
+        locations.selectableTripRecordDestinations()
     }
     var showLocationSheet by remember { mutableStateOf(false) }
     var locationSearchQuery by rememberSaveable { mutableStateOf("") }
@@ -165,6 +177,10 @@ fun TripRecordEditorScreen(
     val dismissKeyboardOnTap = rememberDismissKeyboardOnTapModifier()
     val photoLibrary = photoLibraryActionsFactory(
         { photos ->
+            analytics.logEvent(
+                MapmoryAnalyticsEvent.PHOTOS_ADDED,
+                mapOf("source" to "gallery", "count" to photos.size.toString()),
+            )
             photoMessage = null
             onPhotosAdded(photos)
         },
@@ -232,6 +248,7 @@ fun TripRecordEditorScreen(
         selectableLocations.filter { location ->
             locationSearchQuery.isBlank() ||
                 location.name.contains(locationSearchQuery, ignoreCase = true) ||
+                location.displayName(locations).contains(locationSearchQuery, ignoreCase = true) ||
                 location.regionCode.contains(locationSearchQuery, ignoreCase = true)
         }
     }
@@ -265,9 +282,13 @@ fun TripRecordEditorScreen(
                         PhotoSection(
                             locationName = uiState.selectedLocation?.name ?: "여행 장소",
                             photos = uiState.selectedPhotos,
-                            onAddClick = photoLibrary.pickFromGallery,
+                            onAddClick = {
+                                analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_PICKER_OPENED)
+                                photoLibrary.pickFromGallery()
+                            },
                             onRecommendClick = {
                                 if (isRecommendationLoading) {
+                                    analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_CANCELLED)
                                     photoLibrary.cancelRecommendation()
                                     photoMessage = "사진 불러오기를 중단했어요."
                                 } else {
@@ -275,6 +296,10 @@ fun TripRecordEditorScreen(
                                     if (selectedLocation == null) {
                                         photoMessage = "사진을 추천받으려면 장소를 먼저 선택해 주세요."
                                     } else {
+                                        analytics.logEvent(
+                                            MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_STARTED,
+                                            mapOf("location_type" to selectedLocation.type.name.lowercase()),
+                                        )
                                         photoMessage = "${selectedLocation.name}에서 촬영된 사진을 찾고 있어요."
                                         recommendationPagingState = PhotoRecommendationPagingState()
                                         lastAutoLoadTriggerKey = null
@@ -350,7 +375,11 @@ fun TripRecordEditorScreen(
                         )
                         EditorDivider(Modifier.padding(horizontal = 20.dp))
 
-                        CompanionChips(
+                        TagEditor(
+                            uiState = uiState,
+                            onInputChanged = onTagInputChanged,
+                            onTagToggled = onTagToggled,
+                            onCreate = onTagCreate,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                         )
 
@@ -396,7 +425,7 @@ fun TripRecordEditorScreen(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "국가, 시·도, 시·군·구를 검색해 보세요",
+                    text = "해외 국가 또는 국내 시·군·구를 검색해 보세요",
                     color = TripRecordPalette.current.muted,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(top = 6.dp),
@@ -443,6 +472,13 @@ fun TripRecordEditorScreen(
                                 locations = locations,
                                 selected = uiState.selectedLocation?.regionCode == location.regionCode,
                                 onClick = {
+                                    analytics.logEvent(
+                                        MapmoryAnalyticsEvent.MAP_LOCATION_SELECTED,
+                                        mapOf(
+                                            "source" to "location_search",
+                                            "location_type" to location.type.name.lowercase(),
+                                        ),
+                                    )
                                     onLocationSelected(location)
                                     showLocationSheet = false
                                 },
@@ -535,6 +571,10 @@ fun TripRecordEditorScreen(
                             if (preparedPhotos.isEmpty()) {
                                 photoMessage = "선택한 사진의 원본을 읽지 못했어요."
                             } else {
+                                analytics.logEvent(
+                                    MapmoryAnalyticsEvent.PHOTOS_ADDED,
+                                    mapOf("source" to "recommendation", "count" to preparedPhotos.size.toString()),
+                                )
                                 onPhotosAdded(preparedPhotos)
                                 showRecommendationSheet = false
                                 photoMessage = null
@@ -562,18 +602,37 @@ fun TripRecordEditorScreen(
 
     val activeDatePickerTarget = datePickerTarget
     val isStartDatePicker = activeDatePickerTarget == StartDatePickerTarget
+    val today = remember(activeDatePickerTarget) {
+        Clock.System.now()
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+            .toString()
+    }
+    val minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
+        endDatePickerMinimumDate(uiState.startDate, today)
+    } else {
+        null
+    }
+    val maximumDate = if (activeDatePickerTarget == StartDatePickerTarget) {
+        startDatePickerMaximumDate(uiState.endDate, today)
+    } else {
+        today
+    }
+    val selectedDate = when (activeDatePickerTarget) {
+        StartDatePickerTarget -> uiState.startDate
+        EndDatePickerTarget -> uiState.endDate
+        else -> null
+    }
     PlatformDatePicker(
         visible = activeDatePickerTarget != null,
-        initialDate = when {
-            isStartDatePicker -> uiState.startDate
-            activeDatePickerTarget == EndDatePickerTarget -> uiState.endDate
-            else -> null
-        },
-        minimumDate = if (activeDatePickerTarget == EndDatePickerTarget) {
-            uiState.startDate
-        } else {
-            null
-        },
+        initialDate = initialSelectableTripRecordDate(
+            selectedDate = selectedDate,
+            fallbackDate = today,
+            minimumDate = minimumDate,
+            maximumDate = maximumDate,
+        ),
+        minimumDate = minimumDate,
+        maximumDate = maximumDate,
         onDateSelected = { date ->
             if (isStartDatePicker) {
                 onStartDateChanged(date)
@@ -698,10 +757,8 @@ private fun PhotoSection(
                         )
                         Text(
                             text = loadingProgress?.let { progress ->
-                                progress.percentage?.let { percentage ->
-                                    "${progress.processed}/${progress.total} ($percentage%)"
-                                }
-                            } ?: "불러오는 중",
+                                progress.percentage?.let { percentage -> "중단 · $percentage%" }
+                            } ?: "중단",
                             color = TripRecordPalette.current.photoRecommendText,
                             fontSize = 9.sp,
                         )
@@ -867,34 +924,101 @@ private fun TripRecordEditorUiState.errorMessageFor(target: TripRecordEditorErro
     }
 
 @Composable
-private fun CompanionChips(modifier: Modifier = Modifier) {
-    val companions = remember { listOf("가족", "애인", "친구", "혼자") }
-    var selectedCompanion by remember { mutableStateOf<String?>(null) }
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        companions.forEach { companion ->
-            val selected = selectedCompanion == companion
+private fun TagEditor(
+    uiState: TripRecordEditorUiState,
+    onInputChanged: (String) -> Unit,
+    onTagToggled: (Long) -> Unit,
+    onCreate: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text(
-                text = companion,
-                color = if (selected) TripRecordPalette.current.primary else TripRecordPalette.current.text,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50.dp))
-                    .background(
-                        if (selected) TripRecordPalette.current.primarySoft else TripRecordPalette.current.surface,
-                    )
-                    .border(1.dp, TripRecordPalette.current.line, RoundedCornerShape(50.dp))
-                    .clickable {
-                        selectedCompanion = if (selected) null else companion
-                    }
-                    .padding(horizontal = 11.dp, vertical = 7.dp),
+                text = "태그",
+                color = TripRecordPalette.current.text,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
             )
+            Text(
+                text = "${uiState.selectedTagIds.size}/5",
+                color = TripRecordPalette.current.muted,
+                fontSize = 11.sp,
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = uiState.tagInput,
+                onValueChange = onInputChanged,
+                placeholder = { Text("직접 입력 (# 제외)") },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TripRecordPalette.current.text,
+                    unfocusedTextColor = TripRecordPalette.current.text,
+                    cursorColor = TripRecordPalette.current.accent,
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent,
+                    disabledBorderColor = Color.Transparent,
+                    errorBorderColor = Color.Transparent,
+                    focusedPlaceholderColor = TripRecordPalette.current.muted,
+                    unfocusedPlaceholderColor = TripRecordPalette.current.muted,
+                ),
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = onCreate,
+                enabled = uiState.tagInput.isNotBlank() && !uiState.isCreatingTag,
+            ) {
+                if (uiState.isCreatingTag) {
+                    CircularProgressIndicator(
+                        color = TripRecordPalette.current.accent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(18.dp),
+                    )
+                } else {
+                    Text("추가", color = TripRecordPalette.current.accent)
+                }
+            }
+        }
+
+        if (uiState.availableTags.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                uiState.availableTags.forEach { tag ->
+                    val selected = tag.id in uiState.selectedTagIds
+                    TripTagChip(
+                        text = tag.name,
+                        selected = selected,
+                        onClick = { onTagToggled(tag.id) },
+                    )
+                }
+            }
+        } else if (!uiState.isTagsLoading) {
+            Text(
+                text = "아직 태그가 없어요. 원하는 태그를 직접 만들어 보세요.",
+                color = TripRecordPalette.current.muted,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+
+        uiState.tagErrorMessage?.let { message ->
+            EditorErrorMessage(message = message, modifier = Modifier.padding(top = 6.dp))
         }
     }
 }

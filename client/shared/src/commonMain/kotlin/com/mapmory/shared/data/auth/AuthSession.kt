@@ -3,6 +3,7 @@ package com.mapmory.shared.data.auth
 import com.mapmory.shared.data.remote.AccessTokenProvider
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.Clock
 
 data class AuthTokens(
     val accessToken: String,
@@ -35,13 +36,14 @@ internal interface AuthGateway {
 /**
  * 첫 보호 API 호출 전에 게스트 세션을 준비한다.
  *
- * 저장된 세션이 있으면 앱 실행 중 한 번만 갱신하고, 없으면 게스트 로그인을 한 번만
- * 수행한다. Mutex는 동시에 여러 화면이 초기화돼도 회전형 리프레시 토큰이 중복 사용되는
- * 것을 막는다.
+ * 저장된 Access Token의 수명이 충분하면 즉시 재사용하고, 만료됐거나 형식을 확인할 수 없을
+ * 때만 앱 실행 중 한 번 갱신한다. 저장된 세션이 없으면 게스트 로그인을 한 번 수행한다.
+ * Mutex는 동시에 여러 화면이 초기화돼도 회전형 리프레시 토큰이 중복 사용되는 것을 막는다.
  */
 internal class GuestSessionManager(
     private val gateway: AuthGateway,
     private val tokenStore: AuthTokenStore,
+    private val nowEpochSeconds: () -> Long = { Clock.System.now().epochSeconds },
 ) : AccessTokenProvider {
     private val authenticationMutex = Mutex()
     private var didLoadStoredTokens = false
@@ -56,6 +58,10 @@ internal class GuestSessionManager(
         if (!didLoadStoredTokens) {
             tokens = tokenStore.load()
             didLoadStoredTokens = true
+            if (tokens?.accessToken?.hasUsableJwtLifetime(nowEpochSeconds()) == true) {
+                isAuthenticated = true
+                return@withLock Result.success(Unit)
+            }
         }
 
         val authentication = tokens

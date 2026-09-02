@@ -13,6 +13,7 @@ data class TripRecordData(
     val createdAt: String,
     val updatedAt: String,
     val thumbnailUrl: String? = null,
+    val tags: List<Tag> = emptyList(),
 )
 
 /** 목록 API가 반환하는 얇은 모델이다. 본문과 전체 미디어는 상세 조회에서만 가져온다. */
@@ -29,6 +30,7 @@ data class TripRecordSummary(
     val locationId: Long? = null,
     val content: String = "",
     val media: List<TripRecordMedia> = emptyList(),
+    val tags: List<Tag> = emptyList(),
 )
 
 data class TripRecordDraft(
@@ -40,6 +42,7 @@ data class TripRecordDraft(
     val mediaObjectKeys: List<String>,
     // API 요청에는 object key만 사용하고, 로컬 저장소에서는 선택한 사진 표시 데이터를 보존한다.
     val localMedia: List<TripRecordMediaDraft> = emptyList(),
+    val tagIds: List<Long> = emptyList(),
 )
 
 fun TripRecordDraft.dateValidationError(): String? = when {
@@ -67,6 +70,7 @@ private fun String.isValidIsoDate(): Boolean {
 
 data class TripRecordQuery(
     val locationId: Long? = null,
+    val tagId: Long? = null,
     val page: Int = 0,
     val size: Int = 20,
 )

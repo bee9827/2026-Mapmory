@@ -6,6 +6,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.navigation.MapmoryBackHandlerRegistry
@@ -31,7 +33,15 @@ internal fun MapRoute(
 ) {
     val uiState = viewModel.uiState
     val scope = rememberCoroutineScope()
+    val analytics = LocalMapmoryAnalytics.current
     val latestNestedBack = rememberUpdatedState { viewModel.closeProvince() }
+
+    LaunchedEffect(Unit) {
+        analytics.logEvent(
+            MapmoryAnalyticsEvent.SCREEN_VIEW,
+            mapOf("screen_name" to "map"),
+        )
+    }
 
     LaunchedEffect(viewModel, tripRecordRevision) {
         viewModel.refresh()
@@ -47,7 +57,15 @@ internal fun MapRoute(
     }
 
     fun openLocation(location: Location) {
-        if (viewModel.hasRecords(location)) {
+        val hasRecords = viewModel.hasRecords(location)
+        analytics.logEvent(
+            MapmoryAnalyticsEvent.MAP_LOCATION_SELECTED,
+            mapOf(
+                "location_type" to location.type.name.lowercase(),
+                "has_records" to hasRecords.toString(),
+            ),
+        )
+        if (hasRecords) {
             onOpenRecords(location.id)
         } else {
             onOpenEditor(location.id)
@@ -63,14 +81,29 @@ internal fun MapRoute(
             selectedProvinceCode != null -> viewModel.visitedDistrictCount(selectedProvinceCode)
             else -> viewModel.visitedProvinceCodes.size
         },
-        onMapScopeChange = viewModel::changeScope,
+        onMapScopeChange = { selectedScope ->
+            analytics.logEvent(
+                MapmoryAnalyticsEvent.MAP_SCOPE_CHANGED,
+                mapOf("scope" to selectedScope.name.lowercase()),
+            )
+            viewModel.changeScope(selectedScope)
+        },
+        tags = uiState.tags,
+        selectedTagId = uiState.selectedTagId,
+        onTagSelected = { tagId ->
+            scope.launch { viewModel.selectTag(tagId) }
+        },
         mapContent = {
             when (uiState.scope) {
                 MapScope.WORLD -> MapArtwork(
                     scope = MapScope.WORLD,
                     visitedCountryCodes = viewModel.visitedCountryCodes,
                     onCountryClick = { countryCode ->
-                        regionCatalog.findByCode(countryCode)?.let(::openLocation)
+                        if (countryCode == KoreaCountryCode) {
+                            viewModel.changeScope(MapScope.KOREA)
+                        } else {
+                            regionCatalog.findByCode(countryCode)?.let(::openLocation)
+                        }
                     },
                 )
 
@@ -80,6 +113,10 @@ internal fun MapRoute(
                         visitedRegionCodes = viewModel.visitedProvinceCodes,
                         koreaRegions = GeneratedKoreaMapData.provinces,
                         onRegionClick = { provinceCode ->
+                            analytics.logEvent(
+                                MapmoryAnalyticsEvent.MAP_PROVINCE_SELECTED,
+                                mapOf("province_code" to provinceCode),
+                            )
                             scope.launch { viewModel.openProvince(provinceCode) }
                         },
                     )
@@ -116,7 +153,10 @@ internal fun MapRoute(
             GeneratedKoreaMapData.provinces.firstOrNull { it.code == provinceCode }?.name
         },
         mapDetailTotal = (uiState.koreaMap as? KoreaMapUiState.DistrictDetail)?.regions?.size,
-        onMapDetailBackClick = { viewModel.closeProvince() },
+        onMapDetailBackClick = {
+            analytics.logEvent(MapmoryAnalyticsEvent.MAP_DETAIL_BACK_CLICKED)
+            viewModel.closeProvince()
+        },
         onRecordClick = { onOpenRecords(null) },
         onCreateClick = { onOpenEditor(null) },
         onProfileClick = onOpenProfile,
@@ -129,3 +169,5 @@ private fun KoreaMapUiState.provinceCodeOrNull(): String? = when (this) {
     is KoreaMapUiState.Error -> provinceCode
     KoreaMapUiState.ProvinceOverview -> null
 }
+
+private const val KoreaCountryCode = "KR"
