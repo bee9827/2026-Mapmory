@@ -108,6 +108,15 @@ class S3PermissionSelfCheckTest {
         assertThatCode(selfCheck::verifyLookupPermissions).doesNotThrowAnyException();
     }
 
+    @Test
+    void 예상하지_못한_오류가_나도_기동을_막지_않는다() {
+        S3PermissionSelfCheck selfCheck = selfCheck("mapmory");
+        when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
+                .thenThrow(new IllegalStateException("예상하지 못한 오류"));
+
+        assertThatCode(selfCheck::verifyLookupPermissions).doesNotThrowAnyException();
+    }
+
     private void givenObjectExists(String objectKey) {
         when(s3Client.listObjectsV2(any(ListObjectsV2Request.class)))
                 .thenReturn(ListObjectsV2Response.builder()

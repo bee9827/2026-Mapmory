@@ -60,6 +60,16 @@ public class S3PermissionSelfCheck {
 
     @EventListener(ApplicationReadyEvent.class)
     public void verifyLookupPermissions() {
+        // 아래 흐름은 S3 오류를 각각 처리하지만, 그 밖의 오류로도 기동이 죽어서는 안 된다.
+        // 진단 하나 때문에 배포가 막히는 쪽이 더 나쁘다.
+        try {
+            verifyLookupPermissionsOrThrow();
+        } catch (RuntimeException exception) {
+            unknown(exception);
+        }
+    }
+
+    private void verifyLookupPermissionsOrThrow() {
         Optional<String> objectKey;
         try {
             objectKey = findAnyObjectKey();
@@ -128,7 +138,7 @@ public class S3PermissionSelfCheck {
                 .log("인스턴스 역할에 {} 권한이 없습니다. {}", permission, consequence);
     }
 
-    private void unknown(SdkException exception) {
+    private void unknown(RuntimeException exception) {
         log.atWarn()
                 .addKeyValue("event", "S3_PERMISSION_UNKNOWN")
                 .setCause(exception)
