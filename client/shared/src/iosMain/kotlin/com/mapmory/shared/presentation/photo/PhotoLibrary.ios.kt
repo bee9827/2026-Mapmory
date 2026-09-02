@@ -396,7 +396,10 @@ private class IosPhotoLibraryController(
         var didComplete = false
         PHImageManager.defaultManager().requestImageForAsset(
             asset = asset,
-            targetSize = CGSizeMake(PreviewSizePx.toDouble(), PreviewSizePx.toDouble()),
+            targetSize = CGSizeMake(
+                RecommendationPreviewSizePx.toDouble(),
+                RecommendationPreviewSizePx.toDouble(),
+            ),
             contentMode = PHImageContentModeAspectFit,
             options = options,
         ) { image, _ ->
@@ -580,6 +583,7 @@ private fun logPhotoPerformance(message: String) {
 }
 
 private const val PreviewSizePx = 1280
+private const val RecommendationPreviewSizePx = 640
 private const val PreviewJpegQuality = 0.85
 private const val FullGalleryAccessMessage =
     "위치 기반 사진 추천을 사용하려면 전체 갤러리 접근 권한을 허용해 주세요."
