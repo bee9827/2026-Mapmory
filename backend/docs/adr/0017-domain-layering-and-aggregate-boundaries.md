@@ -1,6 +1,6 @@
 # ADR 0017. 도메인 계층 구조와 애그리거트 경계
 
-- 상태: 제안
+- 상태: 채택
 - 날짜: 2026-08-31
 - 관련: ADR 0013, ADR 0016, PR #200, PR #201(닫힘), `backend/docs/erd.md`
 
@@ -107,7 +107,13 @@ ADR 0013은 "별도 Tags·MemberTags aggregate는 지금 도입하지 않는다"
 `RecordMediaRepository`와 `TravelRecordTagRepository`는 애그리거트 내부 엔티티의 리포지토리이므로
 외부에서 직접 쓰지 않는다. 조회는 `TravelRecordRepository`를 통하거나 루트를 거친다.
 
-**조회 전용 집계 리포지토리는 이 규칙의 예외로 둔다.** `TravelStatisticsRepository`(ADR 0016)처럼
+**단, `TravelRecordTag`의 쓰기는 리포지토리에 남긴다.** ADR 0013이 태그 교체를 위해
+`@Modifying` 벌크 DELETE 한 문장을 고른 것은 성능을 근거로 한 결정이었다. 컬렉션 cascade로
+바꾸면 같은 작업이 행 단위 DELETE N개가 되어 그 결정을 근거 없이 되돌리게 된다.
+연결 엔티티는 정렬 순서 같은 컬렉션 자체의 불변식도 없어 루트가 소유해서 얻는 것이 적다.
+이 예외는 `TravelRecordTag`에 한하며, 컬렉션 자체의 규칙이 생기면 다시 검토한다.
+
+**조회 전용 집계 리포지토리도 이 규칙의 예외로 둔다.** `TravelStatisticsRepository`(ADR 0016)처럼
 애그리거트 상태를 바꾸지 않고 원본 테이블을 집계만 하는 리포지토리는 루트당 하나 제한을 적용하지 않는다.
 제한의 목적은 불변식이 깨질 수 있는 **쓰기 경로**를 좁히는 것이지 조회 수단을 줄이는 것이 아니다.
 
@@ -183,6 +189,12 @@ travelrecord/
 `RecordMedia`(엔티티)는 TravelRecord 애그리거트 내부이므로 `travelrecord` 패키지로 옮긴다.
 `RecordMediaUrlService`(presigned URL 발급)는 인프라 관심사이므로 `recordmedia`에 남는다.
 
+**엔티티를 옮기는 것만으로는 순환 참조가 끊기지 않는다.** `RecordMediaUrlService`가 목록 썸네일을
+만들기 위해 `RecordMedia`와 그 리포지토리를 쓰고 있어서, 엔티티를 옮기면 방향만 뒤집힐 뿐이다.
+썸네일 조회를 루트 리포지토리로 올리고 URL 서비스가 **Object Key 하나를 URL로 바꾸는 일만** 하도록
+줄여야 끊긴다. 그 결과 `recordmedia`에는 `ExpiringUrl`과 `RecordMediaUrlService`만 남고,
+`RecordMediaRepository`는 사라진다.
+
 ### 7. 단계적으로 적용한다
 
 경계를 먼저 확정하고(이 ADR), 코드는 되돌리기 쉬운 것부터 바꾼다.
@@ -192,14 +204,15 @@ travelrecord/
 |---|---|---|---|---|
 | 1 | VO 추출 — `TravelPeriod`, `ObjectKey` | 낮음 | 쉬움 | 중 |
 | 2 | 불변식을 애그리거트로 — `syncMedia`, 태그 개수 제한 | 중간 | 보통 | **높음** |
-| 3 | 리포지토리 정리 — 내부 엔티티 리포지토리 흡수, 죽은 메서드 제거, 생성 경로 검증 정합 | 중간 | 어려움 | 중 |
-| 4 | `RecordMedia` 패키지 이동 | 낮음 | 쉬움 | 낮음 |
+| 3 | 리포지토리 정리 — 미디어 컬렉션 소유, 죽은 메서드 제거, 생성 경로 검증 정합 | 중간 | 어려움 | 중 |
+| 4 | `RecordMedia` 패키지 이동과 순환 참조 해소 | 중간 | 보통 | 낮음 |
 
 1단계를 먼저 두는 이유는 `TagName`이라는 선례가 이미 있어 판단 기준이 서 있고,
 `validateTravelDates`가 `TravelPeriod`로 들어가면 응용 서비스에서 검증 메서드가 통째로 빠지기 때문이다.
 
 2단계가 실질 이득의 대부분이다. 3단계는 쿼리 실행 계획에 영향을 주므로 측정을 동반한다.
-4단계는 순수 이동이라 리뷰는 쉽지만 diff가 크므로, 진행 중인 다른 작업이 없을 때 한다.
+4단계는 파일 이동이 대부분이라 리뷰는 쉽지만 diff가 크므로, 진행 중인 다른 작업이 없을 때 한다.
+순수 이동만으로 끝나지 않는다는 점은 결정 6에 적었다.
 
 3단계에서 함께 정리할 항목은 다음과 같다.
 
@@ -209,6 +222,22 @@ travelrecord/
   중복 요청이 500 대신 400으로 바뀌는 동작 변경이므로 단독으로 처리하지 않는다.
 - **`synchronizeMedia`의 현재 미디어 인자 제거.** 2단계에서는 애그리거트가 컬렉션을 소유하지 않아
   현재 미디어를 인자로 받는다. 리포지토리를 흡수하면서 인자를 없앤다.
+- **`TravelRecordTag`는 대상이 아니다.** 위 결정 3의 예외에 따라 벌크 DELETE를 유지한다.
+
+### 2026-09-01 보완: 3단계 실측 결과
+
+미디어 컬렉션 소유가 쿼리를 늘리지 않는지 MySQL 8.4에서 실제 생성 SQL로 확인했다.
+
+| 경로 | 결과 |
+|---|---|
+| 목록 조회 | `record_media` 쿼리 0회. 컬렉션이 LAZY라 목록 경로가 건드리지 않는다 |
+| 상세 조회 | 미디어 조회 1회. 기존 `findByTravelRecordIdOrderBySortOrderAsc`와 같다 |
+| 미디어 동기화 | insert 1 + update 1 + delete 1. 기존 `saveAll`·`deleteAll`과 같다 |
+| Object Key 존재 확인 | 조인 없이 `object_key` 인덱스를 탄다. 엔티티를 만들지 않는 count 조회로 바뀌었다 |
+
+가장 큰 위험이던 목록 조회 N+1은 발생하지 않는다. 다만 이는 목록 경로가 썸네일을
+`RecordMediaUrlService`의 일괄 조회로 가져오기 때문이며, **목록에서 `getMedia()`를 호출하는
+코드가 생기면 즉시 N+1이 된다.** 목록 응답에 미디어를 더 노출해야 할 때 이 지점을 다시 본다.
 
 ---
 
@@ -254,3 +283,49 @@ travelrecord/
   클라이언트가 수정 직후 화면을 다시 그리지 않아도 된다면 응답을 줄이는 편이 구조상 유리하다. 기획·안드로이드 확인 필요.
 - **폴더 분리 재검토 시점.** 팀이 `domain` / `application` 폴더를 명시적으로 원하면 4단계 이후 언제든 가능하다.
 - **태그 개수 제한(회원 10개, 기록 5개)** 은 ADR 0013대로 여전히 잠정값이다. 2단계에서 위치만 옮기고 값은 바꾸지 않는다.
+
+---
+
+## 2026-09-01 보완: 4단계 실측 결과
+
+썸네일 조회를 `RecordMediaRepository`의 파생 쿼리에서 `TravelRecordRepository`의 명시 쿼리로
+옮겼다. 생성 SQL은 컬럼·WHERE·ORDER BY까지 이전과 같다.
+
+```sql
+select rm1_0.id, rm1_0.created_at, rm1_0.object_key,
+       rm1_0.sort_order, rm1_0.thumb_key, rm1_0.travel_record_id
+from record_media rm1_0
+where rm1_0.travel_record_id in (?)
+order by rm1_0.travel_record_id, rm1_0.sort_order, rm1_0.id
+```
+
+4단계까지 마치면 패키지 의존은 `travelrecord → recordmedia` 한 방향만 남는다.
+
+### 뒤늦게 확인한 3단계의 대가: 삭제 SQL
+
+3단계에서 목록·상세·동기화·존재 확인은 측정했으나 **삭제 경로를 빠뜨렸다.**
+4단계 병합 직전에 다시 재보니 문장 수가 늘어 있었다.
+
+```sql
+-- 이전: DB의 ON DELETE CASCADE 가 처리한다
+delete from travel_record where id=?
+
+-- 이후: JPA cascade 가 처리한다
+select ... from record_media where travel_record_id=?   -- 컬렉션 로딩
+delete from record_media where id=?                      -- 미디어마다 한 문장
+delete from travel_record where id=?
+```
+
+1문장에서 **N+2문장**이 됐다. 애그리거트가 컬렉션을 소유하면 JPA가 삭제를 관리하므로
+되돌리려면 소유 자체를 포기해야 한다. 즉 결정 1의 대가이지 버그가 아니다.
+
+**수용한다.** N이 일지당 사진 수로 묶여 있고 삭제는 드문 연산이다.
+`record_media`의 `ON DELETE CASCADE`는 안전망으로 남는다.
+
+다만 다음 두 경우에는 다시 검토한다.
+
+- 일지를 대량으로 지우는 배치가 생길 때
+- 일지당 미디어 수 상한이 크게 늘 때
+
+**측정에서 얻은 교훈:** 애그리거트 소유 관계를 바꿀 때는 조회뿐 아니라 **삭제 경로도 함께**
+측정한다. 조회는 LAZY로 막을 수 있지만 삭제는 cascade가 반드시 개입한다.
