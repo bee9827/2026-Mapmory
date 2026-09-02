@@ -1,5 +1,6 @@
 package com.mapmory.backend.waitlist;
 
+import com.mapmory.backend.common.exception.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import java.text.Normalizer;
@@ -41,25 +42,29 @@ record Email(
 
     private static void validateNotNull(String rawEmail) {
         if (rawEmail == null) {
-            throw new IllegalArgumentException("email must not be null");
+            throwInvalidEmail();
         }
     }
 
     private static void validateNotBlank(String value) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("email must not be blank");
+            throwInvalidEmail();
         }
     }
 
     private static void validateLength(String value) {
         if (value.length() > MAX_LENGTH) {
-            throw new IllegalArgumentException("email must not exceed " + MAX_LENGTH + " characters");
+            throwInvalidEmail();
         }
     }
 
     private static void validateNormalized(String value) {
         if (!value.equals(normalize(value))) {
-            throw new IllegalArgumentException("email must be normalized");
+            throwInvalidEmail();
         }
+    }
+
+    private static void throwInvalidEmail() {
+        throw new BusinessException(LaunchWaitlistErrorCode.INVALID_EMAIL);
     }
 }

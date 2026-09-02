@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.mapmory.backend.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -34,8 +35,7 @@ class EmailTest {
     @NullAndEmptySource
     @ValueSource(strings = {" ", "\t"})
     void 비어_있는_주소를_거부한다(String rawEmail) {
-        assertThatThrownBy(() -> Email.from(rawEmail))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertInvalidEmail(() -> Email.from(rawEmail));
     }
 
     @Test
@@ -49,13 +49,18 @@ class EmailTest {
     void 저장_한계를_넘는_주소를_거부한다() {
         String localPart = "a".repeat(MAX_LENGTH - "@example.com".length() + 1);
 
-        assertThatThrownBy(() -> Email.from(localPart + "@example.com"))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertInvalidEmail(() -> Email.from(localPart + "@example.com"));
     }
 
     @Test
     void 정규화되지_않은_값으로는_만들_수_없다() {
-        assertThatThrownBy(() -> new Email("USER@example.com"))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertInvalidEmail(() -> new Email("USER@example.com"));
+    }
+
+    private void assertInvalidEmail(Runnable action) {
+        assertThatThrownBy(action::run)
+                .isInstanceOf(BusinessException.class)
+                .extracting(exception -> ((BusinessException) exception).getErrorCode().code())
+                .isEqualTo("VALIDATION_ERROR");
     }
 }
