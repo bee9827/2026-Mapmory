@@ -2,6 +2,7 @@ package com.mapmory.backend.travelrecord.mapsummary.dto;
 
 import com.mapmory.backend.region.RegionType;
 import com.mapmory.backend.travelrecord.mapsummary.RegionMapSummary;
+import java.util.List;
 import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
 
 public record RegionMapSummaryResponse(
@@ -12,6 +13,12 @@ public record RegionMapSummaryResponse(
         long count,
         MapColorLevel level
 ) {
+
+    public static List<RegionMapSummaryResponse> from(List<RegionMapSummary> summaries) {
+        return summaries.stream()
+                .map(RegionMapSummaryResponse::from)
+                .toList();
+    }
 
     public static RegionMapSummaryResponse from(RegionMapSummary summary) {
         return new RegionMapSummaryResponse(
