@@ -1,9 +1,8 @@
 package com.mapmory.backend.travelrecord.mapsummary.dto;
 
 import com.mapmory.backend.region.RegionType;
-import com.mapmory.backend.travelrecord.mapsummary.policy.LevelPolicy;
+import com.mapmory.backend.travelrecord.mapsummary.RegionMapSummary;
 import com.mapmory.backend.travelrecord.mapsummary.policy.MapColorLevel;
-import com.mapmory.backend.travelrecord.mapsummary.repository.RegionMapSummaryQueryResult;
 
 public record RegionMapSummaryResponse(
         Long regionId,
@@ -14,17 +13,14 @@ public record RegionMapSummaryResponse(
         MapColorLevel level
 ) {
 
-    public static RegionMapSummaryResponse from(
-            RegionMapSummaryQueryResult result,
-            LevelPolicy levelPolicy
-    ) {
+    public static RegionMapSummaryResponse from(RegionMapSummary summary) {
         return new RegionMapSummaryResponse(
-                result.getRegionId(),
-                result.getRegionCode(),
-                RegionType.valueOf(result.getRegionType()),
-                result.getName(),
-                result.getRecordCount(),
-                levelPolicy.levelFor(result.getRecordCount())
+                summary.regionId(),
+                summary.regionCode(),
+                summary.regionType(),
+                summary.name(),
+                summary.recordCount(),
+                summary.level()
         );
     }
 }

@@ -3,6 +3,7 @@ package com.mapmory.backend.travelrecord.mapsummary.controller;
 import com.mapmory.backend.auth.security.LoginMember;
 import com.mapmory.backend.common.dto.ApiResponse;
 import com.mapmory.backend.member.Member;
+import com.mapmory.backend.travelrecord.mapsummary.RegionMapSummary;
 import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;
 import com.mapmory.backend.travelrecord.mapsummary.service.RegionMapSummaryService;
 import jakarta.validation.constraints.Positive;
@@ -30,7 +31,7 @@ public class RegionMapSummaryController {
             @LoginMember Member member,
             @RequestParam(required = false) @Positive Long tagId
     ) {
-        return ApiResponse.from(regionMapSummaryService.getSummaries(member, null, tagId));
+        return ApiResponse.from(toResponses(regionMapSummaryService.getSummaries(member, null, tagId)));
     }
 
     @GetMapping("/{regionId}/children")
@@ -41,6 +42,12 @@ public class RegionMapSummaryController {
             Long regionId,
             @RequestParam(required = false) @Positive Long tagId
     ) {
-        return ApiResponse.from(regionMapSummaryService.getSummaries(member, regionId, tagId));
+        return ApiResponse.from(toResponses(regionMapSummaryService.getSummaries(member, regionId, tagId)));
+    }
+
+    private List<RegionMapSummaryResponse> toResponses(List<RegionMapSummary> summaries) {
+        return summaries.stream()
+                .map(RegionMapSummaryResponse::from)
+                .toList();
     }
 }
