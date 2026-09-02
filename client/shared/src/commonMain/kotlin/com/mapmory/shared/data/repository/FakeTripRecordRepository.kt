@@ -14,17 +14,20 @@ import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordPage
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.model.TripRecordSummary
+import com.mapmory.shared.domain.model.TripStatistics
+import com.mapmory.shared.domain.model.TopRegionStatistics
 import com.mapmory.shared.domain.model.dateValidationError
 import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.domain.repository.MapSummaryRepository
 import com.mapmory.shared.domain.repository.TagRepository
 import com.mapmory.shared.domain.repository.TripRecordRepository
+import com.mapmory.shared.domain.repository.TripStatisticsRepository
 
 /** 서버 API를 연결하기 전 기록 흐름을 확인하는 메모리 기반 구현이다. */
 class FakeTripRecordRepository(
     private val regionCatalog: RegionCatalog = StaticRegionCatalog(),
     private val now: () -> String,
-) : TripRecordRepository, MapSummaryRepository, TagRepository {
+) : TripRecordRepository, MapSummaryRepository, TripStatisticsRepository, TagRepository {
     private val records = mutableListOf<TripRecordData>()
     private val tags = mutableListOf<Tag>()
     private var nextRecordId = 1L
@@ -122,6 +125,51 @@ class FakeTripRecordRepository(
             parent.regionCode.startsWith(KoreanProvincePrefix) -> koreanDistrictSummaries(parent, recordsFor(tagId))
             else -> emptyList()
         }
+    }
+
+    override suspend fun getStatistics(): Result<TripStatistics> = runCatching {
+        val visitedCountryCodes = records.mapNotNull { record ->
+            rootLocation(regionCatalog.findById(record.locationId))?.regionCode
+        }.distinct().sorted()
+        val visitedKoreaDistrictCount = records.mapNotNull { record ->
+            regionCatalog.findById(record.locationId)?.takeIf { location ->
+                location.countryId == KoreaCountryId && location.type == LocationType.DISTRICT
+            }?.id
+        }.distinct().size
+        val topRegions = records.groupBy { record ->
+            val location = regionCatalog.findById(record.locationId)
+            when {
+                location == null -> null
+                location.countryId == KoreaCountryId -> location.parentId?.let(regionCatalog::findById)
+                else -> rootLocation(location)
+            }
+        }.mapNotNull { (location, regionRecords) ->
+            location?.let { region ->
+                TopRegionStatistics(
+                    regionId = region.id,
+                    code = region.regionCode.removePrefix(KoreanProvincePrefix),
+                    type = if (region.countryId == KoreaCountryId) {
+                        MapRegionType.PROVINCE
+                    } else {
+                        MapRegionType.COUNTRY
+                    },
+                    name = region.name,
+                    recordCount = regionRecords.size.toLong(),
+                )
+            }
+        }.sortedWith(
+            compareByDescending<TopRegionStatistics>(TopRegionStatistics::recordCount)
+                .thenBy(TopRegionStatistics::regionId),
+        ).take(TopRegionLimit)
+
+        TripStatistics(
+            recordCount = records.size.toLong(),
+            mediaCount = records.sumOf { record -> record.media.size }.toLong(),
+            visitedCountryCount = visitedCountryCodes.size.toLong(),
+            visitedKoreaDistrictCount = visitedKoreaDistrictCount.toLong(),
+            visitedCountryCodes = visitedCountryCodes,
+            topRegions = topRegions,
+        )
     }
 
     override suspend fun getTags(): Result<List<Tag>> = Result.success(tags.toList())
@@ -223,3 +271,4 @@ private const val KoreaCountryCode = "KR"
 private const val KoreanProvincePrefix = "KR-"
 private const val CountryCodeLength = 2
 private const val MaxPageSize = 100
+private const val TopRegionLimit = 3

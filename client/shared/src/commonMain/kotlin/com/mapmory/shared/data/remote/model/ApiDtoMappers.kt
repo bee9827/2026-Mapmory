@@ -13,6 +13,8 @@ import com.mapmory.shared.domain.model.TripRecordMedia
 import com.mapmory.shared.domain.model.TripRecordPage
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.model.TripRecordSummary
+import com.mapmory.shared.domain.model.TripStatistics
+import com.mapmory.shared.domain.model.TopRegionStatistics
 import com.mapmory.shared.domain.model.dateValidationError
 import com.mapmory.shared.domain.region.RegionCatalog
 
@@ -158,6 +160,23 @@ fun MapRegionSummaryDto.toDomain(): MapRegionSummary = MapRegionSummary(
     name = name,
     count = count,
     level = MapRegionLevel.valueOf(level),
+)
+
+fun TripStatisticsDto.toDomain(): TripStatistics = TripStatistics(
+    recordCount = recordCount,
+    mediaCount = mediaCount,
+    visitedCountryCount = visitedCountryCount,
+    visitedKoreaDistrictCount = visitedKoreaDistrictCount,
+    visitedCountryCodes = visitedCountryCodes,
+    topRegions = topRegions.map { region ->
+        TopRegionStatistics(
+            regionId = region.regionId,
+            code = region.code,
+            type = MapRegionType.valueOf(region.regionType),
+            name = region.name,
+            recordCount = region.recordCount,
+        )
+    },
 )
 
 private const val KoreaCountryCode = "KR"

@@ -31,7 +31,7 @@ class MapViewModel(
     private val regionCatalog: RegionCatalog,
     private val getTags: GetTagsUseCase? = null,
 ) : ViewModel() {
-    var uiState by mutableStateOf(MapUiState())
+    var uiState by mutableStateOf(mapSummaryRepository.cachedUiState())
         private set
 
     suspend fun refresh() {
@@ -169,6 +169,16 @@ class MapViewModel(
             .toSet()
 
     fun visitedDistrictCount(provinceCode: String): Int = visitedDistrictCodes(provinceCode).size
+}
+
+private fun MapSummaryRepository.cachedUiState(): MapUiState {
+    val roots = getCachedRootRegions().orEmpty()
+    val korea = roots.firstOrNull { region -> region.code == KoreaCountryCode }
+    val provinces = korea?.let { region -> getCachedChildRegions(region.regionId) }.orEmpty()
+    return MapUiState(
+        rootRegions = roots,
+        koreaProvinces = provinces,
+    )
 }
 
 private const val KoreaCountryCode = "KR"
