@@ -57,7 +57,7 @@ class TripStatisticsViewModelTest {
     }
 
     @Test
-    fun `캐시된_통계는_즉시_표시하고_백그라운드_갱신_실패에도_유지한다`() = runSuspend {
+    fun `같은_기록_리비전의_캐시된_통계는_백그라운드_갱신_실패에도_유지한다`() = runSuspend {
         val repository = StubTripStatisticsRepository(
             responses = mutableListOf(Result.failure(IllegalStateException("일시적 오류"))),
             cached = statistics(recordCount = 4, mediaCount = 7),
@@ -76,6 +76,25 @@ class TripStatisticsViewModelTest {
     }
 
     @Test
+    fun `기록_변경_후_통계_재조회가_실패하면_이전_통계를_노출하지_않는다`() = runSuspend {
+        val repository = StubTripStatisticsRepository(
+            responses = mutableListOf(
+                Result.success(statistics(recordCount = 4, mediaCount = 7)),
+                Result.failure(IllegalStateException("서버 연결 실패")),
+            ),
+        )
+        val viewModel = TripStatisticsViewModel(repository)
+        viewModel.refresh(dataRevision = 0)
+
+        viewModel.refresh(dataRevision = 1)
+
+        assertEquals(
+            TripStatisticsUiState.Error("여행 통계를 불러오지 못했습니다."),
+            viewModel.uiState,
+        )
+    }
+
+    @Test
     fun `통계_API_조회가_실패하면_오류_상태를_노출한다`() = runSuspend {
         val viewModel = TripStatisticsViewModel(
             StubTripStatisticsRepository(
@@ -86,7 +105,7 @@ class TripStatisticsViewModelTest {
         viewModel.refresh()
 
         assertEquals(
-            TripStatisticsUiState.Error("서버 연결 실패"),
+            TripStatisticsUiState.Error("여행 통계를 불러오지 못했습니다."),
             viewModel.uiState,
         )
     }

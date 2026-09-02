@@ -16,6 +16,7 @@ class TripStatisticsViewModel(
 ) : ViewModel() {
     private var loadGeneration = 0L
     private val cachedStatistics = tripStatisticsRepository.getCachedStatistics()
+    private var visibleStatisticsRevision: Long? = cachedStatistics?.let { InitialDataRevision }
 
     var uiState by mutableStateOf(
         cachedStatistics
@@ -25,24 +26,21 @@ class TripStatisticsViewModel(
         private set
 
     init {
-        cachedStatistics?.let { statistics ->
-            mapmoryDebugLog(
-                StatisticsLogTag,
-                "cache " +
-                    "visitedCountryCount=${statistics.visitedCountryCount}, " +
-                    "visitedKoreaDistrictCount=${statistics.visitedKoreaDistrictCount}",
-            )
+        if (cachedStatistics != null) {
+            mapmoryDebugLog(StatisticsLogTag, "cache hit")
         }
     }
 
-    suspend fun refresh() {
+    suspend fun refresh(dataRevision: Long = InitialDataRevision) {
         val generation = ++loadGeneration
         val hasVisibleStatistics = uiState is TripStatisticsUiState.Success
+        val canRetainVisibleStatistics =
+            hasVisibleStatistics && visibleStatisticsRevision == dataRevision
         mapmoryDebugLog(
             StatisticsLogTag,
-            "refresh start generation=$generation, hasCachedState=$hasVisibleStatistics",
+            "refresh started generation=$generation, canRetain=$canRetainVisibleStatistics",
         )
-        if (!hasVisibleStatistics) {
+        if (!canRetainVisibleStatistics) {
             uiState = TripStatisticsUiState.Loading
         }
 
@@ -54,29 +52,19 @@ class TripStatisticsViewModel(
         val statistics = result.getOrElse { error ->
             mapmoryDebugLog(
                 StatisticsLogTag,
-                "refresh failed, retainedCache=$hasVisibleStatistics: " +
-                    "${error::class.simpleName}: ${error.message}",
+                "refresh failed, retained=$canRetainVisibleStatistics: ${error::class.simpleName}",
             )
-            if (!hasVisibleStatistics) {
-                uiState = error.toUiState("여행 통계를 불러오지 못했습니다.")
+            if (!canRetainVisibleStatistics) {
+                uiState = TripStatisticsUiState.Error(StatisticsLoadErrorMessage)
             }
             return
         }
 
         val nextState = statistics.toUiState()
         uiState = nextState
-        mapmoryDebugLog(
-            StatisticsLogTag,
-            "ui state " +
-                "worldVisitedCount=${nextState.statistics.worldVisitedCount}, " +
-                "koreaVisitedCount=${nextState.statistics.koreaVisitedCount}, " +
-                "recordCount=${nextState.statistics.recordCount}",
-        )
+        visibleStatisticsRevision = dataRevision
+        mapmoryDebugLog(StatisticsLogTag, "ui state updated")
     }
-
-    private fun Throwable.toUiState(fallbackMessage: String) = TripStatisticsUiState.Error(
-        message = message?.takeIf(String::isNotBlank) ?: fallbackMessage,
-    )
 }
 
 private fun com.mapmory.shared.domain.model.TripStatistics.toUiState() =
@@ -101,3 +89,5 @@ private fun Long.toUiCount(): Int = coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
 
 private const val DefaultTravelerName = "여행자"
 private const val StatisticsLogTag = "MapmoryStatistics"
+private const val StatisticsLoadErrorMessage = "여행 통계를 불러오지 못했습니다."
+private const val InitialDataRevision = 0L

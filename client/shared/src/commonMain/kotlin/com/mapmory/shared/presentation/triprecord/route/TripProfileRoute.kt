@@ -21,7 +21,7 @@ internal fun TripProfileRoute(
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(viewModel, tripRecordRevision) {
-        viewModel.refresh()
+        viewModel.refresh(dataRevision = tripRecordRevision)
     }
 
     TripProfileScreen(
@@ -32,7 +32,7 @@ internal fun TripProfileRoute(
         onCreateClick = onOpenEditor,
         onProfileClick = onOpenProfile,
         onRetryClick = {
-            scope.launch { viewModel.refresh() }
+            scope.launch { viewModel.refresh(dataRevision = tripRecordRevision) }
         },
     )
 }

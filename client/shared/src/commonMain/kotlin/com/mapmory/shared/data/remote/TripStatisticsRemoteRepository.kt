@@ -25,21 +25,12 @@ class TripStatisticsRemoteRepository(
             }.requireSuccess()
                 .body<ApiResponseDto<TripStatisticsDto>>()
                 .data
-            mapmoryDebugLog(
-                StatisticsLogTag,
-                "response " +
-                    "recordCount=${response.recordCount}, " +
-                    "mediaCount=${response.mediaCount}, " +
-                    "visitedCountryCount=${response.visitedCountryCount}, " +
-                    "visitedKoreaDistrictCount=${response.visitedKoreaDistrictCount}, " +
-                    "visitedCountryCodes=${response.visitedCountryCodes}, " +
-                    "topRegions=${response.topRegions.map { "${it.name}:${it.recordCount}" }}",
-            )
+            mapmoryDebugLog(StatisticsLogTag, "request succeeded")
             response.toDomain()
         }.onFailure { error ->
             mapmoryDebugLog(
                 StatisticsLogTag,
-                "request failed: ${error::class.simpleName}: ${error.message}",
+                "request failed: ${error::class.simpleName}",
             )
         }
     }
