@@ -148,6 +148,52 @@ internal fun TripIconButton(
 }
 
 @Composable
+internal fun TripRecordCreateButton(
+    source: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val palette = TripRecordPalette.current
+    val analytics = LocalMapmoryAnalytics.current
+    Box(
+        modifier = modifier
+            .padding(end = 28.dp, bottom = 33.dp)
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(palette.primary)
+            .clickable {
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.RECORD_CREATE_STARTED,
+                    mapOf("source" to source),
+                )
+                onClick()
+            }
+            .semantics { contentDescription = "새 기록 작성" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(Modifier.size(24.dp)) {
+            val strokeWidth = 2.dp.toPx()
+            val center = Offset(size.width / 2f, size.height / 2f)
+            val armLength = size.minDimension * 0.32f
+            drawLine(
+                color = palette.onPrimary,
+                start = Offset(center.x - armLength, center.y),
+                end = Offset(center.x + armLength, center.y),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = palette.onPrimary,
+                start = Offset(center.x, center.y - armLength),
+                end = Offset(center.x, center.y + armLength),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+@Composable
 internal fun TripSectionLabel(
     text: String,
     modifier: Modifier = Modifier,

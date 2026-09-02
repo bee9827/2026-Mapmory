@@ -1,6 +1,5 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,25 +16,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.domain.model.Tag
-import com.mapmory.shared.analytics.LocalMapmoryAnalytics
-import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.MapScope
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
@@ -62,11 +54,9 @@ fun TripMapScreen(
     onProfileClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    val palette = TripRecordPalette.current
-    val analytics = LocalMapmoryAnalytics.current
     TripRecordBackground(
         modifier = modifier,
-        backgroundColor = palette.pageBackground,
+        backgroundColor = TripRecordPalette.current.pageBackground,
     ) {
         Column(
             modifier = Modifier
@@ -98,43 +88,11 @@ fun TripMapScreen(
                     content = mapContent,
                 )
 
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 28.dp, bottom = 33.dp)
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(palette.primary)
-                        .clickable {
-                            analytics.logEvent(
-                                MapmoryAnalyticsEvent.RECORD_CREATE_STARTED,
-                                mapOf("source" to "map_fab"),
-                            )
-                            onCreateClick()
-                        }
-                        .semantics { contentDescription = "새 기록 작성" },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Canvas(Modifier.size(24.dp)) {
-                        val strokeWidth = 2.dp.toPx()
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        val armLength = size.minDimension * 0.32f
-                        drawLine(
-                            color = palette.onPrimary,
-                            start = Offset(center.x - armLength, center.y),
-                            end = Offset(center.x + armLength, center.y),
-                            strokeWidth = strokeWidth,
-                            cap = StrokeCap.Round,
-                        )
-                        drawLine(
-                            color = palette.onPrimary,
-                            start = Offset(center.x, center.y - armLength),
-                            end = Offset(center.x, center.y + armLength),
-                            strokeWidth = strokeWidth,
-                            cap = StrokeCap.Round,
-                        )
-                    }
-                }
+                TripRecordCreateButton(
+                    source = "map_fab",
+                    onClick = onCreateClick,
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                )
             }
 
             TripBottomBar(
@@ -202,13 +160,14 @@ private fun MapHeaderOverlay(
             onMapDetailBackClick = onMapDetailBackClick,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(8.dp))
         MapTagFilter(
             tags = tags,
             selectedTagId = selectedTagId,
             onTagSelected = onTagSelected,
             modifier = Modifier.padding(horizontal = 18.dp),
         )
+        Spacer(Modifier.height(6.dp))
     }
 }
 
