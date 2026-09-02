@@ -262,6 +262,10 @@ fun TripRecordEditorScreen(
                 isSaving = uiState.isSaving,
                 onSaveClick = onSaveClick,
             )
+            EditorErrorMessage(
+                message = uiState.generalErrorMessage,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            )
             CompositionLocalProvider(
                 LocalBringIntoViewSpec provides EditorBringIntoViewSpec,
             ) {
@@ -377,26 +381,25 @@ fun TripRecordEditorScreen(
 
                         TagEditor(
                             uiState = uiState,
+                            saveErrorMessage = uiState.errorMessageFor(TripRecordEditorErrorTarget.TAGS),
                             onInputChanged = onTagInputChanged,
                             onTagToggled = onTagToggled,
                             onCreate = onTagCreate,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                         )
 
-                        EditorContentField(
-                            value = uiState.content,
-                            onValueChange = onContentChanged,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 8.dp),
-                        )
-
-                        uiState.generalErrorMessage?.takeIf { uiState.isDirty }?.let { message ->
+                        Column(Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                            EditorContentField(
+                                value = uiState.content,
+                                onValueChange = onContentChanged,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
                             EditorErrorMessage(
-                                message = message,
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                                message = uiState.errorMessageFor(TripRecordEditorErrorTarget.CONTENT),
+                                modifier = Modifier.padding(top = 6.dp),
                             )
                         }
+
                     }
                 }
             }
@@ -926,6 +929,7 @@ private fun TripRecordEditorUiState.errorMessageFor(target: TripRecordEditorErro
 @Composable
 private fun TagEditor(
     uiState: TripRecordEditorUiState,
+    saveErrorMessage: String?,
     onInputChanged: (String) -> Unit,
     onTagToggled: (Long) -> Unit,
     onCreate: () -> Unit,
@@ -1017,9 +1021,10 @@ private fun TagEditor(
             )
         }
 
-        uiState.tagErrorMessage?.let { message ->
-            EditorErrorMessage(message = message, modifier = Modifier.padding(top = 6.dp))
-        }
+        EditorErrorMessage(
+            message = uiState.tagErrorMessage ?: saveErrorMessage,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 

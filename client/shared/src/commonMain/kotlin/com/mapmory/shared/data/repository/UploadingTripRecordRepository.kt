@@ -73,7 +73,7 @@ internal class UploadingTripRecordRepository(
         val pendingSources = mutableListOf<PhotoUploadSource>()
 
         draft.mediaObjectKeys.forEachIndexed { index, key ->
-            if (key.isServerObjectKey()) return@forEachIndexed
+            if (key in draft.uploadedMediaObjectKeys) return@forEachIndexed
             val media = mediaByLocalId[key]
                 ?: return Result.failure(
                     IllegalStateException("업로드할 사진 데이터를 찾을 수 없습니다: $key"),
@@ -110,6 +110,9 @@ internal class UploadingTripRecordRepository(
                 mediaObjectKeys = draft.mediaObjectKeys.map { key ->
                     objectKeyByLocalId[key] ?: key
                 },
+                uploadedMediaObjectKeys = draft.mediaObjectKeys
+                    .map { key -> objectKeyByLocalId[key] ?: key }
+                    .toSet(),
                 localMedia = draft.localMedia.map { media ->
                     objectKeyByLocalId[media.objectKey]
                         ?.let { objectKey -> media.copy(objectKey = objectKey) }
@@ -177,8 +180,6 @@ private fun List<TripRecordMedia>.toListMedia(): List<TripRecordMedia> =
         )
     }
 
-private fun String.isServerObjectKey(): Boolean = startsWith(ServerObjectKeyPrefix)
-
 private fun normalizedFileName(
     fileName: String?,
     contentType: String,
@@ -240,5 +241,4 @@ private fun ByteArray.hasAsciiAt(offset: Int, expected: String): Boolean =
 private fun ByteArray.hasAnyAsciiAt(offset: Int, vararg expected: String): Boolean =
     expected.any { value -> hasAsciiAt(offset, value) }
 
-private const val ServerObjectKeyPrefix = "travel-records/"
 private const val DefaultMaxCachedPreviewBytes = 32L * 1024L * 1024L

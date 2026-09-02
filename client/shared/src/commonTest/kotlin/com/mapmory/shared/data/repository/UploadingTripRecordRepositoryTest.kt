@@ -15,12 +15,13 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class UploadingTripRecordRepositoryTest {
     @Test
     fun updateKeepsServerMediaAndUploadsOnlyNewLocalPhotosInOrder() = runBlocking {
-        val existingObjectKey = "travel-records/10/existing.jpg"
+        val existingObjectKey = "mapmory/travel-records/10/existing.jpg"
         val newObjectKey = "travel-records/10/new.jpg"
         val newBytes = byteArrayOf(0x01, 0x02)
         var uploadedSources: List<PhotoUploadSource> = emptyList()
@@ -40,6 +41,7 @@ class UploadingTripRecordRepositoryTest {
                 startDate = "2026-08-26",
                 endDate = null,
                 mediaObjectKeys = listOf(existingObjectKey, "content://photo/new"),
+                uploadedMediaObjectKeys = setOf(existingObjectKey),
                 localMedia = listOf(
                     TripRecordMediaDraft(
                         objectKey = existingObjectKey,
@@ -66,6 +68,41 @@ class UploadingTripRecordRepositoryTest {
         )
         assertContentEquals(byteArrayOf(0x0A), result.media[1].previewBytes)
         assertNull(result.media[1].originalBytes)
+    }
+
+    @Test
+    fun existingServerMediaIsRecognizedWithoutInterpretingItsObjectKey() = runBlocking {
+        val opaqueObjectKey = "production-prefix/member-media/existing.jpg"
+        var uploadCalled = false
+        val uploader = PhotoUploader {
+            uploadCalled = true
+            Result.success(emptyList())
+        }
+        val delegate = CapturingTripRecordRepository()
+        val repository = UploadingTripRecordRepository(uploader, delegate)
+
+        repository.updateTripRecord(
+            id = 101,
+            draft = TripRecordDraft(
+                locationId = 1,
+                title = "기존 사진 기록",
+                content = "",
+                startDate = "2026-08-26",
+                endDate = null,
+                mediaObjectKeys = listOf(opaqueObjectKey),
+                uploadedMediaObjectKeys = setOf(opaqueObjectKey),
+                localMedia = listOf(
+                    TripRecordMediaDraft(
+                        objectKey = opaqueObjectKey,
+                        sortOrder = 0,
+                        previewBytes = null,
+                    ),
+                ),
+            ),
+        ).getOrThrow()
+
+        assertFalse(uploadCalled)
+        assertEquals(listOf(opaqueObjectKey), delegate.updatedDraft?.mediaObjectKeys)
     }
 
     @Test

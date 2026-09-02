@@ -1,9 +1,14 @@
 package com.mapmory.shared.presentation.triprecord.viewmodel
 
+import com.mapmory.shared.data.remote.MapmoryApiException
+import com.mapmory.shared.data.remote.model.ProblemFieldErrorDto
 import com.mapmory.shared.data.repository.FakeTripRecordRepository
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.domain.model.TripRecordData
+import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordQuery
+import com.mapmory.shared.domain.repository.TripRecordRepository
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
 import com.mapmory.shared.domain.usecase.CreateTagUseCase
 import com.mapmory.shared.domain.usecase.GetTripRecordsUseCase
@@ -232,5 +237,83 @@ class TripRecordEditorViewModelTest {
         viewModel.removeMediaObjectKey("records/1/photo.jpg")
 
         assertTrue(viewModel.uiState.mediaObjectKeys.isEmpty())
+    }
+
+    @Test
+    fun `사진_업로드_제한_오류는_사진_컴포넌트의_오류로_분류한다`() {
+        val error = MapmoryApiException(
+            statusCode = 400,
+            code = "TOO_MANY_FILES",
+            title = "파일 개수가 너무 많습니다.",
+            detail = "한 번에 업로드할 수 있는 최대 파일 개수를 초과했습니다.",
+            instance = "/api/v1/uploads/presigned-urls",
+            errors = emptyList(),
+        )
+
+        assertEquals(
+            mapOf(
+                TripRecordEditorErrorTarget.PHOTOS to
+                    "한 번에 업로드할 수 있는 최대 파일 개수를 초과했습니다.",
+            ),
+            error.toEditorFieldErrors(),
+        )
+    }
+
+    @Test
+    fun `사진_업로드_실패는_폼_하단이_아니라_사진_필드에_저장한다`() = runSuspend {
+        val error = MapmoryApiException(
+            statusCode = 400,
+            code = "TOO_MANY_FILES",
+            title = "파일 개수가 너무 많습니다.",
+            detail = "한 번에 업로드할 수 있는 최대 파일 개수를 초과했습니다.",
+            instance = "/api/v1/uploads/presigned-urls",
+            errors = emptyList(),
+        )
+        val delegate = FakeTripRecordRepository { "2026-08-31T00:00:00Z" }
+        val repository = object : TripRecordRepository by delegate {
+            override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> =
+                Result.failure(error)
+        }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+        viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
+        viewModel.updateTitle("서울 여행")
+        viewModel.updateStartDate("2026-08-31")
+
+        assertFalse(viewModel.save())
+        assertEquals(
+            "한 번에 업로드할 수 있는 최대 파일 개수를 초과했습니다.",
+            viewModel.uiState.fieldErrors[TripRecordEditorErrorTarget.PHOTOS],
+        )
+        assertNull(viewModel.uiState.generalErrorMessage)
+    }
+
+    @Test
+    fun `서버의_필드_오류는_각_입력_컴포넌트의_오류로_분류한다`() {
+        val error = MapmoryApiException(
+            statusCode = 400,
+            code = "VALIDATION_ERROR",
+            title = "요청 값이 올바르지 않습니다.",
+            detail = null,
+            instance = "/api/v1/travel-records",
+            errors = listOf(
+                ProblemFieldErrorDto("title", "제목을 확인해 주세요."),
+                ProblemFieldErrorDto("content", "내용을 확인해 주세요."),
+                ProblemFieldErrorDto("files[0].fileSize", "사진 크기를 확인해 주세요."),
+                ProblemFieldErrorDto("tagIds", "태그를 확인해 주세요."),
+            ),
+        )
+
+        assertEquals(
+            mapOf(
+                TripRecordEditorErrorTarget.TITLE to "제목을 확인해 주세요.",
+                TripRecordEditorErrorTarget.CONTENT to "내용을 확인해 주세요.",
+                TripRecordEditorErrorTarget.PHOTOS to "사진 크기를 확인해 주세요.",
+                TripRecordEditorErrorTarget.TAGS to "태그를 확인해 주세요.",
+            ),
+            error.toEditorFieldErrors(),
+        )
     }
 }
