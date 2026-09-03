@@ -462,7 +462,10 @@ private class IosPhotoLibraryController(
         var didComplete = false
         PHImageManager.defaultManager().requestImageForAsset(
             asset = asset,
-            targetSize = CGSizeMake(PreviewSizePx.toDouble(), PreviewSizePx.toDouble()),
+            targetSize = CGSizeMake(
+                RecommendationPreviewSizePx.toDouble(),
+                RecommendationPreviewSizePx.toDouble(),
+            ),
             contentMode = PHImageContentModeAspectFit,
             options = options,
         ) { image, _ ->
@@ -646,6 +649,7 @@ private fun logPhotoPerformance(message: String) {
 }
 
 private const val PreviewSizePx = 1280
+private const val RecommendationPreviewSizePx = 640
 private const val PreviewJpegQuality = 0.85
 private fun Long.toPermissionIssue(): PhotoLibraryPermissionIssue =
     if (this == platform.Photos.PHAuthorizationStatusRestricted) {

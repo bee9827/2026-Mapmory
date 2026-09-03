@@ -548,6 +548,22 @@ internal fun Context.readPhoto(
     val coordinates = knownCoordinates ?: traceSection("photo.read.exif") {
         readCoordinates(uri)
     }
+    val displayName = knownName ?: metadata.first ?: "여행 사진"
+    val capturedAt = formatDate(knownCapturedAtMillis ?: metadata.second)
+    if (!includeOriginalBytes) {
+        val previewBytes = traceSection("photo.read.preview_source") {
+            readPreviewBytes(uri, RecommendationPreviewSizePx)
+        } ?: return null
+        return SelectedPhoto(
+            id = uri.toString(),
+            displayName = displayName,
+            previewBytes = previewBytes,
+            latitude = coordinates?.first,
+            longitude = coordinates?.second,
+            capturedAt = capturedAt,
+            originalBytes = null,
+        )
+    }
     val encodedBytes = traceSection("photo.read.original") {
         contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
     }?.takeIf(ByteArray::isNotEmpty) ?: return null
@@ -559,17 +575,45 @@ internal fun Context.readPhoto(
     }
     SelectedPhoto(
         id = uri.toString(),
-        displayName = knownName ?: metadata.first ?: "여행 사진",
+        displayName = displayName,
         previewBytes = previewBytes,
         latitude = coordinates?.first,
         longitude = coordinates?.second,
-        capturedAt = formatDate(knownCapturedAtMillis ?: metadata.second),
-        originalBytes = encodedBytes.takeIf { includeOriginalBytes },
+        capturedAt = capturedAt,
+        originalBytes = encodedBytes,
     )
 } catch (error: CancellationException) {
     throw error
 } catch (error: Exception) {
     null
+}
+
+private fun Context.readPreviewBytes(uri: Uri, maxDimension: Int): ByteArray? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null
+    val bitmap = ImageDecoder.decodeBitmap(
+        ImageDecoder.createSource(contentResolver, uri),
+    ) { decoder, info, _ ->
+        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        val sourceMaxDimension = maxOf(info.size.width, info.size.height)
+        if (sourceMaxDimension > maxDimension) {
+            val scale = maxDimension.toFloat() / sourceMaxDimension
+            decoder.setTargetSize(
+                (info.size.width * scale).toInt().coerceAtLeast(1),
+                (info.size.height * scale).toInt().coerceAtLeast(1),
+            )
+        }
+    }
+    return try {
+        ByteArrayOutputStream().use { output ->
+            if (!bitmap.compress(Bitmap.CompressFormat.JPEG, PreviewJpegQuality, output)) {
+                null
+            } else {
+                output.toByteArray()
+            }
+        }
+    } finally {
+        bitmap.recycle()
+    }
 }
 
 private fun Context.readOriginalBytes(uri: Uri): ByteArray? = runCatching {
@@ -757,6 +801,7 @@ private fun formatDate(epochMillis: Long?): String? = epochMillis?.let {
 }
 
 private const val PreviewSizePx = 1280
+internal const val RecommendationPreviewSizePx = 640
 private const val PreviewJpegQuality = 85
 private const val OriginalJpegQuality = 100
 private const val PhotoPerformanceTag = "MapmoryPhotoPerf"
