@@ -8,9 +8,6 @@
 - [ ] 모든 필수 CI가 성공했는가
 - [ ] `MARKETING_VERSION`이 App Store Connect 버전과 일치하는가
 - [ ] `CURRENT_PROJECT_VERSION`이 이전에 업로드한 빌드보다 큰가
-- [ ] 운영 API 주소가 `https://api.map-mory.com/api/v1`인가
-- [ ] iOS 기본 언어와 지원 언어가 한국어로 설정됐는가
-
 ## 2. Firebase Analytics
 
 - [ ] Firebase Console에 Bundle ID `com.mapmory.ios` Apple 앱이 등록됐는가
