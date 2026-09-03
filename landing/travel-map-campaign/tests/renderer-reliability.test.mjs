@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { drawJourneyMap, getCachedImage, loadJourneyImages } from "../src/mapRenderer.js";
+import { createMapProjection, drawJourneyMap, getCachedImage, loadJourneyImages } from "../src/mapRenderer.js";
 import { renderJourneyVideo, renderShareImage } from "../src/videoRenderer.js";
 
 const point = { lat: 37.5, lng: 127, name: "서울", tripId: 0, date: new Date("2026-01-01T00:00:00Z") };
@@ -17,6 +17,33 @@ function globals(t, values) {
 function context() {
   return new Proxy({}, { get: (target, key) => key in target ? target[key] : () => {} });
 }
+
+test("an empty journey draws finite world geometry before photos are selected", () => {
+  let coordinatesDrawn = 0;
+  const ctx = context();
+  for (const method of ["moveTo", "lineTo", "arc"]) {
+    ctx[method] = (...coordinates) => {
+      assert.ok(coordinates.every(Number.isFinite), `${method} received non-finite coordinates`);
+      coordinatesDrawn += 1;
+    };
+  }
+  const projection = drawJourneyMap(ctx, 390, 400, [], 0);
+  assert.ok(Number.isFinite(projection.scale()) && projection.scale() > 0);
+  assert.ok(projection([0, 0]).every(Number.isFinite));
+  assert.ok(coordinatesDrawn > 0);
+});
+
+test("journey points still determine the non-empty map extent", () => {
+  const points = [point, { ...point, lng: 128, lat: 38 }];
+  const world = createMapProjection(390, 400, []);
+  const journeyProjection = createMapProjection(390, 400, points);
+  assert.ok(journeyProjection.scale() > world.scale());
+  for (const entry of points) {
+    const [x, y] = journeyProjection([entry.lng, entry.lat]);
+    assert.ok(Number.isFinite(x) && Number.isFinite(y));
+    assert.ok(x >= 43.99 && x <= 346.01 && y >= 43.99 && y <= 356.01);
+  }
+});
 
 test("in-flight image loads keep old/new map redraws and concurrent export waiters", async (t) => {
   const images = [];

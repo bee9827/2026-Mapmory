@@ -36,7 +36,7 @@ function getExtentFeature(points) {
 export function createMapProjection(width, height, points, padding = 44) {
   return geoMercator().fitExtent(
     [[padding, padding], [Math.max(padding + 1, width - padding), Math.max(padding + 1, height - padding)]],
-    getExtentFeature(points),
+    points.length > 0 ? getExtentFeature(points) : land,
   );
 }
 
