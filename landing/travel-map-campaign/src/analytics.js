@@ -1,13 +1,23 @@
-import { CAMPAIGN_ID } from "./campaignConfig.js";
+import { canCaptureGa, isScalar, measurementContext, resolveMeasurementId } from "../../src/analytics-contract.js";
+export { resolveMeasurementId } from "../../src/analytics-contract.js";
 
 const environment = import.meta.env ?? {};
-export function resolveMeasurementId(config = {}) {
-  return config.VITE_GA_MEASUREMENT_ID?.trim() || "";
-}
-
 const measurementId = resolveMeasurementId(environment);
 const campaignVersion = environment.VITE_CAMPAIGN_VERSION?.trim() || "travel-map-v1";
 const forbiddenParameterPattern = /(email|phone|name|address|message|free.?text)/i;
+const supportedParameters = new Set([
+  "journey_source", "selected_photos", "valid_gps_photos", "duration_seconds",
+  "metadata_missing_photos", "read_failed_photos", "unsupported_photos",
+  "cta_placement", "destination", "store", "format", "result", "error_type",
+]);
+const supportedEvents = new Set([
+  "travel_map_photo_select", "travel_map_demo_start", "travel_map_photo_analysis_empty",
+  "travel_map_processing_complete", "travel_map_processing_failed", "travel_map_replay_complete",
+  "travel_map_recap_view", "travel_map_video_save_start", "travel_map_video_saved",
+  "travel_map_image_save_start", "travel_map_image_saved", "travel_map_export_failed",
+  "travel_map_share_click", "travel_map_share_result", "travel_map_app_bridge_click",
+  "travel_map_demand_view", "travel_map_landing_click", "download_click",
+]);
 
 export const INTERNAL_TRAFFIC_STORAGE_KEY = "mapmory_internal_traffic_v1";
 
@@ -40,16 +50,14 @@ let gaInitialized = false;
 
 export function sanitizeEventProperties(properties = {}) {
   return Object.fromEntries(Object.entries(properties).filter(([key, value]) => (
-    !forbiddenParameterPattern.test(key)
-    && value !== undefined
-    && value !== null
-    && value !== ""
-    && ["string", "number", "boolean"].includes(typeof value)
+    supportedParameters.has(key) && !forbiddenParameterPattern.test(key) && isScalar(value)
+    && (key !== "journey_source" || ["demo", "photos"].includes(value))
   )));
 }
 
 export function initializeCampaignAnalytics() {
-  if (!measurementId || gaInitialized || typeof window === "undefined") return false;
+  if (!measurementId || gaInitialized || typeof window === "undefined"
+    || !canCaptureGa(environment, window.location.hostname)) return false;
 
   gaInitialized = true;
   window.dataLayer = window.dataLayer || [];
@@ -58,7 +66,8 @@ export function initializeCampaignAnalytics() {
   window.gtag("config", measurementId, {
     anonymize_ip: true,
     send_page_view: true,
-    campaign_name: CAMPAIGN_ID,
+    ...measurementContext("recap"),
+    ...(environment.VITE_GA_DEBUG === "true" ? { debug_mode: true } : {}),
     campaign_version: campaignVersion,
     traffic_type: trafficType,
   });
@@ -71,8 +80,10 @@ export function initializeCampaignAnalytics() {
 }
 
 export function trackCampaignEvent(eventName, properties = {}) {
+  if (!supportedEvents.has(eventName)) return false;
+  if (eventName === "download_click" && !["google_play", "app_store"].includes(properties.store)) return false;
   const eventProperties = {
-    campaign_name: CAMPAIGN_ID,
+    ...measurementContext("recap"),
     campaign_version: campaignVersion,
     traffic_type: trafficType,
     ...sanitizeEventProperties(properties),
