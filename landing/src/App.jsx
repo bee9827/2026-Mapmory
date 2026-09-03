@@ -21,6 +21,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics.js";
+import { createCachedAsyncLoader } from "./cachedAsyncLoader.js";
 import {
   HERO_MOBILE_ENTRY_APPLY_AT_MS,
   HERO_MOBILE_ENTRY_DURATION_MS,
@@ -199,17 +200,10 @@ const memoryByCountry = new Map(memories.map((memory) => [memory.id, memory]));
 const memoryByKey = new Map(memories.map((memory) => [memory.key, memory]));
 const koreaBounds = { minLng: 124.5, maxLng: 130.05, minLat: 33, maxLat: 38.75 };
 const districtMapCache = new Map();
-let worldCountriesPromise;
-
-function loadWorldCountries() {
-  if (!worldCountriesPromise) {
-    worldCountriesPromise = Promise.all([
-      import("topojson-client"),
-      import("world-atlas/countries-110m.json"),
-    ]).then(([{ feature }, { default: topology }]) => feature(topology, topology.objects.countries).features);
-  }
-  return worldCountriesPromise;
-}
+const loadWorldCountries = createCachedAsyncLoader(() => Promise.all([
+  import("topojson-client"),
+  import("world-atlas/countries-110m.json"),
+]).then(([{ feature }, { default: topology }]) => feature(topology, topology.objects.countries).features));
 
 function useWorldCountries(enabled = true) {
   const [countries, setCountries] = useState([]);
@@ -219,6 +213,9 @@ function useWorldCountries(enabled = true) {
     let active = true;
     loadWorldCountries().then((features) => {
       if (active) setCountries(features);
+    }).catch(() => {
+      // Keep the fallback visible; a later mount can retry the cleared cache.
+      if (active) setCountries([]);
     });
     return () => { active = false; };
   }, [enabled]);
@@ -1658,7 +1655,7 @@ function useHeroMemoryRelay() {
 function DesktopHeroSection({ onExperienceEntry, theme }) {
   const { sectionRef, frameRef, relayState } = useHeroMemoryRelay();
   const activeKey = relayState.activeIndex >= 0 ? relayState.cards[relayState.activeIndex].key : "none";
-  const isMapCtaReady = relayState.progress >= 0.93;
+  const isMapCtaReady = relayState.progress > 0.93;
   const isIntroAccessible = relayState.phase === "intro" || relayState.reducedMotion;
   const isFoldCueAccessible = relayState.phase === "intro" && !relayState.reducedMotion;
   const relayStatus = relayState.phase === "intro"
@@ -1672,7 +1669,7 @@ function DesktopHeroSection({ onExperienceEntry, theme }) {
           : "완성된 미국 서부 여행 기록이 3D 기억 지도로 이동하고 있어요.";
 
   return (
-    <section className="hero hero-memory-story" ref={sectionRef} data-relay-phase={relayState.phase} data-active-memory={activeKey} data-recorded={relayState.completedCount > 0 ? "true" : "false"}>
+    <section className="hero hero-memory-story" ref={sectionRef} data-relay-phase={relayState.phase} data-active-memory={activeKey} data-recorded={relayState.completedCount > 0 ? "true" : "false"} data-map-cta-ready={isMapCtaReady ? "true" : "false"}>
       <span className="hero-relay-anchor" id="hero-relay" aria-hidden="true" />
       <div className="hero-story-frame" ref={frameRef}>
         <div className="hero-layout">

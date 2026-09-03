@@ -16,3 +16,10 @@ test("reduced motion collapses the scroll relay and keeps a static summary", () 
   assert.match(storyCss, /prefers-reduced-motion: reduce[\s\S]*\.hero-memory-story \{ height: auto; min-height: 0; \}/);
   assert.match(storyCss, /hero-reduced-summary[\s\S]*display: flex/);
 });
+
+test("the hero handoff link only accepts clicks after its reveal begins", () => {
+  assert.match(appSource, /const isMapCtaReady = relayState\.progress > 0\.93;/);
+  assert.match(appSource, /data-map-cta-ready=\{isMapCtaReady \? "true" : "false"\}/);
+  assert.match(storyCss, /\[data-map-cta-ready="true"\] \.hero-map-cta \{ pointer-events: auto; \}/);
+  assert.doesNotMatch(storyCss, /\[data-recorded="true"\] \.hero-map-cta/);
+});

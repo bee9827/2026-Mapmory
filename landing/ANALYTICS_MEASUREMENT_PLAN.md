@@ -5,12 +5,12 @@
 GA4 측정 ID: `G-MC93CZWLZF`  
 현재 랜딩 버전: `v3`
 
-## 현재 운영 기준 (2026-09-02)
+## 현재 운영 기준 (2026-09-03)
 
-- 현재 최종 웹 전환: 공식 Google Play 상세 페이지 이동 (`download_click`)
+- 현재 최종 웹 전환: 공식 App Store 또는 Google Play 상세 페이지 이동 (`download_click`, `store=app_store|google_play`)
 - 결과 KPI: `download_click` 발생 고유 외부 사용자 수 ÷ 유효 랜딩 방문 고유 외부 사용자 수
 - 현재 진단 퍼널: `page_view → experience_view → experience_start → memory_open(open_index=1) → download_click`
-- `download_click`은 스토어 이동 의도이며 앱 설치·첫 실행을 뜻하지 않는다. 설치와 첫 기억 지도 생성은 Play Console 또는 앱 분석을 연결한 뒤 별도 제품 성과로 본다.
+- `download_click`은 스토어 이동 의도이며 앱 설치·첫 실행을 뜻하지 않는다. 설치와 첫 기억 지도 생성은 App Store Connect·Play Console 또는 앱 분석을 연결한 뒤 별도 제품 성과로 본다. 스토어 구분은 기기 플랫폼이 아니라 `store` 파라미터를 사용한다.
 
 > 아래 출시 알림·대기 명단·폼 KPI는 출시 전 계획의 역사 기록이다. 현재 운영 판단에는 위 기준을 우선 적용한다.
 
@@ -85,7 +85,7 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 | `waitlist_submit_attempt` | 제출 버튼을 눌러 클라이언트 검증을 시작 | `attempt_number` | 제출 시도마다 기록 |
 | `waitlist_submit` | 백엔드가 신규 또는 기존 신청으로 성공 응답 | `result` | 제출 성공마다 기록 |
 | `waitlist_submit_error` | 클라이언트 검증, 네트워크, 서버 또는 응답 오류 | `error_type`, `validation_field` | 오류 발생마다 기록 |
-| `download_click` | 공식 Google Play CTA 클릭 직전 | `cta_placement` | 클릭마다 기록. 설치 완료로 해석하지 않음 |
+| `download_click` | 공식 App Store·Google Play CTA 클릭 직전 | `cta_placement`, `store` | 클릭마다 기록. 설치 완료로 해석하지 않음 |
 
 모든 이벤트에는 `landing_version`과 `traffic_type`이 자동으로 포함된다. 이벤트 이름은 허용 목록으로 제한하고, `email`, `phone`, `name`, `address`, 자유 입력문 등 직접 식별 가능 정보로 보이는 파라미터는 분석 모듈에서 제거한다. PostHog은 자동 클릭 수집, 개인 프로필, 영구 식별자, 세션 녹화를 사용하지 않고 GeoIP 보강도 거부한다. PostHog SDK가 브라우저·기기·페이지 같은 표준 진단 속성을 추가할 수 있으며, 프로젝트 설정에서는 `Discard client IP data`를 사용한다.
 
@@ -109,6 +109,7 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 | `memory_id` | `jeju-coast`, `shanghai`, `tokyo`, `usa-west`, `hapjeong`, `yeosu`, `jeju` |
 | `selection_source` | `shortcut`, `globe`, `photo_tray`, `reveal_tray`, `map` |
 | `cta_placement` | `header`, `header_nav`, `hero`, `scroll_cue`, `korea_memory`, `final` |
+| `store` | `app_store`, `google_play` (다운로드 링크의 목적지) |
 | `open_index` | 해당 체험에서 처음 연 고유 기억부터 `1`, `2`, `3` 순서 |
 | `add_index` | 대한민국 체험에서 추가 완료한 고유 기억 순서 |
 | `active_duration_ms` | 체험 시작 후 체험 영역이 보이고 탭이 활성화된 정확한 누적 밀리초 |
@@ -124,7 +125,7 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 
 GA4에서 다음 문자열 파라미터를 이벤트 범위 맞춤 측정기준으로 등록한다.
 
-`landing_version`, `traffic_type`, `experience_type`, `interaction_type`, `memory_id`, `selection_source`, `cta_placement`, `last_completed_step`, `exit_reason`, `result`, `error_type`, `validation_field`
+`landing_version`, `traffic_type`, `experience_type`, `interaction_type`, `memory_id`, `selection_source`, `cta_placement`, `store`, `last_completed_step`, `exit_reason`, `result`, `error_type`, `validation_field`
 
 다음 숫자 파라미터는 이벤트 범위 맞춤 측정항목으로 등록한다.
 
@@ -134,9 +135,9 @@ GA4에서 다음 문자열 파라미터를 이벤트 범위 맞춤 측정기준�
 
 1. **전체 순차 퍼널**: `page_view → experience_view → experience_start → memory_open(open_index=1) → download_click`
 2. **CTA 비교**: `cta_placement`별 `download_click` 고유 사용자율
-3. **유입 비교**: source·medium·campaign 및 기기별 Google Play 이동률
+3. **유입 비교**: source·medium·campaign 및 `store`별 스토어 이동률. `app_store`와 `google_play`를 각각 비교한다.
 
-`download_click`을 웹 랜딩 핵심 이벤트로 지정하되 대시보드 표시명은 `Google Play 이동`으로 두고, 설치로 명명하지 않는다.
+`download_click`을 웹 랜딩 핵심 이벤트로 지정하되 대시보드 표시명은 `앱 스토어 이동`으로 두고, 설치로 명명하지 않는다.
 
 ### 출시 전 보고서 기록
 

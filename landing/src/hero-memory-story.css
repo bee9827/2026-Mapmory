@@ -193,7 +193,7 @@
   will-change: opacity, transform;
 }
 
-.hero-memory-story[data-recorded="true"] .hero-map-cta { pointer-events: auto; }
+.hero-memory-story[data-map-cta-ready="true"] .hero-map-cta { pointer-events: auto; }
 
 @media (max-width: 900px) {
   .hero-memory-story { height: 440svh; min-height: 3200px; }

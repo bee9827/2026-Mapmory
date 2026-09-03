@@ -95,6 +95,7 @@ const supportedParameters = new Set([
   "memory_id",
   "selection_source",
   "cta_placement",
+  "store",
   "open_index",
   "add_index",
   "time_since_start_ms",

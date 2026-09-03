@@ -90,6 +90,17 @@ test("keeps exact experience duration and distinct-memory parameters", () => {
   );
 });
 
+test("preserves both public store destinations for download attribution", () => {
+  for (const store of ["app_store", "google_play"]) {
+    assert.deepEqual(buildEventParameters({ cta_placement: "header", store }), {
+      landing_version: "v3",
+      traffic_type: "external",
+      cta_placement: "header",
+      store,
+    });
+  }
+});
+
 test("persists and clears the analytics-only internal traffic marker", () => {
   const storage = createMemoryStorage();
 
