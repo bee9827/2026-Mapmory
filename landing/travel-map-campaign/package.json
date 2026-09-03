@@ -5,9 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/prepare-sites-build.mjs",
+    "build": "npm run build:sites && npm run build:recap",
+    "build:sites": "vite build && node scripts/prepare-sites-build.mjs",
+    "build:recap": "vite build --base=/recap/ --outDir dist/recap",
+    "pretest": "npm run build",
     "test": "node --test tests/*.test.mjs",
+    "test:built": "node --test tests/*.test.mjs",
     "preview": "vite preview",
+    "preview:recap": "vite preview --base=/recap/ --outDir dist/recap",
+    "pretest:sites": "npm run build:sites",
     "test:sites": "node --test tests/sites-worker.test.mjs"
   },
   "dependencies": {

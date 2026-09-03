@@ -22,18 +22,21 @@ npm ci
 npm run dev
 ```
 
+일반 `npm test`는 테스트에 필요한 루트/Sites 및 Recap 산출물을 먼저 빌드합니다. `npm run test:sites`도 Sites 빌드 후 실행합니다. CI처럼 같은 환경에서 빌드를 이미 완료했다면 `npm run test:built`로 재빌드 없이 전체 테스트를 실행할 수 있습니다.
+
 개발 서버와 빌드 미리보기(`npm run preview`)는 모두 `http://127.0.0.1:4174/`를 사용합니다. 동시에 실행하지 않으며, 포트가 이미 사용 중이면 다른 포트로 넘어가지 않고 종료합니다. 기존 서버의 작업 경로를 확인해 재사용하거나 해당 캠페인 서버만 종료한 뒤 교체합니다. 다른 작업의 서버를 종료하거나 충돌을 피해 새 포트를 계속 열지 않습니다. 기본 접속은 이 PC로 제한하며 휴대폰 LAN 테스트가 필요한 경우에만 명시적으로 범위를 변경합니다.
 
-배포 산출물을 포함한 검증은 다음 순서로 실행합니다. 패키징 테스트가 빌드 결과를 확인하므로 새 체크아웃에서는 빌드가 먼저 필요합니다.
+배포 산출물을 포함한 검증은 다음 순서로 실행합니다. 테스트 명령이 필요한 빌드를 먼저 준비하므로 새 체크아웃에서도 같은 명령을 사용합니다.
 
 ```sh
-npm run build
 npm test
 # Sites 호환 패키징만 별도로 확인할 때
 npm run test:sites
 ```
 
 `Landing CI`에서 이 패키지를 상위 랜딩과 별도의 작업으로 설치·빌드·테스트합니다. 테스트에는 좌표 형식 처리, 대표 사진 묶음, 통계 보존, 재생 타이밍, CTA 대상/이벤트, 정적 파일 제공과 SPA fallback 검증이 포함됩니다.
+
+`npm run build`는 기존 루트/Sites용 `dist/client`와 운영 하위 경로용 `dist/recap`을 각각 만듭니다. 운영 출력만 빌드하려면 `npm run build:recap`, 운영 경로를 확인하려면 기존 서버를 종료한 뒤 `npm run preview:recap`으로 `http://127.0.0.1:4174/recap/`에 접속합니다. 추가 포트는 사용하지 않습니다.
 
 ### 의존성 보안 검증
 
@@ -65,9 +68,11 @@ npm run test:sites
 
 ## 배포 산출물 및 한계
 
-- Nginx 등 정적 서버에는 `dist/client`만 배포합니다. 자산 경로는 `/assets/...`이므로 독립 서브도메인의 루트 배포를 전제로 합니다.
+- 운영 주소는 `https://map-mory.com/recap/`이고 기존 랜딩은 `/`에 유지합니다. 운영 빌드 `dist/recap`의 내용을 랜딩 CodeDeploy 묶음의 `client/recap/`에 배치합니다. 캠페인 파일로 랜딩의 `client/index.html`이나 `client/assets/`를 덮어쓰지 않습니다.
+- 운영 빌드는 Vite `base=/recap/`를 사용합니다. JavaScript/CSS/폰트뿐 아니라 런타임에서 지정하는 팀 샘플 사진도 해당 경로를 사용합니다. 기존 루트/Sites용 `dist/client`는 별도로 유지하며 운영 `recap/` 폴더에 잘못 복사하지 않습니다.
 - `.openai/hosting.json`, `worker/index.js`, `scripts/prepare-sites-build.mjs`는 기존 Sites 호환 빌드 계약을 유지합니다. EC2 정적 서빙에 Node 서버나 Worker 실행은 필요하지 않습니다.
-- 기존 `landing/scripts/deploy-ec2.sh`는 메인 랜딩의 `/var/www/mapmory/current`를 교체하므로 캠페인에 그대로 실행하지 않습니다. DNS, 인증서, 별도 Nginx server block과 배포 경로는 실제 배포 단계에서 따로 설정합니다.
+- 사용자가 준비한 랜딩 CodePipeline → CodeBuild → 수동 승인 → CodeDeploy 흐름을 재사용합니다. 캠페인 설치·빌드·테스트와 위 정적 파일 병합이 끝난 하나의 묶음을 승인·배포하도록 연결해야 합니다. 배포용 `landing-release`에는 캠페인 소스와 연결 변경이 모두 포함되어야 하며, `main` 대상 기능 PR만으로 자동 배포되지는 않습니다.
+- 기존 `landing/scripts/deploy-ec2.sh`는 메인 랜딩 전체를 교체하므로 캠페인만 담아 실행하지 않습니다. 새 DNS/인증서나 별도 개발 서버 포트는 필요하지 않습니다. Nginx의 기존 `root`와 다른 location을 확인한 뒤 `/recap` 리다이렉트, `/recap/`의 앱 HTML fallback, 누락된 정적 자산의 404 응답을 별도 설정합니다. 이 PR은 운영 Nginx나 AWS 리소스를 변경하지 않습니다.
 - 사진 앱에 위치가 보이더라도 브라우저에 전달된 파일에서 메타데이터가 제거됐을 수 있습니다. HTTPS나 현재 위치 권한으로 과거 촬영 좌표를 복원하지 않습니다.
 - 영상 저장은 브라우저의 `MediaRecorder` 및 Canvas 캡처 지원에 따라 MP4 또는 WebM을 사용합니다. 지원되지 않는 환경에는 PNG 저장 경로가 있습니다.
 - 대량 사진 분석과 영상 생성은 기기의 메모리·성능 영향을 받습니다. 사진 자동 품질 평가, 서버 렌더링, 앱으로의 기록 가져오기는 구현 범위가 아닙니다.

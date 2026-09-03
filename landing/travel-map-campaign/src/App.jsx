@@ -10,6 +10,7 @@ import { analyzePhotoFiles, createPlaybackJourney, demoJourney, formatShortDate,
 import { drawJourneyMap, getActivePoint, loadJourneyImages } from "./mapRenderer.js";
 import { getJourneyProgressState } from "./journeyProgress.js";
 import { downloadBlob, drawShareFrame, renderJourneyVideo, renderShareImage } from "./videoRenderer.js";
+import { shareVideo } from "./shareVideo.js";
 
 const processingSteps = ["촬영 날짜 정리", "GPS로 도시 묶기", "여행 경로 연결"];
 
@@ -283,12 +284,15 @@ function RecapScreen({ journey, onBack, onNext }) {
     trackCampaignEvent("travel_map_share_click", { duration_seconds: duration });
     try {
       const blob = await makeVideo();
-      const extension = blob.type.includes("mp4") ? "mp4" : "webm";
-      const file = new File([blob], `mapmory-2026-travel-map.${extension}`, { type: blob.type });
-      if (navigator.share && navigator.canShare?.({ files: [file] })) await navigator.share({ title: "2026 지금까지의 여행", text: "사진으로 완성한 나의 2026 여행 지도 · Mapmory", files: [file] });
-      else downloadBlob(blob, file.name);
+      const outcome = await shareVideo(blob);
+      if (outcome === "cancelled") {
+        setRenderState({ status: "idle", progress: 0, error: "" });
+        return;
+      }
       onNext();
-    } catch (error) { if (error?.name === "AbortError") setRenderState({ status: "idle", progress: 0, error: "" }); }
+    } catch (error) {
+      setRenderState({ status: "error", progress: 0, error: error?.message || "공유하지 못했어요. 다시 시도해주세요." });
+    }
   };
   const handleSaveImage = async () => {
     try {

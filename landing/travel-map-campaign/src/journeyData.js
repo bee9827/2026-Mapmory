@@ -1,6 +1,7 @@
 import exifr from "exifr";
 import { getJourneyMotionDuration } from "./journeyProgress.js";
 import { parsePhotoBatches, validatePhotoSelection } from "./photoProcessing.js";
+import { publicAssetUrl } from "./publicAssets.js";
 
 const HOURS = 60 * 60 * 1000;
 export const SHARE_INTRO_SECONDS = 0.5;
@@ -78,11 +79,11 @@ export const demoJourney = {
   unsupportedCount: 0,
   formats: ["JPG"],
   points: [
-    { id: "seoul", name: "서울", lat: 37.549, lng: 126.914, date: new Date("2026-01-03T11:10:00+09:00"), image: "/assets/team-hapjeong-huiok.jpg", tripId: 0 },
-    { id: "yeosu", name: "여수", lat: 34.7604, lng: 127.6622, date: new Date("2026-02-14T15:30:00+09:00"), image: "/assets/team-yeosu-mochi.jpg", tripId: 1 },
-    { id: "jeju", name: "제주", lat: 33.4996, lng: 126.5312, date: new Date("2026-03-20T17:20:00+09:00"), image: "/assets/team-jeju-coast.jpg", tripId: 2 },
-    { id: "shanghai", name: "상하이", lat: 31.2304, lng: 121.4737, date: new Date("2026-04-10T19:10:00+08:00"), image: "/assets/team-shanghai-bund.jpg", tripId: 3 },
-    { id: "tokyo", name: "도쿄", lat: 35.6762, lng: 139.6503, date: new Date("2026-08-24T16:40:00+09:00"), image: "/assets/team-tokyo-street.jpeg", tripId: 4 },
+    { id: "seoul", name: "서울", lat: 37.549, lng: 126.914, date: new Date("2026-01-03T11:10:00+09:00"), image: publicAssetUrl("team-hapjeong-huiok.jpg"), tripId: 0 },
+    { id: "yeosu", name: "여수", lat: 34.7604, lng: 127.6622, date: new Date("2026-02-14T15:30:00+09:00"), image: publicAssetUrl("team-yeosu-mochi.jpg"), tripId: 1 },
+    { id: "jeju", name: "제주", lat: 33.4996, lng: 126.5312, date: new Date("2026-03-20T17:20:00+09:00"), image: publicAssetUrl("team-jeju-coast.jpg"), tripId: 2 },
+    { id: "shanghai", name: "상하이", lat: 31.2304, lng: 121.4737, date: new Date("2026-04-10T19:10:00+08:00"), image: publicAssetUrl("team-shanghai-bund.jpg"), tripId: 3 },
+    { id: "tokyo", name: "도쿄", lat: 35.6762, lng: 139.6503, date: new Date("2026-08-24T16:40:00+09:00"), image: publicAssetUrl("team-tokyo-street.jpeg"), tripId: 4 },
   ],
 };
 
