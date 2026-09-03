@@ -20,20 +20,30 @@ test("release validation runs for every release PR with the ruleset's unique che
   assert.ok(workflow.indexOf("run: npm run build") < workflow.indexOf("run: npm test"));
 });
 
-test("CodePipeline preserves landing-only source, build, approval, and deployment order", () => {
+test("CodePipeline automatically deploys only the tested landing artifact after the protected release merge", () => {
   const pipeline = resources.codePipeline;
-  assert.deepEqual(pipeline.stages.map(stage => stage.name), ["Source", "Build", "Approve", "Deploy"]);
-  const [source, build, approve, deploy] = pipeline.stages.map(stage => stage.actions[0]);
+  assert.deepEqual(pipeline.stages.map(stage => stage.name), ["Source", "Build", "Deploy"]);
+  assert.ok(pipeline.stages.every(stage => stage.actions.length === 1));
+  const [source, build, deploy] = pipeline.stages.map(stage => stage.actions[0]);
   assert.equal(source.actionTypeId.provider, "GitHub");
   assert.equal(source.actionTypeId.version, "1");
   assert.equal(source.configuration.Owner, "woowacourse-teams");
   assert.equal(source.configuration.Branch, "landing-release");
+  assert.equal(source.configuration.Repo, "2026-Mapmory");
+  assert.equal(source.configuration.PollForSourceChanges, "false");
+  assert.equal(source.namespace, "SourceVariables");
   assert.equal(build.configuration.ProjectName, "mapmory-landing-build");
-  assert.equal(approve.actionTypeId.provider, "Manual");
-  assert.match(approve.configuration.CustomData, /CodeRabbit.*latest landing-release head/);
+  assert.deepEqual(build.inputArtifacts, source.outputArtifacts);
+  assert.deepEqual(build.outputArtifacts, [{name: "BuildArtifact"}]);
+  assert.deepEqual(deploy.inputArtifacts, build.outputArtifacts);
+  assert.deepEqual(JSON.parse(build.configuration.EnvironmentVariables), [{
+    name: "SOURCE_COMMIT_ID", value: "#{SourceVariables.CommitId}", type: "PLAINTEXT",
+  }]);
+  assert.equal(deploy.actionTypeId.provider, "CodeDeploy");
   assert.equal(deploy.configuration.ApplicationName, "mapmory-landing");
   assert.equal(deploy.configuration.DeploymentGroupName, "mapmory-landing-production");
   assert.equal(pipeline.executionMode, "SUPERSEDED");
+  assert.equal(pipeline.pipelineType, "V2");
   assert.doesNotMatch(workflow, /id-token:|configure-aws-credentials|secrets\.|\bssh\b.*-|\bscp\b/);
 });
 
