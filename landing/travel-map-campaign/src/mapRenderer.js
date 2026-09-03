@@ -1,6 +1,6 @@
 import { geoMercator, geoPath } from "d3-geo";
 import { feature } from "topojson-client";
-import countries from "world-atlas/countries-50m.json";
+import countries from "world-atlas/countries-50m.json" with { type: "json" };
 import { getJourneyProgressState } from "./journeyProgress.js";
 
 const land = feature(countries, countries.objects.countries);
@@ -48,14 +48,14 @@ function roundedRect(ctx, x, y, width, height, radius) {
 function loadImage(src, onReady) {
   if (!src) return null;
   const cached = imageCache.get(src);
-  if (cached?.complete) return cached;
-  if (cached) return null;
-
-  const image = new Image();
-  image.decoding = "async";
-  image.onload = onReady;
-  image.src = src;
-  imageCache.set(src, image);
+  if (cached?.complete) return cached.naturalWidth > 0 ? cached : null;
+  const image = cached ?? new Image();
+  if (onReady) image.addEventListener("load", onReady, { once: true });
+  if (!cached) {
+    image.decoding = "async";
+    imageCache.set(src, image);
+    image.src = src;
+  }
   return null;
 }
 
@@ -143,7 +143,7 @@ export function getActivePoint(points, progress) {
   return activeIndex < 0 ? null : points[activeIndex];
 }
 
-export function drawJourneyMap(ctx, width, height, points, progress, onImageReady = () => {}) {
+export function drawJourneyMap(ctx, width, height, points, progress, onImageReady) {
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = "#eaf5fb";
   ctx.fillRect(0, 0, width, height);
@@ -204,15 +204,21 @@ export async function loadJourneyImages(points) {
     }
     const image = cached ?? new Image();
     image.decoding = "async";
-    image.onload = resolve;
-    image.onerror = resolve;
+    const settle = () => {
+      image.removeEventListener("load", settle);
+      image.removeEventListener("error", settle);
+      resolve();
+    };
+    image.addEventListener("load", settle, { once: true });
+    image.addEventListener("error", settle, { once: true });
     if (!cached) {
-      image.src = point.image;
       imageCache.set(point.image, image);
+      image.src = point.image;
     }
   })));
 }
 
 export function getCachedImage(src) {
-  return imageCache.get(src) ?? null;
+  const image = imageCache.get(src);
+  return image?.complete && image.naturalWidth > 0 ? image : null;
 }

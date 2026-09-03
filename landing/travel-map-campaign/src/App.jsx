@@ -34,6 +34,8 @@ function CampaignHeader({ onBack }) {
 function JourneyMap({ journey, progress, className = "" }) {
   const canvasRef = useRef(null);
   const [revision, setRevision] = useState(0);
+  const drawRef = useRef(null);
+  const onImageReady = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -47,13 +49,19 @@ function JourneyMap({ journey, progress, className = "" }) {
       canvas.height = Math.round(height * density);
       const ctx = canvas.getContext("2d");
       ctx.setTransform(density, 0, 0, density, 0, 0);
-      drawJourneyMap(ctx, width, height, journey.points, progress, () => setRevision((value) => value + 1));
+      drawJourneyMap(ctx, width, height, journey.points, progress, onImageReady);
     };
+    drawRef.current = draw;
     draw();
-    const observer = new ResizeObserver(draw);
+  }, [journey, progress, revision, onImageReady]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const observer = new ResizeObserver(() => drawRef.current?.());
     observer.observe(canvas);
-    return () => observer.disconnect();
-  }, [journey, progress, revision]);
+    return () => { observer.disconnect(); drawRef.current = null; };
+  }, []);
 
   return <canvas ref={canvasRef} className={`journey-map ${className}`} data-testid="journey-map" aria-label="사진 GPS를 시간순으로 연결한 여행 지도" />;
 }
@@ -79,6 +87,7 @@ function EntryScreen({ onFiles, onDemo }) {
         </figure>
         <input ref={inputRef} className="visually-hidden" type="file" accept=".jpg,.jpeg,.heic,.heif,.png,.tif,.tiff,.avif,.webp" multiple onChange={(event) => event.target.files?.length && onFiles(event.target.files)} />
         <button className="primary-button" type="button" onClick={() => inputRef.current?.click()}><UploadSimple size={20} weight="bold" /> 사진 선택하고 지도 만들기</button>
+        <p className="accuracy-note">최대 200장 · 총 500MB · 사진 한 장 50MB 이하</p>
         <button className="text-button" type="button" onClick={onDemo}>사진 없이 샘플 결과 먼저 보기 <ArrowRight size={16} weight="bold" /></button>
         <aside className="privacy-note"><ShieldCheck size={23} weight="duotone" /><div><strong>원본 사진은 업로드하지 않아요</strong><p>이 브라우저에서 날짜·GPS만 읽고 결과를 만들어요.</p></div></aside>
       </div>
@@ -116,17 +125,17 @@ function EmptyScreen({ analysis, selectedCount, onRetry, onDemo }) {
   const metadataMissingCount = analysis?.metadataMissingCount ?? 0;
   const parserFailedCompletely = supportedCount > 0 && readFailedCount >= supportedCount;
   const unsupportedCompletely = selectedCount > 0 && unsupportedCount === selectedCount;
-  const title = unsupportedCompletely
+  const title = analysis?.error ? "사진을 분석하지 못했어요." : unsupportedCompletely
     ? "선택한 파일을 분석할 수 없어요."
     : parserFailedCompletely
       ? "파일 정보를 읽는 중 문제가 생겼어요."
       : "웹에서 받은 파일에 GPS 좌표가 없어요.";
-  const description = unsupportedCompletely
+  const description = analysis?.error || (unsupportedCompletely
     ? "JPG, HEIC, HEIF, PNG, TIFF, AVIF, WEBP 형식의 사진을 선택해주세요."
     : parserFailedCompletely
       ? "사진은 정상적으로 선택됐지만 파일 내부 정보를 판독하지 못했습니다."
-      : "사진 앱에 위치가 표시되어도 웹에 전달된 파일에는 좌표가 빠질 수 있어요.";
-  const resultMessage = unsupportedCompletely
+      : "사진 앱에 위치가 표시되어도 웹에 전달된 파일에는 좌표가 빠질 수 있어요.");
+  const resultMessage = analysis?.error ? "사진 수와 용량을 확인한 뒤 다시 선택해주세요. 선택한 사진은 일부만 처리하지 않아요." : unsupportedCompletely
     ? "선택한 파일 형식을 확인해주세요."
     : parserFailedCompletely
       ? "원본 파일로 다시 시도하면 해결될 수 있어요."
@@ -281,7 +290,16 @@ function RecapScreen({ journey, onBack, onNext }) {
       onNext();
     } catch (error) { if (error?.name === "AbortError") setRenderState({ status: "idle", progress: 0, error: "" }); }
   };
-  const handleSaveImage = async () => { const blob = await renderShareImage(playbackJourney, 1); downloadBlob(blob, "mapmory-2026-travel-map.png"); trackCampaignEvent("travel_map_image_saved"); };
+  const handleSaveImage = async () => {
+    try {
+      const blob = await renderShareImage(playbackJourney, 1);
+      downloadBlob(blob, "mapmory-2026-travel-map.png");
+      trackCampaignEvent("travel_map_image_saved");
+      setRenderState({ status: "complete", progress: 1, error: "" });
+    } catch (error) {
+      setRenderState({ status: "error", progress: 0, error: error?.message || "이미지를 저장하지 못했어요. 다시 시도해주세요." });
+    }
+  };
   const handleAppInterest = () => {
     trackCampaignEvent("travel_map_app_bridge_click", { cta_placement: "recap", destination: "demand_screen" });
     onNext();
@@ -368,9 +386,10 @@ export function App() {
       }
       trackCampaignEvent("travel_map_processing_complete", { selected_photos: count, valid_gps_photos: result.validPhotoCount, duration_seconds: getAutoDuration(result) });
       navigate("replay");
-    } catch {
+    } catch (error) {
       window.clearInterval(timer);
       setJourney({
+        error: error?.message || "사진 처리 중 오류가 발생했어요. 다시 시도해주세요.",
         source: "photos",
         photoCount: count,
         supportedPhotoCount: 0,

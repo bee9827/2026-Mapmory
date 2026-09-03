@@ -151,40 +151,49 @@ export async function renderJourneyVideo(journey, _durationSeconds, onProgress =
   canvas.height = VIDEO_HEIGHT;
   const ctx = canvas.getContext("2d", { alpha: false });
   const stream = canvas.captureStream(30);
-  const mimeType = supportedMimeType();
-  const recorder = new MediaRecorder(stream, {
-    ...(mimeType ? { mimeType } : {}),
-    videoBitsPerSecond: 6_000_000,
-  });
-  const chunks = [];
-  const completion = new Promise((resolve, reject) => {
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
-    };
-    recorder.onerror = () => reject(new Error("영상 생성 중 오류가 발생했어요."));
-    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType || "video/webm" }));
-  });
-
-  recorder.start(1000);
-  const startedAt = performance.now();
-
-  await new Promise((resolve) => {
-    const draw = (now) => {
-      const elapsed = now - startedAt;
-      const progress = clamp(elapsed / (playbackDuration * 1000));
-      drawShareFrame(ctx, playbackJourney, progress, playbackDuration);
-      onProgress(progress);
-      if (progress < 1) requestAnimationFrame(draw);
-      else resolve();
-    };
-    requestAnimationFrame(draw);
-  });
-
-  await new Promise((resolve) => setTimeout(resolve, 120));
-  recorder.stop();
-  const blob = await completion;
-  stream.getTracks().forEach((track) => track.stop());
-  return blob;
+  let recorder;
+  let frame = null;
+  let stopTimer = null;
+  try {
+    const mimeType = supportedMimeType();
+    recorder = new MediaRecorder(stream, {
+      ...(mimeType ? { mimeType } : {}),
+      videoBitsPerSecond: 6_000_000,
+    });
+    const chunks = [];
+    // Attach failure handling before starting either recording or animation.
+    return await new Promise((resolve, reject) => {
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      };
+      recorder.onerror = () => reject(new Error("영상 생성 중 오류가 발생했어요."));
+      recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType || "video/webm" }));
+      recorder.start(1000);
+      const startedAt = performance.now();
+      const draw = (now) => {
+        try {
+          const progress = clamp((now - startedAt) / (playbackDuration * 1000));
+          drawShareFrame(ctx, playbackJourney, progress, playbackDuration);
+          onProgress(progress);
+          if (progress < 1) frame = requestAnimationFrame(draw);
+          else stopTimer = setTimeout(() => {
+            try { recorder.stop(); } catch (error) { reject(error); }
+          }, 120);
+        } catch (error) { reject(error); }
+      };
+      frame = requestAnimationFrame(draw);
+    });
+  } finally {
+    if (frame !== null) cancelAnimationFrame(frame);
+    if (stopTimer !== null) clearTimeout(stopTimer);
+    if (recorder) {
+      recorder.ondataavailable = null;
+      recorder.onerror = null;
+      recorder.onstop = null;
+      try { if (recorder.state !== "inactive") recorder.stop(); } catch { /* Always release tracks below. */ }
+    }
+    stream.getTracks().forEach((track) => track.stop());
+  }
 }
 
 export function downloadBlob(blob, filename) {

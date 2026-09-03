@@ -1,8 +1,11 @@
 import { CAMPAIGN_ID } from "./campaignConfig.js";
 
 const environment = import.meta.env ?? {};
-const measurementId = environment.VITE_GA_MEASUREMENT_ID?.trim()
-  || (environment.PROD ? "G-MC93CZWLZF" : "");
+export function resolveMeasurementId(config = {}) {
+  return config.VITE_GA_MEASUREMENT_ID?.trim() || "";
+}
+
+const measurementId = resolveMeasurementId(environment);
 const campaignVersion = environment.VITE_CAMPAIGN_VERSION?.trim() || "travel-map-v1";
 const forbiddenParameterPattern = /(email|phone|name|address|message|free.?text)/i;
 
@@ -76,7 +79,7 @@ export function trackCampaignEvent(eventName, properties = {}) {
   };
 
   let tracked = false;
-  if (typeof window !== "undefined" && typeof window.gtag === "function") {
+  if (measurementId && gaInitialized && typeof window !== "undefined" && typeof window.gtag === "function") {
     window.gtag("event", eventName, eventProperties);
     tracked = true;
   }

@@ -1,5 +1,6 @@
 import exifr from "exifr";
 import { getJourneyMotionDuration } from "./journeyProgress.js";
+import { parsePhotoBatches, validatePhotoSelection } from "./photoProcessing.js";
 
 const HOURS = 60 * 60 * 1000;
 export const SHARE_INTRO_SECONDS = 0.5;
@@ -213,9 +214,11 @@ export function formatShortDate(date) {
 
 export async function analyzePhotoFiles(fileList) {
   const selectedFiles = Array.from(fileList);
+  validatePhotoSelection(selectedFiles);
   const files = selectedFiles.filter((file) => file.type.startsWith("image/") || IMAGE_EXTENSION_PATTERN.test(file.name));
   const unsupportedFiles = selectedFiles.filter((file) => !files.includes(file));
-  const parsed = await Promise.all(files.map(async (file, index) => {
+  const objectUrls = [];
+  const parsed = await parsePhotoBatches(files, async (file, index) => {
     let metadata = null;
     let metadataError = null;
     let gpsMetadata = null;
@@ -303,10 +306,12 @@ export async function analyzePhotoFiles(fileList) {
     const hasGps = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
     const extension = file.name.includes(".") ? file.name.split(".").pop().toUpperCase() : "알 수 없음";
 
+    const image = URL.createObjectURL(file);
+    objectUrls.push(image);
     return {
       id: `${file.name}-${file.lastModified}-${index}`,
       file,
-      image: URL.createObjectURL(file),
+      image,
       date: Number.isNaN(date.getTime()) ? new Date(file.lastModified || Date.now()) : date,
       lat,
       lng,
@@ -315,7 +320,10 @@ export async function analyzePhotoFiles(fileList) {
       metadataStatus: metadata || fallbackHasMetadata ? "read" : metadataError && fallbackError ? "failed" : "missing",
       gpsStatus: hasGps ? "found" : gpsError && fallbackError ? "failed" : "missing",
     };
-  }));
+  }).catch((error) => {
+    objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    throw error;
+  });
 
   const validPoints = parsed
     .filter((photo) => photo.hasGps)
