@@ -25,12 +25,12 @@ test("CI and CodeBuild install, build and test the campaign before packaging", (
   }
 });
 
-for (const scenario of ["success", "missing-trip", "wrong-base", "missing-landing", "existing-trip", "bad-sha"]) {
-  test("static-only trip CodeDeploy packaging: " + scenario, { skip: !existsSync(bash) }, (t) => {
-    const root = mkdtempSync(path.join(os.tmpdir(), "mapmory-trip-package-"));
+for (const scenario of ["success", "missing-recap", "wrong-base", "missing-landing", "existing-recap", "bad-sha"]) {
+  test("static-only recap CodeDeploy packaging: " + scenario, { skip: !existsSync(bash) }, (t) => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "mapmory-recap-package-"));
     t.after(() => {
       assert.equal(path.dirname(path.resolve(root)), path.resolve(os.tmpdir()));
-      assert.ok(path.basename(root).startsWith("mapmory-trip-package-"));
+      assert.ok(path.basename(root).startsWith("mapmory-recap-package-"));
       rmSync(root, { recursive: true, force: true });
     });
     mkdirSync(path.join(root, "scripts"), { recursive: true });
@@ -38,11 +38,11 @@ for (const scenario of ["success", "missing-trip", "wrong-base", "missing-landin
     cpSync(path.join(landing, "codedeploy"), path.join(root, "codedeploy"), { recursive: true });
     if (scenario !== "missing-landing") put(root, "dist/client/index.html", "landing-home");
     put(root, "dist/client/assets/shared.js", "landing-asset");
-    if (scenario === "existing-trip") put(root, "dist/client/trip/index.html", "old-trip");
-    if (scenario !== "missing-trip") {
-      put(root, "travel-map-campaign/dist/trip/index.html",
-        '<script src="' + (scenario === "wrong-base" ? "/" : "/trip/") + 'assets/app.js"></script>');
-      put(root, "travel-map-campaign/dist/trip/assets/app.js", "campaign-asset");
+    if (scenario === "existing-recap") put(root, "dist/client/recap/index.html", "old-recap");
+    if (scenario !== "missing-recap") {
+      put(root, "travel-map-campaign/dist/recap/index.html",
+        '<script src="' + (scenario === "wrong-base" ? "/" : "/recap/") + 'assets/app.js"></script>');
+      put(root, "travel-map-campaign/dist/recap/assets/app.js", "campaign-asset");
     }
     put(root, "travel-map-campaign/.env", "PRIVATE_FAKE_VALUE=must-not-ship");
     put(root, "travel-map-campaign/dist/server/index.js", "worker-must-not-ship");
@@ -62,15 +62,15 @@ for (const scenario of ["success", "missing-trip", "wrong-base", "missing-landin
     };
     const files = tar("-tzf", output).split(/\r?\n/).filter(Boolean);
     assert.ok(files.includes("client/index.html"));
-    assert.ok(files.includes("client/trip/index.html"));
-    assert.ok(files.includes("client/trip/assets/app.js"));
+    assert.ok(files.includes("client/recap/index.html"));
+    assert.ok(files.includes("client/recap/assets/app.js"));
     assert.ok(files.every((file) => file === "appspec.yml" || file.startsWith("scripts/") || file.startsWith("client/")));
     assert.ok(files.every((file) => !/\.env|node_modules|server\/|backend\//.test(file)));
     assert.equal(tar("-xOzf", output, "client/index.html"), "landing-home");
     assert.equal(tar("-xOzf", output, "client/assets/shared.js"), "landing-asset");
     assert.equal(tar("-xOzf", output, "client/release.txt").trim(), sha);
-    assert.equal(tar("-xOzf", output, "client/trip/release.txt").trim(), sha);
+    assert.equal(tar("-xOzf", output, "client/recap/release.txt").trim(), sha);
     assert.equal(readFileSync(path.join(root, "dist/client/index.html"), "utf8"), "landing-home");
-    assert.equal(existsSync(path.join(root, "dist/client/trip")), false);
+    assert.equal(existsSync(path.join(root, "dist/client/recap")), false);
   });
 }

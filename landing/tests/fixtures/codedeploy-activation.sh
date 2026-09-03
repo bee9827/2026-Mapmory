@@ -7,15 +7,15 @@ trap 'rm -rf -- "$fixture"' EXIT
 root="$fixture/landing"
 bundle="$fixture/bundle"
 mkdir -p "$root/releases/old" "$bundle/client" "$fixture/outside"
-mkdir -p "$bundle/client/trip"
+mkdir -p "$bundle/client/recap"
 printf old > "$root/releases/old/index.html"
 printf external > "$fixture/outside/index.html"
 ln -s "$root/releases/old" "$root/current"
 sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 printf new > "$bundle/client/index.html"
 printf '%s\n' "$sha" > "$bundle/client/release.txt"
-printf '<script src="/trip/assets/app.js"></script>' > "$bundle/client/trip/index.html"
-printf '%s\n' "$sha" > "$bundle/client/trip/release.txt"
+printf '<script src="/recap/assets/app.js"></script>' > "$bundle/client/recap/index.html"
+printf '%s\n' "$sha" > "$bundle/client/recap/release.txt"
 deployment_id=d-TEST123
 
 # Never call host services or the network. Filesystem operations stay under mktemp.
@@ -30,14 +30,14 @@ systemctl() {
 }
 curl() {
   [[ "$scenario" != http-failure ]] || return 22
-  if [[ "$*" == *'/trip/'* ]]; then
-    [[ "$scenario" != trip-http-failure ]] || return 22
+  if [[ "$*" == *'/recap/'* ]]; then
+    [[ "$scenario" != recap-http-failure ]] || return 22
     if [[ "$*" == *release.txt* ]]; then
-      if [[ "$scenario" == trip-identity-failure ]]; then printf wrong; else printf '%s' "$sha"; fi
-    elif [[ "$scenario" == trip-shell-failure ]]; then
+      if [[ "$scenario" == recap-identity-failure ]]; then printf wrong; else printf '%s' "$sha"; fi
+    elif [[ "$scenario" == recap-shell-failure ]]; then
       printf '<html>landing fallback</html>'
     else
-      printf '<script src="/trip/assets/app.js"></script>'
+      printf '<script src="/recap/assets/app.js"></script>'
     fi
     return
   fi
@@ -47,8 +47,8 @@ curl() {
 }
 case "$scenario" in
   bad-marker) printf '../bad' > "$bundle/client/release.txt" ;;
-  missing-trip) rm -- "$bundle/client/trip/index.html" ;;
-  bad-trip-marker) printf wrong > "$bundle/client/trip/release.txt" ;;
+  missing-recap) rm -- "$bundle/client/recap/index.html" ;;
+  bad-recap-marker) printf wrong > "$bundle/client/recap/release.txt" ;;
   bad-id) deployment_id=../bad ;;
   missing-previous) unlink "$root/current" ;;
   outside-previous) ln -sfnT "$fixture/outside" "$root/current" ;;

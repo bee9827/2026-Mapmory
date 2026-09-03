@@ -5,21 +5,21 @@ import { CAMPAIGN_PATH, CAMPAIGN_URL, CAMPAIGN_LANDING_URL } from "../src/campai
 import { publicAssetUrl } from "../src/publicAssets.js";
 import { demoJourney } from "../src/journeyData.js";
 
-test("campaign lives under /trip/ while the introduction still goes to the landing root", () => {
-  assert.equal(CAMPAIGN_PATH, "/trip/");
-  assert.equal(CAMPAIGN_URL, "https://map-mory.com/trip/");
+test("campaign lives under /recap/ while the introduction still goes to the landing root", () => {
+  assert.equal(CAMPAIGN_PATH, "/recap/");
+  assert.equal(CAMPAIGN_URL, "https://map-mory.com/recap/");
   assert.equal(new URL(CAMPAIGN_LANDING_URL).pathname, "/");
 });
 
-test("runtime public photos honor both root and trip builds", () => {
+test("runtime public photos honor both root and recap builds", () => {
   assert.equal(publicAssetUrl("photo.jpg", "/"), "/assets/photo.jpg");
-  assert.equal(publicAssetUrl("photo.jpg", "/trip/"), "/trip/assets/photo.jpg");
+  assert.equal(publicAssetUrl("photo.jpg", "/recap/"), "/recap/assets/photo.jpg");
   assert.equal(publicAssetUrl("photo.jpg"), "/assets/photo.jpg");
   assert.equal(demoJourney.points.length, 5);
   for (const point of demoJourney.points) assert.match(point.image, /^\/assets\/team-/);
 });
 
-for (const [directory, base] of [["client", "/"], ["trip", "/trip/"]]) {
+for (const [directory, base] of [["client", "/"], ["recap", "/recap/"]]) {
   test(`${directory} build keeps scripts, CSS, fonts and team photos in its own asset directory`, async () => {
     const output = new URL(`../dist/${directory}/`, import.meta.url);
     const html = await readFile(new URL("index.html", output), "utf8");

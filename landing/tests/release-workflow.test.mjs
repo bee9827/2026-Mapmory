@@ -89,7 +89,7 @@ test("CodeDeploy rejects use from the backend group before filesystem access", (
   assert.match(result.stderr, /only in the landing/);
 });
 
-for (const scenario of ["success", "reload-failure", "identity-failure", "http-failure", "nginx-failure", "bad-marker", "bad-id", "missing-previous", "outside-previous", "duplicate", "symlink-bundle", "locked", "missing-trip", "bad-trip-marker", "trip-http-failure", "trip-identity-failure", "trip-shell-failure"]) {
+for (const scenario of ["success", "reload-failure", "identity-failure", "http-failure", "nginx-failure", "bad-marker", "bad-id", "missing-previous", "outside-previous", "duplicate", "symlink-bundle", "locked", "missing-recap", "bad-recap-marker", "recap-http-failure", "recap-identity-failure", "recap-shell-failure"]) {
   test(`CodeDeploy activation fixture: ${scenario}`, { skip: process.platform === "win32" ? "Linux filesystem/flock fixture runs in CI and CodeBuild" : false }, () => {
     const fixture = fileURLToPath(new URL("./fixtures/codedeploy-activation.sh", import.meta.url));
     const result = spawnSync(bash, [fixture, scenario], {encoding: "utf8", timeout: 15000});
