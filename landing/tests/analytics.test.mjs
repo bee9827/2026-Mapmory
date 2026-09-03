@@ -59,7 +59,7 @@ test("adds the landing version and removes direct personal information", () => {
       unused: undefined,
     }),
     {
-      landing_version: "v2",
+      landing_version: "v3",
       traffic_type: "external",
       cta_placement: "hero",
     },
@@ -80,7 +80,7 @@ test("keeps exact experience duration and distinct-memory parameters", () => {
       last_completed_step: "memory_open",
     }),
     {
-      landing_version: "v2",
+      landing_version: "v3",
       traffic_type: "external",
       experience_type: "globe",
       active_duration_ms: 23740,
@@ -88,6 +88,17 @@ test("keeps exact experience duration and distinct-memory parameters", () => {
       last_completed_step: "memory_open",
     },
   );
+});
+
+test("preserves both public store destinations for download attribution", () => {
+  for (const store of ["app_store", "google_play"]) {
+    assert.deepEqual(buildEventParameters({ cta_placement: "header", store }), {
+      landing_version: "v3",
+      traffic_type: "external",
+      cta_placement: "header",
+      store,
+    });
+  }
 });
 
 test("persists and clears the analytics-only internal traffic marker", () => {
