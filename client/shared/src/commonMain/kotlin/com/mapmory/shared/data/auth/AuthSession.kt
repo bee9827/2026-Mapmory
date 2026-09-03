@@ -10,10 +10,10 @@ data class AuthTokens(
     val refreshToken: String,
 ) {
     init {
-        require(accessToken.isNotBlank()) { "액세스 토큰은 비어 있을 수 없습니다." }
-        require(refreshToken.isNotBlank()) { "리프레시 토큰은 비어 있을 수 없습니다." }
+        require(accessToken.isNotBlank()) { "로그인 정보를 확인하지 못했습니다. 다시 로그인해 주세요." }
+        require(refreshToken.isNotBlank()) { "로그인 정보를 확인하지 못했습니다. 다시 로그인해 주세요." }
         require('\n' !in accessToken && '\n' !in refreshToken) {
-            "토큰에는 줄바꿈을 포함할 수 없습니다."
+            "로그인 정보를 확인하지 못했습니다. 다시 로그인해 주세요."
         }
     }
 }
@@ -89,7 +89,7 @@ internal class GuestSessionManager(
         authenticationMutex.withLock {
             val currentTokens = tokens
                 ?: return@withLock Result.failure(
-                    IllegalStateException("갱신할 인증 토큰이 없습니다."),
+                    IllegalStateException("로그인 정보가 만료되었습니다. 다시 로그인해 주세요."),
                 )
 
             if (currentTokens.accessToken != failedAccessToken) {
