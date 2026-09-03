@@ -10,6 +10,7 @@ on:
 permissions:
   contents: read
 
+# PR validation only. CodePipeline uses the existing institution-managed AWS roles.
 jobs:
   validate:
     name: Landing release validation
@@ -33,80 +34,5 @@ jobs:
           VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ vars.VITE_POSTHOG_HOST }}
       - run: npm test
-      - name: Package tested release
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/landing-release'
-        run: |
-          printf '%s\n' "$GITHUB_SHA" > dist/client/release.txt
-          tar -czf "$RUNNER_TEMP/mapmory-landing.tar.gz" -C dist/client .
-      - uses: actions/upload-artifact@v7
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/landing-release'
-        with:
-          name: mapmory-landing-${{ github.sha }}
-          path: ${{ runner.temp }}/mapmory-landing.tar.gz
-          if-no-files-found: error
-          retention-days: 7
-
-  deploy:
-    name: Deploy landing production
-    if: >-
-      github.repository == 'woowacourse-teams/2026-Mapmory' &&
-      github.event_name != 'pull_request' &&
-      github.ref == 'refs/heads/landing-release'
-    needs: validate
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: landing-production
-      url: https://map-mory.com/
-    concurrency:
-      group: landing-production
-      cancel-in-progress: false
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v7
-        with:
-          name: mapmory-landing-${{ github.sha }}
-          path: ${{ runner.temp }}
-      - name: Configure verified landing SSH access
-        env:
-          LANDING_EC2_SSH_KEY: ${{ secrets.LANDING_EC2_SSH_KEY }}
-          LANDING_EC2_KNOWN_HOSTS: ${{ secrets.LANDING_EC2_KNOWN_HOSTS }}
-          LANDING_EC2_HOST: ${{ secrets.LANDING_EC2_HOST }}
-          LANDING_EC2_USER: ${{ secrets.LANDING_EC2_USER }}
-        run: |
-          set -euo pipefail
-          for name in LANDING_EC2_SSH_KEY LANDING_EC2_KNOWN_HOSTS LANDING_EC2_HOST LANDING_EC2_USER; do
-            if [[ -z "${!name}" ]]; then
-              echo "::error::Missing landing-production secret: $name"
-              exit 1
-            fi
-          done
-          [[ "$LANDING_EC2_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]]
-          [[ "$LANDING_EC2_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
-          install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$LANDING_EC2_SSH_KEY" > "$HOME/.ssh/landing_deploy_key"
-          printf '%s\n' "$LANDING_EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
-          chmod 600 "$HOME/.ssh/landing_deploy_key" "$HOME/.ssh/known_hosts"
-      - name: Upload and activate tested release
-        env:
-          LANDING_EC2_HOST: ${{ secrets.LANDING_EC2_HOST }}
-          LANDING_EC2_USER: ${{ secrets.LANDING_EC2_USER }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          head_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/landing-release" --jq .object.sha)"
-          if [[ "$head_sha" != "$GITHUB_SHA" ]]; then
-            echo '::error::A newer landing release exists. Deploy the latest run instead.'
-            exit 1
-          fi
-          release_id="${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          remote_archive="/tmp/mapmory-landing-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
-          ssh_options=(-i "$HOME/.ssh/landing_deploy_key" -o BatchMode=yes -o ConnectTimeout=15 -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes)
-          scp "${ssh_options[@]}" "$RUNNER_TEMP/mapmory-landing.tar.gz" "$LANDING_EC2_USER@$LANDING_EC2_HOST:$remote_archive"
-          ssh "${ssh_options[@]}" "$LANDING_EC2_USER@$LANDING_EC2_HOST" \
-            "bash -s -- '$release_id' '$remote_archive'" < landing/scripts/deploy-ec2.sh
-      - name: Verify public release identity
-        run: |
-          set -euo pipefail
-          deployed_sha="$(curl --fail --silent --show-error --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 2 "https://map-mory.com/release.txt?run=$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT")"
-          [[ "$deployed_sha" == "$GITHUB_SHA" ]] || { echo '::error::Public release does not match the tested commit.'; exit 1; }
+      - name: Validate CodeDeploy bundle
+        run: bash scripts/package-codedeploy.sh "$GITHUB_SHA" "$RUNNER_TEMP/mapmory-landing.tar.gz"
