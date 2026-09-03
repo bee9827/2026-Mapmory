@@ -2,6 +2,8 @@
 
 Run the local server yourself and open the preview in the browser available to this environment. Do not give the user server-start instructions when you can run it.
 
+Keep one campaign preview at http://127.0.0.1:4174/. Before starting it, inspect the existing listener and its process command/path. Reuse the correct server or stop only a positively identified campaign server before replacing it. Do not pick a new port to work around a collision, leave extra preview servers running, or stop another task's server. Both dev and production preview use strictPort; default to loopback access and expand LAN access only for an explicit device-test request. Reuse the existing browser tab and close agent-created obsolete campaign tabs.
+
 Before making substantial visual changes, use the Product Design plugin's `get-context` skill when the visual source is unclear or no longer matches the current goal. When the user gives durable prototype-specific design feedback, preferences, or decisions, record them in `AGENTS.md`.
 
 In the mobile replay, make the causal chain from a selected photo to its mapped location explicit. Never reveal the next location or swap its active photo before the animated route actually reaches that point; connect the active photo card to its map point and label the state as a photo being recorded on the map.
