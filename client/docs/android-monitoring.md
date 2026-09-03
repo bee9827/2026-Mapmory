@@ -28,6 +28,14 @@ Android 앱은 `com.mapmory.android`, App Store용 iOS 앱은 `com.mapmory.ios`�
 이벤트는 같은 프로젝트의 Analytics에서 앱별로 확인한다. iOS 출시 전에는 Firebase Console에
 `com.mapmory.ios` 앱이 등록되어 있고 해당 앱에서 내려받은 `GoogleService-Info.plist`가 포함됐는지 확인한다.
 
+### iOS Firebase Analytics 식별자 변경 이력
+
+- 이전 식별자: `com.mapmory.ios3` (테스트용 Firebase 앱)
+- 현재 식별자: `com.mapmory.ios` (현재 iOS 앱)
+- 기존 `ios3` 이벤트 데이터는 과거 테스트 기록으로 보존하고, 현재 `ios` 데이터와 합산하지 않는다.
+- Git 커밋 이력에 남은 `ios3` 문자열은 과거 설정 기록이므로 삭제하거나 재작성하지 않는다.
+- Firebase·GA4 대시보드에서는 현재 사용자 행동을 `com.mapmory.ios` 앱 스트림으로만 조회한다.
+
 이 문서는 현재 MVP의 개발·출시 전 검증 기준이다. 지도 전환을 자동 반복하는 Macrobenchmark와 원격 오류 수집은 별도 도입 조건이 충족될 때 추가한다.
 
 ## 모니터링 계층
