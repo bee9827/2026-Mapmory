@@ -1,11 +1,20 @@
 # Mapmory 랜딩페이지 측정 계획
 
-기준일: 2026-08-25  
+최초 작성일: 2026-08-25
 대상 페이지: <https://map-mory.com/>  
 GA4 측정 ID: `G-MC93CZWLZF`  
-현재 랜딩 버전: `v2`
+현재 랜딩 버전: `v3`
 
-## 1. 측정 목적
+## 현재 운영 기준 (2026-09-03)
+
+- 현재 최종 웹 전환: 공식 App Store 또는 Google Play 상세 페이지 이동 (`download_click`, `store=app_store|google_play`)
+- 결과 KPI: `download_click` 발생 고유 외부 사용자 수 ÷ 유효 랜딩 방문 고유 외부 사용자 수
+- 현재 진단 퍼널: `page_view → experience_view → experience_start → memory_open(open_index=1) → download_click`
+- `download_click`은 스토어 이동 의도이며 앱 설치·첫 실행을 뜻하지 않는다. 설치와 첫 기억 지도 생성은 App Store Connect·Play Console 또는 앱 분석을 연결한 뒤 별도 제품 성과로 본다. 스토어 구분은 기기 플랫폼이 아니라 `store` 파라미터를 사용한다.
+
+> 아래 출시 알림·대기 명단·폼 KPI는 출시 전 계획의 역사 기록이다. 현재 운영 판단에는 위 기준을 우선 적용한다.
+
+## 1. 측정 목적 (출시 전 기록)
 
 랜딩페이지의 목표는 공개 출시 전에는 **신규 출시 알림 이메일 확보**, 공개 출시 후에는 **Google Play 다운로드 이동**이다. 측정은 아래 세 가지 의사결정에 답해야 한다.
 
@@ -32,7 +41,7 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 
 전환에는 예약, 문의, 가입, 다운로드 등 서로 다른 행동이 섞여 있다. 따라서 4.8%와 6.6%는 Mapmory의 절대 합격선이 아니라 첫 목표 범위를 잡는 외부 기준으로만 사용한다.
 
-## 3. KPI와 기대치·실측치 비교
+## 3. KPI와 기대치·실측치 비교 (출시 전 기록)
 
 기대치는 공개 벤치마크와 현재 한 필드 이메일 폼의 마찰도를 바탕으로 잡은 **출시 전 가설**이다. 최초 100~200개의 정상 세션 또는 배포 후 7일 중 늦게 도달하는 시점에 첫 실측치를 기록하고 목표를 다시 조정한다.
 
@@ -49,16 +58,18 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 | 선행 지표 | 폼 완료율 = `waitlist_submit` 세션 ÷ `waitlist_form_start` 세션 | **70% 이상** | 50% 미만 | 배포 전 | 한 필드 폼 가설 |
 | 가드레일 | 기술 제출 오류율 = `waitlist_submit_error(error_type!=validation)` ÷ `waitlist_submit_attempt` | **2% 미만** | 5% 초과 | 배포 전 | 백엔드 로그와 함께 확인 |
 
-운영 해석 기준:
+출시 전 운영 해석 기준:
 
 - 신규 대기 명단 전환율 **8% 이상**은 초기 강한 신호로 본다.
 - 체험 활성화율이나 체험시간이 높아도 기억 열기와 신청률이 오르지 않으면 체험은 재미 또는 혼란에 머물고 제품 가치나 CTA로 연결되지 않는 것이다.
 - 폼 시작률이 낮으면 제안 문구·신뢰·개인정보 설명을, 폼 완료율이 낮으면 검증 오류와 체크박스 마찰을 먼저 본다.
 - `experience_end`의 정확한 활성 체험시간과 체험당 고유 기억 수, CTA 위치별 클릭률은 첫 기간에는 목표를 두지 않고 기준선을 만든다.
 
-## 4. 이벤트 사전
+## 4. 이벤트 사전 (현재 허용 목록과 출시 전 호환 이벤트)
 
 `page_view`는 GA4가 자동 수집하고 PostHog에는 `$pageview`로 한 번 전송한다. 아래 이벤트는 하나의 허용 목록을 통해 GA4와 PostHog에 동일하게 전송한다.
+
+현재 전환 UI에서 발생하는 전환 이벤트는 `download_click`이다. `waitlist_*` 이벤트는 출시 전 데이터 해석과 스키마 호환을 위해 보존하며 현재 화면에서는 발생하지 않는다.
 
 | 이벤트 | 발생 조건 | 주요 파라미터 | 중복 방지 |
 | --- | --- | --- | --- |
@@ -74,7 +85,7 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 | `waitlist_submit_attempt` | 제출 버튼을 눌러 클라이언트 검증을 시작 | `attempt_number` | 제출 시도마다 기록 |
 | `waitlist_submit` | 백엔드가 신규 또는 기존 신청으로 성공 응답 | `result` | 제출 성공마다 기록 |
 | `waitlist_submit_error` | 클라이언트 검증, 네트워크, 서버 또는 응답 오류 | `error_type`, `validation_field` | 오류 발생마다 기록 |
-| `download_click` | 공개 출시 후 Google Play CTA 클릭 | `cta_placement` | 클릭마다 기록 |
+| `download_click` | 공식 App Store·Google Play CTA 클릭 직전 | `cta_placement`, `store` | 클릭마다 기록. 설치 완료로 해석하지 않음 |
 
 모든 이벤트에는 `landing_version`과 `traffic_type`이 자동으로 포함된다. 이벤트 이름은 허용 목록으로 제한하고, `email`, `phone`, `name`, `address`, 자유 입력문 등 직접 식별 가능 정보로 보이는 파라미터는 분석 모듈에서 제거한다. PostHog은 자동 클릭 수집, 개인 프로필, 영구 식별자, 세션 녹화를 사용하지 않고 GeoIP 보강도 거부한다. PostHog SDK가 브라우저·기기·페이지 같은 표준 진단 속성을 추가할 수 있으며, 프로젝트 설정에서는 `Discard client IP data`를 사용한다.
 
@@ -91,13 +102,14 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 
 | 파라미터 | 허용값 |
 | --- | --- |
-| `landing_version` | `v2`부터 시작하는 안정적인 배포 버전. 자동 `page_view`에도 포함 |
+| `landing_version` | 현재 `v3`. 출시 전 `v2`와 분리하며 자동 `page_view`에도 포함 |
 | `traffic_type` | `external`, `internal`. 자동 `page_view`와 모든 허용 이벤트에 포함 |
 | `experience_type` | `globe`, `korea_detail` |
 | `interaction_type` | `place_select`, `memory_add`, `globe_drag`, `globe_zoom` |
 | `memory_id` | `jeju-coast`, `shanghai`, `tokyo`, `usa-west`, `hapjeong`, `yeosu`, `jeju` |
 | `selection_source` | `shortcut`, `globe`, `photo_tray`, `reveal_tray`, `map` |
 | `cta_placement` | `header`, `header_nav`, `hero`, `scroll_cue`, `korea_memory`, `final` |
+| `store` | `app_store`, `google_play` (다운로드 링크의 목적지) |
 | `open_index` | 해당 체험에서 처음 연 고유 기억부터 `1`, `2`, `3` 순서 |
 | `add_index` | 대한민국 체험에서 추가 완료한 고유 기억 순서 |
 | `active_duration_ms` | 체험 시작 후 체험 영역이 보이고 탭이 활성화된 정확한 누적 밀리초 |
@@ -113,13 +125,23 @@ GA4는 행동 분석 도구이며, 실제 고유 이메일 신청자 수의 원�
 
 GA4에서 다음 문자열 파라미터를 이벤트 범위 맞춤 측정기준으로 등록한다.
 
-`landing_version`, `traffic_type`, `experience_type`, `interaction_type`, `memory_id`, `selection_source`, `cta_placement`, `last_completed_step`, `exit_reason`, `result`, `error_type`, `validation_field`
+`landing_version`, `traffic_type`, `experience_type`, `interaction_type`, `memory_id`, `selection_source`, `cta_placement`, `store`, `last_completed_step`, `exit_reason`, `result`, `error_type`, `validation_field`
 
 다음 숫자 파라미터는 이벤트 범위 맞춤 측정항목으로 등록한다.
 
 `open_index`, `add_index`, `time_since_start_ms`, `active_duration_ms`, `unique_memories_opened`, `attempt_number`
 
-권장 탐색 보고서:
+현재 권장 탐색 보고서:
+
+1. **전체 순차 퍼널**: `page_view → experience_view → experience_start → memory_open(open_index=1) → download_click`
+2. **CTA 비교**: `cta_placement`별 `download_click` 고유 사용자율
+3. **유입 비교**: source·medium·campaign 및 `store`별 스토어 이동률. `app_store`와 `google_play`를 각각 비교한다.
+
+`download_click`을 웹 랜딩 핵심 이벤트로 지정하되 대시보드 표시명은 `앱 스토어 이동`으로 두고, 설치로 명명하지 않는다.
+
+### 출시 전 보고서 기록
+
+아래 보고서는 출시 알림 폼을 운영하던 시점의 설정이다.
 
 1. **전체 순차 퍼널**: `page_view → experience_view → experience_start → memory_open(open_index=1) → waitlist_form_view → waitlist_form_start → waitlist_submit_attempt → waitlist_submit`
 2. **기억 탐색 깊이**: `experience_type`별 `open_index=1 → 2 → 3` 도달률과 체험당 고유 `memory_id` 수
@@ -138,13 +160,13 @@ GA4는 유입·캠페인·최종 전환을 판단하는 원천으로 유지하�
 
 초기 대시보드는 다음 다섯 항목으로 제한한다.
 
-1. `$pageview → experience_view → experience_start → memory_open(open_index=1) → waitlist_form_view → waitlist_submit_attempt → waitlist_submit` 순차 퍼널
+1. `$pageview → experience_view → experience_start → memory_open(open_index=1) → download_click` 순차 퍼널
 2. `experience_end.active_duration_ms`의 중앙값과 25·75 백분위
 3. `experience_end.unique_memories_opened`의 0개·1개·2개 이상 분포
 4. `memory_open(open_index=1).time_since_start_ms`의 중앙값
-5. `waitlist_submit_error`의 `error_type`, `validation_field` 분포
+5. `cta_placement`별 `download_click` 고유 사용자율
 
-모든 운영 타일에는 공통으로 `traffic_type != internal`을 적용하고, 필요할 때 `landing_version`, 기기 유형, 유입 소스로 나눈다. PostHog 수치와 GA4 수치가 완전히 같을 필요는 없으며 광고 차단, 저장 방식, 세션 정의 차이를 감안한다. 최종 신규 신청자 수는 계속 백엔드 DB를 원천으로 사용한다.
+모든 운영 타일에는 공통으로 `traffic_type != internal`을 적용하고, 필요할 때 `landing_version`, 기기 유형, 유입 소스로 나눈다. PostHog 수치와 GA4 수치가 완전히 같을 필요는 없으며 광고 차단, 저장 방식, 세션 정의 차이를 감안한다. 최종 웹 전환은 `download_click`으로 보고, 실제 설치·첫 실행은 Play Console 또는 앱 분석이 연결된 경우에만 별도 판단한다.
 
 ## 7. 실측 업데이트 절차
 
@@ -153,7 +175,7 @@ GA4는 유입·캠페인·최종 전환을 판단하는 원천으로 유지하�
 1. 내부 개발·QA 트래픽을 제외한다.
 2. 자동 `page_view`와 모든 커스텀 이벤트의 `landing_version`으로 페이지 변경 전후를 분리한다.
 3. 전체와 모바일을 함께 보고, 모바일 표본도 별도로 확인한다.
-4. GA4 신규 신청 이벤트 수와 DB 신규 행 수의 차이를 확인한다.
+4. CTA 위치별 `download_click` 사용자 수와 전환율을 확인하고, 실제 설치·첫 실행은 연결된 Play Console 또는 앱 분석 지표와 별도로 비교한다.
 5. 기준 미달 지표는 바로 UI를 바꾸기 전에 해당 단계의 유입 품질과 오류율을 함께 확인한다.
 
 첫 100세션 이전의 비율은 방향만 참고하고, 단일 날짜 변화로 결론 내리지 않는다.
