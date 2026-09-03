@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -76,6 +77,7 @@ import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordPhotoRules
 import com.mapmory.shared.presentation.photo.PhotoLibraryActionsFactory
+import com.mapmory.shared.presentation.photo.PhotoLibraryPermissionIssue
 import com.mapmory.shared.presentation.photo.PhotoLoadingProgress
 import com.mapmory.shared.presentation.photo.PhotoRecommendationPagingState
 import com.mapmory.shared.presentation.photo.RecommendationLoadKey
@@ -132,6 +134,7 @@ fun TripRecordEditorScreen(
     onEndDateChanged: (String) -> Unit,
     onTagInputChanged: (String) -> Unit = {},
     onTagToggled: (Long) -> Unit = {},
+    onPendingTagToggled: (String) -> Unit = {},
     onTagCreate: () -> Unit = {},
     onPhotosAdded: (List<SelectedPhoto>) -> Unit = {},
     onPhotoRemoved: (String) -> Unit = {},
@@ -149,6 +152,7 @@ fun TripRecordEditorScreen(
             onLoadingChanged,
             onLoadingProgressChanged,
             onRecommendationLoadingChanged,
+            onPermissionRequired,
         ->
             rememberPhotoLibraryActions(
                 onPicked,
@@ -157,6 +161,7 @@ fun TripRecordEditorScreen(
                 onLoadingChanged,
                 onLoadingProgressChanged,
                 onRecommendationLoadingChanged,
+                onPermissionRequired,
             )
         },
     modifier: Modifier = Modifier,
@@ -175,6 +180,7 @@ fun TripRecordEditorScreen(
     var isPreparingRecommendationPhotos by remember { mutableStateOf(false) }
     var isRecommendationLoading by remember { mutableStateOf(false) }
     var photoLoadingProgress by remember { mutableStateOf<PhotoLoadingProgress?>(null) }
+    var photoPermissionIssue by remember { mutableStateOf<PhotoLibraryPermissionIssue?>(null) }
     var datePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
     val remainingPhotoSlots = TripRecordPhotoRules.remainingSlots(uiState.selectedPhotos.size)
     val dismissKeyboardOnTap = rememberDismissKeyboardOnTapModifier()
@@ -207,6 +213,10 @@ fun TripRecordEditorScreen(
         },
         { progress -> photoLoadingProgress = progress },
         { isLoading -> isRecommendationLoading = isLoading },
+        { issue ->
+            photoMessage = null
+            photoPermissionIssue = issue
+        },
     )
     val locationResultsListState = rememberLazyListState()
     val recommendationGridState = rememberLazyGridState()
@@ -313,11 +323,8 @@ fun TripRecordEditorScreen(
                                             MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_STARTED,
                                             mapOf("location_type" to selectedLocation.type.name.lowercase()),
                                         )
-                                        photoMessage = "${selectedLocation.name}에서 촬영된 사진을 찾고 있어요."
-                                        recommendationPagingState = PhotoRecommendationPagingState(
-                                            maxSelectionCount = remainingPhotoSlots,
-                                        )
-                                        recommendationSelectionMessage = null
+                                        photoMessage = "${selectedLocation.name}에서 찍은 사진을 찾고 있어요."
+                                        recommendationPagingState = PhotoRecommendationPagingState()
                                         lastAutoLoadTriggerKey = null
                                         showRecommendationSheet = false
                                         val parentName = locations
@@ -396,6 +403,7 @@ fun TripRecordEditorScreen(
                             saveErrorMessage = uiState.errorMessageFor(TripRecordEditorErrorTarget.TAGS),
                             onInputChanged = onTagInputChanged,
                             onTagToggled = onTagToggled,
+                            onPendingTagToggled = onPendingTagToggled,
                             onCreate = onTagCreate,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
                         )
@@ -523,7 +531,7 @@ fun TripRecordEditorScreen(
             ) {
                 Text("이 장소에서 찍은 사진", fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    "사진의 EXIF GPS가 선택한 행정구역과 일치하는 결과예요.",
+                    "사진에 저장된 촬영 위치를 기준으로 찾았어요.",
                     color = TripRecordPalette.current.muted,
                     fontSize = 12.sp,
                     modifier = Modifier.padding(top = 6.dp),
@@ -635,6 +643,17 @@ fun TripRecordEditorScreen(
                 Spacer(Modifier.height(12.dp))
             }
         }
+    }
+
+    photoPermissionIssue?.let { issue ->
+        PhotoPermissionDialog(
+            issue = issue,
+            onOpenSettings = {
+                photoPermissionIssue = null
+                photoLibrary.openAppSettings()
+            },
+            onExit = { photoPermissionIssue = null },
+        )
     }
 
     val activeDatePickerTarget = datePickerTarget
@@ -759,8 +778,7 @@ private fun PhotoSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "$locationName · 여행 일정과 가까운 사진 · " +
-                    "${photos.size}/${TripRecordPhotoRules.MaxPhotosPerRecord}",
+                text = "${locationName}에서 찍은 사진을 찾아드려요",
                 color = TripRecordPalette.current.text,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -803,7 +821,7 @@ private fun PhotoSection(
                     }
                 } else {
                     Text(
-                        text = "위치 기반 사진\n불러오기",
+                        text = "이 장소 사진\n찾기",
                         color = TripRecordPalette.current.photoRecommendText,
                         fontSize = 9.sp,
                         lineHeight = 11.sp,
@@ -819,6 +837,46 @@ private fun PhotoSection(
             modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
         )
     }
+}
+
+@Composable
+private fun PhotoPermissionDialog(
+    issue: PhotoLibraryPermissionIssue,
+    onOpenSettings: () -> Unit,
+    onExit: () -> Unit,
+) {
+    val isRestricted = issue == PhotoLibraryPermissionIssue.RESTRICTED
+    AlertDialog(
+        onDismissRequest = onExit,
+        shape = RoundedCornerShape(20.dp),
+        containerColor = TripRecordPalette.current.surface,
+        titleContentColor = TripRecordPalette.current.text,
+        textContentColor = TripRecordPalette.current.bodyText,
+        title = {
+            Text(if (isRestricted) "사진 접근이 제한되어 있어요" else "사진 전체 접근이 필요해요")
+        },
+        text = {
+            Text(
+                if (isRestricted) {
+                    "기기 설정으로 사진 접근이 제한되어 있어요."
+                } else {
+                    "이 장소의 사진을 찾으려면 설정에서 사진 접근을 전체 허용해 주세요."
+                },
+            )
+        },
+        confirmButton = {
+            if (!isRestricted) {
+                TextButton(onClick = onOpenSettings) {
+                    Text("설정으로 이동", color = TripRecordPalette.current.accent)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onExit) {
+                Text("나가기", color = TripRecordPalette.current.muted)
+            }
+        },
+    )
 }
 
 @Composable
@@ -967,6 +1025,7 @@ private fun TagEditor(
     saveErrorMessage: String?,
     onInputChanged: (String) -> Unit,
     onTagToggled: (Long) -> Unit,
+    onPendingTagToggled: (String) -> Unit,
     onCreate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -983,7 +1042,7 @@ private fun TagEditor(
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "${uiState.selectedTagIds.size}/5",
+                text = "${uiState.selectedTagCount}/5",
                 color = TripRecordPalette.current.muted,
                 fontSize = 11.sp,
             )
@@ -1016,21 +1075,13 @@ private fun TagEditor(
             )
             TextButton(
                 onClick = onCreate,
-                enabled = uiState.tagInput.isNotBlank() && !uiState.isCreatingTag,
+                enabled = uiState.tagInput.isNotBlank() && !uiState.isSaving,
             ) {
-                if (uiState.isCreatingTag) {
-                    CircularProgressIndicator(
-                        color = TripRecordPalette.current.accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(18.dp),
-                    )
-                } else {
-                    Text("추가", color = TripRecordPalette.current.accent)
-                }
+                Text("추가", color = TripRecordPalette.current.accent)
             }
         }
 
-        if (uiState.availableTags.isNotEmpty()) {
+        if (uiState.availableTags.isNotEmpty() || uiState.pendingTagNames.isNotEmpty()) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1044,6 +1095,13 @@ private fun TagEditor(
                         text = tag.name,
                         selected = selected,
                         onClick = { onTagToggled(tag.id) },
+                    )
+                }
+                uiState.pendingTagNames.forEach { name ->
+                    TripTagChip(
+                        text = name,
+                        selected = name in uiState.selectedPendingTagNames,
+                        onClick = { onPendingTagToggled(name) },
                     )
                 }
             }
