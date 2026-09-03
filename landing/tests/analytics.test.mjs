@@ -59,7 +59,7 @@ test("adds the landing version and removes direct personal information", () => {
       unused: undefined,
     }),
     {
-      landing_version: "v2",
+      landing_version: "v3",
       traffic_type: "external",
       cta_placement: "hero",
     },
@@ -80,7 +80,7 @@ test("keeps exact experience duration and distinct-memory parameters", () => {
       last_completed_step: "memory_open",
     }),
     {
-      landing_version: "v2",
+      landing_version: "v3",
       traffic_type: "external",
       experience_type: "globe",
       active_duration_ms: 23740,

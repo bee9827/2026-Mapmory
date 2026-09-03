@@ -1,7 +1,7 @@
 const environment = import.meta.env ?? {};
 const measurementId = environment.VITE_GA_MEASUREMENT_ID?.trim()
   || (environment.PROD ? "G-MC93CZWLZF" : "");
-const landingVersion = environment.VITE_LANDING_VERSION?.trim() || "v2";
+const landingVersion = environment.VITE_LANDING_VERSION?.trim() || "v3";
 const posthogKey = environment.VITE_POSTHOG_KEY?.trim() || "";
 const posthogHost = environment.VITE_POSTHOG_HOST?.trim() || "";
 const capturePosthogLocally = environment.VITE_POSTHOG_CAPTURE_LOCAL === "true";
