@@ -1,0 +1,13 @@
+# Prototype Instructions
+
+Run the local server yourself and open the preview in the browser available to this environment. Do not give the user server-start instructions when you can run it.
+
+Before making substantial visual changes, use the Product Design plugin's `get-context` skill when the visual source is unclear or no longer matches the current goal. When the user gives durable prototype-specific design feedback, preferences, or decisions, record them in `AGENTS.md`.
+
+In the mobile replay, make the causal chain from a selected photo to its mapped location explicit. Never reveal the next location or swap its active photo before the animated route actually reaches that point; connect the active photo card to its map point and label the state as a photo being recorded on the map.
+
+Treat chronologically consecutive photos from one trip as a single playback stop when they remain within 50 meters of the first photo in the group and each neighboring capture is no more than 60 minutes apart. Show only the earliest photo as that stop's representative, keep every analyzed photo in the journey statistics, and never merge separate trips or return visits into the same stop.
+
+When implementing from a selected generated mock, treat that image as the source of truth for layout, component anatomy, density, spacing, color, typography, visible content, and hierarchy.
+
+Build app UI in `src/`. Keep `.openai/hosting.json`, `worker/index.js`, `scripts/prepare-sites-build.mjs`, and `tests/sites-worker.test.mjs` intact so the same local prototype can be handed to Sites. Before a Sites handoff, run `npm run build` and `npm run test:sites`; the build must leave `dist/client/index.html`, `dist/server/index.js`, and `dist/.openai/hosting.json`.
