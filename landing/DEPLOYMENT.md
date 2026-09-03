@@ -37,6 +37,34 @@ The EC2 `ec2-project` role is an instance role, not the human console user. It m
 
 ## Build, deploy and verification
 
+### Travel campaign under /trip/
+
+The campaign is served at `https://map-mory.com/trip/`; the existing landing remains at `/`. Reuse the existing pipeline, build project, approval action, deployment group and release root. No new DNS record, certificate, server port, IAM resource or backend change is part of this integration.
+
+CodeBuild and release CI also install/build/test `travel-map-campaign`. Its `dist/trip` is built with Vite base `/trip/`; the packager copies only those static files into `client/trip/`, leaving the main landing HTML/assets intact. The root/Sites `dist/client` and Worker output of the campaign are not deployed into that folder. Missing campaign output or a root-base campaign build causes packaging to fail rather than silently publish a landing-only release.
+
+Both `/release.txt` and `/trip/release.txt` must contain the same tested SHA. The activation hook checks both, and requires `/trip/` to return the campaign shell rather than the landing fallback. A trip failure restores the previous complete release, just like a landing failure.
+
+Before first production approval, inspect the existing Nginx server block. The existing `root /var/www/mapmory/current;` should serve both sets of files. If absent, the operator can add these locations inside that HTTPS server block; do not replace unrelated routes or the existing TLS settings:
+
+```nginx
+location = /trip {
+    return 308 /trip/$is_args$args;
+}
+location = /trip/index.html {
+    add_header Cache-Control "no-cache" always;
+    try_files $uri =404;
+}
+location ^~ /trip/assets/ {
+    try_files $uri =404;
+}
+location ^~ /trip/ {
+    try_files $uri $uri/ /trip/index.html;
+}
+```
+
+The PR does not apply Nginx configuration. Check `nginx -t` and retain the previous config before any separately approved server change. Verify `/trip` redirects while preserving the query, `/trip/` and a direct app route refresh show the campaign, missing `/trip/assets/*` returns 404, and the unchanged `/` still shows the landing. Keep the manual production approval in place.
+
 Local validation in `landing/`: `npm ci`, `npm run build`, `npm test`. Linux CI and CodeBuild additionally execute the real filesystem activation/rollback fixtures (service/network calls are mocked); Windows skips only those Linux-specific fixtures.
 
 CodeBuild validates that `CODEBUILD_RESOLVED_SOURCE_VERSION` equals the source action's full `SOURCE_COMMIT_ID`, builds and tests before packaging, and refuses to publish a failed build. The bundle root contains only `appspec.yml`, `scripts/activate.sh`, and `client/` (static files including `release.txt`). It never includes backend JARs, `.env` files or server code. CodePipeline retains and passes that exact build artifact to approval and deployment.
@@ -56,4 +84,6 @@ The old `scripts/deploy-ec2.sh` remains available for the already-established ma
 
 ## Current rollout state
 
-The live site remains the manually deployed `e91d82c` release. Pipeline code/blueprints do not prove AWS provisioning or a successful automated deployment. Record actual resource IDs, checks and rollout status privately after setup; never claim success until the entire pipeline is observed. Keep PR #243 unmerged while first-deployment prerequisites or CodeRabbit review remain incomplete.
+On 2026-09-03 the user reported that the deployment pipeline is already installed and asked for PR changes only. Reuse those resources; the provisioning instructions above are a reference, not authorization to create replacements. This /trip integration has not inspected or changed live AWS/Nginx settings or approved a deployment. Pipeline files alone do not prove a successful production rollout.
+
+The /trip release PR builds on the pipeline code from PR #243 without modifying its source branch. Review/merge #243 first (or explicitly review its included changes) before this dependent PR. Preserve both source branches and the older main-targeted campaign PR #242. Verify the exact reviewed landing-release SHA at the existing manual approval checkpoint; do not infer deployment authorization from preparing or opening this PR.

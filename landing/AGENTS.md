@@ -2,6 +2,8 @@
 
 ## Shared AWS account operations
 
+- The travel campaign belongs at https://map-mory.com/trip/ beside the existing landing at /. Preserve the installed managed pipeline and manual approval; build/test both apps and package only campaign dist/trip into client/trip. Do not overwrite the current landing UI or reuse its root asset directory for campaign files. Changes go through landing-release PRs; no production approval, AWS resource changes or Nginx configuration mutation is implied by preparing the PR.
+
 - Before any AWS resource creation/change, tell the user the exact targets, steps, cost and operational risks. Afterward report what actually changed.
 - Follow the institution settings and `DEPLOYMENT.md`: existing project roles only, required Service/Role/ProjectTeam tags on every new resource, no changes to other teams, shared IAM/network settings or backend deployment. Do not infer permissions from the EC2 role; use the existing human AWS console login when needed.
 

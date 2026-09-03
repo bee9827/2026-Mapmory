@@ -10,8 +10,14 @@ activate_release() (
   [[ -f "$bundle/client/index.html" && -f "$bundle/client/release.txt" ]] || {
     echo 'Missing static landing files' >&2; exit 2;
   }
+  [[ -f "$bundle/client/trip/index.html" && -f "$bundle/client/trip/release.txt" ]] || {
+    echo 'Missing static trip files' >&2; exit 2;
+  }
   sha="$(cat -- "$bundle/client/release.txt")"
   [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo 'Invalid release marker' >&2; exit 2; }
+  [[ "$(cat -- "$bundle/client/trip/release.txt")" == "$sha" ]] || {
+    echo 'Trip release identity mismatch' >&2; exit 2;
+  }
   [[ -z "$(find "$bundle/client" -type l -print -quit)" ]] || {
     echo 'Symlinks are not allowed in the static bundle' >&2; exit 2;
   }
@@ -68,6 +74,15 @@ activate_release() (
   [[ "$served_sha" == "$sha" ]] || { echo 'Release identity check failed' >&2; false; }
   curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
     --resolve map-mory.com:443:127.0.0.1 https://map-mory.com/ --output /dev/null
+  local trip_sha trip_html
+  trip_sha="$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
+    --resolve map-mory.com:443:127.0.0.1 "https://map-mory.com/trip/release.txt?deployment=$deployment_id")"
+  [[ "$trip_sha" == "$sha" ]] || { echo 'Served trip release identity mismatch' >&2; false; }
+  trip_html="$(curl --fail --silent --show-error --connect-timeout 5 --max-time 15 \
+    --resolve map-mory.com:443:127.0.0.1 https://map-mory.com/trip/)"
+  [[ "$trip_html" == *'src="/trip/assets/'* ]] || {
+    echo 'Trip URL did not serve the campaign shell' >&2; false;
+  }
   trap - ERR INT TERM
   echo "Activated landing release: $sha ($deployment_id)"
 )

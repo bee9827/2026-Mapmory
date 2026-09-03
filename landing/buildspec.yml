@@ -10,6 +10,7 @@ phases:
     commands:
       - cd "$CODEBUILD_SRC_DIR/landing"
       - npm ci
+      - npm --prefix travel-map-campaign ci
   pre_build:
     commands:
       - test "$CODEBUILD_RESOLVED_SOURCE_VERSION" = "$SOURCE_COMMIT_ID"
@@ -17,7 +18,9 @@ phases:
   build:
     commands:
       - npm run build
+      - npm --prefix travel-map-campaign run build
       - npm test
+      - npm --prefix travel-map-campaign test
   post_build:
     commands:
       - |
