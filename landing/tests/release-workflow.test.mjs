@@ -47,6 +47,15 @@ test("CodePipeline automatically deploys only the tested landing artifact after 
   assert.doesNotMatch(workflow, /id-token:|configure-aws-credentials|secrets\.|\bssh\b.*-|\bscp\b/);
 });
 
+test("Recap operator guidance follows the shared automatic landing deployment policy", () => {
+  const guidance = readFileSync(new URL("../travel-map-campaign/AGENTS.md", import.meta.url), "utf8");
+  assert.match(guidance, /Follow \.\.\/DEPLOYMENT\.md/);
+  assert.match(guidance, /V2\/SUPERSEDED/);
+  assert.match(guidance, /no AWS manual approval action/);
+  assert.match(guidance, /protected landing-release PR merge.*starts production deployment/);
+  assert.match(guidance, /main PR merge does not/);
+});
+
 test("CodeBuild binds the tested source SHA to a static-only CodeDeploy bundle", () => {
   assert.match(buildspec, /CODEBUILD_RESOLVED_SOURCE_VERSION.*SOURCE_COMMIT_ID/);
   assert.ok(buildspec.indexOf("npm run build") < buildspec.indexOf("npm test"));
