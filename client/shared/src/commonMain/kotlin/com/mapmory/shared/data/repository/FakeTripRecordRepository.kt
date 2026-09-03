@@ -36,7 +36,9 @@ class FakeTripRecordRepository(
 
     override suspend fun getTripRecords(query: TripRecordQuery): Result<TripRecordPage> {
         if (query.page < 0 || query.size !in 1..MaxPageSize) {
-            return Result.failure(IllegalArgumentException("페이지 번호와 크기를 확인해 주세요."))
+            return Result.failure(
+                IllegalArgumentException("여행 기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."),
+            )
         }
 
         val filteredRecords = records.filter { record ->

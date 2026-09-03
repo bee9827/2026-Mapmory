@@ -35,9 +35,11 @@ class TripRecordRemoteRepository(
 
     override suspend fun getTripRecords(query: TripRecordQuery): Result<TripRecordPage> =
         apiCall {
-            require(query.page >= 0) { "페이지 번호는 0 이상이어야 합니다." }
-            require(query.size in 1..MaxPageSize) { "페이지 크기는 1 이상 100 이하여야 합니다." }
-            require(query.tagId == null || query.tagId > 0) { "태그 ID는 양수여야 합니다." }
+            require(query.page >= 0) { "여행 기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." }
+            require(query.size in 1..MaxPageSize) {
+                "여행 기록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+            }
+            require(query.tagId == null || query.tagId > 0) { "선택한 태그 정보를 확인하지 못했습니다." }
             val region = query.toRegionQuery(regionCatalog)
             val response = client.get(recordsUrl) {
                 authorizeWith(accessTokenProvider)
@@ -99,7 +101,7 @@ class TripRecordRemoteRepository(
         }
 
     private fun requireValidRecordId(id: Long) {
-        require(id > 0) { "여행 기록 ID는 양수여야 합니다." }
+        require(id > 0) { "여행 기록을 찾을 수 없습니다." }
     }
 }
 

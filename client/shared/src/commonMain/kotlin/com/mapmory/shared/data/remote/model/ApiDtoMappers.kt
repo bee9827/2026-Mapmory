@@ -42,8 +42,7 @@ fun TripRecordDetailDto.toDomain(regionCatalog: RegionCatalog): TripRecordData {
         else -> regionCatalog.findByCode(region.country.code)
     }
     requireNotNull(location) {
-        "서버 지역 코드를 로컬 지역 데이터에서 찾을 수 없습니다: ${region.country.code}/" +
-            "${region.province?.code.orEmpty()}/${region.district?.code.orEmpty()}"
+        "여행 장소 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요."
     }
 
     return TripRecordData(
@@ -87,7 +86,7 @@ internal data class RegionQuery(
 internal fun TripRecordQuery.toRegionQuery(regionCatalog: RegionCatalog): RegionQuery? =
     locationId?.let { id ->
         val location = requireNotNull(regionCatalog.findById(id)) {
-            "선택한 지역을 찾을 수 없습니다: $id"
+            "선택한 지역 정보를 확인하지 못했습니다. 여행 장소를 다시 선택해 주세요."
         }
         location.toRegionQuery(regionCatalog, allowKoreanProvince = true)
     }
@@ -96,11 +95,11 @@ internal fun TripRecordDraft.toRequestDto(regionCatalog: RegionCatalog): TripRec
     require(title.length <= MaxTitleLength) { "제목은 200자 이하여야 합니다." }
     dateValidationError()?.let { error -> throw IllegalArgumentException(error) }
     require(mediaObjectKeys.distinct().size == mediaObjectKeys.size) {
-        "사진 Object Key는 중복될 수 없습니다."
+        "같은 사진을 중복해서 추가할 수 없습니다."
     }
     TagRules.validateRecordTagIds(tagIds)
     val location = requireNotNull(regionCatalog.findById(locationId)) {
-        "선택한 지역을 찾을 수 없습니다: $locationId"
+        "선택한 지역 정보를 확인하지 못했습니다. 여행 장소를 다시 선택해 주세요."
     }
     val region = location.toRegionQuery(regionCatalog, allowKoreanProvince = false)
     return TripRecordRequestDto(
@@ -122,10 +121,10 @@ private fun Location.toRegionQuery(
 ): RegionQuery = when {
     type == LocationType.DISTRICT -> {
         val province = requireNotNull(parentId?.let(regionCatalog::findById)) {
-            "시·군·구의 상위 시·도를 찾을 수 없습니다: $regionCode"
+            "선택한 지역 정보를 확인하지 못했습니다. 여행 장소를 다시 선택해 주세요."
         }
         require(province.regionCode.startsWith(KoreanProvincePrefix)) {
-            "대한민국 시·군·구만 기록할 수 있습니다: $regionCode"
+            "국내 여행은 시·군·구 단위로 선택해 주세요."
         }
         RegionQuery(
             countryCode = KoreaCountryCode,
@@ -143,7 +142,7 @@ private fun Location.toRegionQuery(
     }
 
     regionCode.length == CountryCodeLength -> RegionQuery(countryCode = regionCode)
-    else -> error("지원하지 않는 지역 단계입니다: $regionCode")
+    else -> error("선택한 지역 정보를 확인하지 못했습니다. 여행 장소를 다시 선택해 주세요.")
 }
 
 fun PageDto<TripRecordListItemDto>.toDomain(): TripRecordPage = TripRecordPage(

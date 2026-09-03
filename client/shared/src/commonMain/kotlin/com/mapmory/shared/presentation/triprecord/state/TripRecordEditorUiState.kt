@@ -48,5 +48,6 @@ enum class TripRecordEditorErrorTarget {
     START_DATE,
     END_DATE,
     CONTENT,
+    TAGS,
     GENERAL,
 }

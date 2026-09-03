@@ -68,72 +68,83 @@ fun TripRecordListScreen(
                 recordCount = (uiState as? TripRecordListUiState.Success)?.records?.size ?: 0,
             )
 
-            Column(
+            Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 18.dp),
+                    .fillMaxWidth()
+                    .weight(1f),
             ) {
-                Spacer(Modifier.height(14.dp))
-                JournalTagFilters(
-                    tags = filter.tags,
-                    selectedTagId = filter.selectedTagId,
-                    onTagClick = onTagClick,
-                )
-                Spacer(Modifier.height(18.dp))
-
-                when (uiState) {
-                    TripRecordListUiState.Idle,
-                    TripRecordListUiState.Loading,
-                    -> CircularProgressIndicator(
-                        color = TripRecordPalette.current.accent,
-                        modifier = Modifier.padding(top = 20.dp),
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 18.dp),
+                ) {
+                    Spacer(Modifier.height(14.dp))
+                    JournalTagFilters(
+                        tags = filter.tags,
+                        selectedTagId = filter.selectedTagId,
+                        onTagClick = onTagClick,
                     )
+                    Spacer(Modifier.height(18.dp))
 
+                    when (uiState) {
+                        TripRecordListUiState.Idle,
+                        TripRecordListUiState.Loading,
+                        -> CircularProgressIndicator(
+                            color = TripRecordPalette.current.accent,
+                            modifier = Modifier.padding(top = 20.dp),
+                        )
 
-                    is TripRecordListUiState.Error -> Text(
-                        text = uiState.message,
-                        color = TripRecordPalette.current.danger,
-                        modifier = Modifier.padding(top = 20.dp),
-                    )
+                        is TripRecordListUiState.Error -> Text(
+                            text = uiState.message,
+                            color = TripRecordPalette.current.danger,
+                            modifier = Modifier.padding(top = 20.dp),
+                        )
 
-                    is TripRecordListUiState.Success -> {
-                        if (uiState.records.isEmpty()) {
-                            EmptyTripRecords(
-                                hasFilter = filter.locationId != null || filter.selectedTagId != null,
-                                modifier = Modifier.weight(1f),
-                            )
-                        } else {
-                            TripRecordList(
-                                records = uiState.records,
-                                onRecordClick = { recordId ->
-                                    analytics.logEvent(MapmoryAnalyticsEvent.JOURNAL_RECORD_OPENED)
-                                    onRecordClick(recordId)
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (uiState.totalPages > 1) {
-                            PageControls(
-                                page = uiState.page,
-                                totalPages = uiState.totalPages,
-                                onPreviousPageClick = {
-                                    analytics.logEvent(
-                                        MapmoryAnalyticsEvent.JOURNAL_PAGE_CHANGED,
-                                        mapOf("direction" to "previous"),
-                                    )
-                                    onPreviousPageClick()
-                                },
-                                onNextPageClick = {
-                                    analytics.logEvent(
-                                        MapmoryAnalyticsEvent.JOURNAL_PAGE_CHANGED,
-                                        mapOf("direction" to "next"),
-                                    )
-                                    onNextPageClick()
-                                },
-                            )
+                        is TripRecordListUiState.Success -> {
+                            if (uiState.records.isEmpty()) {
+                                EmptyTripRecords(
+                                    hasFilter = filter.locationId != null || filter.selectedTagId != null,
+                                    modifier = Modifier.weight(1f),
+                                )
+                            } else {
+                                TripRecordList(
+                                    records = uiState.records,
+                                    onRecordClick = { recordId ->
+                                        analytics.logEvent(MapmoryAnalyticsEvent.JOURNAL_RECORD_OPENED)
+                                        onRecordClick(recordId)
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (uiState.totalPages > 1) {
+                                PageControls(
+                                    page = uiState.page,
+                                    totalPages = uiState.totalPages,
+                                    onPreviousPageClick = {
+                                        analytics.logEvent(
+                                            MapmoryAnalyticsEvent.JOURNAL_PAGE_CHANGED,
+                                            mapOf("direction" to "previous"),
+                                        )
+                                        onPreviousPageClick()
+                                    },
+                                    onNextPageClick = {
+                                        analytics.logEvent(
+                                            MapmoryAnalyticsEvent.JOURNAL_PAGE_CHANGED,
+                                            mapOf("direction" to "next"),
+                                        )
+                                        onNextPageClick()
+                                    },
+                                )
+                            }
                         }
                     }
                 }
+
+                TripRecordCreateButton(
+                    source = "journal_fab",
+                    onClick = onCreateClick,
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                )
             }
 
             TripBottomBar(

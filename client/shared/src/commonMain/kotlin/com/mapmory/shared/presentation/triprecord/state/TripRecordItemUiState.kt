@@ -23,6 +23,7 @@ data class TripRecordPhotoUiState(
     val displayName: String,
     val previewBytes: PhotoPreviewBytes?,
     val sortOrder: Int,
+    val isUploaded: Boolean = false,
     val latitude: Double? = null,
     val longitude: Double? = null,
     val capturedAt: String? = null,
@@ -79,6 +80,7 @@ fun TripRecordData.toTripRecordItemUiState(
                 displayName = media.objectKey.substringAfterLast('/'),
                 previewBytes = PhotoPreviewBytes.from(media.previewBytes ?: media.originalBytes),
                 sortOrder = media.sortOrder,
+                isUploaded = true,
                 latitude = media.latitude,
                 longitude = media.longitude,
                 capturedAt = media.capturedAt,
@@ -118,6 +120,7 @@ fun TripRecordSummary.toTripRecordItemUiState(
                     null
                 },
                 sortOrder = media.sortOrder,
+                isUploaded = true,
                 latitude = media.latitude,
                 longitude = media.longitude,
                 capturedAt = media.capturedAt,
