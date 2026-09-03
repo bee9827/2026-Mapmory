@@ -54,6 +54,8 @@ iOS는 `client/iosApp`을 Xcode에서 열어 실행합니다.
 - [클라이언트 안내](client/README.md)
 - [클라이언트 환경](client/docs/environment.md)
 - [iOS 환경](client/iosApp/README.md)
+- [App Store Connect 제출 체크리스트](client/docs/app-store-connect-submission-checklist.md)
+- [App Store 개인정보 응답 기준](client/docs/app-store-privacy-responses.md)
 - [Backend 안내](backend/README.md)
 
 ## 팀 운영 원칙
