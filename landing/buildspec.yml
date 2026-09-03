@@ -13,6 +13,8 @@ phases:
       - npm --prefix travel-map-campaign ci
   pre_build:
     commands:
+      - '[[ "${VITE_GA_MEASUREMENT_ID:-}" =~ ^G-[A-Z0-9]+$ ]]'
+      - '[[ "${VITE_GA_CAPTURE_LOCAL:-false}" != true && "${VITE_GA_DEBUG:-false}" != true ]]'
       - test "$CODEBUILD_RESOLVED_SOURCE_VERSION" = "$SOURCE_COMMIT_ID"
       - '[[ "$SOURCE_COMMIT_ID" =~ ^[0-9a-f]{40}$ ]]'
   build:

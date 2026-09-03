@@ -34,14 +34,11 @@ test("an unconfigured campaign neither initializes GA nor forwards to a foreign 
   assert.equal(gtag.mock.callCount(), 0);
 });
 
-test("attributes the lower-commitment Mapmory landing path separately", () => {
+test("internal landing navigation preserves acquisition attribution", () => {
   const destination = new URL(CAMPAIGN_LANDING_URL);
   assert.equal(destination.origin, MAPMORY_SITE_ORIGIN);
   assert.equal(destination.pathname, "/");
-  assert.equal(destination.searchParams.get("utm_source"), "travel_map_campaign");
-  assert.equal(destination.searchParams.get("utm_medium"), "web_campaign");
-  assert.equal(destination.searchParams.get("utm_campaign"), "2026_travel_map");
-  assert.equal(destination.searchParams.get("utm_content"), "demand_secondary");
+  assert.equal(destination.search, "");
 });
 
 test("marks internal campaign traffic without collecting personal fields", () => {
@@ -54,5 +51,5 @@ test("marks internal campaign traffic without collecting personal fields", () =>
   assert.equal(resolveTrafficType({ search: "?internal=1", storage }), "internal");
   assert.equal(resolveTrafficType({ storage }), "internal");
   assert.equal(resolveTrafficType({ search: "?internal=0", storage }), "external");
-  assert.deepEqual(sanitizeEventProperties({ source: "demo", selected_photos: 5, email: "private@example.com" }), { source: "demo", selected_photos: 5 });
+  assert.deepEqual(sanitizeEventProperties({ journey_source: "demo", selected_photos: 5, latitude: 37.5, filename: "private.jpg", email: "private@example.com" }), { journey_source: "demo", selected_photos: 5 });
 });

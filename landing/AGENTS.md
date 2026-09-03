@@ -17,6 +17,13 @@ When implementing from a selected generated mock, treat that image as the source
 
 ## Mapmory Landing Decisions
 
+### Current analytics decisions (2026-09-03)
+
+- Follow ANALYTICS_MEASUREMENT_PLAN.md for the current UI, not the historical waitlist funnel. The primary web conversion is an actual App Store or Google Play link click; internal download-section navigation is not a conversion.
+- Keep illustrative hero motion and mobile vertical scrolling out of interactive experience events. Record memory opening after the panel is committed to the screen.
+- Separate landing/recap, schema revisions, internal QA, and demo/own-photo Recap use. Do not overwrite incoming campaign attribution with internal UTMs or a fixed campaign_name.
+- Preserve historical measurements and reports. New tracking code, GA4 console configuration, and live event receipt are separate verification steps; do not report one as proof of the others.
+
 ### Current mobile decisions (2026-09-03)
 
 These decisions supersede older mobile scroll-relay guidance below. Desktop choreography remains unchanged.

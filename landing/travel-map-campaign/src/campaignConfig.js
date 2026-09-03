@@ -15,11 +15,5 @@ const playInstallReferrer = new URLSearchParams({
 
 export const APP_ACQUISITION_URL = `${GOOGLE_PLAY_URL}&referrer=${encodeURIComponent(playInstallReferrer)}`;
 
-const landingAttribution = new URLSearchParams({
-  utm_source: "travel_map_campaign",
-  utm_medium: "web_campaign",
-  utm_campaign: CAMPAIGN_ID,
-  utm_content: "demand_secondary",
-}).toString();
-
-export const CAMPAIGN_LANDING_URL = `${MAPMORY_SITE_ORIGIN}/?${landingAttribution}`;
+// Internal navigation is measured by travel_map_landing_click, not acquisition UTMs.
+export const CAMPAIGN_LANDING_URL = `${MAPMORY_SITE_ORIGIN}/`;

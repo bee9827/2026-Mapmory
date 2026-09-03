@@ -60,7 +60,8 @@ npm run test:sites
 
 `.env.example`의 공개 프런트엔드 설정을 사용합니다.
 
-- `VITE_GA_MEASUREMENT_ID`: GA4 측정 ID. 개발·프리뷰·프로덕션 모두 명시적인 값이 없으면 GA를 초기화하거나 이벤트를 전송하지 않습니다. 운영 빌드에만 원하는 측정 ID를 별도로 지정합니다.
+- `VITE_GA_MEASUREMENT_ID`: GA4 측정 ID. 명시하지 않으면 전송하지 않습니다. 운영 도메인 외에서는 `VITE_GA_CAPTURE_LOCAL=true`를 별도로 지정한 QA만 허용합니다. QA는 `VITE_GA_DEBUG=true`, `?internal=1`로 구분하고 운영 빌드에 QA 플래그를 넣지 않습니다.
+- 현재 이벤트·GA4 보고서 명세는 [공통 측정 계획](../ANALYTICS_MEASUREMENT_PLAN.md)을 따릅니다. `journey_source`로 샘플과 내 사진을 분리하고, 스토어 이동은 랜딩과 공통인 `download_click`입니다. 내부 랜딩 링크에 유입 UTM을 다시 붙이지 않습니다.
 - `VITE_CAMPAIGN_VERSION`: 캠페인 이벤트 버전입니다.
 - 내부 QA는 `?internal=1`로 접속해 이벤트를 구분하고 `?internal=0`으로 해제할 수 있습니다. 이 표시는 인증 수단이 아닙니다.
 

@@ -187,11 +187,11 @@ function ReplayScreen({ journey, onBack, onNext }) {
       const next = Math.min(1, startedFrom.current + ((now - startedAt.current) / 1000) / duration);
       setProgress(next);
       if (next < 1) frame = requestAnimationFrame(tick);
-      else { setPlaying(false); trackCampaignEvent("travel_map_replay_complete", { duration_seconds: duration }); }
+      else { setPlaying(false); trackCampaignEvent("travel_map_replay_complete", { duration_seconds: duration, journey_source: journey.source }); }
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [playing, duration]);
+  }, [playing, duration, journey.source]);
 
   useEffect(() => {
     if (journey.source !== "demo" || progress < 1 || playing) return undefined;
@@ -265,7 +265,7 @@ function RecapScreen({ journey, onBack, onNext }) {
   const playbackJourney = useMemo(() => createPlaybackJourney(journey), [journey]);
   const duration = getAutoDuration(playbackJourney);
   const [renderState, setRenderState] = useState({ status: "idle", progress: 0, error: "" });
-  useEffect(() => { trackCampaignEvent("travel_map_recap_view", { duration_seconds: duration, source: journey.source }); }, [duration, journey.source]);
+  useEffect(() => { trackCampaignEvent("travel_map_recap_view", { duration_seconds: duration, journey_source: journey.source }); }, [duration, journey.source]);
 
   const makeVideo = async () => {
     setRenderState({ status: "rendering", progress: 0, error: "" });
@@ -277,35 +277,46 @@ function RecapScreen({ journey, onBack, onNext }) {
   };
 
   const handleSaveVideo = async () => {
-    trackCampaignEvent("travel_map_video_save_start", { duration_seconds: duration });
-    try { const blob = await makeVideo(); const extension = blob.type.includes("mp4") ? "mp4" : "webm"; downloadBlob(blob, `mapmory-2026-travel-map.${extension}`); trackCampaignEvent("travel_map_video_saved", { format: extension }); } catch { /* Visible state explains the fallback. */ }
+    trackCampaignEvent("travel_map_video_save_start", { duration_seconds: duration, journey_source: journey.source });
+    try {
+      const blob = await makeVideo();
+      const extension = blob.type.includes("mp4") ? "mp4" : "webm";
+      downloadBlob(blob, `mapmory-2026-travel-map.${extension}`);
+      trackCampaignEvent("travel_map_video_saved", { format: extension, journey_source: journey.source, result: "download_started" });
+    } catch {
+      trackCampaignEvent("travel_map_export_failed", { format: "video", journey_source: journey.source, error_type: "export_failed" });
+    }
   };
   const handleShare = async () => {
-    trackCampaignEvent("travel_map_share_click", { duration_seconds: duration });
+    trackCampaignEvent("travel_map_share_click", { duration_seconds: duration, journey_source: journey.source });
     try {
       const blob = await makeVideo();
       const outcome = await shareVideo(blob);
+      trackCampaignEvent("travel_map_share_result", { journey_source: journey.source, result: outcome === "downloaded" ? "download_started" : outcome });
       if (outcome === "cancelled") {
         setRenderState({ status: "idle", progress: 0, error: "" });
         return;
       }
       onNext();
     } catch (error) {
+      trackCampaignEvent("travel_map_share_result", { journey_source: journey.source, result: "failed", error_type: "share_failed" });
       setRenderState({ status: "error", progress: 0, error: error?.message || "공유하지 못했어요. 다시 시도해주세요." });
     }
   };
   const handleSaveImage = async () => {
+    trackCampaignEvent("travel_map_image_save_start", { journey_source: journey.source });
     try {
       const blob = await renderShareImage(playbackJourney, 1);
       downloadBlob(blob, "mapmory-2026-travel-map.png");
-      trackCampaignEvent("travel_map_image_saved");
+      trackCampaignEvent("travel_map_image_saved", { journey_source: journey.source, format: "png", result: "download_started" });
       setRenderState({ status: "complete", progress: 1, error: "" });
     } catch (error) {
+      trackCampaignEvent("travel_map_export_failed", { journey_source: journey.source, format: "png", error_type: "export_failed" });
       setRenderState({ status: "error", progress: 0, error: error?.message || "이미지를 저장하지 못했어요. 다시 시도해주세요." });
     }
   };
   const handleAppInterest = () => {
-    trackCampaignEvent("travel_map_app_bridge_click", { cta_placement: "recap", destination: "demand_screen" });
+    trackCampaignEvent("travel_map_app_bridge_click", { cta_placement: "recap", destination: "demand_screen", journey_source: journey.source });
     onNext();
   };
   const isRendering = renderState.status === "rendering";
@@ -332,7 +343,7 @@ function RecapScreen({ journey, onBack, onNext }) {
 function DemandScreen({ journeySource, onBack }) {
   useEffect(() => { trackCampaignEvent("travel_map_demand_view", { journey_source: journeySource }); }, [journeySource]);
   const handleAppVisit = () => {
-    trackCampaignEvent("travel_map_app_store_click", { cta_placement: "demand_primary", destination: "google_play", journey_source: journeySource });
+    trackCampaignEvent("download_click", { cta_placement: "demand_primary", store: "google_play", journey_source: journeySource });
   };
   const handleLandingVisit = () => {
     trackCampaignEvent("travel_map_landing_click", { cta_placement: "demand_secondary", destination: "main_landing", journey_source: journeySource });
@@ -367,7 +378,7 @@ export function App() {
   useEffect(() => () => objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url)), []);
 
   const navigate = (nextScreen) => { setScreen(nextScreen); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const runProcessing = async (analysisPromise, count, minimumDelay = 1100) => {
+  const runProcessing = async (analysisPromise, count, journeySource, minimumDelay = 1100) => {
     setSelectedCount(count); setProcessingProgress(8); navigate("processing");
     const startedAt = performance.now();
     const timer = window.setInterval(() => setProcessingProgress((value) => Math.min(92, value + (value < 42 ? 9 : value < 76 ? 6 : 2))), 180);
@@ -380,6 +391,7 @@ export function App() {
       setJourney(result);
       if (result.points.length === 0) {
         trackCampaignEvent("travel_map_photo_analysis_empty", {
+          journey_source: journeySource,
           selected_photos: count,
           metadata_missing_photos: result.metadataMissingCount,
           read_failed_photos: result.readFailedCount,
@@ -388,10 +400,11 @@ export function App() {
         navigate("empty");
         return;
       }
-      trackCampaignEvent("travel_map_processing_complete", { selected_photos: count, valid_gps_photos: result.validPhotoCount, duration_seconds: getAutoDuration(result) });
+      trackCampaignEvent("travel_map_processing_complete", { journey_source: journeySource, selected_photos: count, valid_gps_photos: result.validPhotoCount, duration_seconds: getAutoDuration(result) });
       navigate("replay");
     } catch (error) {
       window.clearInterval(timer);
+      trackCampaignEvent("travel_map_processing_failed", { journey_source: journeySource, selected_photos: count, error_type: "analysis_failed" });
       setJourney({
         error: error?.message || "사진 처리 중 오류가 발생했어요. 다시 시도해주세요.",
         source: "photos",
@@ -411,8 +424,8 @@ export function App() {
       navigate("empty");
     }
   };
-  const handleFiles = (files) => { trackCampaignEvent("travel_map_photo_select", { selected_photos: files.length }); runProcessing(analyzePhotoFiles(files), files.length); };
-  const handleDemo = () => { trackCampaignEvent("travel_map_demo_start"); runProcessing(Promise.resolve(demoJourney), demoJourney.photoCount, 700); };
+  const handleFiles = (files) => { trackCampaignEvent("travel_map_photo_select", { journey_source: "photos", selected_photos: files.length }); runProcessing(analyzePhotoFiles(files), files.length, "photos"); };
+  const handleDemo = () => { trackCampaignEvent("travel_map_demo_start", { journey_source: "demo" }); runProcessing(Promise.resolve(demoJourney), demoJourney.photoCount, "demo", 700); };
 
   return (
     <main className="campaign-page">
