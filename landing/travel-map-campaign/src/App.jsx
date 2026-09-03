@@ -283,8 +283,9 @@ function RecapScreen({ journey, onBack, onNext }) {
       const extension = blob.type.includes("mp4") ? "mp4" : "webm";
       downloadBlob(blob, `mapmory-2026-travel-map.${extension}`);
       trackCampaignEvent("travel_map_video_saved", { format: extension, journey_source: journey.source, result: "download_started" });
-    } catch {
+    } catch (error) {
       trackCampaignEvent("travel_map_export_failed", { format: "video", journey_source: journey.source, error_type: "export_failed" });
+      setRenderState({ status: "error", progress: 0, error: error?.message || "영상을 저장하지 못했어요. 다시 시도해주세요." });
     }
   };
   const handleShare = async () => {

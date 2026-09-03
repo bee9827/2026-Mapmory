@@ -307,10 +307,32 @@ function StoreButton({ className = "", placement, platform, label, onSelect, tab
 
 function HeaderStoreMenu() {
   const menuRef = useRef(null);
-  const closeMenu = () => menuRef.current?.removeAttribute("open");
+  const [isOpen, setIsOpen] = useState(false);
+  const closeMenu = useCallback(() => {
+    menuRef.current?.removeAttribute("open");
+    setIsOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (!menuRef.current?.contains(event.target)) closeMenu();
+    };
+    const handleKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      closeMenu();
+      menuRef.current?.querySelector("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeMenu, isOpen]);
 
   return (
-    <details className="header-store-menu" ref={menuRef}>
+    <details className="header-store-menu" ref={menuRef} onToggle={(event) => setIsOpen(event.currentTarget.open)}>
       <summary className="button button-primary header-store-trigger" aria-label="앱 다운로드 메뉴 열기">
         <DownloadSimple size={18} weight="bold" /><span>앱 받기</span>
       </summary>

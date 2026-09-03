@@ -45,6 +45,17 @@ try {
     const events = () => page.evaluate(() => (window.dataLayer ?? []).map((args) => [...args]).filter(([command]) => command === "event"));
     await page.goto("https://map-mory.com/?internal=1");
     await page.locator(".site-header").waitFor();
+    const menu = page.locator(".header-store-menu");
+    const trigger = page.locator(".header-store-trigger");
+    await trigger.click();
+    await menu.locator('[role="group"]').waitFor({ state: "visible" });
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector(".header-store-menu").open);
+    assert.equal(await trigger.evaluate((element) => element === document.activeElement), true);
+    await trigger.click();
+    await menu.locator('[role="group"]').waitFor({ state: "visible" });
+    await page.locator(".site-header .brand").click();
+    await page.waitForFunction(() => !document.querySelector(".header-store-menu").open);
     assert.equal((await events()).filter(([, name]) => ["experience_start", "memory_open", "korea_memory_add"].includes(name)).length, 0);
     for (const [label, store] of [["App Store", "app_store"], ["Google Play", "google_play"]]) {
       await page.locator(".header-store-trigger").click();
@@ -79,6 +90,22 @@ try {
     await page.goto("https://map-mory.com/recap/?internal=1");
     await page.getByRole("button", { name: "사진 없이 샘플 결과 먼저 보기" }).click();
     await page.getByRole("button", { name: "내 여행 영상 보기" }).click();
+    // Inject a download failure after real video rendering, not a fabricated UI error.
+    await page.evaluate(() => {
+      const originalClick = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = function () {
+        if (this.download) throw new Error("QA download failure: retry is available");
+        return originalClick.call(this);
+      };
+    });
+    await page.getByRole("button", { name: "영상 저장", exact: true }).click();
+    await page.getByText("QA download failure: retry is available", { exact: true }).waitFor({ timeout: 60000 });
+    assert.equal(await page.getByRole("button", { name: "영상 저장", exact: true }).isEnabled(), true);
+    assert.equal((await events()).filter(([, name]) => name === "travel_map_video_saved").length, 0);
+    const failedExport = (await events()).filter(([, name]) => name === "travel_map_export_failed");
+    assert.equal(failedExport.length, 1);
+    assert.equal(failedExport[0][2].format, "video");
+    assert.equal(failedExport[0][2].error_type, "export_failed");
     await page.getByRole("button", { name: "Mapmory 앱 알아보기" }).click();
     await page.getByRole("link", { name: "Google Play에서 바로 다운로드" }).click();
     const recapEvents = await events();
@@ -93,7 +120,7 @@ try {
     await page.waitForFunction(() => [...(window.dataLayer ?? [])].some((args) => args[1] === "travel_map_photo_analysis_empty"));
     assert.equal((await events()).find(([, name]) => name === "travel_map_photo_analysis_empty")[2].journey_source, "photos");
     assert.equal(errors.length, 0, errors.join("\n"));
-    findings.push({ mobile, passed: true, covered: "header stores, hero exclusion, globe view/start/open, Korea add/internal CTA, recap demo/store and photos/no-GPS" });
+    findings.push({ mobile, passed: true, covered: "header stores/Escape/outside dismissal, hero exclusion, globe view/start/open, Korea add/internal CTA, recap download failure/retry, demo/store and photos/no-GPS" });
     await context.close();
   }
   console.log(JSON.stringify({ output, findings, productionAnalyticsRequests: 0 }, null, 2));
