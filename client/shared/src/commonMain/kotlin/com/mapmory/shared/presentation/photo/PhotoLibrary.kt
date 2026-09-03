@@ -28,6 +28,12 @@ data class PhotoRecommendationPage(
     val hasMore: Boolean,
 )
 
+enum class PhotoLibraryPermissionIssue {
+    LIMITED,
+    DENIED,
+    RESTRICTED,
+}
+
 data class PhotoLibraryActions(
     val pickFromGallery: () -> Unit,
     val recommendForLocation: (Location, String?) -> Unit,
@@ -38,6 +44,7 @@ data class PhotoLibraryActions(
     ) -> Unit = { photos, onReady -> onReady(photos) },
     val recommendationsAvailable: Boolean = true,
     val cancelRecommendation: () -> Unit = {},
+    val openAppSettings: () -> Unit = {},
 )
 
 typealias PhotoLibraryActionsFactory = @Composable (
@@ -47,6 +54,7 @@ typealias PhotoLibraryActionsFactory = @Composable (
     onLoadingChanged: (Boolean) -> Unit,
     onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
     onRecommendationLoadingChanged: (Boolean) -> Unit,
+    onPermissionRequired: (PhotoLibraryPermissionIssue) -> Unit,
 ) -> PhotoLibraryActions
 
 @Composable
@@ -57,6 +65,7 @@ expect fun rememberPhotoLibraryActions(
     onLoadingChanged: (Boolean) -> Unit,
     onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
     onRecommendationLoadingChanged: (Boolean) -> Unit,
+    onPermissionRequired: (PhotoLibraryPermissionIssue) -> Unit,
 ): PhotoLibraryActions
 
 internal fun mergeSelectedPhotos(

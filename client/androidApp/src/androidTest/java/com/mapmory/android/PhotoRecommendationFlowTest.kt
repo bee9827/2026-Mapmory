@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performScrollToIndex
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.presentation.photo.PhotoLibraryActions
+import com.mapmory.shared.presentation.photo.PhotoLibraryPermissionIssue
 import com.mapmory.shared.presentation.photo.PhotoRecommendationPage
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordEditorScreen
@@ -58,7 +59,7 @@ class PhotoRecommendationFlowTest {
                 onPhotosAdded = { photos -> addedPhotos = photos },
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, onRecommended, _, _, _, _ ->
+                photoLibraryActionsFactory = { _, onRecommended, _, _, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { location, parentName ->
@@ -88,7 +89,7 @@ class PhotoRecommendationFlowTest {
             )
         }
 
-        composeRule.onNodeWithText("위치 기반 사진\n불러오기").performClick()
+        composeRule.onNodeWithText("이 장소 사진\n찾기").performClick()
 
         composeRule.onNodeWithText("이 장소에서 찍은 사진").assertIsDisplayed()
         composeRule.runOnIdle {
@@ -127,7 +128,7 @@ class PhotoRecommendationFlowTest {
                 onEndDateChanged = {},
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, onRecommended, _, _, _, _ ->
+                photoLibraryActionsFactory = { _, onRecommended, _, _, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { _, _ ->
@@ -144,7 +145,7 @@ class PhotoRecommendationFlowTest {
             )
         }
 
-        composeRule.onNodeWithText("위치 기반 사진\n불러오기").performClick()
+        composeRule.onNodeWithText("이 장소 사진\n찾기").performClick()
         composeRule.onNodeWithTag("photo-recommendation-grid").assertIsDisplayed()
 
         val first = composeRule
@@ -190,7 +191,7 @@ class PhotoRecommendationFlowTest {
                 onEndDateChanged = {},
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, onRecommended, _, _, _, _ ->
+                photoLibraryActionsFactory = { _, onRecommended, _, _, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { _, _ ->
@@ -217,13 +218,52 @@ class PhotoRecommendationFlowTest {
             )
         }
 
-        composeRule.onNodeWithText("위치 기반 사진\n불러오기").performClick()
+        composeRule.onNodeWithText("이 장소 사진\n찾기").performClick()
         val grid = composeRule.onNodeWithTag("photo-recommendation-grid")
         grid.performScrollToIndex(23)
 
         composeRule.runOnIdle { assertEquals(1, nextPageCalls) }
         grid.performScrollToIndex(24)
         composeRule.onNodeWithTag("photo-recommendation-item-photo-25").assertIsDisplayed()
+    }
+
+    @Test
+    fun `사진_접근이_제한되면_설정_이동과_나가기를_안내한다`() {
+        val seoul = province()
+        val gangnam = district(parentId = seoul.id)
+        var settingsOpenCalls = 0
+
+        composeRule.setContent {
+            TripRecordEditorScreen(
+                uiState = TripRecordEditorUiState(selectedLocation = gangnam),
+                locations = listOf(seoul, gangnam),
+                onLocationSelected = {},
+                onTitleChanged = {},
+                onContentChanged = {},
+                onStartDateChanged = {},
+                onEndDateChanged = {},
+                onSaveClick = {},
+                onBackClick = {},
+                photoLibraryActionsFactory = { _, _, _, _, _, _, onPermissionRequired ->
+                    PhotoLibraryActions(
+                        pickFromGallery = {},
+                        recommendForLocation = { _, _ ->
+                            onPermissionRequired(PhotoLibraryPermissionIssue.LIMITED)
+                        },
+                        openAppSettings = { settingsOpenCalls += 1 },
+                    )
+                },
+            )
+        }
+
+        composeRule.onNodeWithText("이 장소 사진\n찾기").performClick()
+        composeRule.onNodeWithText("사진 전체 접근이 필요해요").assertIsDisplayed()
+        composeRule.onNodeWithText("설정으로 이동").assertIsDisplayed()
+        composeRule.onNodeWithText("나가기").performClick()
+
+        composeRule.onNodeWithText("이 장소 사진\n찾기").performClick()
+        composeRule.onNodeWithText("설정으로 이동").performClick()
+        composeRule.runOnIdle { assertEquals(1, settingsOpenCalls) }
     }
 
     @Test
@@ -241,7 +281,7 @@ class PhotoRecommendationFlowTest {
                 onEndDateChanged = {},
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, _, _, _, _, _ ->
+                photoLibraryActionsFactory = { _, _, _, _, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { _, _ -> recommendationCalls += 1 },
@@ -250,7 +290,7 @@ class PhotoRecommendationFlowTest {
             )
         }
 
-        composeRule.onNodeWithText("위치 기반 사진\n불러오기").performClick()
+        composeRule.onNodeWithText("이 장소 사진\n찾기").performClick()
 
         composeRule.onNodeWithText("사진을 추천받으려면 장소를 먼저 선택해 주세요.")
             .assertIsDisplayed()
@@ -274,7 +314,7 @@ class PhotoRecommendationFlowTest {
                 onEndDateChanged = {},
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, _, _, _, _, _ ->
+                photoLibraryActionsFactory = { _, _, _, _, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { _, _ -> },
@@ -307,7 +347,7 @@ class PhotoRecommendationFlowTest {
                 onEndDateChanged = {},
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, _, _, _, _, _ ->
+                photoLibraryActionsFactory = { _, _, _, _, _, _, _ ->
                     PhotoLibraryActions(
                         pickFromGallery = {},
                         recommendForLocation = { _, _ -> },
@@ -317,7 +357,7 @@ class PhotoRecommendationFlowTest {
         }
 
         composeRule.onNodeWithText("사진첩").assertIsDisplayed()
-        composeRule.onNodeWithText("위치 기반 사진\n불러오기").assertIsDisplayed()
+        composeRule.onNodeWithText("이 장소 사진\n찾기").assertIsDisplayed()
         assertTrue(composeRule.onAllNodesWithText("불러오는 중").fetchSemanticsNodes().isEmpty())
     }
 
@@ -342,7 +382,7 @@ class PhotoRecommendationFlowTest {
                 onEndDateChanged = {},
                 onSaveClick = {},
                 onBackClick = {},
-                photoLibraryActionsFactory = { _, _, _, _, _, recommendationLoadingChanged ->
+                photoLibraryActionsFactory = { _, _, _, _, _, recommendationLoadingChanged, _ ->
                     onRecommendationLoadingChanged = recommendationLoadingChanged
                     PhotoLibraryActions(
                         pickFromGallery = {},
