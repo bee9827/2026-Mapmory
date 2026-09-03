@@ -11,9 +11,6 @@
 - [ ] 운영 API 주소가 `https://api.map-mory.com/api/v1`인가
 - [ ] iOS 기본 언어와 지원 언어가 한국어로 설정됐는가
 
-기존 `1.0.0`이 아직 출시되지 않았다면 버전은 유지하고 빌드 번호만 올린다. `1.0.0`이 이미 출시됐다면
-App Store Connect에 `1.0.1` 같은 새 버전을 만들고 Xcode의 마케팅 버전도 동일하게 맞춘다.
-
 ## 2. Firebase Analytics
 
 - [ ] Firebase Console에 Bundle ID `com.mapmory.ios` Apple 앱이 등록됐는가
