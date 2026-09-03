@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.Mapmory" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/mapmory_system_bar_light</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_transparent</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@color/mapmory_system_bar_light</item>
+        <item name="android:navigationBarColor">@color/mapmory_system_bar_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>
