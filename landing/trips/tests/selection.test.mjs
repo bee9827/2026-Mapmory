@@ -6,6 +6,8 @@ import {validateTripSelection, excludeOversizedPhotos, TRIP_SELECTION_LIMITS} fr
 import {organizePhotos} from '../src/pipeline.js';
 import {parsePhotoBatches} from '../src/photoProcessing.js';
 import {localDay} from '../src/dates.js';
+import {metadataSummary} from '../src/analytics.js';
+const analytics=()=>({track(){},resetFlow(){},setContext(){},environment:{environment_eligible:true}});
 
 const photo = {size: 5 * 1024 * 1024};
 test('Trips supports the 500+ experiment, including 1,000 files over 500MB', () => {
@@ -32,7 +34,7 @@ test('invalid replacement preserves existing results and never resets or starts 
   const start = source.slice(source.indexOf('async function startOrganization('), source.indexOf('\nfunction buildTree('));
   for (const records of [[], [{index: 0}]]) {
     let message = '', reset = false;
-    const context = {state: {records}, isPhoto: () => true, validateTripSelection, excludeOversizedPhotos,
+    const context = {analytics:analytics(),state: {records}, isPhoto: () => true, validateTripSelection, excludeOversizedPhotos,
       renderStart: text => {message = text;}, showResultError: text => {message = text;},
       reset: () => {reset = true; throw Error('should not reset');}};
     await runInNewContext(`${start}\nstartOrganization(Array(1001).fill({size: 1}));`, context);
@@ -57,7 +59,7 @@ test('mixed input keeps processing; all oversized input preserves previous resul
   let message = '', received, resetCalls = 0;
   const previous = [{index: 0}];
   const state = {records: previous};
-  const context = {state, isPhoto: () => true, validateTripSelection, excludeOversizedPhotos,
+  const context = {analytics:analytics(),metadataSummary,performance,processingStarted:0,processingSeconds:()=>1,state, isPhoto: () => true, validateTripSelection, excludeOversizedPhotos,
     n: String, readGeneration: 0, reset() {resetCalls++;}, renderProgress() {},
     organizePhotos: async files => {received = files; return {records: files, locationDataUnavailable: false};},
     planArchives: records => records, renderResults() {}, focusHeading() {}, announce() {}, progressUpdate() {},
