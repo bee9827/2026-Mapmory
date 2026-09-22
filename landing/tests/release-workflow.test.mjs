@@ -102,8 +102,8 @@ test("deployment shell syntax is valid", { skip: !existsSync(bash) }, () => {
 
 test("all local health checks explicitly bypass proxy environment variables", () => {
   const probes = hook.match(/curl --noproxy '\*'/g) || [];
-  assert.equal(probes.length, 4);
-  assert.equal((hook.match(/--resolve map-mory.com:443:127.0.0.1/g) || []).length, 4);
+  assert.equal(probes.length, 7);
+  assert.equal((hook.match(/--resolve map-mory.com:443:127.0.0.1/g) || []).length, 7);
 });
 
 test("CodeDeploy rejects use from the backend group before filesystem access", () => {
@@ -115,7 +115,7 @@ test("CodeDeploy rejects use from the backend group before filesystem access", (
   assert.match(result.stderr, /only in the landing/);
 });
 
-for (const scenario of ["success", "proxy-env", "reload-failure", "identity-failure", "http-failure", "nginx-failure", "bad-marker", "bad-id", "missing-previous", "outside-previous", "duplicate", "symlink-bundle", "locked", "missing-recap", "bad-recap-marker", "recap-http-failure", "recap-identity-failure", "recap-shell-failure"]) {
+for (const scenario of ["success", "proxy-env", "reload-failure", "identity-failure", "http-failure", "nginx-failure", "bad-marker", "bad-id", "missing-previous", "outside-previous", "duplicate", "symlink-bundle", "locked", "missing-recap", "bad-recap-marker", "recap-http-failure", "recap-identity-failure", "recap-shell-failure", "missing-trips", "bad-trips-marker", "trips-http-failure", "trips-identity-failure", "trips-shell-failure", "trips-redirect-failure"]) {
   test(`CodeDeploy activation fixture: ${scenario}`, { skip: process.platform === "win32" ? "Linux filesystem/flock fixture runs in CI and CodeBuild" : false }, () => {
     const fixture = fileURLToPath(new URL("./fixtures/codedeploy-activation.sh", import.meta.url));
     const result = spawnSync(bash, [fixture, scenario], {encoding: "utf8", timeout: 15000});
