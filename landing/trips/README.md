@@ -19,6 +19,14 @@ The metadata reader is mechanically adapted from `../travel-map-campaign`
 Do not infer capture dates from file modification time. Browser/picker redaction
 cannot be repaired by requesting current geolocation.
 
+Trips processes up to 1,000 photos, each up to 50MB. Oversized photos are excluded
+before reading any bytes; the other photos continue and the result explicitly
+reports the excluded count and that they are absent from the ZIP. If every photo
+is oversized, explain why without clearing previous results. Recap's separate 200-photo / 500MB video-selection
+validator is not used: Trips keeps File handles and small metadata records, reads
+only three files concurrently and prepares one size-bounded ZIP part at a time.
+This is a safety boundary, not a guarantee of performance on every phone.
+
 HEIC metadata reading is distinct from preview support: the current browser must
 decode the original image to show it. No HEIC/RAW preview decoder is included.
 

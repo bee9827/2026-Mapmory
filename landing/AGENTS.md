@@ -24,6 +24,7 @@ When implementing from a selected generated mock, treat that image as the source
 - Retain the tested /recap File/byte EXIF reading path; date/GPS extraction is not image analysis or guaranteed HEIC preview support.
 - Keep location folders above date grouping. Use the shared green visual treatment for the travel action, expandable photographic albums for home selection and travel candidates, and a separate explicit home confirmation.
 - Keep photos and GPS on the device. Preserve original location/date ZIP folders; never imply the trip candidate preview changes the export.
+- For Trips, exclude files over 50MB individually and show the excluded count in results; never cancel the whole selection because one file is oversized. Preserve previous results if every selected photo is oversized. Keep the 500+ photo experiment supported instead of inheriting Recap's 200-photo video limit.
 - Follow DEPLOYMENT.md for main integration, release promotion and separately approved Nginx configuration. Never apply server settings or deploy as a side effect of preparing the PR.
 
 ### Current analytics decisions (2026-09-03)
