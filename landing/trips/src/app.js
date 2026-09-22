@@ -1,6 +1,7 @@
 import { formatBytes, formatNumber as n, isPhoto, MAX_ARCHIVE_BYTES, planArchives } from './organize.js';
 import { createPhotoViewer } from './viewer.js';
-import { groupByDate } from './dates.js';
+import { groupByDate, localDay } from './dates.js';
+import { validateTripSelection, excludeOversizedPhotos } from './selection.js';
 import {organizePhotos} from './pipeline.js';
 import {homeOptions,groupTrips} from './trips.js';
 import {createAlbumResources,createPhotoAlbum} from './albums.js';
@@ -19,7 +20,7 @@ const icons = {
   lock: '<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v1"/>',
 };
-const state = { phase: 'idle', files: [], records: [], archives: [], worker: null, skipped: 0, geoUnavailable: false, readyPart: -1, readyUrl: null, busyPart: -1, progress: 0, downloaded: new Set(), archivePromise: null, archiveReject: null };
+const state = { phase: 'idle', files: [], records: [], archives: [], worker: null, skipped: 0, oversized: 0, geoUnavailable: false, readyPart: -1, readyUrl: null, busyPart: -1, progress: 0, downloaded: new Set(), archivePromise: null, archiveReject: null };
 const viewer = createPhotoViewer(index => state.files[index]);
 const albumResources = createAlbumResources(index => state.files[index]);
 function clearAlbums() { albumResources.clear(); }
@@ -59,7 +60,7 @@ function terminate() {
 function reset() {
   readGeneration++; selectedHome=null;
   viewer.reset(); terminate(); releaseReady(); clearAlbums();
-  Object.assign(state, { phase: 'idle', files: [], records: [], archives: [], busyPart: -1, progress: 0, skipped: 0, geoUnavailable: false, downloaded: new Set() });
+  Object.assign(state, { phase: 'idle', files: [], records: [], archives: [], busyPart: -1, progress: 0, skipped: 0, oversized: 0, geoUnavailable: false, downloaded: new Set() });
 }
 function choosePhotos() { input.value = ''; input.click(); }
 function renderStart(message = '') {
@@ -67,6 +68,7 @@ function renderStart(message = '') {
   const content = el('div', 'start-content');
   content.append(button('사진 정리하기', choosePhotos, 'button button-primary start-button', 'photo'));
   content.append(button('선택이 안 되나요? 파일에서 원본 선택',()=>{originalInput.value='';originalInput.click();},'button button-secondary'));
+  content.append(el('p','keep-open','한 번에 최대 1,000장 · 50MB를 넘는 사진은 제외하고 나머지를 정리해요.'));
   content.append(el('p','keep-open','실험 기준: /recap 사진 읽기 · iOS 웹 / 안드로이드 카톡에서 확인한 선택 경로를 이용해주세요. 선택 경로에서 빠진 GPS는 복구할 수 없어요.'));
   if (message) { const note = el('p', 'start-error', message); note.setAttribute('role', 'alert'); content.append(note); }
   app.append(content);
@@ -104,10 +106,17 @@ function workerFor(onMessage, onError) {
   return worker;
 }
 async function startOrganization(files) {
-  const photos = files.filter(isPhoto);
-  if (!photos.length) { if (!state.records.length) renderStart('선택한 파일에서 사진을 찾지 못했어요. 사진 파일을 선택해 주세요.'); else showResultError('선택한 파일에서 사진을 찾지 못했어요.'); return; }
+  const selectedPhotos = files.filter(isPhoto);
+  const {photos, oversized} = excludeOversizedPhotos(selectedPhotos);
+  if (!photos.length) {
+    const message = oversized.length ? `선택한 사진 ${n(oversized.length)}장이 모두 50MB를 넘어 제외됐어요. 50MB 이하 사진을 선택해주세요.` : '선택한 파일에서 사진을 찾지 못했어요. 사진 파일을 선택해 주세요.';
+    if (!state.records.length) renderStart(message); else showResultError(message);
+    return;
+  }
+  try { validateTripSelection(photos); }
+  catch (error) { if (!state.records.length) renderStart(error.message); else showResultError(error.message); return; }
   reset();
-  Object.assign(state, { phase: 'organizing', files: photos, skipped: files.length - photos.length });
+  Object.assign(state, { phase: 'organizing', files: photos, skipped: files.length - selectedPhotos.length, oversized: oversized.length });
   renderProgress();
   const generation=readGeneration;
   const fail = () => { reset(); renderStart('사진을 처리하지 못했어요. 사진을 나누어 선택하거나 연결을 확인한 뒤 다시 시도해 주세요.'); };
@@ -115,7 +124,7 @@ async function startOrganization(files) {
     const data=await organizePhotos(state.files,{cancelled:()=>generation!==readGeneration,onProgress:progressUpdate});
     if(generation!==readGeneration)return;
     Object.assign(state,{phase:'complete',records:data.records,archives:planArchives(data.records),geoUnavailable:data.locationDataUnavailable,progress:100});
-    renderResults();focusHeading();announce(`${n(state.records.length)}장의 사진 정리가 끝났습니다.`);
+    renderResults();focusHeading();announce(`${n(state.records.length)}장의 사진 정리가 끝났습니다.${state.oversized ? ` 50MB 초과 사진 ${n(state.oversized)}장은 제외했습니다.` : ''}`);
   } catch { if(generation===readGeneration)fail(); }
 }
 
@@ -178,9 +187,10 @@ function renderResults() {
   const missingGps = state.records.filter(r => !r.gps).length;
   const missingDate = state.records.filter(r => !r.date).length;
   const readErrors = state.records.filter(r => r.readError).length;
-  if (missingGps || missingDate || readErrors || state.skipped || state.geoUnavailable) {
+  if (missingGps || missingDate || readErrors || state.skipped || state.oversized || state.geoUnavailable) {
     const notice = el('aside', 'notice'); notice.append(icon('info'));
     const text = el('div', 'notice-copy');
+    if (state.oversized) text.append(el('p', '', `용량 초과로 제외한 사진 ${n(state.oversized)}장`), el('p', 'notice-detail', '50MB를 넘는 사진은 정리 결과와 ZIP에 포함되지 않아요. 원본 파일은 변경하지 않았어요.'));
     if (missingGps || missingDate) text.append(el('p', '', [missingGps && `위치 정보 없는 사진 ${n(missingGps)}장`, missingDate && `촬영일 없는 사진 ${n(missingDate)}장`].filter(Boolean).join(' · ')), el('p', 'notice-detail', '정보가 없는 사진은 별도 폴더에 모았어요. 휴대폰 사진 선택 과정에서 메타데이터가 빠질 수도 있어요.'));
     if (readErrors) text.append(el('p', 'notice-detail', `${n(readErrors)}장은 촬영 정보를 완전히 읽지 못했지만 원본은 포함했어요.`));
     if (state.skipped) text.append(el('p', 'notice-detail', `사진이 아닌 파일 ${n(state.skipped)}개는 제외했어요.`));
@@ -262,11 +272,11 @@ function createSurvey() {
 }
 function showResultError(message) {
   let alert = app.querySelector('.result-error');
-  if (!alert) { alert = el('p', 'result-error'); alert.setAttribute('role', 'alert'); app.querySelector('#downloads').append(alert); }
+  if (!alert) { alert = el('p', 'result-error'); alert.setAttribute('role', 'alert'); (app.querySelector('#downloads') ?? app).append(alert); }
   alert.textContent = message;
 }
 function archiveName(index) {
-  const day = new Date().toISOString().slice(0, 10);
+  const day = localDay(new Date());
   return `정리한_사진_${day}${state.archives.length > 1 ? `_${String(index + 1).padStart(2, '0')}` : ''}.zip`;
 }
 function renderDownloads() {

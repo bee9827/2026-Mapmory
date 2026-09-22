@@ -1,3 +1,8 @@
+export function localDay(date) {
+  const pad = value => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export function groupByDate(records) {
   const groups=new Map();
   for(const record of records) {

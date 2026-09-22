@@ -1,7 +1,9 @@
 import {readMetadata} from './metadata.js';
 import {parsePhotoBatches} from './photoProcessing.js';
+import {validateTripSelection} from './selection.js';
 import {classifyPhoto,createLocationResolver,finishRecords} from './organize.js';
 export async function organizePhotos(files,{cancelled=()=>false,onProgress=()=>{}}={}) {
+  validateTripSelection(files);
   const check=()=>{if(cancelled())throw new Error('cancelled');};
   const load=async path=>{try {const response=await fetch(new URL(path,import.meta.url));return response.ok?await response.json():undefined;}catch{return undefined;}};
   const [boundaries,cities]=await Promise.all([load('./data/regions.json'),load('./data/cities.json')]);
