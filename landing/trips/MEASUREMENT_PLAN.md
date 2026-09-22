@@ -101,6 +101,11 @@ page_location에 남기며 다른 query/hash와 referrer 경로는 제거한다.
 
 기존 공개 웹 스트림 `G-MC93CZWLZF` / Mapmory Landing Page(속성 551158914)를 재사용한다.
 빌드가 기존 파이프라인의 `VITE_GA_MEASUREMENT_ID`를 명시적으로 읽는다. 추측한 ID fallback은 없다.
+현재는 **운영 수집 OFF**: 공개 태그에서 자동 폼/링크/다운로드 측정이 활성화된 것을 확인했고,
+콘솔은 로그아웃 상태다. `scripts/analytics-config.mjs`의 `TRIPS_GA_RELEASE_APPROVED=false`가
+운영 ID를 비워 방문자에게 태그가 실행되지 않게 한다. UI 개선 배포와 GA 활성화를 구분한다.
+콘솔 확인 및 필요한 설정 조정 후 별도 리뷰 변경으로 활성화하고 실제 수신을 확인한다.
+이 상태에서 모집하면 설문은 가능하지만 미응답자의 GA 행동 데이터는 수집되지 않는다.
 
 1. 맞춤 정의에 이벤트 범위 차원을 필요한 것만 등록:
    `surface`, `experiment_version`, `traffic_type`, `platform`, `browser_context`,

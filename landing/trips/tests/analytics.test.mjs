@@ -112,6 +112,7 @@ test('build exposes only allowlisted public configuration; disabled when missing
   assert.deepEqual(publicAnalyticsConfig(env),{measurementId:'G-ABC123',captureLocal:true,debug:false});
   assert.doesNotMatch(analyticsConfigSource(env),/SECRET|do-not-publish/);
   assert.equal(publicAnalyticsConfig({}).measurementId,'');
+  assert.equal(publicAnalyticsConfig({VITE_GA_MEASUREMENT_ID:'G-MC93CZWLZF'}).measurementId,'','unreviewed production auto-measurement must remain disabled');
   assert.throws(()=>publicAnalyticsConfig({VITE_GA_MEASUREMENT_ID:'bad<script>'}));
 });
 
