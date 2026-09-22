@@ -87,6 +87,9 @@ jobs:
 
       - name: Validate combined static release without deploying
         run: |
+          npm --prefix ../trips ci
+          npm --prefix ../trips run build
+          npm --prefix ../trips test
           npm --prefix .. ci
           npm --prefix .. run build
           bash ../scripts/package-codedeploy.sh "$GITHUB_SHA" "$RUNNER_TEMP/mapmory-landing.tar.gz"

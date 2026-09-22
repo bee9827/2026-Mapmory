@@ -41,6 +41,42 @@ The EC2 `ec2-project` role is an instance role, not the human console user. It m
 
 ## Build, deploy and verification
 
+### Trips photo experiment under /trips/
+
+The metadata-only experiment is a third static surface. Source is `landing/trips/src/`;
+`npm --prefix trips run build` emits only `trips/dist/trips/`. The packager adds it as
+`client/trips/`, alongside the unchanged root landing and `client/recap/`.
+All three surfaces are one atomic deployment/rollback unit; no extra AWS resource
+is needed. A missing Trips build fails packaging rather than silently dropping it.
+CI/CodeBuild install, build and test Trips before packaging.
+
+Users may enter `https://map-mory.com/trips`. The canonical address is
+`https://map-mory.com/trips/`, reached by a **308 redirect preserving the query**.
+This keeps the experiment's relative script, CSS, worker, parser and data paths
+inside `/trips/`. Missing files under that prefix return 404, not the root SPA.
+
+Before the first production promotion, inspect the live Mapmory Nginx server block
+and compare it with `nginx/trips.conf`. That file is a reviewed configuration
+example, **not automatically installed** by this PR, package or deployment hook.
+Separately obtain approval to add only those locations, back up the actual config,
+run `nginx -t`, then reload Nginx. Preserve TLS, root, API and Recap configuration.
+Do not claim that a local preview proves the production routes are installed.
+
+The activation hook checks `/trips/release.txt` against the same tested SHA,
+checks that `/trips/` returns the experiment entry (not the landing fallback),
+and checks the 308 redirect and query preservation. A failed check restores the
+previous complete release. Linux fixtures cover missing files, marker mismatch,
+HTTP failure, wrong shell and incorrect redirect in addition to previous cases.
+
+After the release is separately authorized and merged, verify those same public
+URLs, a real `/trips/app.js` request, missing-asset 404, and the unchanged homepage,
+Recap and backend. Physical iOS/Android file-picker behavior requires device
+testing; metadata support does not guarantee every browser can preview HEIC/RAW.
+
+The original fork's `.openai/hosting.json`, experiments, tests, screenshots and
+personal photos are not copied into the deployment output. All photo reading and
+classification remains in browser memory; no photo upload endpoint is deployed.
+
 ### Travel campaign under /recap/
 
 The campaign is served at `https://map-mory.com/recap/`; the existing landing remains at `/`. Both use the single automatic landing pipeline, existing build project, deployment group and release root. They deploy and roll back together. Do not create a separate campaign pipeline. No new DNS record, certificate, server port, IAM resource or backend change is part of this integration.
