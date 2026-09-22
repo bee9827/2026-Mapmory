@@ -29,7 +29,7 @@ export function coverPhoto(photos) {
   return photos.find(p => /\.(jpe?g|png|webp|avif)$/i.test(p.name)) ?? photos[0];
 }
 
-export function createPhotoAlbum({ title, photos, label, onSelect }, { resources, onOpen }) {
+export function createPhotoAlbum({ title, photos, label, onSelect, onExpand }, { resources, onOpen }) {
   const album = el('details', 'photo-album');
   const summary = el('summary', 'album-summary');
   const stack = el('span', 'album-stack'); stack.setAttribute('aria-hidden', 'true');
@@ -84,6 +84,7 @@ export function createPhotoAlbum({ title, photos, label, onSelect }, { resources
     hint.textContent = album.open ? '사진 접기' : '사진 펼쳐보기';
     body.hidden = !album.open;
     if (album.open && !shown) appendPhotos();
+    if (album.open) onExpand?.();
   });
   return album;
 }

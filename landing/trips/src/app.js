@@ -5,6 +5,13 @@ import { validateTripSelection, excludeOversizedPhotos } from './selection.js';
 import {organizePhotos} from './pipeline.js';
 import {homeOptions,groupTrips} from './trips.js';
 import {createAlbumResources,createPhotoAlbum} from './albums.js';
+import {analyticsConfig} from './analytics-config.js';
+import {createAnalytics,metadataSummary} from './analytics.js';
+import {mountAnalyticsConsent} from './analytics-consent.js';
+const analytics=createAnalytics({config:analyticsConfig});
+mountAnalyticsConsent(analytics);
+let processingStarted=0;
+const processingSeconds=()=>Math.max(0,Math.round((performance.now()-processingStarted)/1000));
 let readGeneration=0, selectedHome=null;
 
 const app = document.querySelector('#app');
@@ -62,12 +69,12 @@ function reset() {
   viewer.reset(); terminate(); releaseReady(); clearAlbums();
   Object.assign(state, { phase: 'idle', files: [], records: [], archives: [], busyPart: -1, progress: 0, skipped: 0, oversized: 0, geoUnavailable: false, downloaded: new Set() });
 }
-function choosePhotos() { input.value = ''; input.click(); }
+function choosePhotos() { analytics.track('trips_picker_open',{picker_type:'photos'}); input.value = ''; input.click(); }
 function renderStart(message = '') {
   app.className = 'start-screen'; app.replaceChildren();
   const content = el('div', 'start-content');
   content.append(button('사진 정리하기', choosePhotos, 'button button-primary start-button', 'photo'));
-  content.append(button('선택이 안 되나요? 파일에서 원본 선택',()=>{originalInput.value='';originalInput.click();},'button button-secondary'));
+  content.append(button('선택이 안 되나요? 파일에서 원본 선택',()=>{analytics.track('trips_picker_open',{picker_type:'files'});originalInput.value='';originalInput.click();},'button button-secondary'));
   content.append(el('p','keep-open','한 번에 최대 1,000장 · 50MB를 넘는 사진은 제외하고 나머지를 정리해요.'));
   content.append(el('p','keep-open','실험 기준: /recap 사진 읽기 · iOS 웹 / 안드로이드 카톡에서 확인한 선택 경로를 이용해주세요. 선택 경로에서 빠진 GPS는 복구할 수 없어요.'));
   if (message) { const note = el('p', 'start-error', message); note.setAttribute('role', 'alert'); content.append(note); }
@@ -88,7 +95,7 @@ function renderProgress() {
   for (const [i, label] of ['촬영 정보 읽기', '위치·날짜 분류', '폴더 완성'].entries()) {
     const step = el('span', 'process-step'); step.append(el('span', 'step-number', `${i + 1}`), document.createTextNode(label)); steps.append(step);
   }
-  content.append(steps, el('p', 'keep-open', '완료될 때까지 이 화면을 열어 두세요.'), button('취소', () => { reset(); renderStart(); app.querySelector('button').focus(); }, 'button button-text'), privacyNote());
+  content.append(steps, el('p', 'keep-open', '완료될 때까지 이 화면을 열어 두세요.'), button('취소', () => { analytics.track('trips_processing_cancelled',{processing_seconds:processingSeconds()}); reset(); renderStart(); app.querySelector('button').focus(); }, 'button button-text'), privacyNote());
   app.append(content); focusHeading();
 }
 function progressUpdate(data) {
@@ -105,26 +112,35 @@ function workerFor(onMessage, onError) {
   worker.addEventListener('messageerror', () => onError(new Error('사진 데이터를 읽지 못했어요. 사진을 나누어 다시 선택해 주세요.')));
   return worker;
 }
-async function startOrganization(files) {
+async function startOrganization(files,pickerType) {
   const selectedPhotos = files.filter(isPhoto);
   const {photos, oversized} = excludeOversizedPhotos(selectedPhotos);
+  const selection={picker_type:pickerType,selected_count:files.length,photo_count:photos.length,oversized_count:oversized.length,non_photo_count:files.length-selectedPhotos.length};
+  analytics.track('trips_selection_received',selection);
   if (!photos.length) {
+    analytics.track('trips_selection_rejected',{...selection,reason:oversized.length?'all_oversized':'no_photos'});
     const message = oversized.length ? `선택한 사진 ${n(oversized.length)}장이 모두 50MB를 넘어 제외됐어요. 50MB 이하 사진을 선택해주세요.` : '선택한 파일에서 사진을 찾지 못했어요. 사진 파일을 선택해 주세요.';
     if (!state.records.length) renderStart(message); else showResultError(message);
     return;
   }
   try { validateTripSelection(photos); }
-  catch (error) { if (!state.records.length) renderStart(error.message); else showResultError(error.message); return; }
+  catch (error) { analytics.track('trips_selection_rejected',{...selection,reason:photos.length>1000?'too_many':'invalid_size'}); if (!state.records.length) renderStart(error.message); else showResultError(error.message); return; }
   reset();
+  analytics.resetFlow({picker_type:pickerType,photo_count:photos.length,photo_bucket:photos.length>=500?'500_plus':'under_500',gps_coverage:'unknown',date_coverage:'unknown',evaluation_group:analytics.environment.environment_eligible?'pending':'android_non_kakao'});
+  analytics.track('trips_processing_start',selection);
+  processingStarted=performance.now();
   Object.assign(state, { phase: 'organizing', files: photos, skipped: files.length - selectedPhotos.length, oversized: oversized.length });
   renderProgress();
   const generation=readGeneration;
-  const fail = () => { reset(); renderStart('사진을 처리하지 못했어요. 사진을 나누어 선택하거나 연결을 확인한 뒤 다시 시도해 주세요.'); };
+  const fail = () => { analytics.track('trips_processing_failed',{processing_seconds:processingSeconds()}); reset(); renderStart('사진을 처리하지 못했어요. 사진을 나누어 선택하거나 연결을 확인한 뒤 다시 시도해 주세요.'); };
   try {
     const data=await organizePhotos(state.files,{cancelled:()=>generation!==readGeneration,onProgress:progressUpdate});
     if(generation!==readGeneration)return;
     Object.assign(state,{phase:'complete',records:data.records,archives:planArchives(data.records),geoUnavailable:data.locationDataUnavailable,progress:100});
     renderResults();focusHeading();announce(`${n(state.records.length)}장의 사진 정리가 끝났습니다.${state.oversized ? ` 50MB 초과 사진 ${n(state.oversized)}장은 제외했습니다.` : ''}`);
+    const summary=metadataSummary(data.records,analytics.environment);
+    analytics.setContext(summary);
+    analytics.track('trips_processing_complete',{...summary,processing_seconds:processingSeconds(),geo_data_available:!data.locationDataUnavailable});
   } catch { if(generation===readGeneration)fail(); }
 }
 
@@ -176,14 +192,17 @@ function renderResults() {
   app.className = 'result-screen'; app.replaceChildren();
   const header = el('header', 'result-header');
   const badge = el('div', 'complete-badge'); badge.append(icon('check'), document.createTextNode('정리 완료'));
-  header.append(badge, el('h1', '', '사진 속 장소를 찾았어요'), el('p', 'result-description', `${n(state.records.length)}장의 촬영 위치를 바탕으로 사진을 모았어요. 위치를 확인하고, 이어서 여행을 묶어보세요.`));
+  header.append(badge, el('h1', '', '사진 속 장소를 찾았어요'), el('p', 'result-description', `${n(state.records.length)}장의 사진을 위치별로 모았어요.`));
+  const nextStep=el('section','trip-next-step');
+  nextStep.setAttribute('aria-label','여행 묶어서 보기');
+  nextStep.append(button('여행 묶어서 보기',renderTripSetup,'button button-trip'),el('p','trip-next-description','생활 지역을 고르면, 날짜와 위치로 여행 후보를 묶어요.'));
   const summary = el('div', 'summary-grid');
   const places = new Set(state.records.filter(r => r.city).map(r => `${r.countryCode}:${r.cityId ?? r.city}`)).size;
   const dates = new Set(state.records.filter(r => r.date).map(r => r.date.day)).size;
   for (const [value, label] of [[`${n(places)}곳`, '도시·지역'], [`${n(dates)}일`, '촬영 날짜'], [formatBytes(state.records.reduce((sum, r) => sum + r.size, 0)), '원본 용량']]) {
     const item = el('div', 'summary-item'); item.append(el('strong', '', value), el('span', '', label)); summary.append(item);
   }
-  app.append(header, summary);
+  app.append(header, nextStep, summary);
   const missingGps = state.records.filter(r => !r.gps).length;
   const missingDate = state.records.filter(r => !r.date).length;
   const readErrors = state.records.filter(r => r.readError).length;
@@ -201,9 +220,7 @@ function renderResults() {
   locationSection.append(el('p','flow-label','01 · 위치별로 모인 사진'));
   const locationView=el('details','tree-card location-card'); locationView.open=true;
   locationView.append(el('summary','folder-summary location-summary','위치별 폴더보기'),treeContents(buildTree(state.records)));
-  const nextStep=el('div','trip-next-step');
-  nextStep.append(el('p','trip-next-title','이 장소들 속에서 여행을 찾아볼까요?'),el('p','trip-next-description','다음 화면에서 생활 지역을 고르면, 나머지 장소와 촬영 날짜를 연결해 여행 후보로 묶어요.'),button('이 위치들로 여행 묶기',renderTripSetup,'button button-trip'));
-  locationSection.append(locationView,nextStep);app.append(locationSection);
+  locationSection.append(locationView);app.append(locationSection);
   const treeCard = el('details', 'tree-card date-card'); treeCard.setAttribute('aria-label', '날짜별 사진 보기');
   const treeHeader = el('summary', 'tree-header'); const rootName = el('div', 'tree-root-name'); rootName.append(icon('folder'), el('h2', '', '날짜별 사진 보기'));
   treeHeader.append(rootName, el('span', 'tree-hint', '촬영일 → 사진'));
@@ -231,11 +248,12 @@ function renderTripSetup(){
   const options=homeOptions(state.records);
   const albums=el('div','album-list');
   for(const area of options){
-    albums.append(photoAlbum({title:area.label,photos:area.photos,label:'위치별 사진',onSelect:()=>{selectedHome=area;renderTripResults();}}));
+    albums.append(photoAlbum({title:area.label,photos:area.photos,label:'위치별 사진',onExpand:()=>analytics.track('trips_album_open',{album_kind:'home',album_photo_count:area.photos.length},'home_album_open'),onSelect:()=>{selectedHome=area;renderTripResults();}}));
   }
   app.append(albums);
   if(!options.length)app.append(el('p','notice','위치 정보가 없어 여행 후보를 구분할 수 없어요. 날짜별 사진은 계속 확인할 수 있습니다.'));
   app.append(el('p','notice-detail','실험 기준: 생활 지역에서 40km 밖의 사진을 시간순으로 묶고, 생활 지역에서 찍은 사진이 나오거나 촬영 공백이 72시간을 넘으면 나눠요. 이동한 도시가 달라도 같은 후보로 이어질 수 있어요. 촬영 시간대가 다른 해외 이동은 경계가 부정확할 수 있습니다.'),button('위치별 사진으로 돌아가기',renderResults,'button button-text'));
+  analytics.track('trips_grouping_start',{home_option_count:options.length},'grouping_start');
   focusHeading();
 }
 function renderTripResults(){
@@ -246,11 +264,12 @@ function renderTripResults(){
   const albums=el('div','album-list');
   result.trips.forEach((trip,index)=>{
     const places=[...new Set(trip.photos.map(r=>r.city).filter(Boolean))].join(' · ');
-    albums.append(photoAlbum({title:places?`${places} 여행 발견`:`여행 ${index+1} 발견`,photos:trip.photos,label:'날짜와 위치로 찾은 여행 후보'}));
+    albums.append(photoAlbum({title:places?`${places} 여행 발견`:`여행 ${index+1} 발견`,photos:trip.photos,label:'날짜와 위치로 찾은 여행 후보',onExpand:()=>analytics.track('trips_album_open',{album_kind:'trip',album_photo_count:trip.photos.length},'trip_album_open')}));
   });
   if(!result.trips.length)albums.append(el('p','notice','지금 선택한 사진에서는 여행 후보를 찾지 못했어요. 생활 지역을 다시 확인하거나 다른 기간의 사진도 함께 선택해보세요.'));
-  if(result.other.length)albums.append(photoAlbum({title:'따로 확인할 사진',photos:result.other,label:'생활 지역 또는 날짜·위치 정보 부족'}));
+  if(result.other.length)albums.append(photoAlbum({title:'따로 확인할 사진',photos:result.other,label:'생활 지역 또는 날짜·위치 정보 부족',onExpand:()=>analytics.track('trips_album_open',{album_kind:'other',album_photo_count:result.other.length},'other_album_open')}));
   app.append(albums,el('p','notice-detail','이 단계는 여행 후보 미리보기입니다. 위치별 ZIP의 폴더 구조는 바뀌지 않아요.'),button('생활 지역 다시 선택',renderTripSetup,'button button-secondary'),button('위치·날짜별 보기로 돌아가기',renderResults,'button button-text'),createSurvey(),privacyNote());
+  analytics.track('trips_results_view',{candidate_count:result.trips.length,candidate_photo_count:result.trips.reduce((sum,trip)=>sum+trip.photos.length,0),other_photo_count:result.other.length});
   focusHeading();
 }
 
@@ -262,6 +281,7 @@ function createSurvey() {
   const title = el('h2', '', '여행 사진 자동 분류 체험 설문'); title.id = 'survey-title';
   const link = el('a', 'survey-link', '새 탭에서 설문 열기');
   link.href = formUrl; link.target = '_blank'; link.rel = 'noopener noreferrer';
+  link.addEventListener('click',()=>analytics.track('trips_survey_click',{},'survey_click'));
   header.append(title, link);
   const frame = el('iframe', 'survey-frame');
   frame.title = '여행 사진 자동 분류 체험 설문 · Google Forms';
@@ -296,7 +316,7 @@ function renderDownloads() {
       const link = el('a', 'button button-primary save-link');
       link.href = state.readyUrl; link.download = archive.kind === 'original' ? archive.records[0].path.split('/').at(-1) : archiveName(index);
       link.append(icon('download'), el('span', '', archive.kind === 'original' ? '원본 저장하기' : 'ZIP 저장하기'));
-      link.addEventListener('click', () => { state.downloaded.add(index); info.lastChild.textContent = `${n(archive.records.length)}장 · ${formatBytes(archive.size)} · 저장 요청됨`; announce('브라우저에 저장을 요청했어요. 다운로드 목록을 확인해 주세요.'); });
+      link.addEventListener('click', () => { analytics.track('trips_download_request',{archive_photo_count:archive.records.length},`download_${index}`); state.downloaded.add(index); info.lastChild.textContent = `${n(archive.records.length)}장 · ${formatBytes(archive.size)} · 저장 요청됨`; announce('브라우저에 저장을 요청했어요. 다운로드 목록을 확인해 주세요.'); });
       row.append(link);
     } else {
       const download = button(archive.kind === 'original' ? '원본 다운로드' : 'ZIP 다운로드', () => { void prepareArchive(index).catch(() => {}); }, 'button button-primary', 'download');
@@ -307,21 +327,23 @@ function renderDownloads() {
     container.append(row);
   });
   if (state.readyPart >= 0) container.append(el('p', 'ready-hint', '파일이 준비됐어요. 저장하기를 눌러 내려받으세요.'));
-  if (state.busyPart >= 0) container.append(button('ZIP 만들기 취소', () => { terminate(); state.busyPart = -1; state.phase = 'complete'; renderDownloads(); }, 'button button-text'));
+  if (state.busyPart >= 0) container.append(button('ZIP 만들기 취소', () => { analytics.track('trips_archive_cancelled'); terminate(); state.busyPart = -1; state.phase = 'complete'; renderDownloads(); }, 'button button-text'));
 }
 async function prepareArchive(index) {
   if (state.phase !== 'complete' || !Number.isInteger(index) || !state.archives[index] || state.busyPart >= 0) throw new Error('지금은 이 파일을 준비할 수 없습니다.');
   if (state.readyPart === index) return { part: index + 1, status: 'ready' };
   releaseReady();
   const archive = state.archives[index];
+  analytics.track('trips_archive_start',{archive_photo_count:archive.records.length});
   if (archive.kind === 'original') {
     state.readyUrl = URL.createObjectURL(state.files[archive.records[0].index]); state.readyPart = index;
-    renderDownloads(); return { part: index + 1, status: 'ready', kind: 'original' };
+    renderDownloads(); analytics.track('trips_archive_ready',{archive_photo_count:archive.records.length}); return { part: index + 1, status: 'ready', kind: 'original' };
   }
   Object.assign(state, { busyPart: index, progress: 0, phase: 'archiving' }); renderDownloads();
   const promise = new Promise((resolve, reject) => {
     state.archiveReject = reject;
     const fail = () => {
+      analytics.track('trips_archive_failed');
       state.worker?.terminate(); state.worker = null; state.archiveReject = null;
       Object.assign(state, { busyPart: -1, phase: 'complete' }); renderDownloads();
       showResultError('ZIP을 만들지 못했어요. 다시 시도하거나 사진을 더 적게 선택해 주세요.');
@@ -338,6 +360,7 @@ async function prepareArchive(index) {
           state.worker?.terminate(); state.worker = null; state.archiveReject = null;
           Object.assign(state, { readyUrl: URL.createObjectURL(data.blob), readyPart: index, busyPart: -1, phase: 'complete' }); renderDownloads();
           announce('ZIP 파일이 준비됐어요. 저장하기를 눌러 내려받으세요.');
+          analytics.track('trips_archive_ready',{archive_photo_count:archive.records.length});
           app.querySelector('.save-link')?.focus({ preventScroll: true });
           resolve({ part: index + 1, status: 'ready', kind: 'zip' });
         }
@@ -350,8 +373,8 @@ async function prepareArchive(index) {
 }
 
 renderStart();
-input.addEventListener('change', () => { const files = Array.from(input.files ?? []); if (files.length) startOrganization(files); });
-originalInput.addEventListener('change', () => { const files = Array.from(originalInput.files ?? []); if (files.length) startOrganization(files); });
+input.addEventListener('change', () => { const files = Array.from(input.files ?? []); if (files.length) startOrganization(files,'photos'); });
+originalInput.addEventListener('change', () => { const files = Array.from(originalInput.files ?? []); if (files.length) startOrganization(files,'files'); });
 window.addEventListener('beforeunload', event => {
   if (state.files.length) { event.preventDefault(); event.returnValue = ''; }
 });
