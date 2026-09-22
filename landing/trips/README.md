@@ -54,6 +54,10 @@ metadata-missing ratios, Android non-Kakao exclusions and GA4 setup/QA.
 and `VITE_GA_DEBUG`. With no measurement ID, tracking and the consent UI are off.
 Source development and non-production hosts never track by default. Production
 uses the existing pipeline's public GA measurement ID; no server changes are needed.
+Current release gate: `TRIPS_GA_RELEASE_APPROVED=false` intentionally emits an empty
+Trips measurement ID for production. The shared stream has automatic measurement
+enabled and needs console access for review. UI improvements can ship safely;
+Trips analytics remains OFF until a reviewed follow-up enables the gate.
 Tracking code, console custom definitions and confirmed GA receipt are distinct
 checks. Do not announce production measurement until all three have been checked.
 
