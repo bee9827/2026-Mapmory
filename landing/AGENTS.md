@@ -17,6 +17,15 @@ When implementing from a selected generated mock, treat that image as the source
 
 ## Mapmory Landing Decisions
 
+### Trips experiment (2026-09-22)
+
+- Keep the metadata-only experiment separate at `/trips/`; `/trips` redirects with HTTP 308 and preserves the query. Do not replace the homepage or Recap.
+- Maintain `trips/src/` as the experiment source and package only `trips/dist/trips/` into `client/trips/`. No personal test photos, test fixtures, credentials or original third-party hosting IDs may enter the deployment artifact.
+- Retain the tested /recap File/byte EXIF reading path; date/GPS extraction is not image analysis or guaranteed HEIC preview support.
+- Keep location folders above date grouping. Use the shared green visual treatment for the travel action, expandable photographic albums for home selection and travel candidates, and a separate explicit home confirmation.
+- Keep photos and GPS on the device. Preserve original location/date ZIP folders; never imply the trip candidate preview changes the export.
+- Follow DEPLOYMENT.md for main integration, release promotion and separately approved Nginx configuration. Never apply server settings or deploy as a side effect of preparing the PR.
+
 ### Current analytics decisions (2026-09-03)
 
 - Follow ANALYTICS_MEASUREMENT_PLAN.md for the current UI, not the historical waitlist funnel. The primary web conversion is an actual App Store or Google Play link click; internal download-section navigation is not a conversion.

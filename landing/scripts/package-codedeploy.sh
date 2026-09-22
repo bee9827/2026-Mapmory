@@ -14,14 +14,26 @@ grep -q 'src="/recap/assets/' "$recap_root/index.html" || {
 [[ ! -e "$landing_root/dist/client/recap" ]] || {
   echo 'Landing build must not already contain a recap directory' >&2; exit 1;
 }
+trips_root="$landing_root/trips/dist/trips"
+[[ -f "$trips_root/index.html" && -f "$trips_root/app.js" ]] || {
+  echo 'Build the Trips experiment first' >&2; exit 1;
+}
+grep -q 'id="photo-input"' "$trips_root/index.html" && grep -q 'src="./app.js"' "$trips_root/index.html" || {
+  echo 'Trips build must preserve the /trips/ relative entry point' >&2; exit 1;
+}
+[[ ! -e "$landing_root/dist/client/trips" ]] || {
+  echo 'Landing build must not already contain a trips directory' >&2; exit 1;
+}
 
 # The archive contains only static client files and landing-specific deployment hooks.
 bundle="$(mktemp -d)"
 trap 'rm -rf -- "$bundle"' EXIT
 cp -R -- "$landing_root/dist/client" "$bundle/client"
 cp -R -- "$recap_root" "$bundle/client/recap"
+cp -R -- "$trips_root" "$bundle/client/trips"
 printf '%s\n' "$sha" > "$bundle/client/release.txt"
 printf '%s\n' "$sha" > "$bundle/client/recap/release.txt"
+printf '%s\n' "$sha" > "$bundle/client/trips/release.txt"
 cp -- "$landing_root/codedeploy/appspec.yml" "$bundle/appspec.yml"
 mkdir -- "$bundle/scripts"
 cp -- "$landing_root/codedeploy/activate.sh" "$bundle/scripts/activate.sh"
