@@ -30,6 +30,7 @@ jobs:
           cache-dependency-path: landing/package-lock.json
       - run: npm ci
       - run: npm --prefix travel-map-campaign ci
+      - run: npm --prefix trips ci
       - run: npm run build
         env:
           VITE_GA_MEASUREMENT_ID: ${{ vars.VITE_GA_MEASUREMENT_ID }}
@@ -41,6 +42,8 @@ jobs:
         env:
           VITE_GA_MEASUREMENT_ID: ${{ vars.VITE_GA_MEASUREMENT_ID }}
       - run: npm test
+      - run: npm --prefix trips run build
+      - run: npm --prefix trips test
       - run: npm --prefix travel-map-campaign run test:built
       - name: Validate CodeDeploy bundle
         run: bash scripts/package-codedeploy.sh "$GITHUB_SHA" "$RUNNER_TEMP/mapmory-landing.tar.gz"
