@@ -11,7 +11,10 @@ from photo albums → review travel candidates. ZIP keeps the original location/
 folder structure; it does not export the travel-candidate grouping.
 
 Photos, filenames, timestamps and GPS stay in browser memory. No photo upload,
-image analysis, analytics SDK or persistent browser database is used.
+image analysis or persistent photo database is used. Optional, consent-gated GA4
+records aggregate counts and explicit usage steps, never these photo details.
+Analytics consent and the team QA flag are stored locally; GA cookies are used
+only after consent. Refusal does not restrict the experiment.
 The optional Google Forms survey receives only what the participant submits.
 
 The metadata reader is mechanically adapted from `../travel-map-campaign`
@@ -42,6 +45,21 @@ source. Review and test changes to the generated adapter before committing.
 
 The build copies only `src/` to `dist/trips/`; dependencies, tests, hosting
 credentials and personal test photos are never packaged.
+
+## Experiment measurement
+
+See [MEASUREMENT_PLAN.md](./MEASUREMENT_PLAN.md) for events, recruitment links,
+metadata-missing ratios, Android non-Kakao exclusions and GA4 setup/QA.
+`npm run build` embeds only `VITE_GA_MEASUREMENT_ID`, `VITE_GA_CAPTURE_LOCAL`
+and `VITE_GA_DEBUG`. With no measurement ID, tracking and the consent UI are off.
+Source development and non-production hosts never track by default. Production
+uses the existing pipeline's public GA measurement ID; no server changes are needed.
+Current release gate: `TRIPS_GA_RELEASE_APPROVED=false` intentionally emits an empty
+Trips measurement ID for production. The shared stream has automatic measurement
+enabled and needs console access for review. UI improvements can ship safely;
+Trips analytics remains OFF until a reviewed follow-up enables the gate.
+Tracking code, console custom definitions and confirmed GA receipt are distinct
+checks. Do not announce production measurement until all three have been checked.
 
 ## Deployment
 
