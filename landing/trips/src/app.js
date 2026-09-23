@@ -140,7 +140,7 @@ async function startOrganization(files,pickerType) {
     const summary=metadataSummary(data.records,analytics.environment);
     analytics.setContext(summary);
     analytics.track('trips_processing_complete',{...summary,processing_seconds:processingSeconds(),geo_data_available:!data.locationDataUnavailable});
-    renderTripSetup();focusHeading();announce(`${n(state.records.length)}장의 사진으로 여행 후보를 만들었어요.${state.oversized ? ` 50MB 초과 사진 ${n(state.oversized)}장은 제외했습니다.` : ''}`);
+    renderTripSetup();focusHeading();announce(`${n(state.records.length)}장의 사진 분류를 마쳤어요.${state.oversized ? ` 50MB 초과 사진 ${n(state.oversized)}장은 제외했습니다.` : ''}`);
   } catch { if(generation===readGeneration)fail(); }
 }
 
