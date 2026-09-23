@@ -121,13 +121,14 @@ test('date-only, GPS-only, fully missing and full metadata are distinguished',()
   assert.equal(metadataSummary([{gps:{}},{date:{}}],env).evaluation_group,'date_only','date-only inference is distinct from paired location evidence');
 });
 
-test('build exposes only allowlisted public configuration; disabled when missing',()=>{
+test('build pins the dedicated production stream; local QA requires explicit configuration',()=>{
   const env={VITE_GA_MEASUREMENT_ID:' G-ABC123 ',VITE_GA_CAPTURE_LOCAL:'true',VITE_GA_DEBUG:'false',AWS_SECRET_ACCESS_KEY:'do-not-publish'};
   assert.deepEqual(publicAnalyticsConfig(env),{measurementId:'G-ABC123',captureLocal:true,debug:false});
   assert.doesNotMatch(analyticsConfigSource(env),/SECRET|do-not-publish/);
-  assert.equal(publicAnalyticsConfig({}).measurementId,'');
-  assert.equal(publicAnalyticsConfig({VITE_GA_MEASUREMENT_ID:'G-MC93CZWLZF'}).measurementId,'','unreviewed production auto-measurement must remain disabled');
-  assert.throws(()=>publicAnalyticsConfig({VITE_GA_MEASUREMENT_ID:'bad<script>'}));
+  assert.deepEqual(publicAnalyticsConfig({}),{measurementId:'G-P0TDZHRQ6P',captureLocal:false,debug:false});
+  assert.equal(publicAnalyticsConfig({VITE_GA_MEASUREMENT_ID:'G-MC93CZWLZF'}).measurementId,'G-P0TDZHRQ6P','never inherit the shared stream');
+  assert.equal(publicAnalyticsConfig({VITE_GA_CAPTURE_LOCAL:'true'}).measurementId,'','local QA does not silently send to production');
+  assert.throws(()=>publicAnalyticsConfig({VITE_GA_CAPTURE_LOCAL:'true',VITE_GA_MEASUREMENT_ID:'bad<script>'}));
 });
 
 test('analytics preserves file inputs and the photo-only CSP protections',async()=>{

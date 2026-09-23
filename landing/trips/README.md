@@ -70,14 +70,14 @@ credentials and personal test photos are never packaged.
 
 See [MEASUREMENT_PLAN.md](./MEASUREMENT_PLAN.md) for events, recruitment links,
 metadata-missing ratios, Android non-Kakao exclusions and GA4 setup/QA.
-`npm run build` embeds only `VITE_GA_MEASUREMENT_ID`, `VITE_GA_CAPTURE_LOCAL`
-and `VITE_GA_DEBUG`. With no measurement ID, tracking and the consent UI are off.
-Source development and non-production hosts never track by default. Production
-uses the existing pipeline's public GA measurement ID; no server changes are needed.
-Current release gate: `TRIPS_GA_RELEASE_APPROVED=false` intentionally emits an empty
-Trips measurement ID for production. The shared stream has automatic measurement
-enabled and needs console access for review. UI improvements can ship safely;
-Trips analytics remains OFF until a reviewed follow-up enables the gate.
+Production builds pin the public Trips-only ID `G-P0TDZHRQ6P`; the shared pipeline's
+`VITE_GA_MEASUREMENT_ID` is deliberately ignored. The user chose this separate
+stream on 2026-09-23, and its enhanced measurement was verified OFF in GA4.
+`TRIPS_GA_RELEASE_APPROVED=true` enables the consent-gated production build.
+Source development and non-production hosts never track by default. Explicit
+local QA (`VITE_GA_CAPTURE_LOCAL=true`) requires its own `VITE_GA_MEASUREMENT_ID`
+and may enable `VITE_GA_DEBUG=true`; it never silently inherits the production ID.
+No server or shared landing/Recap analytics configuration changes are needed.
 Tracking code, console custom definitions and confirmed GA receipt are distinct
 checks. Do not announce production measurement until all three have been checked.
 
