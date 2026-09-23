@@ -1,8 +1,8 @@
 # Trips 실험 측정 계획
 
-2026-09-23 · 읽기 전용 분류 결과 · `surface=trips` · `analytics_schema_version=3` · `experiment_version=trips_v2`
+2026-09-23 · 위치 기반 분류 / 위치 없는 추정 보류 · `surface=trips` · `analytics_schema_version=4` · `experiment_version=trips_v3`
 
-v1의 생활 지역 선택 퍼널과 직접 합산하지 않는다. main 리뷰 후 별도 release PR로 배포하며,
+v1 생활 지역 선택 및 v2 촬영량 추정 결과와 직접 합산하지 않는다. main 리뷰 후 별도 release PR로 배포하며,
 배포 성공과 운영 GA 수집 활성화는 별개다. 현재 GA 수집은 OFF다.
 
 ## 무엇을 판단하는가
@@ -19,7 +19,7 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
 만족도를 대표한다고 단정할 수 없다. GA 사용자는 쿠키/브라우저 기준이며 실제 고유 인원과
 일치하지 않는다. 같은 사람이 크롬에서 카카오톡으로 옮기면 별도 사용자로 잡힐 수 있다.
 
-- 공통: `surface=trips`, `experiment_version=trips_v2`, `traffic_type=external`.
+- 공통: `surface=trips`, `experiment_version=trips_v3`, `traffic_type=external`.
 - **우테코 참여자도 외부 실험 참여자**다. `internal`은 개발팀 QA에만 사용한다.
 - 사용자의 실험 기준에 따라 Android + 비카카오톡 환경은
   `environment_group=android_non_kakao`로 모든 단계에서 분리한다.
@@ -30,7 +30,7 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
   UA가 숨겨지거나 변경되면 오분류될 수 있다. 원문 UA는 자체 이벤트에 넣지 않는다.
 - 읽기 완료 시 날짜와 GPS가 **같은 사진에 하나 이상** 있어야
   `evaluation_group=eligible`. 둘을 갖춘 사진이 0장이지만 날짜가 있으면 `date_only`,
-  날짜도 없으면 `no_usable_metadata`. 날짜 전용 경로는 위치 기반 경로와 별도 평가한다.
+  날짜도 없으면 `no_usable_metadata`. 날짜 전용 사진은 추정하지 않고 보류하며 위치 기반 분류 효과 평가에서 제외한다.
   Android 비카카오톡의 평가 그룹은 항상 `android_non_kakao`.
   처리 시작 시에는 아직 모르므로 `pending`이다.
 - 500장 실험은 실제 처리한 수 기준 `photo_bucket=500_plus`로 따로 본다.
@@ -43,7 +43,7 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
 | 위치정보가 전혀 없는 사람의 비율 | `trips_processing_complete`에서 `gps_coverage=none`을 경험한 총 사용자 / 같은 기간 읽기 완료 총 사용자. `some`(일부), `all`(전부)도 나란히 확인 |
 | 촬영시간도 없는가 | 위와 동일하게 `date_coverage=none/some/all`로 비교. 시간 있음·위치 없음은 둘 다 없음과 구분 |
 | 환경 탓으로 제외되는 규모 | 비카카오톡 Android 읽기 완료 사용자 / 전체 읽기 완료 사용자. 전체 진단과 `standard`만의 누락률을 모두 제시 |
-| 어떤 근거로 후보를 만들 수 있는가 | 읽기 완료 중 eligible / date_only / no_usable_metadata 분포. 날짜만 있어도 촬영량 비교가 충분하다는 뜻은 아님 |
+| 어떤 근거로 후보를 만들 수 있는가 | 읽기 완료 중 eligible / date_only / no_usable_metadata 분포. 날짜만 있는 경우 촬영량 추정 없이 보류 |
 | 처리 성공·실패·취소 | 시작 / 완료 / 실패 / 명시적 취소 이벤트 건수 비교. 새로고침·창 닫기는 원인을 알 수 없는 미완료이며 강제로 취소 이벤트를 만들어내지 않음 |
 | 제안 이후 무엇을 하는가 | 읽기 완료 후 grouping_start/results_view는 자동 표시 단계이며 의도적 클릭이 아니다. 이후 album_open(`album_kind=trip`)과 survey_click을 능동 행동으로 본다. eligible/date_only와 환경/500장 조건을 분리 |
 | 얼마나 기다렸는가 | `processing_seconds`의 분포. 실제 대기 경과 시간으로 백그라운드 정지 영향도 포함. 적극 이용 시간이나 만족도 아님 |
@@ -77,7 +77,7 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
 | `trips_processing_complete` | 메타데이터 읽기 성공, 후보 표시 직전 · processing_seconds, gps_count, dated_count, usable_count, read_error_count, geo_data_available | 시도당 1회. 결과 화면 재방문으로 재발화 안 함 |
 | `trips_processing_failed` | 현재 시도 처리 실패 · processing_seconds | 실패 시. 취소 후 늦게 끝난 작업은 무시 |
 | `trips_processing_cancelled` | 사용자가 읽기 취소 버튼 클릭 · processing_seconds | 취소 시 |
-| `trips_grouping_start` | 후보 검토 화면 진입 · grouping_mode=location/mixed/pattern | 유효한 사진 선택당 첫 진입 |
+| `trips_grouping_start` | 결과 화면 진입 · grouping_mode=location/mixed/holding | 유효한 사진 선택당 첫 진입 |
 | `trips_results_view` | 최초 자동 제안 표시 · grouping_mode, candidate_count, candidate_photo_count, other_photo_count | 사진 선택당 1회. 후보 0개도 기록 |
 | `trips_album_open` | 앨범 펼침 · album_kind=trip/other, album_photo_count, classification_method | 사진 선택당 종류별 최초 1회. 모든 후보 근거의 분포를 대표하지 않음 |
 | `trips_archive_start` / `trips_archive_ready` | ZIP/원본 준비 시작 및 준비 완료 · archive_photo_count | 준비 시도별. 이미 준비된 항목 요청은 재발화 안 함 |
@@ -89,12 +89,12 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
 사진 수는 처리 대상으로 남은 수다. selected_count는 사진 외/용량 초과도 포함한 반환 수다.
 
 결과 집계는 grouping_mode, candidate_count, candidate_photo_count, other_photo_count다.
-candidate_count는 위치·시간·촬영량 후보 수이며 실제 여행 수나 성공 건수가 아니다.
+candidate_count는 위치·날짜와 제한된 시간 연결 후보 수이며 실제 여행 수나 성공 건수가 아니다.
 날짜만으로 남은 사진과 촬영일 없는 사진은 단일 보류 앨범으로 묶고 other_photo_count에 포함한다.
-grouping_mode=pattern은 GPS 기준 사진이 없는 경로이며, 충분한 기록으로 추정에 성공했다는 뜻은 아니다.
+grouping_mode=holding은 GPS·날짜 기준 사진이 없는 경로다. candidate_count=0이고 모든 사진은 other_photo_count에 포함한다.
 classification_method는 location/time_assisted/time/pattern/date/combined이며 사진별 근거를 합친 값이다.
 편집·확정 이벤트는 현재 UI에서 발화하지 않는다. 후보 표시가 사용자 확정이나 만족도를 뜻하지 않는다.
-Android 비카카오톡 제외는 날짜 전용 추정에도 그대로 유지한다. 추정 경로 추가를 이유로 평가에 재포함하지 않는다.
+Android 비카카오톡은 누락 진단에 별도 표시하고 제품 효과 평가에서 계속 제외한다.
 
 ## 모집 링크
 

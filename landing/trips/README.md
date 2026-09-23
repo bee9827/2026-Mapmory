@@ -10,10 +10,9 @@ Select originals → read metadata → read-only classified albums, then survey 
 same screen. No editing, confirmation, location/date review or home-region input.
 All undecidable date-only and undated photos share ONE holding album, after the
 travel candidates. Original location/date folders and ZIP remain optional secondary views.
-Observed location/date evidence and capture-time/count inference are labeled separately.
-With no usable GPS anchors, capture-count inference runs automatically if history is
-sufficient, comparing selected active days only; it is not a confirmed personal baseline.
-Otherwise preserve photos in the holding album. These are experimental rules,
+Observed location/date evidence and bounded capture-time linkage are labeled separately.
+Capture-count inference is paused. With no usable GPS/date anchors, preserve ALL
+photos in one holding album, even if a large capture burst exists. These are experimental rules,
 not validated travel detection. See [TRIP_GROUPING_PLAN.md](./TRIP_GROUPING_PLAN.md).
 Results are memory-only and disappear on refresh. ZIP keeps the original
 location/date folder structure; it does not export the travel-candidate grouping.

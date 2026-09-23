@@ -7,7 +7,7 @@ const seconds = value => Number.isFinite(value) && value >= 0 && value <= 86400;
 const oneOf = (...values) => value => values.includes(value);
 const coverage = oneOf('none', 'some', 'all', 'unknown');
 const picker = { picker_type: oneOf('photos', 'files') };
-const grouping = { grouping_mode: oneOf('location', 'mixed', 'pattern'), candidate_count: count, candidate_photo_count: count, other_photo_count: count };
+const grouping = { grouping_mode: oneOf('location', 'mixed', 'holding'), candidate_count: count, candidate_photo_count: count, other_photo_count: count };
 const selection = { ...picker, selected_count: count, photo_count: count, oversized_count: count, non_photo_count: count };
 const schemas = {
   trips_picker_open: picker,
@@ -81,7 +81,7 @@ export function createAnalytics({ config, win = window, doc = document }) {
   const internalQuery = new URL(win.location.href).searchParams.get('internal');
   if (internalQuery === '1' || internalQuery === '0') write(INTERNAL_KEY, internalQuery === '1' ? '1' : '0');
   const internal = config.captureLocal || (internalQuery === '1' || (internalQuery !== '0' && read(INTERNAL_KEY) === '1'));
-  const base = { surface: 'trips', analytics_schema_version: '3', experiment_version: 'trips_v2', traffic_type: internal ? 'internal' : 'external', platform: environment.platform, browser_context: environment.browser_context, environment_group: environment.environment_eligible ? 'standard' : 'android_non_kakao' };
+  const base = { surface: 'trips', analytics_schema_version: '4', experiment_version: 'trips_v3', traffic_type: internal ? 'internal' : 'external', platform: environment.platform, browser_context: environment.browser_context, environment_group: environment.environment_eligible ? 'standard' : 'android_non_kakao' };
   const commonPage = { page_location: safePageLocation(win.location.href), page_referrer: safeReferrer(doc.referrer), page_title: '사진 정리하기 · Mapmory' };
   function gtag() { (win.dataLayer ??= []).push(arguments); }
   function initialize() {

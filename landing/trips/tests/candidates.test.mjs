@@ -38,33 +38,32 @@ test('ambiguous location intervals and long unobserved gaps do not guess a locat
   const overnight = [photo(0, 1, busan, 8), photo(1, 1, null, 20), photo(2, 2, busan, 8)];
   assert.equal(proposeTrips(overnight).groups.find(g => g.photos.some(p => p.index === 1)).basis[1], 'date');
 });
-test('GPS-free patterns run automatically but require adequate observed history', () => {
+test('GPS-free burst inference is paused even with adequate observed history', () => {
   const input = patternPhotos();
-  assert.equal(proposeTrips(input).pattern.status, 'ready');
-  assert.ok(proposeTrips(input).groups.some(g => candidateMethod(g) === 'pattern'));
+  assert.equal(proposeTrips(input).pattern, null);
+  assert.deepEqual(proposeTrips(input).groups, []);
+  assert.equal(proposeTrips(input).mode, 'holding');
   const insufficient = proposeTrips(input.filter(p => p.date.day >= '2026-09-15'));
-  assert.equal(insufficient.pattern.status, 'insufficient');
-  assert.ok(insufficient.groups.every(g => candidateMethod(g) === 'date'));
+  assert.equal(insufficient.mode, 'holding');
+  assert.deepEqual(insufficient.groups, []);
 });
-test('burst ratio uses observed active-day median and preserves ordinary photos', () => {
+test('holding preserves ordinary photos and a large burst without classification', () => {
   const input = patternPhotos(), result = proposeTrips(input);
-  assert.equal(result.pattern.status, 'ready'); assert.equal(result.pattern.baseline, 2);
-  assert.equal(result.pattern.minimum, 10); assert.equal(result.pattern.activeDays, 9); assert.equal(result.pattern.spanDays, 16);
-  const bursts = result.groups.filter(g => candidateMethod(g) === 'pattern');
-  assert.equal(bursts.length, 1); assert.equal(bursts[0].photos.length, 40);
+  assert.equal(result.other.length, input.length);
+  assert.equal(result.groups.length, 0);
   partition(result, input);
 });
 test('many photos every day is not treated as a burst', () => {
   const input = Array.from({ length: 14 * 20 }, (_, i) => photo(i, Math.floor(i / 20) + 1, null));
   const result = proposeTrips(input);
-  assert.equal(result.pattern.status, 'no_burst'); assert.ok(result.groups.every(g => candidateMethod(g) === 'date'));
+  assert.equal(result.mode, 'holding'); assert.equal(result.groups.length, 0);
   partition(result, input);
 });
 test('no dates and invalid GPS have safe fallbacks', () => {
   const input = [photo(0, null), photo(1, null, null)];
-  assert.equal(proposeTrips(input).pattern.status, 'no_dates'); assert.equal(proposeTrips(input).groups.length, 0);
+  assert.equal(proposeTrips(input).mode, 'holding'); assert.equal(proposeTrips(input).groups.length, 0);
   partition(proposeTrips(input), input);
-  assert.equal(proposeTrips([photo(0, 1, { latitude: 999, longitude: 127 })]).mode, 'pattern');
+  assert.equal(proposeTrips([photo(0, 1, { latitude: 999, longitude: 127 })]).mode, 'holding');
   assert.deepEqual(proposeTrips([]).groups, []);
 });
 test('merge, split and dismiss preserve every photo and original per-photo evidence', () => {

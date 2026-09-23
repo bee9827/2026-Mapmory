@@ -52,20 +52,21 @@ test('read-only results show albums first, survey below, with no editing control
   assert.doesNotMatch(JSON.stringify(h.events()),/PRIVATE|2026-09|latitude|longitude|candidate-/);
   assert.equal(JSON.stringify(records),original);
 });
-test('GPS-free inference is automatic; ordinary dates and undated photos form one holding album',()=>{
+test('GPS-free bursts, ordinary dates and undated photos all form one holding album',()=>{
   let index=0;
   const records=[1,3,5,7,9,11,13,15,16].flatMap(day=>Array.from({length:day>=15?20:2},()=>photo(index++,day,null)));
   records.push({index:index++,name:'unknown.jpg',date:null,gps:null});
   const h=setup(records);h.review.open();
-  assert.equal(title(h.root),'1개 여행 후보를 찾았어요');
-  assert.equal(h.albums.length,2);
-  assert.equal(h.albums[0].label,'추정 · 촬영량 증가');
-  assert.equal(h.albums[0].photos.length,40);
-  assert.equal(h.albums[1].title,'분류 보류');
-  assert.equal(h.albums[1].photos.length,15);
+  assert.equal(title(h.root),'분류 보류 사진을 한곳에 모았어요');
+  assert.equal(h.albums.length,1);
+  assert.equal(h.albums[0].title,'분류 보류');
+  assert.equal(h.albums[0].photos.length,55);
   assert.equal(new Set(h.albums.flatMap(a=>a.photos.map(p=>p.index))).size,55);
   const event=h.events().find(e=>e.event==='trips_results_view');
-  assert.equal(event.candidate_count,1);assert.equal(event.other_photo_count,15);
+  assert.equal(event.candidate_count,0);assert.equal(event.other_photo_count,55);
+  assert.equal(event.grouping_mode,'holding');
+  assert.equal(event.experiment_version,'trips_v3');
+  assert.equal(event.analytics_schema_version,'4');
 });
 test('insufficient or undated input stays visible in one holding album, not tiny date groups',()=>{
   for(const records of [[{index:0,name:'unknown.jpg',date:null,gps:null}],

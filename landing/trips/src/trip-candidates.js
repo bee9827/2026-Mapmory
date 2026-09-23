@@ -1,8 +1,6 @@
 // Experimental defaults, not validated definitions of a trip. No home required.
 export const TRIP_RULES = Object.freeze({
   visitRadiusKm: 30, visitGapHours: 36, linkHours: 6,
-  baselineSpanDays: 14, baselineActiveDays: 7, baselineOrdinaryDays: 5,
-  burstRatio: 3, burstMinPhotos: 10,
 });
 const DAY = 86400000;
 export function distance(a, b) {
@@ -36,39 +34,6 @@ function dayGroups(photos, basis = 'date') {
   }
   return [...days.values()].map(photos => candidate(photos, basis));
 }
-const median = values => {
-  const sorted = [...values].sort((a, b) => a - b), middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-};
-
-/** Missing selected days are unknown, NOT zero-photo days. The active-day median
- * describes this selection only, never a confirmed personal ordinary-photo baseline.
- */
-function patternCandidates(dated, rules) {
-  const days = dayGroups(dated);
-  const spanDays = days.length ? Math.floor(photoTime(dated.at(-1)) / DAY) - Math.floor(photoTime(dated[0]) / DAY) + 1 : 0;
-  const baseline = days.length ? median(days.map(day => day.photos.length)) : 0;
-  const minimum = Math.max(rules.burstMinPhotos, baseline * rules.burstRatio);
-  const ordinaryDays = days.filter(day => day.photos.length < minimum).length;
-  let status = !dated.length ? 'no_dates'
-    : spanDays < rules.baselineSpanDays || days.length < rules.baselineActiveDays || ordinaryDays < rules.baselineOrdinaryDays
-      ? 'insufficient' : 'ready';
-  const groups = [], pending = [];
-  let current = null;
-  for (const day of days) {
-    if (status !== 'ready' || day.photos.length < minimum) { pending.push(...day.photos); current = null; continue; }
-    const dayNumber = Math.floor(photoTime(day.photos[0]) / DAY);
-    if (!current || dayNumber - current.lastDay !== 1) {
-      current = { ...candidate(day.photos, 'pattern'), lastDay: dayNumber }; groups.push(current);
-    } else {
-      current.lastDay = dayNumber; current.photos.push(...day.photos);
-      for (const photo of day.photos) current.basis[photo.index] = 'pattern';
-    }
-  }
-  if (status === 'ready' && !groups.length) status = 'no_burst';
-  return { groups, pending, pattern: { status, spanDays, activeDays: days.length, baseline, minimum, ratio: rules.burstRatio } };
-}
-
 /** Partition every input once; never write inferred GPS back to an original record. */
 export function proposeTrips(records, { rules = TRIP_RULES } = {}) {
   if (new Set(records.map(p => p.index)).size !== records.length) throw new Error('사진 식별자가 중복됐어요.');
@@ -76,9 +41,9 @@ export function proposeTrips(records, { rules = TRIP_RULES } = {}) {
   const undated = chronological(records.filter(p => !Number.isFinite(photoTime(p))));
   const located = dated.filter(hasGps);
   if (!located.length) {
-    const { groups, pending, pattern } = patternCandidates(dated, rules);
-    return { groups: [...groups, ...dayGroups(pending)].sort((a, b) => photoTime(a.photos[0]) - photoTime(b.photos[0])),
-      other: [...undated], pattern, mode: 'pattern', confirmed: false };
+    // Capture-volume inference is paused. No usable location/date anchors means
+    // every photo stays visible in the single holding album, regardless of volume.
+    return { groups: [], other: chronological(records), pattern: null, mode: 'holding', confirmed: false };
   }
   const groups = [];
   let current = null;
