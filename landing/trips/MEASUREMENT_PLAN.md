@@ -1,12 +1,15 @@
 # Trips 실험 측정 계획
 
-2026-09-23 · `surface=trips` · `analytics_schema_version=2` · `experiment_version=trips_v1`
+2026-09-23 · 읽기 전용 분류 결과 · `surface=trips` · `analytics_schema_version=3` · `experiment_version=trips_v2`
+
+v1의 생활 지역 선택 퍼널과 직접 합산하지 않는다. main 리뷰 후 별도 release PR로 배포하며,
+배포 성공과 운영 GA 수집 활성화는 별개다. 현재 GA 수집은 OFF다.
 
 ## 무엇을 판단하는가
 
 설문 미응답자의 행동도 참고하되 **사용 행동을 만족도로 바꾸어 해석하지 않는다.**
 질문은 (1) 사진을 가져올 수 있는가, (2) 메타데이터가 얼마나 읽히는가,
-(3) 위치 정리 이후 여행 후보까지 진행하고 실제로 펼쳐보는가이다.
+(3) 자동 분류된 후보를 펼쳐보고 설문으로 이동하는가이다. 편집·확정 단계는 없다.
 ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기능이 아니다.
 
 ### 분모와 환경 제외 기준
@@ -16,7 +19,7 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
 만족도를 대표한다고 단정할 수 없다. GA 사용자는 쿠키/브라우저 기준이며 실제 고유 인원과
 일치하지 않는다. 같은 사람이 크롬에서 카카오톡으로 옮기면 별도 사용자로 잡힐 수 있다.
 
-- 공통: `surface=trips`, `experiment_version=trips_v1`, `traffic_type=external`.
+- 공통: `surface=trips`, `experiment_version=trips_v2`, `traffic_type=external`.
 - **우테코 참여자도 외부 실험 참여자**다. `internal`은 개발팀 QA에만 사용한다.
 - 사용자의 실험 기준에 따라 Android + 비카카오톡 환경은
   `environment_group=android_non_kakao`로 모든 단계에서 분리한다.
@@ -26,7 +29,8 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
   OS/브라우저는 UA에서 Android/iOS/other, Kakao/Slack/Chrome/Safari/other 범주만 추정한다.
   UA가 숨겨지거나 변경되면 오분류될 수 있다. 원문 UA는 자체 이벤트에 넣지 않는다.
 - 읽기 완료 시 날짜와 GPS가 **같은 사진에 하나 이상** 있어야
-  `evaluation_group=eligible`. 둘을 갖춘 사진이 0장이면 `no_usable_metadata`.
+  `evaluation_group=eligible`. 둘을 갖춘 사진이 0장이지만 날짜가 있으면 `date_only`,
+  날짜도 없으면 `no_usable_metadata`. 날짜 전용 경로는 위치 기반 경로와 별도 평가한다.
   Android 비카카오톡의 평가 그룹은 항상 `android_non_kakao`.
   처리 시작 시에는 아직 모르므로 `pending`이다.
 - 500장 실험은 실제 처리한 수 기준 `photo_bucket=500_plus`로 따로 본다.
@@ -39,9 +43,9 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
 | 위치정보가 전혀 없는 사람의 비율 | `trips_processing_complete`에서 `gps_coverage=none`을 경험한 총 사용자 / 같은 기간 읽기 완료 총 사용자. `some`(일부), `all`(전부)도 나란히 확인 |
 | 촬영시간도 없는가 | 위와 동일하게 `date_coverage=none/some/all`로 비교. 시간 있음·위치 없음은 둘 다 없음과 구분 |
 | 환경 탓으로 제외되는 규모 | 비카카오톡 Android 읽기 완료 사용자 / 전체 읽기 완료 사용자. 전체 진단과 `standard`만의 누락률을 모두 제시 |
-| 정상 환경에서도 실제 묶기가 가능한가 | 읽기 완료 중 `evaluation_group=eligible` 비율. 메타데이터 실패를 무관심으로 해석하지 않음 |
+| 어떤 근거로 후보를 만들 수 있는가 | 읽기 완료 중 eligible / date_only / no_usable_metadata 분포. 날짜만 있어도 촬영량 비교가 충분하다는 뜻은 아님 |
 | 처리 성공·실패·취소 | 시작 / 완료 / 실패 / 명시적 취소 이벤트 건수 비교. 새로고침·창 닫기는 원인을 알 수 없는 미완료이며 강제로 취소 이벤트를 만들어내지 않음 |
-| 여행 결과를 보려 하는가 | eligible 읽기 완료 → grouping_start → results_view → album_open(`album_kind=trip`)의 총 사용자 퍼널. 각 단계의 환경/500장 조건을 일치시킴 |
+| 제안 이후 무엇을 하는가 | 읽기 완료 후 grouping_start/results_view는 자동 표시 단계이며 의도적 클릭이 아니다. 이후 album_open(`album_kind=trip`)과 survey_click을 능동 행동으로 본다. eligible/date_only와 환경/500장 조건을 분리 |
 | 얼마나 기다렸는가 | `processing_seconds`의 분포. 실제 대기 경과 시간으로 백그라운드 정지 영향도 포함. 적극 이용 시간이나 만족도 아님 |
 | 결과를 활용하려 하는가 | `trips_download_request` 총 사용자. 브라우저에 저장을 요청한 것이며 파일 저장 완료 아님 |
 | 설문으로 이동하려 하는가 | `trips_survey_click` 총 사용자. 새 탭 링크 클릭만 측정. iframe 내부 응답 및 제출 완료는 모름 |
@@ -70,12 +74,12 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
 | `trips_selection_received` | 비어 있지 않은 FileList 반환 · selected_count, photo_count, oversized_count, non_photo_count, picker_type | 반환마다 |
 | `trips_selection_rejected` | 전체 제외/선택 오류 · 위 건수 + reason=no_photos/all_oversized/too_many/invalid_size | 거절마다. 기존 결과는 유지 |
 | `trips_processing_start` | 유효한 선택으로 처리 시작 · 위 선택 건수 | 처리 시도당 1회 |
-| `trips_processing_complete` | 읽기 성공 및 위치 결과 표시 · processing_seconds, gps_count, dated_count, usable_count, read_error_count, geo_data_available | 시도당 1회. 결과 화면 재방문으로 재발화 안 함 |
+| `trips_processing_complete` | 메타데이터 읽기 성공, 후보 표시 직전 · processing_seconds, gps_count, dated_count, usable_count, read_error_count, geo_data_available | 시도당 1회. 결과 화면 재방문으로 재발화 안 함 |
 | `trips_processing_failed` | 현재 시도 처리 실패 · processing_seconds | 실패 시. 취소 후 늦게 끝난 작업은 무시 |
 | `trips_processing_cancelled` | 사용자가 읽기 취소 버튼 클릭 · processing_seconds | 취소 시 |
-| `trips_grouping_start` | 생활 지역 선택 화면 진입 · home_option_count | 유효한 사진 선택당 첫 진입 |
-| `trips_results_view` | 생활 지역 명시적 선택 후 결과 표시 · candidate_count, candidate_photo_count, other_photo_count | 생활 지역 선택마다. 후보 0개도 별도 값으로 기록 |
-| `trips_album_open` | 앨범 펼침 · album_kind=home/trip/other, album_photo_count | 사진 선택당 종류별 최초 1회. 다시 접고 펴기/화면 재방문 중복 제외 |
+| `trips_grouping_start` | 후보 검토 화면 진입 · grouping_mode=location/mixed/pattern | 유효한 사진 선택당 첫 진입 |
+| `trips_results_view` | 최초 자동 제안 표시 · grouping_mode, candidate_count, candidate_photo_count, other_photo_count | 사진 선택당 1회. 후보 0개도 기록 |
+| `trips_album_open` | 앨범 펼침 · album_kind=trip/other, album_photo_count, classification_method | 사진 선택당 종류별 최초 1회. 모든 후보 근거의 분포를 대표하지 않음 |
 | `trips_archive_start` / `trips_archive_ready` | ZIP/원본 준비 시작 및 준비 완료 · archive_photo_count | 준비 시도별. 이미 준비된 항목 요청은 재발화 안 함 |
 | `trips_archive_failed` / `trips_archive_cancelled` | 생성 실패 / 명시적 생성 취소 | 실제 실패/취소 시 |
 | `trips_download_request` | 준비된 파일의 저장 링크 클릭 · archive_photo_count | 사진 선택당 분할 파일별 1회. 경로나 파일명/인덱스는 전송 안 함 |
@@ -83,6 +87,14 @@ ZIP은 위치·날짜 폴더를 내보내며 여행 후보를 내보내는 기�
 
 `picker_type`은 웹의 두 입력 버튼을 구분할 뿐 실제 OS에서 고른 앱 이름을 뜻하지 않는다.
 사진 수는 처리 대상으로 남은 수다. selected_count는 사진 외/용량 초과도 포함한 반환 수다.
+
+결과 집계는 grouping_mode, candidate_count, candidate_photo_count, other_photo_count다.
+candidate_count는 위치·시간·촬영량 후보 수이며 실제 여행 수나 성공 건수가 아니다.
+날짜만으로 남은 사진과 촬영일 없는 사진은 단일 보류 앨범으로 묶고 other_photo_count에 포함한다.
+grouping_mode=pattern은 GPS 기준 사진이 없는 경로이며, 충분한 기록으로 추정에 성공했다는 뜻은 아니다.
+classification_method는 location/time_assisted/time/pattern/date/combined이며 사진별 근거를 합친 값이다.
+편집·확정 이벤트는 현재 UI에서 발화하지 않는다. 후보 표시가 사용자 확정이나 만족도를 뜻하지 않는다.
+Android 비카카오톡 제외는 날짜 전용 추정에도 그대로 유지한다. 추정 경로 추가를 이유로 평가에 재포함하지 않는다.
 
 ## 모집 링크
 
@@ -110,7 +122,7 @@ page_location에 남기며 다른 query/hash와 referrer 경로는 제거한다.
 1. 맞춤 정의에 이벤트 범위 차원을 필요한 것만 등록:
    `surface`, `experiment_version`, `traffic_type`, `platform`, `browser_context`,
    `environment_group`, `picker_type`, `photo_bucket`, `gps_coverage`, `date_coverage`,
-   `evaluation_group`, `album_kind`, `reason`. 기존 정의가 있으면 재사용.
+   `evaluation_group`, `album_kind`, `reason`, `grouping_mode`, `classification_method`. 기존 정의가 있으면 재사용.
 2. 수치 분석이 필요하면 `processing_seconds`(초), `photo_count`, `gps_count`,
    `dated_count`, `usable_count`, `candidate_count`를 이벤트 범위 맞춤 측정항목으로 등록.
 3. 자유 형식 탐색에 완료 이벤트의 총 사용자/이벤트 수와 GPS·날짜 coverage를 두고,
@@ -135,13 +147,18 @@ Google Signals/광고 개인화는 이 페이지 태그에서 사용하지 않�
 테스트 범위: consent, host gate, UA 환경 분리, 누락 집계, 파라미터 유출 방지,
 재선택 중복, 공개 빌드 설정, 기존 파서/분류/ZIP/라우트 회귀.
 실제 휴대폰 재검증 및 GA DebugView/Realtime 수신은 별도 확인이다.
-2026-09-23 로컬 검증: Trips 52개 테스트 통과, 공개 GA 설정을 넣은 정적 빌드 통과.
+이전 v1 검증 기록: Trips 52개 테스트 통과, 공개 GA 설정을 넣은 정적 빌드 통과.
 기존 landing 빌드 및 회귀 테스트도 통과(83 통과, Linux 전용 24개는 Windows에서 제외).
 390×844 브라우저에서 통계 거절/허용/철회 UI와 오류 로그 없음 확인.
 브라우저 검증은 `node tests/browser-preview.mjs`의 **로컬 GA 대역**을 사용했다.
 운영 GA 수신을 확인한 것이 아니며, 이 대역 서버는 배포 파일에 포함되지 않는다.
 로컬에서는 기본 미수집. QA build만 `VITE_GA_CAPTURE_LOCAL=true`, `VITE_GA_DEBUG=true`를
 명시하고 QA 표시를 유지한다. 운영 빌드에는 이 두 옵션을 켜지 않는다.
+
+v2 읽기 전용 결과 로컬 검증: Trips 64개 테스트 통과. 1,000장 누락·중복 방지,
+부분 GPS 시간 연결, 촬영량 자동 추정/근거 부족, 편집 컨트롤 제거, 단일 보류 앨범,
+개인정보 허용 목록을 포함한다. 모바일 너비에서 앨범이 첫 화면에 보이고 펼쳐지는지 확인했다.
+합성 데이터 검증이며 실제 사용자 정확도나 운영 GA 수신을 검증한 것은 아니다.
 
 공식 참고: [Consent mode](https://developers.google.com/tag-platform/security/guides/consent),
 [GA4 config](https://developers.google.com/analytics/devguides/collection/ga4/reference/config),
