@@ -104,7 +104,7 @@ test('date-only, GPS-only, fully missing and full metadata are distinguished',()
   assert.equal(metadataSummary([{readError:true}],env).read_error_count,1);
   assert.equal(metadataSummary([{},{}],env).evaluation_group,'no_usable_metadata');
   assert.equal(metadataSummary([{gps:{},date:{}}],env).gps_coverage,'all');
-  assert.equal(metadataSummary([{gps:{}},{date:{}}],env).evaluation_group,'no_usable_metadata','must be paired on the same photo');
+  assert.equal(metadataSummary([{gps:{}},{date:{}}],env).evaluation_group,'date_only','date-only inference is distinct from paired location evidence');
 });
 
 test('build exposes only allowlisted public configuration; disabled when missing',()=>{

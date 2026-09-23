@@ -62,7 +62,7 @@ test('mixed input keeps processing; all oversized input preserves previous resul
   const context = {analytics:analytics(),metadataSummary,performance,processingStarted:0,processingSeconds:()=>1,state, isPhoto: () => true, validateTripSelection, excludeOversizedPhotos,
     n: String, readGeneration: 0, reset() {resetCalls++;}, renderProgress() {},
     organizePhotos: async files => {received = files; return {records: files, locationDataUnavailable: false};},
-    planArchives: records => records, renderResults() {}, focusHeading() {}, announce() {}, progressUpdate() {},
+    planArchives: records => records, renderTripSetup() {}, focusHeading() {}, announce() {}, progressUpdate() {},
     renderStart: text => {message = text;}, showResultError: text => {message = text;}, files: [large]};
   await runInNewContext(`${start}\nstartOrganization(files);`, context);
   assert.match(message, /모두 50MB/);
