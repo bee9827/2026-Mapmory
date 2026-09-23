@@ -6,9 +6,21 @@ The existing homepage and `/recap/` are unchanged.
 
 ## Flow and privacy
 
-Select originals → location folders (date view below) → choose a home region
-from photo albums → review travel candidates. ZIP keeps the original location/date
-folder structure; it does not export the travel-candidate grouping.
+Select originals → read metadata → read-only classified albums, then survey on the
+same screen. No editing, confirmation, location/date review or home-region input.
+All undecidable date-only and undated photos share ONE holding album, after the
+travel candidates. Original location/date folders and ZIP remain optional secondary views.
+Observed location/date evidence and capture-time/count inference are labeled separately.
+With no usable GPS anchors, capture-count inference runs automatically if history is
+sufficient, comparing selected active days only; it is not a confirmed personal baseline.
+Otherwise preserve photos in the holding album. These are experimental rules,
+not validated travel detection. See [TRIP_GROUPING_PLAN.md](./TRIP_GROUPING_PLAN.md).
+Results are memory-only and disappear on refresh. ZIP keeps the original
+location/date folder structure; it does not export the travel-candidate grouping.
+
+The user authorized production promotion after local review on 2026-09-23.
+Use the reviewed main PR → landing-release PR → existing automatic deployment path.
+Do not interpret a successful local build or PR merge alone as verified deployment.
 
 Photos, filenames, timestamps and GPS stay in browser memory. No photo upload,
 image analysis or persistent photo database is used. Optional, consent-gated GA4

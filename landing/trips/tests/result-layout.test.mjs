@@ -9,7 +9,7 @@ const render=source.slice(source.indexOf('function renderResults()'),source.inde
 function node(tag,className='',text=''){
   return {tag,className,text,children:[],append(...children){this.children.push(...children);},replaceChildren(){this.children=[];},setAttribute(){},addEventListener(){}};
 }
-test('travel CTA precedes summary, all warnings and long location lists, and keeps home selection action',()=>{
+test('optional folder view keeps a prominent return to candidate review above long lists',()=>{
   const app=node('main');let selected=false;
   const records=Array.from({length:500},(_,index)=>({index,size:10,city:`test-${index}`,gps:null,date:null,readError:true}));
   const context={app,state:{records,skipped:2,oversized:3,geoUnavailable:true},el:node,icon:node,n:String,formatBytes:String,
@@ -26,4 +26,15 @@ test('travel CTA precedes summary, all warnings and long location lists, and kee
   const dateIndex=app.children.findIndex(n=>n.className==='tree-card date-card');
   assert.ok(locationIndex>1);assert.ok(dateIndex>locationIndex);
   assert.equal(app.children[locationIndex].children.some(n=>n.className==='trip-next-step'),false,'no duplicate CTA under folders');
+});
+
+test('direct candidate view retains metadata counts and oversized-file exclusions',()=>{
+  const notice=source.slice(source.indexOf('function tripImportNotice()'),source.indexOf('function renderTripSetup()'));
+  const context={state:{records:[{gps:{},date:{}},{gps:null,date:{},readError:true}],oversized:3,skipped:1,geoUnavailable:true},el:node,n:String};
+  const result=runInNewContext(`${notice}\ntripImportNotice();`,context);
+  const copy=result.children.map(n=>n.text).join(' ');
+  assert.match(copy,/2장 읽음 · 촬영일 2장 · 위치 1장/);
+  assert.match(copy,/50MB 초과 사진 3장은 제외/);
+  assert.match(copy,/사진이 아닌 파일 1개/);
+  assert.match(copy,/1장은 촬영 정보를 완전히 읽지 못했지만 원본은 보존/);
 });
