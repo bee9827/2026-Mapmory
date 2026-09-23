@@ -56,13 +56,13 @@ test('mixed input keeps processing; all oversized input preserves previous resul
   const source = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
   const start = source.slice(source.indexOf('async function startOrganization('), source.indexOf('\nfunction buildTree('));
   const large = {size: TRIP_SELECTION_LIMITS.fileBytes + 1};
-  let message = '', received, resetCalls = 0;
+  let message = '', announcement = '', received, resetCalls = 0;
   const previous = [{index: 0}];
   const state = {records: previous};
   const context = {analytics:analytics(),metadataSummary,performance,processingStarted:0,processingSeconds:()=>1,state, isPhoto: () => true, validateTripSelection, excludeOversizedPhotos,
     n: String, readGeneration: 0, reset() {resetCalls++;}, renderProgress() {},
     organizePhotos: async files => {received = files; return {records: files, locationDataUnavailable: false};},
-    planArchives: records => records, renderTripSetup() {}, focusHeading() {}, announce() {}, progressUpdate() {},
+    planArchives: records => records, renderTripSetup() {}, focusHeading() {}, announce(text) {announcement = text;}, progressUpdate() {},
     renderStart: text => {message = text;}, showResultError: text => {message = text;}, files: [large]};
   await runInNewContext(`${start}\nstartOrganization(files);`, context);
   assert.match(message, /모두 50MB/);
@@ -75,6 +75,7 @@ test('mixed input keeps processing; all oversized input preserves previous resul
   assert.equal(state.oversized, 1);
   assert.equal(state.skipped, 0);
   assert.equal(state.phase, 'complete');
+  assert.equal(announcement, '2장의 사진 분류를 마쳤어요. 50MB 초과 사진 1장은 제외했습니다.');
   assert.match(source, /if \(state\.oversized\) text\.append/);
 });
 
