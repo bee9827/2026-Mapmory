@@ -3,7 +3,7 @@ import { createPhotoViewer } from './viewer.js';
 import { groupByDate, localDay } from './dates.js';
 import { validateTripSelection, excludeOversizedPhotos } from './selection.js';
 import {organizePhotos} from './pipeline.js';
-import {homeOptions,groupTrips} from './trips.js';
+import {createTripReview} from './trip-review.js';
 import {createAlbumResources,createPhotoAlbum} from './albums.js';
 import {analyticsConfig} from './analytics-config.js';
 import {createAnalytics,metadataSummary} from './analytics.js';
@@ -12,7 +12,7 @@ const analytics=createAnalytics({config:analyticsConfig});
 mountAnalyticsConsent(analytics);
 let processingStarted=0;
 const processingSeconds=()=>Math.max(0,Math.round((performance.now()-processingStarted)/1000));
-let readGeneration=0, selectedHome=null;
+let readGeneration=0, tripReview=null;
 
 const app = document.querySelector('#app');
 const input = document.querySelector('#photo-input');
@@ -65,7 +65,7 @@ function terminate() {
   state.archiveReject = null; state.archivePromise = null;
 }
 function reset() {
-  readGeneration++; selectedHome=null;
+  readGeneration++; tripReview=null;
   viewer.reset(); terminate(); releaseReady(); clearAlbums();
   Object.assign(state, { phase: 'idle', files: [], records: [], archives: [], busyPart: -1, progress: 0, skipped: 0, oversized: 0, geoUnavailable: false, downloaded: new Set() });
 }
@@ -137,10 +137,10 @@ async function startOrganization(files,pickerType) {
     const data=await organizePhotos(state.files,{cancelled:()=>generation!==readGeneration,onProgress:progressUpdate});
     if(generation!==readGeneration)return;
     Object.assign(state,{phase:'complete',records:data.records,archives:planArchives(data.records),geoUnavailable:data.locationDataUnavailable,progress:100});
-    renderResults();focusHeading();announce(`${n(state.records.length)}장의 사진 정리가 끝났습니다.${state.oversized ? ` 50MB 초과 사진 ${n(state.oversized)}장은 제외했습니다.` : ''}`);
     const summary=metadataSummary(data.records,analytics.environment);
     analytics.setContext(summary);
     analytics.track('trips_processing_complete',{...summary,processing_seconds:processingSeconds(),geo_data_available:!data.locationDataUnavailable});
+    renderTripSetup();focusHeading();announce(`${n(state.records.length)}장의 사진 분류를 마쳤어요.${state.oversized ? ` 50MB 초과 사진 ${n(state.oversized)}장은 제외했습니다.` : ''}`);
   } catch { if(generation===readGeneration)fail(); }
 }
 
@@ -195,7 +195,7 @@ function renderResults() {
   header.append(badge, el('h1', '', '사진 속 장소를 찾았어요'), el('p', 'result-description', `${n(state.records.length)}장의 사진을 위치별로 모았어요.`));
   const nextStep=el('section','trip-next-step');
   nextStep.setAttribute('aria-label','여행 묶어서 보기');
-  nextStep.append(button('여행 묶어서 보기',renderTripSetup,'button button-trip'),el('p','trip-next-description','생활 지역을 고르면, 날짜와 위치로 여행 후보를 묶어요.'));
+  nextStep.append(button('여행 묶어서 보기',renderTripSetup,'button button-trip'),el('p','trip-next-description','위치·날짜 또는 촬영량으로 분류한 사진 묶음을 확인하세요.'));
   const summary = el('div', 'summary-grid');
   const places = new Set(state.records.filter(r => r.city).map(r => `${r.countryCode}:${r.cityId ?? r.city}`)).size;
   const dates = new Set(state.records.filter(r => r.date).map(r => r.date.day)).size;
@@ -241,36 +241,22 @@ function renderResults() {
   app.append(button('다른 사진 정리하기', choosePhotos, 'button button-text restart-button'), privacyNote());
 }
 
-function renderTripSetup(){
-  clearAlbums();
-  app.replaceChildren();app.className='result-screen';
-  app.append(el('p','flow-label','02 · 생활 지역 선택'),el('h1','','어느 곳이 일상인가요?'),el('p','result-description','위치별로 모은 사진이에요. 앨범을 펼쳐 사진을 확인한 뒤, 평소 머무는 곳을 생활 지역으로 선택해주세요.'));
-  const options=homeOptions(state.records);
-  const albums=el('div','album-list');
-  for(const area of options){
-    albums.append(photoAlbum({title:area.label,photos:area.photos,label:'위치별 사진',onExpand:()=>analytics.track('trips_album_open',{album_kind:'home',album_photo_count:area.photos.length},'home_album_open'),onSelect:()=>{selectedHome=area;renderTripResults();}}));
-  }
-  app.append(albums);
-  if(!options.length)app.append(el('p','notice','위치 정보가 없어 여행 후보를 구분할 수 없어요. 날짜별 사진은 계속 확인할 수 있습니다.'));
-  app.append(el('p','notice-detail','실험 기준: 생활 지역에서 40km 밖의 사진을 시간순으로 묶고, 생활 지역에서 찍은 사진이 나오거나 촬영 공백이 72시간을 넘으면 나눠요. 이동한 도시가 달라도 같은 후보로 이어질 수 있어요. 촬영 시간대가 다른 해외 이동은 경계가 부정확할 수 있습니다.'),button('위치별 사진으로 돌아가기',renderResults,'button button-text'));
-  analytics.track('trips_grouping_start',{home_option_count:options.length},'grouping_start');
-  focusHeading();
+function tripImportNotice(){
+  const box=el('aside','notice trip-import-notice');
+  const gps=state.records.filter(r=>r.gps).length, dated=state.records.filter(r=>r.date).length;
+  box.append(el('p','',`${n(state.records.length)}장 읽음 · 촬영일 ${n(dated)}장 · 위치 ${n(gps)}장`));
+  if(state.oversized)box.append(el('p','',`50MB 초과 사진 ${n(state.oversized)}장은 제외했어요. 결과와 ZIP에 포함되지 않으며 원본은 변경하지 않았어요.`));
+  if(state.skipped)box.append(el('p','notice-detail',`사진이 아닌 파일 ${n(state.skipped)}개는 제외했어요.`));
+  const errors=state.records.filter(r=>r.readError).length;
+  if(errors)box.append(el('p','notice-detail',`${n(errors)}장은 촬영 정보를 완전히 읽지 못했지만 원본은 보존했어요.`));
+  if(state.geoUnavailable)box.append(el('p','notice-detail','지역명 자료 일부를 불러오지 못했어요. 좌표가 있으면 분류에 사용하지만 지역명은 표시되지 않을 수 있어요.'));
+  return box;
 }
-function renderTripResults(){
-  const result=groupTrips(state.records,selectedHome.gps);
-  clearAlbums();
-  app.replaceChildren();app.className='result-screen';
-  app.append(el('p','flow-label','03 · 여행 발견'),el('h1','',`${result.trips.length}개의 여행 후보를 찾았어요`),el('p','result-description',`생활 지역은 ${selectedHome.label}이에요. 앨범을 눌러 여행의 순간들을 펼쳐보세요.`),el('p','notice-detail','외출·출장도 포함될 수 있으며, 선택하지 않은 사진의 이동은 알 수 없어요.'));
-  const albums=el('div','album-list');
-  result.trips.forEach((trip,index)=>{
-    const places=[...new Set(trip.photos.map(r=>r.city).filter(Boolean))].join(' · ');
-    albums.append(photoAlbum({title:places?`${places} 여행 발견`:`여행 ${index+1} 발견`,photos:trip.photos,label:'날짜와 위치로 찾은 여행 후보',onExpand:()=>analytics.track('trips_album_open',{album_kind:'trip',album_photo_count:trip.photos.length},'trip_album_open')}));
-  });
-  if(!result.trips.length)albums.append(el('p','notice','지금 선택한 사진에서는 여행 후보를 찾지 못했어요. 생활 지역을 다시 확인하거나 다른 기간의 사진도 함께 선택해보세요.'));
-  if(result.other.length)albums.append(photoAlbum({title:'따로 확인할 사진',photos:result.other,label:'생활 지역 또는 날짜·위치 정보 부족',onExpand:()=>analytics.track('trips_album_open',{album_kind:'other',album_photo_count:result.other.length},'other_album_open')}));
-  app.append(albums,el('p','notice-detail','이 단계는 여행 후보 미리보기입니다. 위치별 ZIP의 폴더 구조는 바뀌지 않아요.'),button('생활 지역 다시 선택',renderTripSetup,'button button-secondary'),button('위치·날짜별 보기로 돌아가기',renderResults,'button button-text'),createSurvey(),privacyNote());
-  analytics.track('trips_results_view',{candidate_count:result.trips.length,candidate_photo_count:result.trips.reduce((sum,trip)=>sum+trip.photos.length,0),other_photo_count:result.other.length});
-  focusHeading();
+function renderTripSetup(){
+  tripReview ??= createTripReview({records:state.records,root:app,photoAlbum,clearAlbums,
+    photoUrl:record=>albumResources.url(record),onBack:renderResults,onChoose:choosePhotos,
+    createNotice:tripImportNotice,createSurvey,analytics,announce});
+  tripReview.open();
 }
 
 function createSurvey() {

@@ -4,18 +4,18 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import {createAnalytics,metadataSummary,CONSENT_KEY} from '../src/analytics.js';
 import {validateTripSelection,excludeOversizedPhotos} from '../src/selection.js';
-import {homeOptions,groupTrips} from '../src/trips.js';
 
 const source=readFileSync(new URL('../src/app.js',import.meta.url),'utf8');
 const start=source.slice(source.indexOf('async function startOrganization('),source.indexOf('\nfunction buildTree('));
-const grouping=source.slice(source.indexOf('function renderTripSetup('),source.indexOf('\nfunction createSurvey('));
+const grouping=source.slice(source.indexOf('function tripImportNotice('),source.indexOf('\nfunction createSurvey('));
 function setup(ua='iPhone Safari'){
   const win={location:new URL('https://map-mory.com/trips/'),navigator:{userAgent:ua},localStorage:{getItem:key=>key===CONSENT_KEY?'granted':null,setItem(){}}};
   const analytics=createAnalytics({config:{measurementId:'G-TEST'},win,doc:{referrer:'',createElement:()=>({}),head:{append(){}}}});
   const events=()=>win.dataLayer.filter(args=>args[0]==='event').map(args=>({name:args[1],...args[2]}));
   const context={analytics,metadataSummary,performance,processingStarted:0,processingSeconds:()=>3,
     state:{records:[]},readGeneration:0,isPhoto:()=>true,validateTripSelection,excludeOversizedPhotos,n:String,
-    reset(){context.readGeneration++;},renderProgress(){},progressUpdate(){},renderResults(){},focusHeading(){},announce(){},
+    reset(){context.readGeneration++;},renderProgress(){},progressUpdate(){},renderResults(){throw Error('folder view must not be first');},
+    renderTripSetup(){context.reviewOpened=true;},focusHeading(){},announce(){},
     planArchives:()=>[],renderStart(){},showResultError(){},
   };
   return {context,events};
@@ -31,6 +31,7 @@ test('real selection handler emits start/completion with GPS missing and Android
   assert.equal(completed.evaluation_group,'android_non_kakao');assert.equal(completed.photo_bucket,'500_plus');
   assert.equal(completed.picker_type,'files');assert.equal(completed.processing_seconds,3);
   assert.equal(h.context.state.phase,'complete');
+  assert.equal(h.context.reviewOpened,true,'selection goes directly to editable candidates');
 });
 test('rejected oversized-only selection does not emit processing or wipe previous results',async()=>{
   const h=setup(); const previous=[{index:0}];h.context.state.records=previous;
@@ -55,22 +56,10 @@ test('late completion/error after cancellation cannot produce completion or fail
     assert.equal(h.events().at(-1).name,'trips_processing_start');
   }
 });
-test('actual grouping handlers record screen commit and first candidate expansion, without place/date labels',()=>{
-  const h=setup(), albums=[];
-  const node=()=>({append(){},replaceChildren(){}});
-  h.context.analytics.resetFlow({photo_count:2,evaluation_group:'eligible',gps_coverage:'all',date_coverage:'all'});
-  h.context.state.records=[
-    {index:0,city:'PRIVATE HOME',gps:{latitude:37,longitude:127},date:{capturedAt:'2026-09-01T12:00:00'}},
-    {index:1,city:'PRIVATE TRIP',gps:{latitude:33,longitude:126},date:{capturedAt:'2026-09-03T12:00:00'}},
-  ];
-  Object.assign(h.context,{el:node,app:node(),clearAlbums(){},homeOptions,groupTrips,button:node,createSurvey:node,privacyNote:node,
-    photoAlbum:options=>{albums.push(options);return node();},selectedHome:null});
+test('app reuses a selection-scoped reviewer when returning from folder view',()=>{
+  const h=setup();let creations=0,opens=0;
+  Object.assign(h.context,{tripReview:null,app:{},photoAlbum(){},clearAlbums(){},albumResources:{url(){}},createSurvey(){},choosePhotos(){},
+    createTripReview(options){creations++;assert.equal(options.records,h.context.state.records);return {open(){opens++;}};}});
   runInNewContext(`${grouping}\nrenderTripSetup();renderTripSetup();`,h.context);
-  assert.equal(h.events().filter(e=>e.name==='trips_grouping_start').length,1);
-  albums[0].onSelect();
-  assert.equal(h.events().at(-1).name,'trips_results_view');assert.equal(h.events().at(-1).candidate_count,1);
-  const trip=albums.find(a=>a.label==='날짜와 위치로 찾은 여행 후보');
-  trip.onExpand();trip.onExpand();
-  assert.equal(h.events().filter(e=>e.name==='trips_album_open'&&e.album_kind==='trip').length,1);
-  assert.doesNotMatch(JSON.stringify(h.events()),/PRIVATE|2026-09|latitude|longitude/);
+  assert.equal(creations,1);assert.equal(opens,2);
 });

@@ -7,6 +7,7 @@ const seconds = value => Number.isFinite(value) && value >= 0 && value <= 86400;
 const oneOf = (...values) => value => values.includes(value);
 const coverage = oneOf('none', 'some', 'all', 'unknown');
 const picker = { picker_type: oneOf('photos', 'files') };
+const grouping = { grouping_mode: oneOf('location', 'mixed', 'pattern'), candidate_count: count, candidate_photo_count: count, other_photo_count: count };
 const selection = { ...picker, selected_count: count, photo_count: count, oversized_count: count, non_photo_count: count };
 const schemas = {
   trips_picker_open: picker,
@@ -16,9 +17,11 @@ const schemas = {
   trips_processing_complete: { processing_seconds: seconds, gps_count: count, dated_count: count, usable_count: count, read_error_count: count, geo_data_available: value => typeof value === 'boolean' },
   trips_processing_failed: { processing_seconds: seconds },
   trips_processing_cancelled: { processing_seconds: seconds },
-  trips_grouping_start: { home_option_count: count },
-  trips_results_view: { candidate_count: count, candidate_photo_count: count, other_photo_count: count },
-  trips_album_open: { album_kind: oneOf('home', 'trip', 'other'), album_photo_count: count },
+  trips_grouping_start: grouping,
+  trips_results_view: grouping,
+  trips_album_open: { album_kind: oneOf('trip', 'other'), album_photo_count: count, classification_method: oneOf('location', 'time', 'time_assisted', 'pattern', 'date', 'combined') },
+  trips_review_edit: { ...grouping, edit_action: oneOf('merge', 'split', 'dismiss', 'undo', 'regenerate'), affected_count: count },
+  trips_review_confirm: { ...grouping, edit_count: count, review_seconds: seconds },
   trips_archive_start: { archive_photo_count: count },
   trips_archive_ready: { archive_photo_count: count },
   trips_archive_failed: {},
@@ -30,7 +33,7 @@ const contextSchema = {
   ...picker, photo_count: count,
   photo_bucket: oneOf('under_500', '500_plus'),
   gps_coverage: coverage, date_coverage: coverage,
-  evaluation_group: oneOf('pending', 'android_non_kakao', 'no_usable_metadata', 'eligible'),
+  evaluation_group: oneOf('pending', 'android_non_kakao', 'no_usable_metadata', 'date_only', 'eligible'),
 };
 function selectSafe(schema, values) {
   return Object.fromEntries(Object.entries(schema).filter(([key, valid]) => valid(values[key])).map(([key]) => [key, values[key]]));
@@ -50,7 +53,7 @@ export function metadataSummary(records, environment) {
     gps_count: gps, dated_count: dated, usable_count: usable,
     read_error_count: records.filter(record => record.readError).length,
     gps_coverage: coverageOf(gps, total), date_coverage: coverageOf(dated, total),
-    evaluation_group: !environment.environment_eligible ? 'android_non_kakao' : !usable ? 'no_usable_metadata' : 'eligible',
+    evaluation_group: !environment.environment_eligible ? 'android_non_kakao' : usable ? 'eligible' : dated ? 'date_only' : 'no_usable_metadata',
   };
 }
 // Only campaign tokens chosen for this experiment are forwarded, never arbitrary URL text.
@@ -78,7 +81,7 @@ export function createAnalytics({ config, win = window, doc = document }) {
   const internalQuery = new URL(win.location.href).searchParams.get('internal');
   if (internalQuery === '1' || internalQuery === '0') write(INTERNAL_KEY, internalQuery === '1' ? '1' : '0');
   const internal = config.captureLocal || (internalQuery === '1' || (internalQuery !== '0' && read(INTERNAL_KEY) === '1'));
-  const base = { surface: 'trips', analytics_schema_version: '2', experiment_version: 'trips_v1', traffic_type: internal ? 'internal' : 'external', platform: environment.platform, browser_context: environment.browser_context, environment_group: environment.environment_eligible ? 'standard' : 'android_non_kakao' };
+  const base = { surface: 'trips', analytics_schema_version: '3', experiment_version: 'trips_v2', traffic_type: internal ? 'internal' : 'external', platform: environment.platform, browser_context: environment.browser_context, environment_group: environment.environment_eligible ? 'standard' : 'android_non_kakao' };
   const commonPage = { page_location: safePageLocation(win.location.href), page_referrer: safeReferrer(doc.referrer), page_title: '사진 정리하기 · Mapmory' };
   function gtag() { (win.dataLayer ??= []).push(arguments); }
   function initialize() {
