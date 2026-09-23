@@ -1,6 +1,6 @@
 # Trips 실험 측정 계획
 
-2026-09-23 · 위치 기반 분류 / 위치 없는 추정 보류 · `surface=trips` · `analytics_schema_version=4` · `experiment_version=trips_v3`
+2026-09-23 · 기본 위치 분류 / 선택형 촬영 패턴 실험 · `surface=trips` · `analytics_schema_version=4` · `experiment_version=trips_v3`
 
 v1 생활 지역 선택 및 v2 촬영량 추정 결과와 직접 합산하지 않는다. main 리뷰 후 별도 release PR로 배포하며,
 배포 성공과 운영 GA 수집 활성화는 별개다. 현재 GA 수집은 OFF다.
@@ -95,6 +95,39 @@ grouping_mode=holding은 GPS·날짜 기준 사진이 없는 경로다. candidat
 classification_method는 location/time_assisted/time/pattern/date/combined이며 사진별 근거를 합친 값이다.
 편집·확정 이벤트는 현재 UI에서 발화하지 않는다. 후보 표시가 사용자 확정이나 만족도를 뜻하지 않는다.
 Android 비카카오톡은 누락 진단에 별도 표시하고 제품 효과 평가에서 계속 제외한다.
+
+## 선택형 촬영 패턴 지표
+
+기본 결과의 candidate_count와 아래 실험의 candidate_count를 합산하지 않는다. 실험은 기존 보류 사진을 다시 보는 대안 미리보기다.
+자동 실행·재선택 요구 없음. 사진 선택당 버튼 실행/요약/결과 각 1회, 실험 앨범 펼침 최초 1회만 기록한다.
+폴더 화면에서 돌아와도 재실행/중복 발화하지 않으며, 새 사진 선택 시 초기화한다. 같은 동의·환경 제외·개인정보 허용 목록을 적용한다.
+
+| 이벤트 | 값 / 시점 |
+|---|---|
+| `trips_pattern_start` | 버튼 클릭 · target_photo_count (위치 없는 보류 사진, 날짜 없는 사진 포함) |
+| `trips_pattern_stats` | 실행 후 요약 · 아래 8개 수치 + pattern_status |
+| `trips_pattern_result` | 결과 표시 · pattern_status, candidate_count, candidate_photo_count, other_photo_count |
+| `trips_pattern_album_open` | 실험 앨범 최초 펼침 · album_photo_count |
+
+| GA4 수치 파라미터 | 정의 |
+|---|---|
+| active_days | 선택한 전체 사진 중 유효 촬영일의 서로 다른 날짜 수 |
+| span_days | 첫~마지막 유효 촬영일의 양 끝을 포함한 달력 일수 |
+| empty_selected_days | span_days - active_days. 선택한 사진이 없는 날짜 수이며 실제 미촬영일이 아님 |
+| daily_mean | 유효 촬영일별 장수 평균(소수 둘째 자리). 공백은 0으로 포함하지 않음 |
+| daily_median | 유효 촬영일별 장수 중앙값 |
+| daily_max | 유효 촬영일별 최대 장수 |
+| burst_threshold | max(10, 중앙값 × 3). 검증된 여행 판별 기준이 아닌 초기 실험값 |
+| burst_day_count | GPS 없는 보류 사진의 일별 장수가 기준 이상인 날짜 수. 기간 조건 미달이면 이 값이 있어도 후보 생성 안 함 |
+
+pattern_status: ready(후보 생성), insufficient(기간/일수 근거 부족), no_dates(대상 촬영일 없음), no_burst(조건은 충족하나 대상 급증 없음).
+날짜가 전혀 없으면 기간·일수는 0이고 no_dates로 구분한다. 0일이 실제 관찰 기간이라는 뜻은 아니다.
+요약 숫자만 보내고 실제 날짜, 날짜별 장수 배열, 파일명, 좌표, 묶음 ID는 보내지 않는다.
+
+GA 콘솔에서 pattern_status는 이벤트 범위 맞춤 차원, 위 8개는 이벤트 범위 맞춤 측정항목(표준 단위)으로 등록해야 한다.
+숫자의 합계를 평균으로 읽지 않는다. daily_mean 평균은 선택 단위 평균이며 전체 날짜를 합친 가중 평균과 다르다.
+기본 성과는 eligible/standard, 실험은 별도 이벤트와 상태로 분석한다. Android 비카카오톡은 실험에서도 제품 효과 평가 제외를 유지한다.
+현재는 코드·로컬 테스트만 준비됐고, 콘솔 등록과 운영 수신 확인은 완료되지 않았다. 운영 GA 게이트는 OFF 유지.
 
 ## 모집 링크
 

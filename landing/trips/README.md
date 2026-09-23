@@ -11,11 +11,20 @@ same screen. No editing, confirmation, location/date review or home-region input
 All undecidable date-only and undated photos share ONE holding album, after the
 travel candidates. Original location/date folders and ZIP remain optional secondary views.
 Observed location/date evidence and bounded capture-time linkage are labeled separately.
-Capture-count inference is paused. With no usable GPS/date anchors, preserve ALL
+Automatic capture-count inference is paused. With no usable GPS/date anchors, preserve ALL
 photos in one holding album, even if a large capture burst exists. These are experimental rules,
 not validated travel detection. See [TRIP_GROUPING_PLAN.md](./TRIP_GROUPING_PLAN.md).
 Results are memory-only and disappear on refresh. ZIP keeps the original
 location/date folder structure; it does not export the travel-candidate grouping.
+
+At the bottom, an OPTIONAL button explores capture patterns using already selected
+photos. It never requires reselection or runs automatically. The baseline uses all
+selected dated photos; only unclassified GPS-missing photos can become experimental
+candidates. Original albums stay intact, and the experimental preview is clearly
+labeled as an alternative view of holding photos, not additional photos. Insufficient
+evidence stays pending. Summary counts include empty selected days (calendar span
+minus active dates), NOT confirmed days without shooting. These gaps are excluded
+from mean/median calculations rather than zero-filled.
 
 The user authorized production promotion after local review on 2026-09-23.
 Use the reviewed main PR → landing-release PR → existing automatic deployment path.

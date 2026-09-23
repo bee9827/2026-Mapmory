@@ -67,6 +67,23 @@ test('GPS-free bursts, ordinary dates and undated photos all form one holding al
   assert.equal(event.grouping_mode,'holding');
   assert.equal(event.experiment_version,'trips_v3');
   assert.equal(event.analytics_schema_version,'4');
+  assert.equal(h.events().some(e=>e.event.startsWith('trips_pattern_')),false);
+  assert.equal(h.root.children.at(-1).attributes['aria-label'],'선택형 촬영 패턴 실험');
+  const run=find(h.root,'촬영 패턴으로 찾아보기');run.click();run.click();
+  assert.equal(h.albums.length,2,'experiment adds a separate preview, preserving original holding album');
+  assert.equal(h.albums[0].photos.length,55);
+  assert.equal(h.albums[1].photos.length,40);
+  assert.equal(h.albums[1].label,'실험 · 촬영 패턴으로 추정');
+  const stats=h.events().find(e=>e.event==='trips_pattern_stats');
+  assert.equal(stats.daily_mean,6);assert.equal(stats.empty_selected_days,7);
+  assert.equal(stats.pattern_status,'ready');
+  h.albums[1].onExpand();h.albums[1].onExpand();
+  h.review.open();
+  assert.equal(h.albums.length,2);assert.equal(find(h.root,'촬영 패턴으로 찾아보기'),undefined);
+  for(const name of ['trips_pattern_start','trips_pattern_stats','trips_pattern_result','trips_pattern_album_open'])
+    assert.equal(h.events().filter(e=>e.event===name).length,1);
+  assert.equal(h.events().filter(e=>e.event==='trips_results_view').length,1);
+  assert.doesNotMatch(JSON.stringify(h.events()),/PRIVATE|2026-09|latitude|longitude|candidate-/);
 });
 test('insufficient or undated input stays visible in one holding album, not tiny date groups',()=>{
   for(const records of [[{index:0,name:'unknown.jpg',date:null,gps:null}],
@@ -75,6 +92,9 @@ test('insufficient or undated input stays visible in one holding album, not tiny
     assert.equal(title(h.root),'분류 보류 사진을 한곳에 모았어요');
     assert.equal(h.albums.length,1);assert.equal(h.albums[0].title,'분류 보류');
     assert.equal(h.albums[0].photos.length,records.length);
+    find(h.root,'촬영 패턴으로 찾아보기').click();
+    assert.equal(h.albums.length,1);
+    assert.equal(h.events().find(e=>e.event==='trips_pattern_result').candidate_count,0);
   }
 });
 test('holding album includes ambiguous GPS-free photos alongside missing dates',()=>{

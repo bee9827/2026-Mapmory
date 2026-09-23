@@ -82,6 +82,20 @@ test('dedup is per accepted selection, not render; new selections never inherit 
   assert.equal(h.analytics.track('trips_album_open',{album_kind:'trip'},'trip_album_open'),true);
 });
 
+test('pattern statistics allow aggregate finite values only, respecting consent and context',()=>{
+  const h=harness({consent:'granted',ua:'Android Chrome'});
+  h.analytics.track('trips_pattern_stats',{active_days:9,span_days:16,empty_selected_days:7,daily_mean:6,
+    daily_median:2,daily_max:20,burst_threshold:10,burst_day_count:2,pattern_status:'ready',
+    dates:['2026-09-01'],daily_counts:[2,20],filename:'PRIVATE.jpg',latitude:37});
+  const event=h.events().at(-1)[2];
+  assert.equal(event.empty_selected_days,7);assert.equal(event.daily_mean,6);
+  assert.equal(event.environment_group,'android_non_kakao');
+  assert.doesNotMatch(JSON.stringify(event),/2026-09|PRIVATE|latitude|daily_counts/);
+  h.analytics.track('trips_pattern_stats',{daily_mean:Infinity,daily_max:-1,empty_selected_days:0.5,pattern_status:'private'});
+  for(const key of ['daily_mean','daily_max','empty_selected_days','pattern_status'])assert.equal(h.events().at(-1)[2][key],undefined);
+  h.analytics.setConsent('denied');assert.equal(h.analytics.track('trips_pattern_start'),false);
+});
+
 test('Android non-Kakao is measured diagnostically but excluded regardless of metadata success',()=>{
   const chrome=clientEnvironment('Mozilla Android Chrome Safari');
   const kakao=clientEnvironment('Mozilla Android Chrome Safari KAKAOTALK 26');

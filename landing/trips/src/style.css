@@ -196,6 +196,9 @@ h1:focus { outline: none; }
 .review-legend summary, .split-days summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 650; }
 .pattern-note h2 { font-size: 1rem; margin-bottom: 8px; }
 .pattern-note > p { margin-top: 8px; }
+.pattern-note > .button { width: 100%; margin-top: 16px; min-height: 44px; }
+.pattern-output > * { margin-top: 16px; }
+.pattern-status { font-size: 1rem; line-height: 1.6; }
 .pattern-status { color: var(--trip-strong); font-weight: 600; }
 .review-choice { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 10px 4px; font-size: .875rem; line-height: 1.6; cursor: pointer; overflow-wrap: anywhere; }
 .review-choice input, .split-photo input { width: 22px; height: 22px; accent-color: var(--trip); flex-shrink: 0; }

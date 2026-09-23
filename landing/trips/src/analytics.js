@@ -9,7 +9,14 @@ const coverage = oneOf('none', 'some', 'all', 'unknown');
 const picker = { picker_type: oneOf('photos', 'files') };
 const grouping = { grouping_mode: oneOf('location', 'mixed', 'holding'), candidate_count: count, candidate_photo_count: count, other_photo_count: count };
 const selection = { ...picker, selected_count: count, photo_count: count, oversized_count: count, non_photo_count: count };
+const summaryNumber = value => Number.isFinite(value) && value >= 0 && value <= 100000;
+const patternStatus = oneOf('ready', 'insufficient', 'no_dates', 'no_burst');
 const schemas = {
+  trips_pattern_start: { target_photo_count: count },
+  trips_pattern_stats: { active_days: count, span_days: count, empty_selected_days: count, daily_mean: summaryNumber, daily_median: summaryNumber,
+    daily_max: count, burst_threshold: summaryNumber, burst_day_count: count, pattern_status: patternStatus },
+  trips_pattern_result: { pattern_status: patternStatus, candidate_count: count, candidate_photo_count: count, other_photo_count: count },
+  trips_pattern_album_open: { album_photo_count: count },
   trips_picker_open: picker,
   trips_selection_received: selection,
   trips_selection_rejected: { ...selection, reason: oneOf('no_photos', 'all_oversized', 'too_many', 'invalid_size') },
