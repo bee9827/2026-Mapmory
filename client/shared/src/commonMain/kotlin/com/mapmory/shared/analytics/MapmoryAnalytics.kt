@@ -26,6 +26,7 @@ object MapmoryAnalyticsEvent {
     const val RECORD_LOCATION_SELECTED = "record_location_selected"
     const val MAP_DETAIL_BACK_CLICKED = "map_detail_back_clicked"
     const val RECORD_CREATE_STARTED = "record_create_started"
+    const val RECORD_FLOW_STEP_VIEWED = "record_flow_step_viewed"
     const val RECORD_EDITOR_FIELD_INTERACTED = "record_editor_field_interacted"
     const val RECORD_EDITOR_EXITED = "record_editor_exited"
     const val RECORD_SAVE_STARTED = "record_save_started"

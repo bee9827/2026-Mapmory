@@ -134,7 +134,7 @@ Firebase 이벤트와 파라미터 이름은 영문으로 유지하고, 아래 �
 
 | 이벤트 | 한글 표시명 | 기록 시점 | 주요 파라미터 |
 | --- | --- | --- | --- |
-| `app_screen_view` | 앱 화면 조회 | 지도·일지·기록 작성·프로필·기록 상세 화면 진입 | `screen_name` |
+| `app_screen_view` | 앱 화면 조회 | 지도·일지·기록 작성·프로필·기록 상세 화면 진입 | `screen_name` (`record_create_flow`, `record_editor` 등) |
 | `bottom_nav_clicked` | 하단 탭 선택 | 하단 지도·일지·프로필 탭 클릭 | `from_tab`, `to_tab` |
 | `map_scope_changed` | 지도 범위 변경 | 대한민국·전세계 전환 | `scope` |
 | `map_province_selected` | 시·도 선택 | 대한민국 시·도 선택 | `province_code` |
@@ -142,7 +142,8 @@ Firebase 이벤트와 파라미터 이름은 영문으로 유지하고, 아래 �
 | `record_location_selected` | 기록 장소 선택 | 기록 작성 화면의 장소 검색 결과 선택 | `source`, `location_type` |
 | `map_detail_back_clicked` | 상세 지도 뒤로가기 | 시·군·구 지도에서 시·도 지도로 이동 | 없음 |
 | `record_create_started` | 기록 작성 시작 | 지도·일지 FAB 클릭 또는 기록이 없는 지도 지역 선택 후 작성 화면 진입 | `source` (`map_fab`, `journal_fab`, `map_location`) |
-| `record_editor_field_interacted` | 기록 작성 항목 사용 | 작성 화면에서 각 항목을 처음 조작하거나 포커스 | `field_name` (`photos`, `title`, `location`, `start_date`, `end_date`, `tags`, `content`) |
+| `record_flow_step_viewed` | 기록 작성 단계 조회 | 새 기록 작성 흐름에서 단계 화면 진입 | `step_name` (`date_location`, `photo_loading`, `photo_picker`, `album_details`) |
+| `record_editor_field_interacted` | 기록 작성 항목 사용 | 새 기록 작성·기록 수정 화면에서 각 항목을 처음 조작 | `field_name` (`photos`, `title`, `location`, `start_date`, `end_date`, `content`) |
 | `record_editor_exited` | 기록 작성 화면 이탈 | 사용자가 뒤로가기·하단 탭 이동을 확정해 작성 화면을 나감 | `mode`, `destination`, `has_unsaved_changes` |
 | `photo_picker_opened` | 사진 선택기 열기 | 갤러리 사진 선택 시작 | 없음 |
 | `photo_recommendation_started` | 사진 추천 시작 | 위치 기반 사진 추천 시작 | `location_type` |
@@ -168,15 +169,16 @@ Firebase 이벤트와 파라미터 이름은 영문으로 유지하고, 아래 �
 강제 종료를 의미하지 않는다. 사용자가 작성한 태그 이름도 보내지 않고 `filter_type`으로 전체 필터인지
 사용자 태그 필터인지만 구분한다. `count`도 사진 내용이 아니라 처리된 개수만 의미한다.
 
-기록 작성 퍼널은 `record_create_started` → `record_editor_field_interacted` →
-`record_save_completed` 또는 `record_editor_exited` 순으로 살펴본다. `source`와 `field_name`,
-`destination`, `mode`, `has_unsaved_changes`, `has_title`, `has_content`, `has_end_date`, `has_tags`,
-`has_photos`를 GA4 탐색에서 비교하면 작성 시작 경로와 사용한 항목,
-명시적으로 나간 시점을 구분할 수 있다. 다만 앱을 닫거나 백그라운드로 보낸 경우는 명시적 이탈로
-계산되지 않으므로, 이 이벤트만으로 모든 이탈 원인을 단정하지 않는다.
+새 기록 작성 퍼널은 `record_create_started` → `record_flow_step_viewed`의 `date_location` →
+`photo_loading` 또는 `photo_picker` → `album_details` → `record_save_completed` 순으로 본다.
+기록 수정 퍼널은 `record_editor_field_interacted` → `record_save_completed` 또는
+`record_editor_exited`로 분리한다. `source`, `step_name`, `field_name`, `destination`, `mode`,
+`has_unsaved_changes`, `has_title`, `has_content`, `has_end_date`, `has_tags`, `has_photos`를 GA4에서
+비교하면 진입 경로와 멈춘 단계, 명시적으로 나간 시점을 구분할 수 있다. 앱을 닫거나 백그라운드로
+보낸 경우는 명시적 이탈로 계산되지 않으므로, 이 이벤트만으로 모든 이탈 원인을 단정하지 않는다.
 
 이벤트 파라미터를 GA4 탐색에서 분류 기준으로 쓰려면 GA4 관리 화면의 `맞춤 정의`에 이벤트 범위
-맞춤 측정기준으로 등록해야 한다. `source`, `field_name`, `destination`, `mode`와 작성 상태의
+맞춤 측정기준으로 등록해야 한다. `source`, `step_name`, `field_name`, `destination`, `mode`와 작성 상태의
 참/거짓 값만 등록해 값 종류가 과도하게 늘어나지 않도록 한다. 새 정의는 데이터가 수집된 뒤 보고서와
 탐색에 반영되기까지 최대 24~48시간 걸릴 수 있다.
 
