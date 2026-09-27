@@ -80,6 +80,10 @@ internal fun MapRoute(
         if (hasRecords) {
             onOpenRecords(location.id)
         } else {
+            analytics.logEvent(
+                MapmoryAnalyticsEvent.RECORD_CREATE_STARTED,
+                mapOf("source" to "map_location"),
+            )
             onOpenEditor(location.id)
         }
     }

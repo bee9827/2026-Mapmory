@@ -63,6 +63,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.mapmory.shared.analytics.LocalMapmoryAnalytics
+import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.model.TripRecordDraft
@@ -145,11 +147,13 @@ internal fun NewTripRecordFlowScreen(
         },
     modifier: Modifier = Modifier,
 ) {
+    val analytics = LocalMapmoryAnalytics.current
     val selectableLocations = remember(locations) {
         locations.selectableTripRecordDestinations()
     }
     var stepName by rememberSaveable { mutableStateOf(NewRecordFlowStep.DATE_AND_LOCATION.name) }
     val step = NewRecordFlowStep.valueOf(stepName)
+    val interactedFields = remember { mutableSetOf<String>() }
     var locationSearchQuery by rememberSaveable { mutableStateOf("") }
     var detailsErrorMessage by remember { mutableStateOf<String?>(null) }
     var photoMessage by remember { mutableStateOf<String?>(null) }
@@ -168,6 +172,28 @@ internal fun NewTripRecordFlowScreen(
     var previewPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
     var datePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
     val photoListState = rememberLazyListState()
+
+    fun logFieldInteraction(fieldName: String) {
+        if (interactedFields.add(fieldName)) {
+            analytics.logEvent(
+                MapmoryAnalyticsEvent.RECORD_EDITOR_FIELD_INTERACTED,
+                mapOf("field_name" to fieldName),
+            )
+        }
+    }
+
+    LaunchedEffect(step) {
+        val stepName = when (step) {
+            NewRecordFlowStep.DATE_AND_LOCATION -> "date_location"
+            NewRecordFlowStep.PHOTO_LOADING -> "photo_loading"
+            NewRecordFlowStep.PHOTO_PICKER -> "photo_picker"
+            NewRecordFlowStep.ALBUM_DETAILS -> "album_details"
+        }
+        analytics.logEvent(
+            MapmoryAnalyticsEvent.RECORD_FLOW_STEP_VIEWED,
+            mapOf("step_name" to stepName),
+        )
+    }
 
     fun showPhotoLimitMessage() {
         transientPhotoMessage = TripRecordPhotoRules.LimitMessage
@@ -190,6 +216,10 @@ internal fun NewTripRecordFlowScreen(
             val acceptedPhotos = photos.take(TripRecordPhotoRules.MaxPhotosPerRecord)
             if (photos.size > acceptedPhotos.size) showPhotoLimitMessage()
             if (acceptedPhotos.isNotEmpty()) {
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.PHOTOS_ADDED,
+                    mapOf("source" to "gallery", "count" to acceptedPhotos.size.toString()),
+                )
                 replaceEditorPhotos(acceptedPhotos)
                 photoMessage = null
                 stepName = NewRecordFlowStep.ALBUM_DETAILS.name
@@ -282,6 +312,7 @@ internal fun NewTripRecordFlowScreen(
         when (step) {
             NewRecordFlowStep.DATE_AND_LOCATION -> onBackClick()
             NewRecordFlowStep.PHOTO_LOADING -> {
+                analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_CANCELLED)
                 photoLibrary.cancelRecommendation()
                 onPhotoLoadingChanged(false)
                 isPreparingPhotoPreviews = false
@@ -342,6 +373,7 @@ internal fun NewTripRecordFlowScreen(
                 stepName = NewRecordFlowStep.PHOTO_PICKER.name
             }
             else -> {
+                logFieldInteraction("photos")
                 detailsErrorMessage = null
                 photoMessage = null
                 photoLoadingProgress = null
@@ -349,6 +381,10 @@ internal fun NewTripRecordFlowScreen(
                 recommendationPagingState = PhotoRecommendationPagingState()
                 lastAutoLoadTriggerKey = null
                 stepName = NewRecordFlowStep.PHOTO_LOADING.name
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_STARTED,
+                    mapOf("location_type" to location.type.name.lowercase()),
+                )
                 val parentName = locations.firstOrNull { it.id == location.parentId }?.name
                 val dateRange = requireNotNull(
                     photoRecommendationDateRange(uiState.startDate, uiState.endDate),
@@ -382,6 +418,10 @@ internal fun NewTripRecordFlowScreen(
             if (preparedPhotos.isEmpty()) {
                 photoMessage = "선택한 사진의 원본을 읽지 못했어요."
             } else {
+                analytics.logEvent(
+                    MapmoryAnalyticsEvent.PHOTOS_ADDED,
+                    mapOf("source" to "recommendation", "count" to preparedPhotos.size.toString()),
+                )
                 replaceEditorPhotos(preparedPhotos)
                 photoMessage = null
                 stepName = NewRecordFlowStep.ALBUM_DETAILS.name
@@ -402,18 +442,33 @@ internal fun NewTripRecordFlowScreen(
                 searchResults = filteredLocations,
                 errorMessage = detailsErrorMessage,
                 onSearchQueryChanged = {
+                    if (it.isNotBlank()) logFieldInteraction("location")
                     locationSearchQuery = it
                     val selectedName = uiState.selectedLocation?.flowDisplayName(locations)
                     if (selectedName != null && it != selectedName) onLocationCleared()
                     detailsErrorMessage = null
                 },
                 onLocationSelected = { location ->
+                    logFieldInteraction("location")
+                    analytics.logEvent(
+                        MapmoryAnalyticsEvent.RECORD_LOCATION_SELECTED,
+                        mapOf(
+                            "source" to "location_search",
+                            "location_type" to location.type.name.lowercase(),
+                        ),
+                    )
                     onLocationSelected(location)
                     locationSearchQuery = location.flowDisplayName(locations)
                     detailsErrorMessage = null
                 },
-                onStartDateClick = { datePickerTarget = FlowStartDatePickerTarget },
-                onEndDateClick = { datePickerTarget = FlowEndDatePickerTarget },
+                onStartDateClick = {
+                    logFieldInteraction("start_date")
+                    datePickerTarget = FlowStartDatePickerTarget
+                },
+                onEndDateClick = {
+                    logFieldInteraction("end_date")
+                    datePickerTarget = FlowEndDatePickerTarget
+                },
                 onGlobeCountryClick = { countryCode ->
                     val location = selectableLocations.firstOrNull { candidate ->
                         candidate.regionCode == countryCode
@@ -425,6 +480,14 @@ internal fun NewTripRecordFlowScreen(
                             "선택한 나라는 아직 지원하지 않아요."
                         }
                     } else {
+                        logFieldInteraction("location")
+                        analytics.logEvent(
+                            MapmoryAnalyticsEvent.RECORD_LOCATION_SELECTED,
+                            mapOf(
+                                "source" to "globe",
+                                "location_type" to location.type.name.lowercase(),
+                            ),
+                        )
                         onLocationSelected(location)
                         locationSearchQuery = location.flowDisplayName(locations)
                         detailsErrorMessage = null
@@ -440,7 +503,11 @@ internal fun NewTripRecordFlowScreen(
                 isPreparingPreviews = isPreparingPhotoPreviews,
                 message = photoMessage,
                 onBackClick = ::returnToPreviousStep,
-                onPickFromGallery = photoLibrary.pickFromGallery,
+                onPickFromGallery = {
+                    logFieldInteraction("photos")
+                    analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_PICKER_OPENED)
+                    photoLibrary.pickFromGallery()
+                },
                 onRetry = ::beginPhotoSearch,
             )
 
@@ -453,7 +520,11 @@ internal fun NewTripRecordFlowScreen(
                 isPreparing = isPreparingPhotos,
                 onBackClick = ::returnToPreviousStep,
                 onCompleteClick = ::completePhotoSelection,
-                onPickFromGallery = photoLibrary.pickFromGallery,
+                onPickFromGallery = {
+                    logFieldInteraction("photos")
+                    analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_PICKER_OPENED)
+                    photoLibrary.pickFromGallery()
+                },
                 onPhotoPreview = { previewPhotoId = it.id },
                 onPhotoToggle = { photo ->
                     val next = recommendationPagingState.toggleSelection(photo.id)
@@ -488,8 +559,14 @@ internal fun NewTripRecordFlowScreen(
 
             NewRecordFlowStep.ALBUM_DETAILS -> AlbumDetailsStep(
                 uiState = uiState,
-                onTitleChanged = onTitleChanged,
-                onContentChanged = onContentChanged,
+                onTitleChanged = {
+                    logFieldInteraction("title")
+                    onTitleChanged(it)
+                },
+                onContentChanged = {
+                    logFieldInteraction("content")
+                    onContentChanged(it)
+                },
                 onBackClick = ::returnToPreviousStep,
                 onSaveClick = onSaveClick,
             )
