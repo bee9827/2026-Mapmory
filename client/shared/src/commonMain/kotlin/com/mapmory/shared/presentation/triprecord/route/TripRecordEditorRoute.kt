@@ -21,6 +21,7 @@ import com.mapmory.shared.analytics.LocalMapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.navigation.MapmoryBackHandlerRegistry
+import com.mapmory.shared.presentation.triprecord.screen.NewTripRecordFlowScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordEditorScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordPalette
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordEditorViewModel
@@ -46,6 +47,7 @@ internal fun TripRecordEditorRoute(
     var pendingPhotoLoadingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
     var isPhotoLoadingSaveConfirmation by remember { mutableStateOf(false) }
     val mode = if (recordId == null) "create" else "edit"
+    var newFlowBackHandler by remember { mutableStateOf<(() -> Boolean)?>(null) }
 
     LaunchedEffect(viewModel, recordId, selectedLocationId) {
         viewModel.initialize(
@@ -57,7 +59,7 @@ internal fun TripRecordEditorRoute(
     LaunchedEffect(Unit) {
         analytics.logEvent(
             MapmoryAnalyticsEvent.SCREEN_VIEW,
-            mapOf("screen_name" to "record_editor"),
+            mapOf("screen_name" to if (recordId == null) "record_create_flow" else "record_editor"),
         )
     }
 
@@ -116,8 +118,10 @@ internal fun TripRecordEditorRoute(
     }
 
     val latestBackHandler = rememberUpdatedState {
-        requestExit("back", onBack)
-        true
+        newFlowBackHandler?.invoke() ?: run {
+            requestExit("back", onBack)
+            true
+        }
     }
     DisposableEffect(viewModel, backHandlerRegistry) {
         val registration = backHandlerRegistry.register {
@@ -128,39 +132,60 @@ internal fun TripRecordEditorRoute(
         }
     }
 
-    TripRecordEditorScreen(
-        modifier = modifier,
-        uiState = viewModel.uiState,
-        locations = regionCatalog.locations,
-        onLocationSelected = viewModel::selectLocation,
-        onLocationTouched = viewModel::touchLocation,
-        onTitleChanged = viewModel::updateTitle,
-        onContentChanged = viewModel::updateContent,
-        onStartDateChanged = viewModel::updateStartDate,
-        onEndDateChanged = viewModel::updateEndDate,
-        onTagInputChanged = viewModel::updateTagInput,
-        onTagToggled = viewModel::toggleTag,
-        onPendingTagToggled = viewModel::togglePendingTag,
-        onTagCreate = viewModel::createAndSelectTag,
-        onPhotosAdded = viewModel::addPhotos,
-        onPhotoRemoved = viewModel::removeMediaObjectKey,
-        onPhotoLoadingChanged = viewModel::setPhotoLoading,
-        onSaveClick = {
-            if (viewModel.uiState.isPhotoLoading) {
-                isPhotoLoadingSaveConfirmation = true
-                pendingPhotoLoadingAction = {
-                    viewModel.setPhotoLoading(false)
+    if (recordId == null) {
+        NewTripRecordFlowScreen(
+            modifier = modifier,
+            uiState = viewModel.uiState,
+            locations = regionCatalog.locations,
+            onLocationSelected = viewModel::selectLocation,
+            onLocationCleared = viewModel::clearLocation,
+            onLocationTouched = viewModel::touchLocation,
+            onTitleChanged = viewModel::updateTitle,
+            onContentChanged = viewModel::updateContent,
+            onStartDateChanged = viewModel::updateStartDate,
+            onEndDateChanged = viewModel::updateEndDate,
+            onPhotosAdded = viewModel::addPhotos,
+            onPhotoRemoved = viewModel::removeMediaObjectKey,
+            onPhotoLoadingChanged = viewModel::setPhotoLoading,
+            onSaveClick = ::save,
+            onBackClick = { requestExit("back", onBack) },
+            onInternalBackHandlerChanged = { handler -> newFlowBackHandler = handler },
+        )
+    } else {
+        TripRecordEditorScreen(
+            modifier = modifier,
+            uiState = viewModel.uiState,
+            locations = regionCatalog.locations,
+            onLocationSelected = viewModel::selectLocation,
+            onLocationTouched = viewModel::touchLocation,
+            onTitleChanged = viewModel::updateTitle,
+            onContentChanged = viewModel::updateContent,
+            onStartDateChanged = viewModel::updateStartDate,
+            onEndDateChanged = viewModel::updateEndDate,
+            onTagInputChanged = viewModel::updateTagInput,
+            onTagToggled = viewModel::toggleTag,
+            onPendingTagToggled = viewModel::togglePendingTag,
+            onTagCreate = viewModel::createAndSelectTag,
+            onPhotosAdded = viewModel::addPhotos,
+            onPhotoRemoved = viewModel::removeMediaObjectKey,
+            onPhotoLoadingChanged = viewModel::setPhotoLoading,
+            onSaveClick = {
+                if (viewModel.uiState.isPhotoLoading) {
+                    isPhotoLoadingSaveConfirmation = true
+                    pendingPhotoLoadingAction = {
+                        viewModel.setPhotoLoading(false)
+                        save()
+                    }
+                } else {
                     save()
                 }
-            } else {
-                save()
-            }
-        },
-        onBackClick = { requestExit("back", onBack) },
-        onMapClick = { requestExit("map_tab", onOpenMap) },
-        onRecordClick = { requestExit("journal_tab", onOpenRecords) },
-        onProfileClick = { requestExit("profile_tab", onOpenProfile) },
-    )
+            },
+            onBackClick = { requestExit("back", onBack) },
+            onMapClick = { requestExit("map_tab", onOpenMap) },
+            onRecordClick = { requestExit("journal_tab", onOpenRecords) },
+            onProfileClick = { requestExit("profile_tab", onOpenProfile) },
+        )
+    }
 
     pendingEditorExit?.let { exit ->
         EditorConfirmationDialog(
