@@ -301,7 +301,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun `기록_수정에서는_기존_사진을_포함해_최대_50장만_추가한다`() {
+    fun `기록_수정에서는_기존_사진을_포함해_최대_100장만_추가한다`() {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(repository),
@@ -316,7 +316,7 @@ class TripRecordEditorViewModelTest {
                 content = "",
                 startDate = "2026-08-01",
                 endDate = null,
-                media = (1..49).map { index ->
+                media = (1..99).map { index ->
                     TripRecordMedia(
                         id = index.toLong(),
                         objectKey = "records/1/existing-$index.jpg",

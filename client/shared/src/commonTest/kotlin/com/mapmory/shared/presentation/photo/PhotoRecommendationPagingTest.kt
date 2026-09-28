@@ -12,23 +12,31 @@ class PhotoRecommendationPagingTest {
         val pages = listOf(
             PhotoRecommendationPage(1, (1..24).map { photo(it) }, hasMore = true),
             PhotoRecommendationPage(1, (25..48).map { photo(it) }, hasMore = true),
-            PhotoRecommendationPage(1, (49..60).map { photo(it) }, hasMore = false),
+            PhotoRecommendationPage(1, (49..72).map { photo(it) }, hasMore = true),
+            PhotoRecommendationPage(1, (73..96).map { photo(it) }, hasMore = true),
+            PhotoRecommendationPage(1, (97..120).map { photo(it) }, hasMore = false),
         )
 
         val first = PhotoRecommendationPagingState().accept(pages[0])
         val second = first?.accept(pages[1])
         val third = second?.accept(pages[2])
+        val fourth = third?.accept(pages[3])
+        val fifth = fourth?.accept(pages[4])
 
         assertNotNull(first)
         assertNotNull(second)
         assertNotNull(third)
+        assertNotNull(fourth)
+        assertNotNull(fifth)
         assertEquals(24, first.photos.size)
         assertEquals(48, second.photos.size)
-        assertEquals(60, third.photos.size)
-        assertEquals(2, third.pageIndex)
-        assertFalse(third.hasMore)
-        assertEquals(60, third.photos.map(SelectedPhoto::id).toSet().size)
-        assertEquals(50, third.selectedIds.size)
+        assertEquals(72, third.photos.size)
+        assertEquals(96, fourth.photos.size)
+        assertEquals(120, fifth.photos.size)
+        assertEquals(4, fifth.pageIndex)
+        assertFalse(fifth.hasMore)
+        assertEquals(120, fifth.photos.map(SelectedPhoto::id).toSet().size)
+        assertEquals(100, fifth.selectedIds.size)
     }
 
     @Test

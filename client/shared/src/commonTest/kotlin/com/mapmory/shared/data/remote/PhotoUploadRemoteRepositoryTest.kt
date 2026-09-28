@@ -19,7 +19,7 @@ import kotlin.test.assertIs
 class PhotoUploadRemoteRepositoryTest {
     @Test
     fun recordLimitPhotosAreUploadedInPresignedBatches() = runBlocking {
-        val sources = (1..50).map { index ->
+        val sources = (1..100).map { index ->
             PhotoUploadSource(
                 localId = "content://photo/$index",
                 fileName = "photo-$index.jpg",
@@ -27,7 +27,7 @@ class PhotoUploadRemoteRepositoryTest {
                 bytes = byteArrayOf(index.toByte()),
             )
         }
-        val expectedBatchSizes = List(5) { 10 }
+        val expectedBatchSizes = List(10) { 10 }
         var batchIndex = 0
         var objectIndex = 0
         var putCount = 0
@@ -68,7 +68,7 @@ class PhotoUploadRemoteRepositoryTest {
         val uploads = repository.upload(sources).getOrThrow()
 
         assertEquals(expectedBatchSizes.size, batchIndex)
-        assertEquals(50, putCount)
+        assertEquals(100, putCount)
         assertEquals(sources.map(PhotoUploadSource::localId), uploads.map(UploadedPhoto::localId))
         client.close()
     }
