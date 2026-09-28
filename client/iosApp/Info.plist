@@ -30,6 +30,8 @@
 	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>MAPMORY_API_BASE_URL</key>
+	<string>$(MAPMORY_API_BASE_URL)</string>
 	<key>NSCameraUsageDescription</key>
 	<string>여행 기록에 첨부할 사진을 촬영하기 위해 카메라를 사용합니다.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

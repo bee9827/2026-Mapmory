@@ -16,6 +16,12 @@ val localProperties = Properties().apply {
     }
 }
 
+val debugApiBaseUrl = localProperties
+    .getProperty("MAPMORY_DEBUG_API_BASE_URL")
+    ?.takeIf(String::isNotBlank)
+    ?: "https://dev-api.map-mory.com/api/v1"
+val releaseApiBaseUrl = "https://api.map-mory.com/api/v1"
+
 android {
     namespace = "com.mapmory.android"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -27,11 +33,6 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = 7
         versionName = "0.1.6"
-        resValue(
-            type = "string",
-            name = "mapmory_api_base_url",
-            value = localProperties.getProperty("MAPMORY_API_BASE_URL").orEmpty(),
-        )
     }
 
     buildFeatures {
@@ -40,8 +41,20 @@ android {
     }
 
     buildTypes {
+        debug {
+            resValue(
+                type = "string",
+                name = "mapmory_api_base_url",
+                value = debugApiBaseUrl,
+            )
+        }
         release {
             isMinifyEnabled = false
+            resValue(
+                type = "string",
+                name = "mapmory_api_base_url",
+                value = releaseApiBaseUrl,
+            )
         }
     }
 }
