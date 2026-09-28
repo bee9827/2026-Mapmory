@@ -36,6 +36,8 @@ test("declares the agreed landing funnel events", () => {
       "experience_view",
       "experience_start",
       "memory_open",
+      "memory_photo_swiped",
+      "memory_sheet_closed",
       "korea_memory_add",
       "experience_end",
       "waitlist_cta_click",
@@ -45,6 +47,7 @@ test("declares the agreed landing funnel events", () => {
       "waitlist_submit",
       "waitlist_submit_error",
       "download_click",
+      "download_cta_click",
     ]),
   );
 });
@@ -59,7 +62,9 @@ test("adds the landing version and removes direct personal information", () => {
       unused: undefined,
     }),
     {
-      landing_version: "v2",
+      surface: "landing",
+      analytics_schema_version: "2",
+      landing_version: "v4",
       traffic_type: "external",
       cta_placement: "hero",
     },
@@ -71,23 +76,71 @@ test("rejects event names outside the agreed taxonomy", () => {
   assert.equal(isSupportedEvent("button_click"), false);
 });
 
-test("keeps exact experience duration and distinct-memory parameters", () => {
+test("keeps seconds-based experience duration and distinct-memory parameters", () => {
   assert.deepEqual(
     buildEventParameters({
       experience_type: "globe",
-      active_duration_ms: 23740,
+      active_duration_seconds: 23.7,
+      time_since_memory_open_seconds: 4.2,
       unique_memories_opened: 3,
       last_completed_step: "memory_open",
     }),
     {
-      landing_version: "v2",
+      surface: "landing",
+      analytics_schema_version: "2",
+      landing_version: "v4",
       traffic_type: "external",
       experience_type: "globe",
-      active_duration_ms: 23740,
+      active_duration_seconds: 23.7,
+      time_since_memory_open_seconds: 4.2,
       unique_memories_opened: 3,
       last_completed_step: "memory_open",
     },
   );
+});
+
+test("allows only the approved photo-sheet diagnostic properties", () => {
+  assert.deepEqual(
+    buildEventParameters({
+      experience_type: "globe",
+      memory_id: "usa-west",
+      photo_index: 2,
+      photo_count: 5,
+      close_method: "browser_back",
+      max_photo_index: 4,
+      photos_viewed: 3,
+      time_since_memory_open_seconds: 6.8,
+      caption: "must-not-pass",
+      coordinates: "must-not-pass",
+    }),
+    {
+      surface: "landing",
+      analytics_schema_version: "2",
+      landing_version: "v4",
+      traffic_type: "external",
+      experience_type: "globe",
+      memory_id: "usa-west",
+      photo_index: 2,
+      photo_count: 5,
+      close_method: "browser_back",
+      max_photo_index: 4,
+      photos_viewed: 3,
+      time_since_memory_open_seconds: 6.8,
+    },
+  );
+});
+
+test("preserves both public store destinations for download attribution", () => {
+  for (const store of ["app_store", "google_play"]) {
+    assert.deepEqual(buildEventParameters({ cta_placement: "header", store }), {
+      surface: "landing",
+      analytics_schema_version: "2",
+      landing_version: "v4",
+      traffic_type: "external",
+      cta_placement: "header",
+      store,
+    });
+  }
 });
 
 test("persists and clears the analytics-only internal traffic marker", () => {

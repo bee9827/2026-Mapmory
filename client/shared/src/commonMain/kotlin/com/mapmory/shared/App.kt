@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -21,7 +22,9 @@ import com.mapmory.shared.navigation.MapmoryBackHandlerRegistry
 import com.mapmory.shared.navigation.MapmoryNavHost
 import com.mapmory.shared.navigation.MapmoryNavigator
 import com.mapmory.shared.preview.PreviewSurface
+import com.mapmory.shared.presentation.splash.MapmorySplashScreen
 import com.mapmory.shared.presentation.triprecord.screen.ProvideTripRecordPalettes
+import kotlinx.coroutines.delay
 
 @Composable
 fun MapmoryApp(
@@ -53,6 +56,12 @@ fun MapmoryApp(
     val latestNavigateBack = rememberUpdatedState {
         backHandlerRegistry.handleBack() || navigator.navigateBack()
     }
+    var showSplash by rememberSaveable { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        delay(SplashDurationMillis)
+        showSplash = false
+    }
 
     DisposableEffect(navigation, navigator, backHandlerRegistry) {
         navigation?.bindBackHandler { latestNavigateBack.value() }
@@ -67,16 +76,22 @@ fun MapmoryApp(
         LocalMapmoryAnalytics provides analytics,
     ) {
         ProvideTripRecordPalettes(isDark = isDarkTheme) {
-            MapmoryNavHost(
-                navController = navController,
-                navigator = navigator,
-                container = appContainer,
-                backHandlerRegistry = backHandlerRegistry,
-                contentWindowInsets = contentWindowInsets,
-            )
+            if (showSplash) {
+                MapmorySplashScreen(contentWindowInsets = contentWindowInsets)
+            } else {
+                MapmoryNavHost(
+                    navController = navController,
+                    navigator = navigator,
+                    container = appContainer,
+                    backHandlerRegistry = backHandlerRegistry,
+                    contentWindowInsets = contentWindowInsets,
+                )
+            }
         }
     }
 }
+
+private const val SplashDurationMillis = 900L
 
 @Preview(
     name = "앱 지도",

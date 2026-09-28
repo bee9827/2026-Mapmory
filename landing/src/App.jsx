@@ -1,11 +1,15 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import koreaProvinces from "./data/korea-provinces.json";
 import {
+  AppleLogo,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
   Bell,
+  CaretDown,
   CheckCircle,
+  DownloadSimple,
   EnvelopeSimple,
   GlobeHemisphereEast,
   HandSwipeLeft,
@@ -13,18 +17,63 @@ import {
   MapTrifold,
   Moon,
   NavigationArrow,
+  Play,
   Plus,
   Sun,
-  X,
 } from "@phosphor-icons/react";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics.js";
+import { classifyGlobeGesture } from "./globe-gesture.js";
+import { createCachedAsyncLoader } from "./cachedAsyncLoader.js";
+import {
+  HERO_MOBILE_ENTRY_APPLY_AT_MS,
+  HERO_MOBILE_ENTRY_DURATION_MS,
+  HERO_MEMORY_RELAY_STEPS,
+  MEMORY_DENSITY_LEVELS,
+  clampUnit,
+  getHeroMobileEntryState,
+  getHeroMemoryRelayState,
+  getHeroGlobeRenderSize,
+  getHeroMobileMapShift,
+  getHeroRelayProgress,
+} from "./heroMemoryRelay.js";
+import {
+  createWorldMemoryHistoryState,
+  isWorldMemoryHistoryEntry,
+} from "./worldMemoryHistory.js";
 import { subscribeToLaunchWaitlist } from "./waitlist.js";
 import { useExperienceAnalytics } from "./useExperienceAnalytics.js";
 
-const GOOGLE_PLAY_URL = import.meta.env.VITE_GOOGLE_PLAY_URL?.trim();
+const GOOGLE_PLAY_URL = import.meta.env.VITE_GOOGLE_PLAY_URL?.trim()
+  || "https://play.google.com/store/apps/details?id=com.mapmory.android";
+const APP_STORE_URL = "https://apps.apple.com/kr/app/mapmory-%EC%97%AC%ED%96%89-%EA%B8%B0%EB%A1%9D-%EC%95%84%EC%B9%B4%EC%9D%B4%EB%B8%8C/id6807056166";
 const Globe = lazy(() => import("react-globe.gl"));
-const WORLD_SELECTION_MOTION_MS = 1050;
+const WORLD_SELECTION_MOTION_MS = 720;
 const KOREA_FILL_MOTION_MS = 1500;
+const HERO_CUE_POST_MOTION_DELAY_MS = 400;
+const KOREA_DETAIL_HISTORY_KEY = "__mapmoryKoreaDetail";
+const GLOBE_RENDERER_CONFIG = Object.freeze({ antialias: true, alpha: true, powerPreference: "high-performance" });
+
+function currentTimeMs() {
+  return typeof performance !== "undefined" ? performance.now() : Date.now();
+}
+
+function elapsedSeconds(startedAt) {
+  return Math.max(0, Math.round((currentTimeMs() - startedAt) / 100) / 10);
+}
+
+function isKoreaDetailHistoryEntry(state) {
+  return Boolean(
+    state
+    && typeof state === "object"
+    && typeof state[KOREA_DETAIL_HISTORY_KEY] === "string"
+    && state[KOREA_DETAIL_HISTORY_KEY].length > 0,
+  );
+}
+
+function createKoreaDetailHistoryState(state, memoryKey) {
+  const currentState = state && typeof state === "object" ? state : {};
+  return { ...currentState, [KOREA_DETAIL_HISTORY_KEY]: memoryKey };
+}
 
 const memories = [
   {
@@ -108,6 +157,22 @@ const memories = [
   },
 ];
 
+const usaWestMemory = memories.find(({ key }) => key === "usa-west");
+const HERO_JOURNEY_RECORD = Object.freeze({
+  key: usaWestMemory.key,
+  country: usaWestMemory.country,
+  location: "미국 서부",
+  dateLabel: "2025 · 미국 서부",
+  title: "붉은 협곡에서 라스베이거스의 밤까지",
+  quote: "빛이 들어오던 순간, 한참을 올려다봤어요.",
+  recordLine: "흩어진 순간이, 여행 하나로.",
+  mapLine: "기록이 쌓일수록, 나만의 지도가 완성돼요.",
+  photoCount: usaWestMemory.photos.length,
+  representative: usaWestMemory.photos[1],
+  supporting: Object.freeze([usaWestMemory.photos[0], usaWestMemory.photos[3]]),
+  photoCredit: usaWestMemory.photoCredit,
+});
+
 const koreaMemories = [
   {
     key: "hapjeong",
@@ -158,8 +223,80 @@ const koreaMemories = [
 const koreaAddMemories = [koreaMemories[2], koreaMemories[1], koreaMemories[0]];
 
 const memoryByCountry = new Map(memories.map((memory) => [memory.id, memory]));
+const memoryByKey = new Map(memories.map((memory) => [memory.key, memory]));
 const koreaBounds = { minLng: 124.5, maxLng: 130.05, minLat: 33, maxLat: 38.75 };
 const districtMapCache = new Map();
+const loadWorldCountries = createCachedAsyncLoader(() => Promise.all([
+  import("topojson-client"),
+  import("world-atlas/countries-110m.json"),
+]).then(([{ feature }, { default: topology }]) => feature(topology, topology.objects.countries).features));
+
+function useWorldCountries(enabled = true) {
+  const [countries, setCountries] = useState([]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let active = true;
+    loadWorldCountries().then((features) => {
+      if (active) setCountries(features);
+    }).catch(() => {
+      // Keep the fallback visible; a later mount can retry the cleared cache.
+      if (active) setCountries([]);
+    });
+    return () => { active = false; };
+  }, [enabled]);
+
+  return countries;
+}
+
+function getGlobePalette(theme) {
+  return theme === "dark"
+    ? {
+        atmosphere: "#93a6b8",
+        visited: "#3fd09a",
+        visitedHover: "#72efbd",
+        unvisited: "#303b4d",
+        visitedSide: "#189a6d",
+        unvisitedSide: "#1b2532",
+        visitedStroke: "#a3f4d3",
+        unvisitedStroke: "#778497",
+      }
+    : {
+        atmosphere: "#c5ded2",
+        visited: "#65d7a7",
+        visitedHover: "#8be9c4",
+        unvisited: "#e7ebe6",
+        visitedSide: "#2cab7b",
+        unvisitedSide: "#c4cec7",
+        visitedStroke: "#f7fffb",
+        unvisitedStroke: "#aab8af",
+      };
+}
+
+function getHeroDensityPalette(theme, level) {
+  const palettes = theme === "dark"
+    ? {
+        NONE: { cap: "#303b4d", side: "#1b2532", stroke: "#667589" },
+        LOW: { cap: "#286f59", side: "#19503f", stroke: "#55b890" },
+        MEDIUM: { cap: "#3fd09a", side: "#1f8f68", stroke: "#8ae8c2" },
+        HIGH: { cap: "#72efbd", side: "#25b681", stroke: "#d0ffec" },
+      }
+    : {
+        NONE: { cap: "#e7ebe6", side: "#c4cec7", stroke: "#aab8af" },
+        LOW: { cap: "#bdeed7", side: "#83cbae", stroke: "#dff8ec" },
+        MEDIUM: { cap: "#65d7a7", side: "#2cab7b", stroke: "#effff8" },
+        HIGH: { cap: "#0a9d67", side: "#08794f", stroke: "#d8ffed" },
+      };
+  return palettes[level] ?? palettes.NONE;
+}
+
+function applyGlobeRenderQuality(globe) {
+  if (!globe) return;
+  const maxPixelRatio = window.matchMedia("(max-width: 560px)").matches ? 1.5 : 2.25;
+  const pixelRatio = Math.min(Math.max(window.devicePixelRatio || 1, 1), maxPixelRatio);
+  globe.renderer()?.setPixelRatio(pixelRatio);
+  globe.postProcessingComposer()?.setPixelRatio?.(pixelRatio);
+}
 
 function Brand() {
   return (
@@ -178,19 +315,58 @@ function ThemeToggle({ theme, onChange }) {
   );
 }
 
-function DownloadButton({ className = "", placement }) {
+function StoreButton({ className = "", placement, platform, label, onSelect, tabIndex }) {
+  const isAppStore = platform === "ios";
+  const url = isAppStore ? APP_STORE_URL : GOOGLE_PLAY_URL;
+  const Icon = isAppStore ? AppleLogo : Play;
   const handleClick = () => {
     trackEvent(
-      GOOGLE_PLAY_URL ? ANALYTICS_EVENTS.DOWNLOAD_CLICK : ANALYTICS_EVENTS.WAITLIST_CTA_CLICK,
-      { cta_placement: placement },
+      ANALYTICS_EVENTS.DOWNLOAD_CLICK,
+      { cta_placement: placement, store: isAppStore ? "app_store" : "google_play" },
     );
+    onSelect?.();
   };
 
-  if (GOOGLE_PLAY_URL) {
-    return <a className={`button button-primary ${className}`} href={GOOGLE_PLAY_URL} target="_blank" rel="noreferrer" onClick={handleClick}><ArrowDown size={19} weight="bold" />Mapmory 다운로드</a>;
-  }
+  return <a className={`button button-primary button-store ${className}`} href={url} target="_blank" rel="noreferrer" tabIndex={tabIndex} onClick={handleClick}><Icon size={18} weight="fill" />{label}</a>;
+}
 
-  return <a className={`button button-primary ${className}`} href="#download" onClick={handleClick}><Bell size={19} weight="fill" />출시 알림 신청하기</a>;
+function HeaderStoreMenu() {
+  const menuRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const closeMenu = useCallback(() => {
+    menuRef.current?.removeAttribute("open");
+    setIsOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (!menuRef.current?.contains(event.target)) closeMenu();
+    };
+    const handleKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      closeMenu();
+      menuRef.current?.querySelector("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeMenu, isOpen]);
+
+  return (
+    <details className="header-store-menu" ref={menuRef} onToggle={(event) => setIsOpen(event.currentTarget.open)}>
+      <summary className="button button-primary header-store-trigger" aria-label="앱 다운로드 메뉴 열기">
+        <DownloadSimple size={18} weight="bold" /><span>앱 받기</span>
+      </summary>
+      <div className="header-store-popover" role="group" aria-label="Mapmory 앱 다운로드">
+        <StoreButton placement="header" platform="ios" label="App Store" onSelect={closeMenu} />
+        <StoreButton placement="header" platform="android" label="Google Play" onSelect={closeMenu} />
+      </div>
+    </details>
+  );
 }
 
 function LaunchWaitlistForm() {
@@ -349,31 +525,27 @@ function LaunchWaitlistForm() {
 
 function InteractiveGlobe({ selected, focusRequest, onSelect, onInteract, theme, guideVisible, onGuideDismiss, isSelecting }) {
   const globeRef = useRef(null);
+  const gestureStartRef = useRef(null);
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 540, height: 540 });
   const [hoveredId, setHoveredId] = useState(null);
   const [globeMaterial, setGlobeMaterial] = useState(null);
-  const [countries, setCountries] = useState([]);
+  const [hasGlobeMounted, setHasGlobeMounted] = useState(false);
+  const countries = useWorldCountries(hasGlobeMounted);
   const [isGlobeReady, setIsGlobeReady] = useState(false);
   const [isGlobeInView, setIsGlobeInView] = useState(false);
   const hasFocusedRef = useRef(false);
-
-  useEffect(() => {
-    let active = true;
-    Promise.all([
-      import("topojson-client"),
-      import("world-atlas/countries-110m.json"),
-    ]).then(([{ feature }, { default: topology }]) => {
-      if (active) setCountries(feature(topology, topology.objects.countries).features);
-    });
-    return () => { active = false; };
-  }, []);
+  const lastFocusRequestRef = useRef(0);
 
   useEffect(() => {
     let active = true;
     let material;
     import("three").then(({ MeshPhongMaterial }) => {
-      material = new MeshPhongMaterial({ color: theme === "dark" ? "#0b111c" : "#121c27", emissive: theme === "dark" ? "#07121b" : "#0b1118", shininess: 12 });
+      material = new MeshPhongMaterial({
+        color: theme === "dark" ? "#0b111c" : "#f4f6f2",
+        emissive: theme === "dark" ? "#07121b" : "#e8eee9",
+        shininess: theme === "dark" ? 12 : 7,
+      });
       if (active) setGlobeMaterial(material);
       else material.dispose();
     });
@@ -395,10 +567,14 @@ function InteractiveGlobe({ selected, focusRequest, onSelect, onInteract, theme,
     const element = containerRef.current;
     if (!element || !("IntersectionObserver" in window)) {
       setIsGlobeInView(true);
+      setHasGlobeMounted(true);
       return undefined;
     }
     const observer = new IntersectionObserver(
-      ([entry]) => setIsGlobeInView(entry.isIntersecting),
+      ([entry]) => {
+        setIsGlobeInView(entry.isIntersecting);
+        if (entry.isIntersecting) setHasGlobeMounted(true);
+      },
       { rootMargin: "120px 0px" },
     );
     observer.observe(element);
@@ -413,9 +589,23 @@ function InteractiveGlobe({ selected, focusRequest, onSelect, onInteract, theme,
 
   useEffect(() => {
     if (!isGlobeReady || !globeRef.current) return;
-    const viewpoint = selected.viewpoint ?? { lat: selected.lat, lng: selected.lng, altitude: 2.05 };
-    globeRef.current.pointOfView(viewpoint, hasFocusedRef.current ? 850 : 0);
-    hasFocusedRef.current = true;
+    if (!hasFocusedRef.current) {
+      const initialViewpoint = selected.viewpoint ?? { lat: selected.lat, lng: selected.lng, altitude: 2.05 };
+      globeRef.current.pointOfView(initialViewpoint, 0);
+      hasFocusedRef.current = true;
+      return;
+    }
+    if (!focusRequest || focusRequest.id === lastFocusRequestRef.current) return;
+    lastFocusRequestRef.current = focusRequest.id;
+    if (focusRequest.selectionSource !== "shortcut") return;
+
+    const currentViewpoint = globeRef.current.pointOfView();
+    const requestedViewpoint = selected.viewpoint ?? { lat: selected.lat, lng: selected.lng, altitude: 2.05 };
+    const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : WORLD_SELECTION_MOTION_MS;
+    globeRef.current.pointOfView({
+      ...requestedViewpoint,
+      altitude: currentViewpoint?.altitude ?? requestedViewpoint.altitude,
+    }, duration);
   }, [focusRequest, isGlobeReady, selected]);
 
   useEffect(() => {
@@ -434,6 +624,7 @@ function InteractiveGlobe({ selected, focusRequest, onSelect, onInteract, theme,
   }, [isGlobeReady, size, globeMaterial]);
 
   const isVisited = (polygon) => memoryByCountry.has(String(polygon.id));
+  const globePalette = getGlobePalette(theme);
 
   return (
     <div
@@ -442,22 +633,48 @@ function InteractiveGlobe({ selected, focusRequest, onSelect, onInteract, theme,
       role="region"
       aria-label="회전 가능한 Mapmory 세계 지구본"
       aria-busy={isSelecting}
-      onPointerDown={() => onInteract("globe_drag")}
-      onWheel={() => onInteract("globe_zoom")}
+      onPointerDown={(event) => {
+        if (!isGlobeReady || event.target.tagName !== "CANVAS") return;
+        gestureStartRef.current = { pointerId: event.pointerId, pointerType: event.pointerType, clientX: event.clientX, clientY: event.clientY };
+      }}
+      onPointerMove={(event) => {
+        const gesture = classifyGlobeGesture(gestureStartRef.current, event);
+        if (gesture === "pending") return;
+        gestureStartRef.current = null;
+        if (gesture === "globe_drag") {
+          onInteract(gesture);
+          onGuideDismiss();
+        }
+      }}
+      onPointerUp={() => { gestureStartRef.current = null; }}
+      onPointerCancel={() => { gestureStartRef.current = null; }}
+      onPointerLeave={() => { gestureStartRef.current = null; }}
+      onWheel={(event) => {
+        if (isGlobeReady && event.target.tagName === "CANVAS" && event.deltaY !== 0) {
+          onInteract("globe_zoom");
+          onGuideDismiss();
+        }
+      }}
     >
       <Suspense fallback={<div className="globe-loading"><GlobeHemisphereEast size={28} weight="duotone" /><span>지구본을 준비하고 있어요</span></div>}>
-        {globeMaterial && countries.length > 0 && <Globe ref={globeRef} width={size.width} height={size.height} backgroundColor="rgba(0,0,0,0)" globeMaterial={globeMaterial} showAtmosphere atmosphereColor="#93a6b8" atmosphereAltitude={0.12} polygonsData={countries}
-          onGlobeReady={() => setIsGlobeReady(true)}
-          polygonCapColor={(polygon) => { const id = String(polygon.id); if (id === selected.id) return "#f6c66f"; if (id === hoveredId && isVisited(polygon)) return "#72efbd"; return isVisited(polygon) ? "#3fd09a" : "#303b4d"; }}
-          polygonSideColor={(polygon) => (String(polygon.id) === selected.id ? "#b87924" : isVisited(polygon) ? "#189a6d" : "#1b2532")}
-          polygonStrokeColor={(polygon) => (String(polygon.id) === selected.id ? "#fff1c7" : isVisited(polygon) ? "#a3f4d3" : "#778497")}
+        {hasGlobeMounted && globeMaterial && countries.length > 0 && <Globe ref={globeRef} width={size.width} height={size.height} backgroundColor="rgba(0,0,0,0)" globeMaterial={globeMaterial} rendererConfig={GLOBE_RENDERER_CONFIG} showAtmosphere atmosphereColor={globePalette.atmosphere} atmosphereAltitude={0.12} polygonsData={countries}
+          onGlobeReady={() => { setIsGlobeReady(true); applyGlobeRenderQuality(globeRef.current); }}
+          polygonCapColor={(polygon) => { const id = String(polygon.id); if (id === selected.id) return "#f6c66f"; if (id === hoveredId && isVisited(polygon)) return globePalette.visitedHover; return isVisited(polygon) ? globePalette.visited : globePalette.unvisited; }}
+          polygonSideColor={(polygon) => (String(polygon.id) === selected.id ? "#b87924" : isVisited(polygon) ? globePalette.visitedSide : globePalette.unvisitedSide)}
+          polygonStrokeColor={(polygon) => (String(polygon.id) === selected.id ? "#fff1c7" : isVisited(polygon) ? globePalette.visitedStroke : globePalette.unvisitedStroke)}
           polygonAltitude={(polygon) => (String(polygon.id) === selected.id ? 0.04 : isVisited(polygon) ? 0.012 : 0.003)}
           polygonsTransitionDuration={WORLD_SELECTION_MOTION_MS}
           onPolygonHover={(polygon) => { const visited = polygon && isVisited(polygon); setHoveredId(visited ? String(polygon.id) : null); if (containerRef.current) containerRef.current.style.cursor = visited ? "pointer" : "grab"; }}
           onPolygonClick={(polygon) => { const memory = memoryByCountry.get(String(polygon.id)); if (memory) onSelect(memory, "globe"); }} />}
       </Suspense>
-      {guideVisible && <GlobeOnboarding onDismiss={onGuideDismiss} />}
-      <p className="globe-instruction"><NavigationArrow size={18} weight="fill" />{isSelecting ? "선택한 나라가 올라오는 중 · 잠시만 기다려주세요" : "잡고 돌려보세요 · 민트색 나라를 누르면 기억이 열려요"}</p>
+      {guideVisible && <GlobeOnboarding />}
+      <p className="globe-instruction" aria-live="polite"><NavigationArrow size={18} weight="fill" />{
+        isSelecting
+          ? "선택한 나라로 이동하는 중이에요"
+          : guideVisible
+            ? "지구본을 좌우로 움직여보세요"
+            : "민트색 나라를 눌러 사진을 열어보세요"
+      }</p>
     </div>
   );
 }
@@ -478,42 +695,88 @@ function PhotoCredit({ label, url }) {
   return <span className="photo-credit photo-credit-owned">Photo: {label}</span>;
 }
 
-function MemoryCard({ memory, onClose }) {
+function MemoryCard({ memory, onClose, onPhotoChange, openSequence = 0, priority = false, isModal = false }) {
   const photos = memory.photos ?? [{
     src: memory.image,
     caption: memory.location,
     alt: `${memory.location}에서 남긴 실제 여행 장면`,
   }];
   const [photoIndex, setPhotoIndex] = useState(0);
+  const swipeStartRef = useRef(null);
   const activePhoto = photos[photoIndex];
   const hasGallery = photos.length > 1;
 
-  const movePhoto = (offset) => {
-    setPhotoIndex((current) => (current + offset + photos.length) % photos.length);
+  useEffect(() => {
+    setPhotoIndex(0);
+    swipeStartRef.current = null;
+  }, [memory.key, openSequence]);
+
+  const movePhoto = (offset, source = "button") => {
+    setPhotoIndex((current) => {
+      const next = Math.min(photos.length - 1, Math.max(0, current + offset));
+      if (next !== current) onPhotoChange?.({ photoIndex: next, photoCount: photos.length, source });
+      return next;
+    });
+  };
+
+  const handleSwipeStart = (event) => {
+    if (event.pointerType === "mouse") return;
+    swipeStartRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+
+  const handleSwipeEnd = (event) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start || start.pointerId !== event.pointerId) return;
+    const deltaX = start.x - event.clientX;
+    const deltaY = start.y - event.clientY;
+    if (Math.abs(deltaX) < 36 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+    movePhoto(deltaX > 0 ? 1 : -1, "swipe");
   };
 
   return (
-    <article className="memory-card world-memory-card" aria-live="polite">
+    <article
+      className="memory-card world-memory-card"
+      aria-live="polite"
+      aria-modal={isModal ? "true" : undefined}
+      aria-label={isModal ? `${memory.location} 기억 사진` : undefined}
+      role={isModal ? "dialog" : undefined}
+    >
       <header>
-        <MapPin size={18} weight="fill" /><span>{memory.location}</span><small>{memory.country}</small>
-        {onClose && <button type="button" className="world-memory-close" onClick={onClose} aria-label="기억 닫고 지구본으로 돌아가기"><X size={18} weight="bold" /><span>지구본으로</span></button>}
+        <MapPin size={18} weight="fill" />
+        <span className="memory-location"><span className="memory-location-full">{memory.location}</span><span className="memory-location-compact">{memory.location.replace(" · ", " ").replace(" 여행", "")}</span></span>
+        <small>{memory.country}</small>
+        {onClose && <button type="button" className="world-memory-close" onClick={() => onClose("button")} aria-label="기억 닫기"><CaretDown size={16} weight="bold" aria-hidden="true" /><span>닫기</span></button>}
       </header>
-      <div className={`memory-image-wrap ${hasGallery ? "is-gallery" : ""}`}>
-        <img key={activePhoto.src} src={activePhoto.src} alt={activePhoto.alt} loading="lazy" decoding="async" />
+      <div
+        className={`memory-image-wrap ${hasGallery ? "is-gallery" : ""}`}
+        onPointerDown={handleSwipeStart}
+        onPointerUp={handleSwipeEnd}
+        onPointerCancel={() => { swipeStartRef.current = null; }}
+      >
+        <img key={activePhoto.src} src={activePhoto.src} alt={activePhoto.alt} loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} decoding={priority ? "auto" : "async"} />
         {hasGallery && (
           <>
             <span className="memory-photo-count" aria-hidden="true">{photoIndex + 1} / {photos.length}</span>
-            <button type="button" className="memory-gallery-arrow is-prev" onClick={() => movePhoto(-1)} aria-label="이전 미국 여행 사진"><ArrowLeft size={18} weight="bold" /></button>
-            <button type="button" className="memory-gallery-arrow is-next" onClick={() => movePhoto(1)} aria-label="다음 미국 여행 사진"><ArrowRight size={18} weight="bold" /></button>
+            <button type="button" className="memory-gallery-arrow is-prev" disabled={photoIndex === 0} onClick={() => movePhoto(-1)} aria-label={`이전 ${memory.country} 여행 사진`}><ArrowLeft size={18} weight="bold" /></button>
+            <button type="button" className="memory-gallery-arrow is-next" disabled={photoIndex === photos.length - 1} onClick={() => movePhoto(1)} aria-label={`다음 ${memory.country} 여행 사진`}><ArrowRight size={18} weight="bold" /></button>
             <div className="memory-photo-meta">
-              <span>{activePhoto.caption}</span>
-              <div className="memory-photo-dots" role="group" aria-label="미국 여행 사진 선택">
+              <span className="memory-photo-caption">{activePhoto.caption}</span>
+              <div className="memory-photo-dots" role="group" aria-label={`${memory.country} 여행 사진 선택`}>
                 {photos.map((photo, index) => (
                   <button
                     key={photo.src}
                     type="button"
                     className={index === photoIndex ? "is-active" : ""}
-                    onClick={() => setPhotoIndex(index)}
+                    onClick={() => {
+                      if (index === photoIndex) return;
+                      setPhotoIndex(index);
+                      onPhotoChange?.({ photoIndex: index, photoCount: photos.length, source: "dot" });
+                    }}
                     aria-label={`${index + 1}번째 사진: ${photo.caption}`}
                     aria-pressed={index === photoIndex}
                   />
@@ -523,6 +786,20 @@ function MemoryCard({ memory, onClose }) {
           </>
         )}
       </div>
+      {hasGallery && (
+        <div className="memory-sheet-gallery-controls">
+          <button type="button" disabled={photoIndex === 0} onClick={() => movePhoto(-1)} aria-label={`이전 ${memory.country} 여행 사진`}><ArrowLeft size={18} weight="bold" /></button>
+          <div>
+            <p className="memory-mobile-photo-caption">{activePhoto.caption}</p>
+            <span className="memory-sheet-photo-count">{photoIndex + 1} / {photos.length}</span>
+            <div className="memory-sheet-photo-dots" aria-hidden="true">
+              {photos.map((photo, index) => <span key={photo.src} className={index === photoIndex ? "is-active" : ""} />)}
+            </div>
+          </div>
+          <button type="button" disabled={photoIndex === photos.length - 1} onClick={() => movePhoto(1)} aria-label={`다음 ${memory.country} 여행 사진`}><ArrowRight size={18} weight="bold" /></button>
+        </div>
+      )}
+      {!hasGallery && <div className="memory-single-title"><h2>{memory.title}</h2></div>}
       <div className="memory-card-body">
         <span className="memory-kind">실제 사진으로 열린 기억</span>
         <h2>{memory.title}</h2>
@@ -904,11 +1181,13 @@ function KoreaDetailExperience({ theme }) {
   const [selected, setSelected] = useState(null);
   const [addedMemoryKeys, setAddedMemoryKeys] = useState(() => new Set());
   const [isAddPanelOpen, setIsAddPanelOpen] = useState(true);
-  const [addFeedback, setAddFeedback] = useState("아래 사진을 추가해 지도가 채워지는 과정을 체험해보세요.");
+  const [addFeedback, setAddFeedback] = useState("사진을 고르면 그 장소의 지역이 지도에 채워져요.");
   const [detailLevel, setDetailLevel] = useState(2);
   const [transitioningKey, setTransitioningKey] = useState(null);
   const detailDemoRef = useRef(null);
+  const pendingMemorySourceRef = useRef(null);
   const transitionTimerRef = useRef(null);
+  const detailLevelRef = useRef(2);
   const analytics = useExperienceAnalytics("korea_detail");
   const addedMemories = useMemo(
     () => koreaMemories.filter((memory) => addedMemoryKeys.has(memory.key)),
@@ -925,23 +1204,48 @@ function KoreaDetailExperience({ theme }) {
     return () => clearTimeout(transitionTimerRef.current);
   }, []);
 
+  const showKoreaOverview = useCallback(({ consumeHistory = true } = {}) => {
+    const shouldConsumeHistory = consumeHistory && isKoreaDetailHistoryEntry(window.history.state);
+    clearTimeout(transitionTimerRef.current);
+    detailLevelRef.current = 2;
+    setTransitioningKey(null);
+    setIsAddPanelOpen(false);
+    setDetailLevel(2);
+    if (shouldConsumeHistory) window.history.back();
+  }, []);
+
   useEffect(() => {
-    if (detailLevel !== 3 || (window.innerWidth > 900 && window.innerHeight > 800)) return undefined;
-    const frame = requestAnimationFrame(() => {
-      detailDemoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [detailLevel]);
+    const handleKoreaHistoryBack = () => {
+      if (detailLevelRef.current !== 3) return;
+      showKoreaOverview({ consumeHistory: false });
+    };
+    window.addEventListener("popstate", handleKoreaHistoryBack);
+    return () => window.removeEventListener("popstate", handleKoreaHistoryBack);
+  }, [showKoreaOverview]);
 
   const openDetail = (memory, selectionSource) => {
     if (selected?.key !== memory.key || detailLevel !== 3) {
-      analytics.trackMemoryOpen(memory.key, selectionSource);
+      pendingMemorySourceRef.current = selectionSource;
     }
     setSelected(memory);
     setIsAddPanelOpen(false);
     setTransitioningKey(null);
+    if (window.matchMedia("(max-width: 900px)").matches && detailLevelRef.current !== 3 && !isKoreaDetailHistoryEntry(window.history.state)) {
+      window.history.pushState(
+        createKoreaDetailHistoryState(window.history.state, memory.key),
+        "",
+        window.location.href,
+      );
+    }
+    detailLevelRef.current = 3;
     setDetailLevel(3);
   };
+
+  useEffect(() => {
+    if (detailLevel !== 3 || !selected || !pendingMemorySourceRef.current) return;
+    analytics.trackMemoryOpen(selected.key, pendingMemorySourceRef.current);
+    pendingMemorySourceRef.current = null;
+  }, [detailLevel, selected, analytics.trackMemoryOpen]);
 
   const handleSelect = (memory, selectionSource) => {
     if (!addedMemoryKeys.has(memory.key) || transitioningKey) return;
@@ -961,27 +1265,18 @@ function KoreaDetailExperience({ theme }) {
     setSelected(memory);
     setIsAddPanelOpen(false);
     setTransitioningKey(memory.key);
-    setAddFeedback(`${memory.province}가 지도에 채워지고 있어요. 색이 모두 채워질 때까지 잠시 봐주세요.`);
+    setAddFeedback(`${memory.province}에 기억을 남기고 있어요.`);
     transitionTimerRef.current = setTimeout(() => {
       analytics.trackMemoryAdd(memory.key);
       setTransitioningKey(null);
-      setAddFeedback(`${memory.province}가 채워졌어요. 색칠된 지역이나 상세지역 보기 버튼을 눌러 기억을 열어보세요.`);
-      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-      detailDemoRef.current?.scrollIntoView({ behavior, block: "start" });
+      setAddFeedback(`${memory.province}에 기억이 남았어요. 색칠된 지역이나 기억 보기를 눌러 열어보세요.`);
     }, KOREA_FILL_MOTION_MS);
-  };
-
-  const handleBack = () => {
-    clearTimeout(transitionTimerRef.current);
-    setTransitioningKey(null);
-    setIsAddPanelOpen(false);
-    setDetailLevel(2);
   };
 
   return (
     <section className="detail-section" id="korea-detail" ref={analytics.sectionRef}>
       <div className="detail-heading">
-        <div><p className="eyebrow">02 · 대한민국</p><h2>사진을 더하면<br /><em>지역의 기억이</em> 채워져요.</h2></div>
+        <div><p className="eyebrow">02 · 대한민국</p><h2>사진을 기록하면<br /><em>지도가 채워져요.</em></h2></div>
       </div>
 
       <div className={`detail-demo detail-level-${detailLevel}`} id="korea-map-demo" ref={detailDemoRef}>
@@ -998,23 +1293,21 @@ function KoreaDetailExperience({ theme }) {
                   <div className="region-reveal-tray" aria-live="polite">
                     <div className="region-reveal-copy">
                       <span><CheckCircle size={17} weight="fill" />{activeAddedMemory.provinceShort} · 기억 1개</span>
-                      <strong>{activeAddedMemory.provinceShort}의 기억이 채워졌어요</strong>
+                      <strong>{activeAddedMemory.provinceShort}에 기억이 남았어요</strong>
                     </div>
                     <div className="region-reveal-actions">
-                      {addedMemories.length < koreaAddMemories.length && (
-                        <button className="region-reveal-add" type="button" onClick={() => setIsAddPanelOpen(true)}>
-                          다른 지역 추가
-                        </button>
-                      )}
+                      <button className="region-reveal-add" type="button" onClick={() => setIsAddPanelOpen(true)}>
+                        {addedMemories.length < koreaAddMemories.length ? "다른 지역 추가" : "기록 목록 보기"}
+                      </button>
                       <button className="region-reveal-open" type="button" onClick={() => handleSelect(activeAddedMemory, "reveal_tray")}>
-                        {activeAddedMemory.provinceShort}의 기억 보기<ArrowRight size={18} weight="bold" />
+                        {activeAddedMemory.provinceShort} 기억 열기<ArrowRight size={18} weight="bold" />
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="memory-add-panel">
                     <div className="memory-add-heading">
-                      <span><b>2단계</b> 사진 한 장을 골라 지도를 채워보세요</span>
+                      <span><b>2단계</b> 사진 한 장을 골라 지도에 기록해보세요</span>
                       <p aria-live="polite">{addFeedback}</p>
                     </div>
                     <div className="memory-add-list" role="list" aria-label="지도에 추가할 예시 사진">
@@ -1040,7 +1333,7 @@ function KoreaDetailExperience({ theme }) {
         ) : (
           <div className="region-detail-stage detail-level-content" aria-live="polite">
             <div className="region-detail-toolbar">
-              <button type="button" onClick={handleBack}><ArrowLeft size={18} weight="bold" />대한민국 지도로 돌아가기</button>
+              <button type="button" onClick={() => showKoreaOverview()}><ArrowLeft size={18} weight="bold" />대한민국 지도로 돌아가기</button>
             </div>
             <div className="district-detail-grid">
               <DistrictMap memory={selected} theme={theme} />
@@ -1055,7 +1348,7 @@ function KoreaDetailExperience({ theme }) {
                     className="button button-primary region-cta"
                     href="#download"
                     onClick={() => trackEvent(
-                      GOOGLE_PLAY_URL ? ANALYTICS_EVENTS.DOWNLOAD_CLICK : ANALYTICS_EVENTS.WAITLIST_CTA_CLICK,
+                      ANALYTICS_EVENTS.DOWNLOAD_CTA_CLICK,
                       { cta_placement: "korea_memory" },
                     )}
                   >
@@ -1071,130 +1364,724 @@ function KoreaDetailExperience({ theme }) {
   );
 }
 
-function GlobeOnboarding({ onDismiss }) {
+function GlobeOnboarding() {
   return (
-    <button
-      type="button"
+    <div
       className="globe-onboarding-overlay"
-      onPointerDown={(event) => event.stopPropagation()}
-      onClick={onDismiss}
-      aria-label="지구본을 돌려보세요. 민트색 나라를 누르면 기억이 열려요."
+      role="status"
+      aria-label="지구본을 좌우로 움직여보세요. 첫 움직임부터 바로 반응합니다."
     >
       <span className="globe-onboarding-card">
         <span className="globe-onboarding-gesture" aria-hidden="true"><HandSwipeLeft size={46} weight="duotone" /></span>
-        <strong>지구본을 돌려보세요</strong>
-        <span className="globe-onboarding-copy">민트색 나라를 누르면 기억이 열려요 · 눌러서 시작</span>
+        <strong>지구본을 좌우로 움직여보세요</strong>
+        <span className="globe-onboarding-copy">첫 움직임부터 바로 반응해요</span>
       </span>
-    </button>
+    </div>
   );
 }
 
-function HeroSection({ onExperienceEntry }) {
-  const [photoStep, setPhotoStep] = useState(0);
-  const heroRef = useRef(null);
+function HeroGlobe({ relayState, theme, onReady, waitForIdle = false, polygonsTransitionDuration = 720 }) {
+  const globeRef = useRef(null);
+  const containerRef = useRef(null);
+  const [isDeferredLoadReady, setIsDeferredLoadReady] = useState(false);
+  const shouldLoadGlobe = isDeferredLoadReady || (!waitForIdle && relayState.progress >= 0.18);
+  const countries = useWorldCountries(shouldLoadGlobe);
+  const [size, setSize] = useState({ width: 420, height: 420 });
+  const [globeMaterial, setGlobeMaterial] = useState(null);
+  const [isGlobeReady, setIsGlobeReady] = useState(false);
+  const [isGlobeInView, setIsGlobeInView] = useState(true);
+  const hasInitialFocusRef = useRef(false);
+  const globePalette = getGlobePalette(theme);
+  const densityByCountry = useMemo(() => new Map((relayState.phase === "intro" ? [relayState.introCard] : relayState.cards).map((card) => {
+    const memory = memoryByKey.get(card.key);
+    return [memory?.id, card.density.level];
+  }).filter(([id]) => Boolean(id))), [relayState.cards, relayState.introCard, relayState.phase]);
 
   useEffect(() => {
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (reducedMotion.matches) {
-      setPhotoStep(2);
-      return undefined;
+    let timerId = 0;
+    let idleId = 0;
+    const enableGlobe = () => setIsDeferredLoadReady(true);
+
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(enableGlobe, { timeout: 900 });
+    } else {
+      timerId = window.setTimeout(enableGlobe, 180);
     }
 
-    let frame = 0;
-    const updatePhotoStep = () => {
-      frame = 0;
-      const distance = Math.max(0, window.scrollY);
-      const nextStep = distance >= 120 ? 2 : distance >= 30 ? 1 : 0;
-      setPhotoStep(nextStep);
-    };
-    const handleScroll = () => {
-      if (frame) return;
-      frame = window.requestAnimationFrame(updatePhotoStep);
-    };
-
-    const startsAtHeroTop = window.location.hash === "" || window.location.hash === "#top";
-    if (startsAtHeroTop) window.scrollTo(0, 0);
-    frame = window.requestAnimationFrame(updatePhotoStep);
-    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      if (frame) window.cancelAnimationFrame(frame);
+      if (idleId) window.cancelIdleCallback(idleId);
+      if (timerId) window.clearTimeout(timerId);
     };
   }, []);
 
+  useEffect(() => {
+    if (!shouldLoadGlobe) {
+      setIsGlobeReady(false);
+      return undefined;
+    }
+    let active = true;
+    let material;
+    import("three").then(({ MeshPhongMaterial }) => {
+      material = new MeshPhongMaterial({
+        color: theme === "dark" ? "#0b111c" : "#f4f6f2",
+        emissive: theme === "dark" ? "#07121b" : "#e8eee9",
+        shininess: theme === "dark" ? 12 : 7,
+      });
+      if (active) setGlobeMaterial(material);
+      else material.dispose();
+    });
+    return () => { active = false; material?.dispose(); };
+  }, [shouldLoadGlobe, theme]);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      const next = getHeroGlobeRenderSize(entry.contentRect.width);
+      setSize({ width: next, height: next });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || !("IntersectionObserver" in window)) return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsGlobeInView(entry.isIntersecting),
+      { rootMargin: "100px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isGlobeReady || !globeRef.current) return;
+    if (isGlobeInView) globeRef.current.resumeAnimation();
+    else globeRef.current.pauseAnimation();
+  }, [isGlobeInView, isGlobeReady]);
+
+  useEffect(() => {
+    if (!isGlobeReady || !globeRef.current) return;
+    const activeCard = relayState.activeIndex >= 0 ? relayState.cards[relayState.activeIndex] : null;
+    const completedCard = relayState.cards.find(({ isApplied }) => isApplied) ?? null;
+    const targetCard = activeCard ?? completedCard;
+    if (!targetCard && hasInitialFocusRef.current) return;
+    const memory = targetCard ? memoryByKey.get(targetCard.key) : memories[0];
+    if (!memory) return;
+    const baseViewpoint = memory.viewpoint ?? { lat: memory.lat, lng: memory.lng, altitude: 2.05 };
+    const viewpoint = { ...baseViewpoint, altitude: 1.72 };
+    globeRef.current.pointOfView(viewpoint, targetCard ? 720 : 0);
+    hasInitialFocusRef.current = true;
+  }, [isGlobeReady, relayState.activeIndex, relayState.cards]);
+
+  const getDensity = (polygon) => densityByCountry.get(String(polygon.id)) ?? "NONE";
+  const globeAriaLabel = relayState.phase === "intro"
+    ? "제주 여행 기록이 남아 있는 3D 기억 지도"
+    : relayState.completedCount > 0
+      ? "미국 서부 여행 기록이 더해져 같은 나라의 색이 한 단계 진해진 3D 기억 지도"
+      : relayState.phase === "map"
+        ? "완성된 미국 서부 여행 기록이 이동하고 있는 3D 기억 지도"
+        : "미국 서부 여행 기록을 기다리고 있는 3D 기억 지도";
+
   return (
-    <section className="hero" ref={heroRef}>
-      <div className="hero-intro">
-        <div className="hero-copy">
-          <h1>장소를 따라가면, 그날의 <span className="hero-memory-word"><em>기억</em><span aria-hidden="true">기억</span></span>이 다시 열려요.</h1>
-          <p className="hero-description">사진과 장소를 모아 나만의 기억 지도를 만들어요.</p>
-          <div className="hero-actions">
-            <a className="button button-primary" href="#experience" onClick={() => onExperienceEntry("hero")}><GlobeHemisphereEast size={19} weight="duotone" />지구본 돌려보기</a>
+    <div
+      className="hero-globe-preview"
+      ref={containerRef}
+      role="img"
+      aria-label={globeAriaLabel}
+      data-theme={theme}
+      data-completed-count={relayState.completedCount}
+    >
+      <span className={`hero-globe-placeholder ${isGlobeReady ? "is-hidden" : ""}`} aria-hidden="true">
+        <GlobeHemisphereEast size={68} weight="duotone" />
+      </span>
+      <Suspense fallback={<div className="hero-globe-loading"><GlobeHemisphereEast size={26} weight="duotone" /><span>기억 지도를 준비하고 있어요</span></div>}>
+        {shouldLoadGlobe && globeMaterial && countries.length > 0 && (
+          <Globe
+            ref={globeRef}
+            width={size.width}
+            height={size.height}
+            backgroundColor="rgba(0,0,0,0)"
+            globeMaterial={globeMaterial}
+            rendererConfig={GLOBE_RENDERER_CONFIG}
+            showAtmosphere
+            atmosphereColor={globePalette.atmosphere}
+            atmosphereAltitude={0.1}
+            polygonsData={countries}
+            enablePointerInteraction={false}
+            polygonCapColor={(polygon) => getHeroDensityPalette(theme, getDensity(polygon)).cap}
+            polygonSideColor={(polygon) => getHeroDensityPalette(theme, getDensity(polygon)).side}
+            polygonStrokeColor={(polygon) => getHeroDensityPalette(theme, getDensity(polygon)).stroke}
+            polygonAltitude={(polygon) => (getDensity(polygon) === "NONE" ? 0.002 : 0.009)}
+            polygonsTransitionDuration={polygonsTransitionDuration}
+            onGlobeReady={() => {
+              const globe = globeRef.current;
+              applyGlobeRenderQuality(globe);
+              const controls = globe?.controls();
+              if (controls) controls.enabled = false;
+              setIsGlobeReady(true);
+              onReady?.();
+            }}
+          />
+        )}
+      </Suspense>
+      <div className="hero-globe-state" aria-hidden="true">
+        {relayState.cards.map((card) => (
+          <span key={card.key} data-country={card.country} data-density={card.density.level} data-applied={card.isApplied ? "true" : "false"} />
+        ))}
+      </div>
+      <span className="hero-target-pulse" aria-hidden="true" />
+    </div>
+  );
+}
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => (
+    typeof window !== "undefined" && window.matchMedia(query).matches
+  ));
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const updateMatch = () => setMatches(media.matches);
+    updateMatch();
+    media.addEventListener("change", updateMatch);
+    return () => media.removeEventListener("change", updateMatch);
+  }, [query]);
+
+  return matches;
+}
+
+function MobileHeroSection({ onExperienceEntry, theme }) {
+  const reducedMotionQuery = "(prefers-reduced-motion: reduce)";
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => window.matchMedia(reducedMotionQuery).matches);
+  const [entryState, setEntryState] = useState(() => getHeroMobileEntryState(0, {
+    reducedMotion: window.matchMedia(reducedMotionQuery).matches,
+  }));
+  const [isGlobeReady, setIsGlobeReady] = useState(false);
+  const [isCueVisible, setIsCueVisible] = useState(prefersReducedMotion);
+  const [isCueNudging, setIsCueNudging] = useState(false);
+  const visualRef = useRef(null);
+  const recordRef = useRef(null);
+  const playedRef = useRef(prefersReducedMotion);
+  const startedRef = useRef(false);
+  const hasDismissedCueRef = useRef(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(reducedMotionQuery);
+    const updatePreference = () => setPrefersReducedMotion(media.matches);
+    media.addEventListener("change", updatePreference);
+    return () => media.removeEventListener("change", updatePreference);
+  }, []);
+
+  useEffect(() => {
+    const visual = visualRef.current;
+    const record = recordRef.current;
+    if (!visual || !record) return undefined;
+
+    const measureTravel = () => {
+      const globe = visual.querySelector(".hero-globe-preview");
+      if (!globe) return;
+      const recordRect = record.getBoundingClientRect();
+      const globeRect = globe.getBoundingClientRect();
+      visual.style.setProperty("--record-travel-x", `${((globeRect.left + (globeRect.width / 2)) - (recordRect.left + (recordRect.width / 2))).toFixed(2)}px`);
+      visual.style.setProperty("--record-travel-y", `${((globeRect.top + (globeRect.height / 2)) - (recordRect.top + (recordRect.height / 2))).toFixed(2)}px`);
+    };
+
+    const observer = new ResizeObserver(measureTravel);
+    observer.observe(visual);
+    observer.observe(record);
+    measureTravel();
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      playedRef.current = true;
+      startedRef.current = false;
+      setEntryState(getHeroMobileEntryState(0, { reducedMotion: true }));
+      return undefined;
+    }
+    if (!isGlobeReady || playedRef.current || startedRef.current) return undefined;
+
+    startedRef.current = true;
+    const playFrame = window.requestAnimationFrame(() => setEntryState(getHeroMobileEntryState(1)));
+    const applyTimer = window.setTimeout(() => {
+      setEntryState(getHeroMobileEntryState(HERO_MOBILE_ENTRY_APPLY_AT_MS));
+    }, HERO_MOBILE_ENTRY_APPLY_AT_MS);
+    const completeTimer = window.setTimeout(() => {
+      playedRef.current = true;
+      startedRef.current = false;
+      setEntryState(getHeroMobileEntryState(HERO_MOBILE_ENTRY_DURATION_MS));
+    }, HERO_MOBILE_ENTRY_DURATION_MS);
+
+    return () => {
+      window.cancelAnimationFrame(playFrame);
+      window.clearTimeout(applyTimer);
+      window.clearTimeout(completeTimer);
+      if (!playedRef.current) startedRef.current = false;
+    };
+  }, [isGlobeReady, prefersReducedMotion]);
+
+  useEffect(() => {
+    const handleFirstScroll = () => {
+      if (hasDismissedCueRef.current || window.scrollY <= 0) return;
+      hasDismissedCueRef.current = true;
+      setIsCueVisible(false);
+      setIsCueNudging(false);
+    };
+
+    window.addEventListener("scroll", handleFirstScroll, { passive: true });
+    handleFirstScroll();
+    return () => window.removeEventListener("scroll", handleFirstScroll);
+  }, []);
+
+  useEffect(() => {
+    if (hasDismissedCueRef.current) return undefined;
+    if (prefersReducedMotion) {
+      setIsCueVisible(true);
+      setIsCueNudging(false);
+      return undefined;
+    }
+    if (!entryState.isComplete) {
+      setIsCueVisible(false);
+      return undefined;
+    }
+    const cueTimer = window.setTimeout(() => {
+      if (hasDismissedCueRef.current) return;
+      setIsCueVisible(true);
+      setIsCueNudging(true);
+    }, HERO_CUE_POST_MOTION_DELAY_MS);
+    return () => window.clearTimeout(cueTimer);
+  }, [entryState.isComplete, prefersReducedMotion]);
+
+  const isComplete = entryState.isComplete;
+  const sourceIsHidden = isComplete && !prefersReducedMotion;
+  const resultIsHidden = !isComplete || prefersReducedMotion;
+  const liveStatus = isComplete
+    ? "미국 서부 여행 기록이 나만의 지도에 남았어요."
+    : entryState.isApplied
+      ? "여행 기록이 지도에 닿아 미국의 색이 진해지고 있어요."
+      : entryState.phase === "playing"
+        ? "미국 서부의 여행 순간을 기록 하나로 만들어 지도에 옮기고 있어요."
+        : "미국 서부의 여행 순간과 나만의 3D 지도가 준비됐어요.";
+
+  return (
+    <section
+      className="hero hero-mobile"
+      data-entry-phase={entryState.phase}
+      data-map-applied={entryState.isApplied ? "true" : "false"}
+      data-reduced-motion={prefersReducedMotion ? "true" : "false"}
+      aria-labelledby="hero-mobile-title"
+    >
+      <span className="hero-relay-anchor" id="hero-relay" aria-hidden="true" />
+      <div className="hero-mobile-frame">
+        <h1 className="hero-mobile-title" id="hero-mobile-title"><span>여행의 순간을,</span><em>나만의 지도로.</em></h1>
+        <div className="hero-mobile-visual" ref={visualRef} aria-label="미국 서부의 여행 사진 한 장이 기록이 되어 3D 지도에 남는 모습">
+          <HeroGlobe
+            relayState={entryState.relayState}
+            theme={theme}
+            onReady={() => setIsGlobeReady(true)}
+            waitForIdle
+            polygonsTransitionDuration={360}
+          />
+
+          <figure className="hero-mobile-source-record" ref={recordRef} aria-hidden={sourceIsHidden}>
+            <div className="hero-mobile-source-photo">
+              <img
+                src={HERO_JOURNEY_RECORD.representative.src}
+                alt={HERO_JOURNEY_RECORD.representative.alt}
+                loading="eager"
+                fetchPriority="high"
+                decoding="auto"
+              />
+              <small>{HERO_JOURNEY_RECORD.photoCredit}</small>
+            </div>
+            <figcaption><MapPin size={14} weight="fill" /><span><strong>미국 서부</strong><small>여행의 순간</small></span></figcaption>
+            <span className="hero-mobile-record-stamp"><CheckCircle size={15} weight="fill" />기록 1개</span>
+          </figure>
+
+          <div className="hero-mobile-recorded-result" aria-hidden={resultIsHidden}>
+            <img src={HERO_JOURNEY_RECORD.representative.src} alt="" />
+            <span><strong>미국 서부</strong><small>나만의 지도에 기록됨</small></span>
+            <CheckCircle size={19} weight="fill" />
           </div>
         </div>
-
-        <div className={`hero-photo-cluster photo-step-${photoStep}`} aria-label="스크롤하며 하나씩 더해지는 Mapmory 개발팀의 실제 장소 기록 세 장">
-          <figure className="hero-photo hero-photo-main">
-            <img src="/assets/team-jeju-coast-hero.jpg" alt="해 질 무렵 검은 바위 사이로 파도가 밀려오는 제주 바닷가" loading="eager" fetchPriority="high" decoding="auto" />
-            <figcaption><span><MapPin size={16} weight="fill" /><span className="hero-photo-handwriting">파도 소리가 남은 저녁</span></span><small>Mapmory 개발팀 촬영</small></figcaption>
-          </figure>
-          <figure className="hero-photo hero-photo-left">
-            <img src="/assets/team-shanghai-bund.jpg" alt="황푸강 건너 푸둥의 불빛이 보이는 상하이 와이탄" loading="eager" decoding="async" />
-            <figcaption><span><MapPin size={15} weight="fill" /><span className="hero-photo-handwriting">불빛이 번지던 강변</span></span><small>Mapmory 개발팀 촬영</small></figcaption>
-          </figure>
-          <figure className="hero-photo hero-photo-right">
-            <img src="/assets/team-usa-antelope-canyon.jpg" alt="붉은 사암 사이로 햇빛이 들어오는 앤텔로프 캐니언" loading="eager" decoding="async" />
-            <figcaption><span><MapPin size={15} weight="fill" /><span className="hero-photo-handwriting">빛이 스며든 붉은 협곡</span></span><small>Mapmory 개발팀 촬영</small></figcaption>
-          </figure>
-        </div>
-        <p className="release-note"><CheckCircle size={17} weight="fill" />Google Play 출시 준비 중</p>
+        <a
+          className={`hero-mobile-experience-cue ${isCueNudging ? "is-nudging" : ""} ${isCueVisible ? "" : "is-hidden"}`}
+          href="#experience"
+          aria-hidden={!isCueVisible}
+          tabIndex={isCueVisible ? 0 : -1}
+          onClick={() => onExperienceEntry("hero_mobile")}
+        ><span>아래로 내려 기록 과정을 보세요</span><ArrowDown size={18} weight="bold" /></a>
+        <p className="sr-only" aria-live="polite">{liveStatus}</p>
       </div>
-      <a className="hero-fold-cue" href="#experience" onClick={() => onExperienceEntry("scroll_cue")}><span>아래로 내려 앱 경험해보기</span><ArrowDown size={18} weight="bold" /></a>
     </section>
   );
+}
+
+function useHeroMemoryRelay() {
+  const sectionRef = useRef(null);
+  const frameRef = useRef(null);
+  const stateKeyRef = useRef("");
+  const [relayState, setRelayState] = useState(() => getHeroMemoryRelayState(0));
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    const frame = frameRef.current;
+    if (!section || !frame) return undefined;
+
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let animationFrame = 0;
+
+    const renderProgress = () => {
+      animationFrame = 0;
+      const sectionRect = section.getBoundingClientRect();
+      const stickyTop = Number.parseFloat(window.getComputedStyle(frame).top) || 0;
+      const progress = getHeroRelayProgress({
+        sectionTop: sectionRect.top,
+        sectionHeight: section.offsetHeight,
+        frameHeight: frame.offsetHeight,
+        stickyTop,
+      });
+      const nextState = getHeroMemoryRelayState(progress, { reducedMotion: reducedMotion.matches });
+
+      section.style.setProperty("--hero-intro-exit", nextState.introExit.toFixed(4));
+      section.style.setProperty("--hero-stack-reveal", nextState.stackReveal.toFixed(4));
+      section.style.setProperty("--hero-handoff-reveal", nextState.handoffReveal.toFixed(4));
+      section.style.setProperty("--hero-copy-x", `${(-42 * nextState.introExit).toFixed(2)}px`);
+      const mobileLayout = window.innerWidth <= 560;
+      const tabletLayout = window.innerWidth <= 680;
+      const compactShortLayout = mobileLayout && window.innerHeight <= 680;
+      section.style.setProperty("--hero-map-x", `${(tabletLayout ? 0 : -150 * nextState.introExit).toFixed(2)}px`);
+      const compactMapShift = mobileLayout ? getHeroMobileMapShift(nextState.introExit, window.innerHeight) : 0;
+      section.style.setProperty("--hero-map-y", `${compactMapShift.toFixed(2)}px`);
+      section.style.setProperty("--hero-memory-x", `${(50 * nextState.introExit).toFixed(2)}px`);
+      section.style.setProperty("--hero-handoff-x", `${(24 * (1 - nextState.handoffReveal)).toFixed(2)}px`);
+      section.style.setProperty("--hero-globe-opacity", nextState.globeOpacity.toFixed(4));
+      section.style.setProperty("--hero-globe-scale", nextState.globeScale.toFixed(4));
+      const [supportLeftReveal = 0, supportRightReveal = 0] = nextState.supportPhotoReveals;
+      const formation = nextState.recordFormation;
+      const travel = nextState.recordTravel;
+      const visualTravel = Math.sqrt(travel);
+      const lerp = (start, end, amount) => start + ((end - start) * amount);
+
+      section.style.setProperty("--hero-moment-reveal", nextState.momentReveal.toFixed(4));
+      section.style.setProperty("--hero-support-left-reveal", supportLeftReveal.toFixed(4));
+      section.style.setProperty("--hero-support-right-reveal", supportRightReveal.toFixed(4));
+      section.style.setProperty("--hero-record-reveal", nextState.recordReveal.toFixed(4));
+      section.style.setProperty("--hero-record-formation", formation.toFixed(4));
+      section.style.setProperty("--hero-map-reveal", nextState.mapReveal.toFixed(4));
+      section.style.setProperty("--hero-map-result-reveal", nextState.mapResultReveal.toFixed(4));
+      section.style.setProperty("--hero-record-object-opacity", nextState.recordObjectOpacity.toFixed(4));
+      section.style.setProperty("--hero-personal-line-reveal", (nextState.momentReveal * (1 - formation)).toFixed(4));
+      section.style.setProperty("--hero-record-line-reveal", (nextState.recordReveal * (1 - nextState.mapReveal)).toFixed(4));
+      section.style.setProperty("--hero-map-line-reveal", nextState.mapResultReveal.toFixed(4));
+      section.style.setProperty("--hero-map-cta-reveal", clampUnit((nextState.progress - 0.93) / 0.05).toFixed(4));
+      section.style.setProperty("--hero-record-surface-opacity", formation.toFixed(4));
+      section.style.setProperty("--hero-record-meta-opacity", formation.toFixed(4));
+      section.style.setProperty("--hero-credit-opacity", (nextState.momentReveal * (1 - formation)).toFixed(4));
+
+      section.style.setProperty("--hero-main-x", `${lerp(0, mobileLayout ? -34 : -40, formation).toFixed(2)}px`);
+      section.style.setProperty("--hero-main-y", `${lerp(0, mobileLayout ? 42 : 55, formation).toFixed(2)}px`);
+      section.style.setProperty("--hero-main-scale", lerp(1, mobileLayout ? 0.72 : 0.72, formation).toFixed(4));
+
+      const supportLeftMomentX = compactShortLayout ? -100 : mobileLayout ? -118 : -190;
+      const supportRightMomentX = compactShortLayout ? 100 : mobileLayout ? 118 : 190;
+      const supportRecordX = compactShortLayout ? 80 : mobileLayout ? 95 : 130;
+      const leftMomentY = mobileLayout ? 24 : 30;
+      const rightMomentY = mobileLayout ? 32 : 38;
+      section.style.setProperty("--hero-support-left-x", `${lerp(lerp(0, supportLeftMomentX, supportLeftReveal), supportRecordX, formation).toFixed(2)}px`);
+      section.style.setProperty("--hero-support-left-y", `${lerp(lerp(8, leftMomentY, supportLeftReveal), mobileLayout ? -18 : -25, formation).toFixed(2)}px`);
+      section.style.setProperty("--hero-support-left-scale", lerp(lerp(0.82, 0.94, supportLeftReveal), 0.72, formation).toFixed(4));
+      section.style.setProperty("--hero-support-right-x", `${lerp(lerp(0, supportRightMomentX, supportRightReveal), supportRecordX, formation).toFixed(2)}px`);
+      section.style.setProperty("--hero-support-right-y", `${lerp(lerp(8, rightMomentY, supportRightReveal), mobileLayout ? 74 : 96, formation).toFixed(2)}px`);
+      section.style.setProperty("--hero-support-right-scale", lerp(lerp(0.82, 0.94, supportRightReveal), 0.72, formation).toFixed(4));
+
+      const recordObject = section.querySelector(".hero-record-object");
+      const globe = section.querySelector(".hero-globe-preview");
+      const mapStory = section.querySelector(".hero-map-story");
+      let travelX = mobileLayout ? 0 : -34;
+      let travelY = mobileLayout ? 138 : 14;
+      if (recordObject && globe && mapStory) {
+        const recordCenterX = recordObject.offsetLeft;
+        const recordCenterY = recordObject.offsetTop + (recordObject.offsetHeight / 2);
+        const globeCenterX = globe.offsetLeft;
+        const responsiveGlobeTop = compactShortLayout ? 94 : 180;
+        const globeCenterY = tabletLayout
+          ? responsiveGlobeTop + (globe.offsetHeight / 2)
+          : mapStory.offsetHeight * 0.46;
+        travelX = globeCenterX - recordCenterX;
+        travelY = globeCenterY - recordCenterY;
+      }
+      section.style.setProperty("--hero-record-travel-x", `${(travelX * visualTravel).toFixed(2)}px`);
+      section.style.setProperty("--hero-record-travel-y", `${(travelY * visualTravel).toFixed(2)}px`);
+      section.style.setProperty("--hero-record-travel-scale", lerp(1, mobileLayout ? 0.24 : 0.22, visualTravel).toFixed(4));
+
+      const nextStateKey = [
+        nextState.phase,
+        nextState.activeIndex,
+        nextState.completedCount,
+        nextState.momentReveal >= 0.5,
+        nextState.recordReveal >= 0.5,
+        nextState.mapResultReveal >= 0.5,
+        nextState.progress >= 0.93,
+        reducedMotion.matches,
+      ].join(":");
+      if (stateKeyRef.current !== nextStateKey) {
+        stateKeyRef.current = nextStateKey;
+        setRelayState(nextState);
+      }
+    };
+
+    const requestRender = () => {
+      if (animationFrame) return;
+      animationFrame = window.requestAnimationFrame(renderProgress);
+    };
+
+    requestRender();
+    window.addEventListener("scroll", requestRender, { passive: true });
+    window.addEventListener("resize", requestRender);
+    reducedMotion.addEventListener("change", requestRender);
+    return () => {
+      window.removeEventListener("scroll", requestRender);
+      window.removeEventListener("resize", requestRender);
+      reducedMotion.removeEventListener("change", requestRender);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
+    };
+  }, []);
+
+  return { sectionRef, frameRef, relayState };
+}
+
+function DesktopHeroSection({ onExperienceEntry, theme }) {
+  const { sectionRef, frameRef, relayState } = useHeroMemoryRelay();
+  const activeKey = relayState.activeIndex >= 0 ? relayState.cards[relayState.activeIndex].key : "none";
+  const isMapCtaReady = relayState.progress > 0.93;
+  const isIntroAccessible = relayState.phase === "intro" || relayState.reducedMotion;
+  const isFoldCueAccessible = relayState.phase === "intro" && !relayState.reducedMotion;
+  const relayStatus = relayState.phase === "intro"
+    ? "제주의 여행 기억이 지도에 남아 있어요."
+    : relayState.phase === "moment"
+      ? "미국 서부의 한 순간 곁으로 같은 여행의 사진들이 모이고 있어요."
+      : relayState.phase === "record"
+        ? "같은 여행의 사진들이 여행 기록 하나로 묶였어요."
+        : relayState.completedCount > 0
+          ? "미국 서부 여행 기록이 더해져 지도 색이 한 단계 진해졌어요."
+          : "완성된 미국 서부 여행 기록이 3D 기억 지도로 이동하고 있어요.";
+
+  return (
+    <section className="hero hero-memory-story" ref={sectionRef} data-relay-phase={relayState.phase} data-active-memory={activeKey} data-recorded={relayState.completedCount > 0 ? "true" : "false"} data-map-cta-ready={isMapCtaReady ? "true" : "false"}>
+      <span className="hero-relay-anchor" id="hero-relay" aria-hidden="true" />
+      <div className="hero-story-frame" ref={frameRef}>
+        <div className="hero-layout">
+          <div className="hero-copy" aria-hidden={!isIntroAccessible} inert={!isIntroAccessible}>
+            <h1><span>여행의 순간을,</span><em>나만의 지도로.</em></h1>
+            <p className="hero-description">사진과 글을 남기면, 그 장소가 <br />나만의 지도에 기억으로 쌓여요.</p>
+            <div className="hero-actions">
+              <div className="store-buttons" role="group" aria-label="Mapmory 앱 다운로드">
+                <StoreButton placement="hero" platform="ios" label="App Store" tabIndex={isIntroAccessible ? 0 : -1} />
+                <StoreButton placement="hero" platform="android" label="Google Play" tabIndex={isIntroAccessible ? 0 : -1} />
+              </div>
+              <a className="button button-secondary" href="#experience" tabIndex={isIntroAccessible ? 0 : -1} onClick={() => onExperienceEntry("hero")}><GlobeHemisphereEast size={19} weight="duotone" />기억 지도 둘러보기</a>
+            </div>
+            <p className="release-note"><CheckCircle size={17} weight="fill" />iPhone과 Android에서 바로 시작할 수 있어요</p>
+          </div>
+
+          <div className="hero-map-story" aria-label="한 여행의 사진과 글이 하나의 기록으로 묶이고, 같은 장소의 기록이 쌓일수록 지도 색이 진해지는 예시">
+            <HeroGlobe relayState={relayState} theme={theme} />
+
+            <article className="hero-memory-preview">
+              <header><MapPin size={15} weight="fill" /><strong>제주 · 바닷가</strong><small>대한민국</small></header>
+              <img src="/assets/team-jeju-coast-hero.jpg" alt="해 질 무렵 검은 바위 사이로 파도가 밀려오는 제주 바닷가" loading="eager" fetchPriority="high" decoding="auto" />
+              <div><strong>파도 소리가 남은 제주 저녁</strong><span>Mapmory 개발팀의 실제 기록</span></div>
+            </article>
+
+            <div className="hero-scroll-sequence">
+              <div className="hero-story-stage">
+                <article className="hero-record-object" aria-label="미국 서부 여행 기록" aria-hidden={relayState.phase === "intro" || relayState.recordObjectOpacity < 0.2}>
+                  <div className="hero-record-surface" aria-hidden="true" />
+                  <figure className="hero-photo hero-photo-main">
+                    <img src={HERO_JOURNEY_RECORD.representative.src} alt={HERO_JOURNEY_RECORD.representative.alt} loading="lazy" decoding="async" />
+                  </figure>
+                  <figure className="hero-photo hero-photo-support hero-photo-support-left" aria-hidden="true">
+                    <img src={HERO_JOURNEY_RECORD.supporting[0].src} alt="" loading="lazy" decoding="async" />
+                  </figure>
+                  <figure className="hero-photo hero-photo-support hero-photo-support-right" aria-hidden="true">
+                    <img src={HERO_JOURNEY_RECORD.supporting[1].src} alt="" loading="lazy" decoding="async" />
+                  </figure>
+                  <small className="hero-photo-credit">{HERO_JOURNEY_RECORD.photoCredit}</small>
+                </article>
+
+                <p className="hero-scene-line hero-line-moment" aria-hidden={relayState.momentReveal < 0.5}>“{HERO_JOURNEY_RECORD.quote}”</p>
+                <p className="hero-scene-line hero-line-record" aria-hidden={relayState.recordReveal < 0.5}>{HERO_JOURNEY_RECORD.recordLine}</p>
+                <p className="hero-scene-line hero-line-map" aria-hidden={relayState.mapResultReveal < 0.5} aria-label={HERO_JOURNEY_RECORD.mapLine}>
+                  <span>기록이 쌓일수록, </span><span className="hero-map-line-keyword"><em>나만의 지도</em>가</span><span> 완성돼요.</span>
+                </p>
+                <a className="button button-primary hero-map-cta" href="#experience" aria-hidden={!isMapCtaReady} tabIndex={isMapCtaReady ? 0 : -1} onClick={() => onExperienceEntry("hero_handoff")}><GlobeHemisphereEast size={19} weight="duotone" />기록된 추억 직접 열어보기</a>
+              </div>
+            </div>
+            <p className="sr-only" aria-live="polite">{relayStatus}</p>
+          </div>
+        </div>
+        <div className="hero-reduced-summary">
+          <p><CheckCircle size={19} weight="fill" />사진과 글이 하나의 여행 기록으로 묶여, 3D 기억 지도에 남아요.</p>
+          <a className="button button-primary" href="#experience" onClick={() => onExperienceEntry("hero_reduced_handoff")}><GlobeHemisphereEast size={19} weight="duotone" />기록된 추억 직접 열어보기</a>
+        </div>
+        <a className="hero-fold-cue" href="#hero-relay" aria-hidden={!isFoldCueAccessible} tabIndex={isFoldCueAccessible ? 0 : -1}><span>아래로 내려 기록 과정을 보세요</span><ArrowDown size={18} weight="bold" /></a>
+      </div>
+    </section>
+  );
+}
+
+function HeroSection(props) {
+  const isMobile = useMediaQuery("(max-width: 560px)");
+  return isMobile ? <MobileHeroSection {...props} /> : <DesktopHeroSection {...props} />;
 }
 
 function App() {
   const [theme, setTheme] = useState(() => localStorage.getItem("mapmory-theme") || "light");
   const [selectedMemory, setSelectedMemory] = useState(memories[0]);
   const [displayedMemory, setDisplayedMemory] = useState(memories[0]);
-  const [globeFocusRequest, setGlobeFocusRequest] = useState(0);
+  const [globeFocusRequest, setGlobeFocusRequest] = useState({ id: 0, selectionSource: "initial" });
   const [isGlobeGuideVisible, setIsGlobeGuideVisible] = useState(false);
+  const [isGlobeFocused, setIsGlobeFocused] = useState(false);
   const [isWorldMemoryOpen, setIsWorldMemoryOpen] = useState(false);
   const [isWorldSelecting, setIsWorldSelecting] = useState(false);
+  const [worldMemoryOpenSequence, setWorldMemoryOpenSequence] = useState(0);
+  const isMobileExperience = useMediaQuery("(max-width: 900px)");
   const experienceRef = useRef(null);
   const experienceStageRef = useRef(null);
   const globePanelRef = useRef(null);
   const worldSelectionTimerRef = useRef(null);
+  const pendingWorldMemorySourceRef = useRef(null);
+  const isWorldMemoryOpenRef = useRef(false);
+  const sheetSessionRef = useRef(null);
   const globeAnalytics = useExperienceAnalytics("globe");
+
+  const beginSheetSession = useCallback((memory) => {
+    sheetSessionRef.current = {
+      memoryId: memory.key,
+      startedAt: currentTimeMs(),
+      maxPhotoIndex: 1,
+      viewedPhotos: new Set([0]),
+      hasTrackedSwipe: false,
+    };
+  }, []);
+
+  const handleMemoryPhotoChange = useCallback(({ photoIndex, photoCount, source }) => {
+    const session = sheetSessionRef.current;
+    if (!session) return;
+    session.maxPhotoIndex = Math.max(session.maxPhotoIndex, photoIndex + 1);
+    session.viewedPhotos.add(photoIndex);
+    if (source !== "swipe" || session.hasTrackedSwipe) return;
+    session.hasTrackedSwipe = true;
+    trackEvent(ANALYTICS_EVENTS.MEMORY_PHOTO_SWIPED, {
+      experience_type: "globe",
+      memory_id: session.memoryId,
+      photo_index: photoIndex + 1,
+      photo_count: photoCount,
+      time_since_memory_open_seconds: elapsedSeconds(session.startedAt),
+    });
+  }, []);
+
+  const finishSheetSession = useCallback((closeMethod) => {
+    const session = sheetSessionRef.current;
+    if (!session) return;
+    trackEvent(ANALYTICS_EVENTS.MEMORY_SHEET_CLOSED, {
+      experience_type: "globe",
+      memory_id: session.memoryId,
+      close_method: closeMethod,
+      max_photo_index: session.maxPhotoIndex,
+      photos_viewed: session.viewedPhotos.size,
+      time_since_memory_open_seconds: elapsedSeconds(session.startedAt),
+    });
+    sheetSessionRef.current = null;
+  }, []);
+
+  const dismissWorldMemory = useCallback((closeMethod = "button") => {
+    if (!isWorldMemoryOpenRef.current) return;
+    window.clearTimeout(worldSelectionTimerRef.current);
+    finishSheetSession(closeMethod);
+    isWorldMemoryOpenRef.current = false;
+    setIsWorldSelecting(false);
+    setIsWorldMemoryOpen(false);
+  }, [finishSheetSession]);
+
+  const closeWorldMemory = useCallback((closeMethod = "button", { consumeHistory = true } = {}) => {
+    if (!isWorldMemoryOpenRef.current) return;
+    const shouldConsumeHistory = consumeHistory && isWorldMemoryHistoryEntry(window.history.state);
+    dismissWorldMemory(closeMethod);
+    if (shouldConsumeHistory) window.history.back();
+  }, [dismissWorldMemory]);
 
   const handleWorldSelect = (memory, selectionSource) => {
     globeAnalytics.startExperience("place_select");
+    dismissGlobeGuide();
     clearTimeout(worldSelectionTimerRef.current);
-    setGlobeFocusRequest((current) => current + 1);
+    if (selectionSource === "shortcut") {
+      setGlobeFocusRequest((current) => ({ id: current.id + 1, selectionSource }));
+    }
     const isNewSelection = selectedMemory.id !== memory.id;
     setIsWorldSelecting(true);
     if (selectedMemory.id !== memory.id) setSelectedMemory(memory);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const selectionDelay = reduceMotion
+      ? 80
+      : selectionSource === "shortcut"
+        ? WORLD_SELECTION_MOTION_MS + 120
+        : 260;
     worldSelectionTimerRef.current = setTimeout(() => {
       setDisplayedMemory(memory);
+      setWorldMemoryOpenSequence((current) => current + 1);
+      beginSheetSession(memory);
+      if (window.matchMedia("(max-width: 900px)").matches && !isWorldMemoryHistoryEntry(window.history.state)) {
+        window.history.pushState(
+          createWorldMemoryHistoryState(window.history.state, memory.key),
+          "",
+          window.location.href,
+        );
+      }
+      isWorldMemoryOpenRef.current = true;
       setIsWorldMemoryOpen(true);
       setIsWorldSelecting(false);
-      globeAnalytics.trackMemoryOpen(memory.key, selectionSource);
-    }, isNewSelection ? WORLD_SELECTION_MOTION_MS + 120 : 320);
+      pendingWorldMemorySourceRef.current = selectionSource;
+    }, isNewSelection || selectionSource === "shortcut" ? selectionDelay : 220);
   };
 
   useEffect(() => () => clearTimeout(worldSelectionTimerRef.current), []);
 
-  useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("mapmory-theme", theme); }, [theme]);
+  useEffect(() => {
+    const handleHistoryBack = () => {
+      if (!isWorldMemoryOpenRef.current) return;
+      closeWorldMemory("browser_back", { consumeHistory: false });
+    };
+    window.addEventListener("popstate", handleHistoryBack);
+    return () => window.removeEventListener("popstate", handleHistoryBack);
+  }, [closeWorldMemory]);
 
   useEffect(() => {
-    if (!isWorldMemoryOpen || window.innerWidth > 900) return undefined;
-    const frame = requestAnimationFrame(() => {
-      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-      experienceStageRef.current?.scrollIntoView({ behavior, block: "start" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [isWorldMemoryOpen]);
+    if (!isMobileExperience || !isWorldMemoryOpen) return undefined;
+    const root = document.getElementById("root");
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousRootAriaHidden = root?.getAttribute("aria-hidden");
+    const rootWasInert = root?.hasAttribute("inert") ?? false;
+    document.body.style.overflow = "hidden";
+    root?.setAttribute("inert", "");
+    root?.setAttribute("aria-hidden", "true");
+    const focusTimer = window.setTimeout(() => {
+      document.querySelector(".world-memory-modal .world-memory-close")?.focus({ preventScroll: true });
+    }, 0);
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = previousBodyOverflow;
+      if (!rootWasInert) root?.removeAttribute("inert");
+      if (previousRootAriaHidden === null) root?.removeAttribute("aria-hidden");
+      else root?.setAttribute("aria-hidden", previousRootAriaHidden);
+    };
+  }, [isMobileExperience, isWorldMemoryOpen]);
+
+  useEffect(() => { document.documentElement.dataset.theme = theme; localStorage.setItem("mapmory-theme", theme); }, [theme]);
 
   useEffect(() => {
     if (!globePanelRef.current) return undefined;
@@ -1208,19 +2095,24 @@ function App() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    if (!experienceStageRef.current) return undefined;
+    const observer = new IntersectionObserver(([entry]) => {
+      setIsGlobeFocused(entry.isIntersecting && entry.intersectionRatio >= 0.35);
+    }, { threshold: [0, 0.35, 0.7] });
+    observer.observe(experienceStageRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   const dismissGlobeGuide = () => {
     setIsGlobeGuideVisible(false);
   };
 
-  const closeWorldMemory = () => {
-    clearTimeout(worldSelectionTimerRef.current);
-    setIsWorldSelecting(false);
-    setIsWorldMemoryOpen(false);
-    requestAnimationFrame(() => {
-      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-      experienceStageRef.current?.scrollIntoView({ behavior, block: "start" });
-    });
-  };
+  useEffect(() => {
+    if (!isWorldMemoryOpen || !pendingWorldMemorySourceRef.current) return;
+    globeAnalytics.trackMemoryOpen(displayedMemory.key, pendingWorldMemorySourceRef.current);
+    pendingWorldMemorySourceRef.current = null;
+  }, [displayedMemory, isWorldMemoryOpen, globeAnalytics.trackMemoryOpen]);
 
   const setExperienceSectionRef = (node) => {
     experienceRef.current = node;
@@ -1235,15 +2127,16 @@ function App() {
           <a href="#experience" onClick={() => globeAnalytics.trackEntryClick("header_nav")}>지구본 체험</a>
           <a href="#korea-detail" onClick={() => trackEvent(ANALYTICS_EVENTS.EXPERIENCE_CTA_CLICK, { experience_type: "korea_detail", cta_placement: "header_nav" })}>대한민국 지도</a>
         </nav>
-        <div className="header-actions"><ThemeToggle theme={theme} onChange={setTheme} /><DownloadButton className="header-download" placement="header" /></div>
+        <div className="header-actions"><ThemeToggle theme={theme} onChange={setTheme} /><HeaderStoreMenu /></div>
       </header>
 
-      <HeroSection onExperienceEntry={globeAnalytics.trackEntryClick} />
+      <HeroSection onExperienceEntry={globeAnalytics.trackEntryClick} theme={theme} />
 
-      <section className="experience-section" id="experience" ref={setExperienceSectionRef}>
+      <section className={`experience-section ${isGlobeFocused ? "is-focused" : ""}`} id="experience" ref={setExperienceSectionRef}>
         <div className="experience-pin">
           <div className="section-heading section-heading-flow">
-            <div><p className="eyebrow">01 · 세계</p><h2>지구본을 돌려 기억을 찾아요.</h2></div>
+            <div><p className="eyebrow">01 · 세계</p><h2>지구본에서 기억을 꺼내봐요.</h2></div>
+            <p>지구본을 움직이고 민트색 나라를 눌러보세요. 지도는 그대로, 그곳의 사진만 열려요.</p>
           </div>
           <div className={`experience-stage ${isWorldMemoryOpen ? "is-memory-open" : ""}`} ref={experienceStageRef}>
             <article className="globe-panel" id="globe-demo" ref={globePanelRef}>
@@ -1251,21 +2144,46 @@ function App() {
               <InteractiveGlobe selected={selectedMemory} focusRequest={globeFocusRequest} onSelect={handleWorldSelect} onInteract={globeAnalytics.startExperience} theme={theme} guideVisible={isGlobeGuideVisible} onGuideDismiss={dismissGlobeGuide} isSelecting={isWorldSelecting} />
               <LocationSelector selected={selectedMemory} onSelect={handleWorldSelect} disabled={isWorldSelecting} />
             </article>
-            <MemoryCard key={displayedMemory.id} memory={displayedMemory} onClose={closeWorldMemory} />
+            {!isMobileExperience && (
+              <MemoryCard
+                key={displayedMemory.id}
+                memory={displayedMemory}
+                onClose={closeWorldMemory}
+                onPhotoChange={handleMemoryPhotoChange}
+                openSequence={worldMemoryOpenSequence}
+                priority
+              />
+            )}
           </div>
         </div>
       </section>
+
+      {isMobileExperience && isWorldMemoryOpen && createPortal(
+        <div className="world-memory-modal">
+          <div className="world-memory-backdrop" aria-hidden="true" />
+          <MemoryCard
+            key={`${displayedMemory.id}-${worldMemoryOpenSequence}`}
+            memory={displayedMemory}
+            onClose={closeWorldMemory}
+            onPhotoChange={handleMemoryPhotoChange}
+            openSequence={worldMemoryOpenSequence}
+            priority
+            isModal
+          />
+        </div>,
+        document.body,
+      )}
 
 
       <KoreaDetailExperience theme={theme} />
 
       <section className="download-section" id="download">
         <h2>방금 본 장소처럼,<br />당신의 기억도 지도로.</h2>
-        {GOOGLE_PLAY_URL ? (
-          <><p>Google Play에서 Mapmory를 다운로드하고 나만의 기억 지도를 시작하세요.</p><DownloadButton placement="final" /></>
-        ) : (
-          <><p>정식 출시되면 입력한 이메일로 한 번만 알려드릴게요.</p><LaunchWaitlistForm /></>
-        )}
+        <p>여행의 순간을 기록하고, 나만의 기억 지도를 시작하세요.</p>
+        <div className="download-actions" role="group" aria-label="Mapmory 앱 다운로드">
+          <StoreButton placement="final" platform="ios" label="App Store" />
+          <StoreButton placement="final" platform="android" label="Google Play" />
+        </div>
       </section>
 
       <footer><div><Brand /><p>기억은 흩어져도, 지도는 남아요.</p></div><p>© 2026 Mapmory. All rights reserved.</p></footer>

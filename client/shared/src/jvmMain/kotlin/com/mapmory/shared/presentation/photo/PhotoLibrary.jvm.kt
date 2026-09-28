@@ -11,6 +11,7 @@ actual fun rememberPhotoLibraryActions(
     onLoadingChanged: (Boolean) -> Unit,
     onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
     onRecommendationLoadingChanged: (Boolean) -> Unit,
+    onPermissionRequired: (PhotoLibraryPermissionIssue) -> Unit,
 ): PhotoLibraryActions = remember(onMessage, onLoadingChanged, onLoadingProgressChanged) {
     PhotoLibraryActions(
         pickFromGallery = { onMessage("사진 선택은 Android와 iOS 앱에서 사용할 수 있어요.") },

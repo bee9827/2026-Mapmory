@@ -5,12 +5,19 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TravelRecordRepository extends JpaRepository<TravelRecord, Long> {
 
+    /**
+     * 상세 응답은 지역을 국가·시도·시군구로 펼쳐 보여주므로 Region의 parent·root까지 필요하다.
+     * 둘 다 지연 로딩이고 open-in-view가 꺼져 있어, 여기서 함께 읽어두지 않으면
+     * 웹 계층의 DTO 변환에서 LazyInitializationException이 난다.
+     */
+    @EntityGraph(attributePaths = {"region", "region.parent", "region.root"})
     Optional<TravelRecord> findByIdAndMemberId(Long id, Long memberId);
 
     /**

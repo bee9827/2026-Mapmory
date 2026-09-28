@@ -41,6 +41,7 @@ kotlin {
             implementation(compose.ui)
             implementation(compose.components.resources)
             implementation("org.jetbrains.compose.ui:ui-tooling-preview:${libs.versions.composeMultiplatform.get()}")
+            implementation(libs.coil.compose)
             implementation(libs.jetbrains.androidx.navigation.compose)
             implementation(libs.jetbrains.androidx.lifecycle.viewmodel.compose)
             implementation(libs.ktor.client.core)

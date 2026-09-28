@@ -10,6 +10,20 @@
 4. 실제 기기 빌드 시 Signing Team과 Bundle Identifier 설정
 5. `Mapmory` scheme으로 Simulator 또는 실제 기기 빌드
 
+## Firebase Analytics
+
+- Firebase 프로젝트: `mapmory-analytics-b6a50`
+- App Store용 Bundle ID: `com.mapmory.ios`
+- 설정 파일: `GoogleService-Info.plist`
+
+Firebase Console에 `com.mapmory.ios` Apple 앱을 등록한 뒤 해당 앱에서 내려받은
+`GoogleService-Info.plist`를 이 디렉터리에 둔다. 설정 파일의 `BUNDLE_ID`와 Xcode Release 설정의
+`PRODUCT_BUNDLE_IDENTIFIER`가 모두 `com.mapmory.ios`인지 출시 전에 확인한다. 다른 Bundle ID로
+등록된 설정 파일의 문자열만 직접 고쳐 사용하지 않는다.
+
+앱은 기능 이용 흐름을 분석하기 위해 Firebase Analytics를 사용하며 광고는 제공하지 않는다. 이벤트 목록과 DebugView 확인 방법은
+[`../docs/android-monitoring.md`](../docs/android-monitoring.md)를 참고한다.
+
 ## 미디어 권한
 
 - 카메라: `NSCameraUsageDescription`

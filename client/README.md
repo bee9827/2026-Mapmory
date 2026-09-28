@@ -25,4 +25,8 @@ cd client
 
 CI 실행 범위와 실패 대응은 [docs/ci.md](docs/ci.md)를 확인합니다.
 
+Firebase Analytics 이벤트와 개인정보 기준은 [docs/android-monitoring.md](docs/android-monitoring.md),
+App Store 제출은 [docs/app-store-connect-submission-checklist.md](docs/app-store-connect-submission-checklist.md),
+App Privacy 응답은 [docs/app-store-privacy-responses.md](docs/app-store-privacy-responses.md)를 확인합니다.
+
 진행 중인 작업은 [docs/development-tasks.md](docs/development-tasks.md)에서 관리합니다.

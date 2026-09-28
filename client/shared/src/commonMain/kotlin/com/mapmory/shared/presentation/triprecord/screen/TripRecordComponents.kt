@@ -1,7 +1,6 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,7 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -48,7 +50,7 @@ import com.mapmory.shared.analytics.LocalMapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
 import com.mapmory.shared.preview.PreviewSurface
-import org.jetbrains.compose.resources.decodeToImageBitmap
+import coil3.compose.AsyncImage
 
 @Composable
 internal fun TripRecordTopBar(
@@ -486,24 +488,38 @@ internal fun TripPhotoImage(
     placeholderVariant: Int = 0,
     shape: Shape = RoundedCornerShape(18.dp),
 ) {
-    val bitmap = remember(imageBytes, fallbackBytes) {
-        imageBytes.decodeToImageBitmapOrNull()
-            ?: fallbackBytes.decodeToImageBitmapOrNull()
-    }
-    if (bitmap == null) {
+    var useFallback by remember(imageBytes, fallbackBytes) { mutableStateOf(false) }
+    var showPlaceholder by remember(imageBytes, fallbackBytes) { mutableStateOf(true) }
+    val model = if (useFallback || imageBytes == null) fallbackBytes else imageBytes
+
+    if (model == null) {
         TripPhotoPlaceholder(modifier, placeholderVariant, shape)
     } else {
-        Image(
-            bitmap = bitmap,
-            contentDescription = contentDescription,
-            contentScale = ContentScale.Crop,
-            modifier = modifier.clip(shape),
-        )
+        Box(modifier = modifier.clip(shape)) {
+            if (showPlaceholder) {
+                TripPhotoPlaceholder(
+                    modifier = Modifier.fillMaxSize(),
+                    variant = placeholderVariant,
+                    shape = shape,
+                )
+            }
+            AsyncImage(
+                model = model,
+                contentDescription = contentDescription,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                onLoading = { showPlaceholder = true },
+                onSuccess = { showPlaceholder = false },
+                onError = {
+                    showPlaceholder = true
+                    if (!useFallback && imageBytes != null && fallbackBytes != null) {
+                        useFallback = true
+                    }
+                },
+            )
+        }
     }
 }
-
-private fun ByteArray?.decodeToImageBitmapOrNull() =
-    this?.let { bytes -> runCatching { bytes.decodeToImageBitmap() }.getOrNull() }
 
 @Composable
 fun TripMapArtwork(

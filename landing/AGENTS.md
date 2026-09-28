@@ -1,5 +1,14 @@
 # Prototype Instructions
 
+## Shared AWS account operations
+
+- The travel campaign belongs at https://map-mory.com/recap/ beside the existing landing at /. Build/test both apps and package only campaign dist/recap into client/recap. Do not overwrite the current landing UI or reuse its root asset directory for campaign files.
+- Start landing changes from upstream/main and integrate through a PR to main. landing-release is a separate production promotion target, not a development branch. Promote only reviewed landing paths and landing-owned workflows; never carry backend/client changes by merging an unrelated integration branch wholesale. main integration does not authorize release promotion or deployment. See DEPLOYMENT.md.
+- Reuse the existing Mapmory CodePipeline, build project and CodeDeploy resources; verify their live configuration rather than inferring it from the blueprint. The user's 2026-09-03 decision supersedes the old manual-approval design: protected landing-release PR merge -> build/test -> automatic landing-only CodeDeploy, with no AWS approval action. Keep V2/SUPERSEDED, existing roles, rollback and backend isolation. Preparing a main PR alone does not authorize release promotion or unrelated AWS/Nginx changes; merging a landing-release PR now starts production deployment.
+
+- Before any AWS resource creation/change, tell the user the exact targets, steps, cost and operational risks. Afterward report what actually changed.
+- Follow the institution settings and `DEPLOYMENT.md`: existing project roles only, required Service/Role/ProjectTeam tags on every new resource, no changes to other teams, shared IAM/network settings or backend deployment. Do not infer permissions from the EC2 role; use the existing human AWS console login when needed.
+
 Run the local server yourself and open the preview in the browser available to this environment. Do not give the user server-start instructions when you can run it.
 
 Before making substantial visual changes, use the Product Design plugin's `get-context` skill when the visual source is unclear or no longer matches the current goal. When the user gives durable prototype-specific design feedback, preferences, or decisions, record them in `AGENTS.md`.
@@ -8,15 +17,49 @@ When implementing from a selected generated mock, treat that image as the source
 
 ## Mapmory Landing Decisions
 
+### Trips experiment (2026-09-22)
+
+- The primary start button uses the exact label `여행 사진 정리하기`. Keep the static HTML fallback and JavaScript-rendered button in sync.
+- Keep the metadata-only experiment separate at `/trips/`; `/trips` redirects with HTTP 308 and preserves the query. Do not replace the homepage or Recap.
+- Maintain `trips/src/` as the experiment source and package only `trips/dist/trips/` into `client/trips/`. No personal test photos, test fixtures, credentials or original third-party hosting IDs may enter the deployment artifact.
+- Retain the tested /recap File/byte EXIF reading path; date/GPS extraction is not image analysis or guaranteed HEIC preview support.
+- Keep location folders above date grouping. Use the shared green visual treatment for the travel action and expandable photographic albums for travel candidates.
+- The latest 2026-09-23 decision is read-only: selection and metadata reading go directly to classified photo albums, with the survey below. Remove merge/split/exclude/undo/confirm controls. Show album cards before long explanations or metadata notices. Do not require location/date review, an extra travel-entry click or home selection. Original location/date folders and ZIP remain optional secondary views.
+- With no usable GPS anchors, automatically estimate increases within the selected photos when sufficient history exists. Never call this a confirmed personal baseline or validated trip detection. Retain the conservative location/date and bounded time-linking rules.
+- Keep observed and inferred evidence distinct. Combine ALL undecidable date-only and undated photos into ONE `분류 보류` album after the travel candidates, not many tiny daily albums. Preserve every photo, including when no travel candidate exists. See trips/TRIP_GROUPING_PLAN.md.
+- Keep photos and GPS on the device. Preserve original location/date ZIP folders; never imply the trip candidate preview changes the export.
+- For Trips, exclude files over 50MB individually and show the excluded count in results; never cancel the whole selection because one file is oversized. Preserve previous results if every selected photo is oversized. Keep the 500+ photo experiment supported instead of inheriting Recap's 200-photo video limit.
+- Follow DEPLOYMENT.md for main integration, release promotion and separately approved Nginx configuration. Never apply server settings or deploy as a side effect of preparing the PR.
+
+### Current analytics decisions (2026-09-03)
+
+- Follow ANALYTICS_MEASUREMENT_PLAN.md for the current UI, not the historical waitlist funnel. The primary web conversion is an actual App Store or Google Play link click; internal download-section navigation is not a conversion.
+- Keep illustrative hero motion and mobile vertical scrolling out of interactive experience events. Record memory opening after the panel is committed to the screen.
+- Separate landing/recap, schema revisions, internal QA, and demo/own-photo Recap use. Do not overwrite incoming campaign attribution with internal UTMs or a fixed campaign_name.
+- Preserve historical measurements and reports. New tracking code, GA4 console configuration, and live event receipt are separate verification steps; do not report one as proof of the others.
+
+### Current mobile decisions (2026-09-03)
+
+These decisions supersede older mobile scroll-relay guidance below. Desktop choreography remains unchanged.
+
+- At widths up to 560px, use one dedicated mobile hero with the exact headline `여행의 순간을, 나만의 지도로.` and one representative team-owned photograph. Keep the photograph, copy, and square globe renderer in distinct readable zones.
+- After the hero globe is ready, play the 1.8-second photo-to-record-to-map reveal once. Reduced-motion mode presents the completed state immediately. Do not add the desktop's long scroll relay or duplicate explanatory scenes on mobile.
+- Desktop and mobile share the causal meaning of a photo becoming a record and changing the map, not identical animation mechanics. Mobile's playful interaction is rotating the live globe and opening its memories.
+- In the mobile memory panel, browser Back closes the panel without leaving the landing page. Preserve the conspicuous close button, 44px touch targets, and photo captions below the image.
+- Keep both public App Store and Google Play destinations reachable from the header and final download section. Do not reactivate the launch waitlist in the visible conversion flow.
+
+### Shared and desktop guidance
+
 - Default to the light theme and provide an explicit dark-theme toggle.
-- Keep the detailed dark globe as the focal product surface in both themes.
+- Keep the globe as the focal product surface. Use a white globe with neutral land and mint visited countries in the default light theme; preserve the detailed dark treatment in dark mode.
 - The globe must rotate, and only activated/visited regions open travel memories.
 - Selecting an activated region swaps the adjacent photo and record content.
 - Use the real current product flow: place selection opens a separate memory panel. Do not imply photos are pinned directly onto the globe.
-- Primary conversion goal is app download; until the public store URL is available, keep the final CTA clearly marked as launch preparation.
-- While the existing private test remains in progress, do not alter its tester setup. Use one inline email field on the landing page for a one-time public-launch notification, with required collection consent and a 14+ confirmation.
+- Primary conversion goal is app download through the public Google Play beta listing at `https://play.google.com/store/apps/details?id=com.mapmory.android`.
+- While the public Google Play listing is available, show install CTAs instead of the retired launch-notification flow. Keep the existing waitlist implementation dormant as a fallback rather than presenting both conversions at once.
 - Lead with travel, then let distinctive places such as a bakery, ramen shop, or dessert shop show how a personal map can trigger memory.
-- Keep the first viewport focused on the value proposition and conversion CTA; do not make the headline, globe, and photo compete at once.
+- Keep the first viewport focused on one composed value proposition: a concise headline and conversion CTA beside one light globe and one separate real-memory panel. Do not scatter multiple equal-weight photos around it.
+- Make the first viewport understandable without scrolling: state that people choose the places they want to revisit, connect their photos and places into a memory map, and can install the public beta now. Do not imply that people must record every trip.
 - Make the memory/location selector's purpose explicit before the user starts interacting.
 - Keep the country selector inside the bounded 3D globe surface so it remains visible while the user rotates the globe; use country names as the primary shortcuts.
 - Give the 3D globe a visible bounded panel and preserve vertical touch scrolling with `touch-action: pan-y`.
@@ -34,17 +77,35 @@ When implementing from a selected generated mock, treat that image as the source
 - Keep the landing visually natural, clean, and immediately understandable. Never add or imply a capability that is not present in the shipping Mapmory product.
 - Treat the current editorial hero and product-flow direction as the preferred design; user review found it substantially better than the previous landing version.
 - On mobile, keep the header, copy, forms, and ordinary content in a centered column with 24px side gutters. Only immersive product-proof surfaces such as the globe and detailed map may expand to an 8px edge gutter.
+- On mobile, keep every actionable control at least 44px tall, finish the hero crossfade before the relay stack becomes focal, and balance Korean memory titles so a single character is not orphaned on its own line.
+- On mobile, keep the intro copy visually separate from the relay globe: hold the globe in place until the copy is almost fully faded, then move the complete map scene upward so the recording photos remain prominent. Label each moving photo and the relay state as recording-in-progress or recorded so the interaction reads as adding a photo to the memory map rather than decorative stacking.
+- On mobile, keep ordinary scene copy and the globe in separate readable zones. The completed travel-record object may deliberately cross into the globe only during the short absorption transition; it must be subordinate to the globe and must never overlap a visible sentence.
+- On mobile, preserve only the globe's square 1:1 render surface and circular clipping mask so the 3D sphere stays perfectly round. Size the WebGL renderer to the actual container instead of enforcing a larger minimum; remove the background disc, inset ring, halo shadow, border, and target-pulse ring. Use country color changes as the only map feedback.
+- On mobile handoff, show only the completed globe, one short result sentence, and the 3D-experience CTA. Do not restore progress pills, completion cards, or repeated explanations.
+- Defer the hero's WebGL globe and world-boundary modules until the browser's first idle window or the relay begins, use a crisp vector loading state instead of enlarging a raster globe capture, and cap mobile WebGL pixel density so the initial render and scrolling stay responsive without a low-resolution first frame.
 - On desktop, align the floating rounded header, ordinary copy, forms, and footer to a centered 1080px column. The editorial hero photo cluster may expand to 1240px, while the globe and detailed map may expand to 1180px as immersive product-proof surfaces.
 - Keep the header as a clearly separated floating surface with outer margin, a rounded border, and enough contrast in both themes.
-- Use the selected centered hero reference at `design-qa/hero-centered-scroll/reference-selected-option-3.png`: a single-axis headline, centered CTAs, and three taped Mapmory team photographs. Show 제주 first, then reveal 합정 and 여수 one at a time during a short natural scroll; never lock or hijack scrolling.
-- Express the act of recording with a restrained handwritten `기억` and handwritten photo captions. Show the handwritten headline word from the first paint instead of gating it on scroll or image loading; use experience-led factual captions and honor reduced-motion preferences.
+- Preserve the approved first viewport from the selected Figma direction at `https://www.figma.com/design/LkDVD6nTjkQ9JT5Rcq5PKQ?node-id=22-2`: it statically combines the travel-recording promise, a light globe, and one separate team-owned memory panel. For scroll-linked motion work, validate choreography in the running prototype first and update Figma only after the motion direction is accepted.
+- Keep one focal action per scroll frame. Never scatter all relay photos around the globe, render photos as map pins, or place photo textures inside country shapes.
+- Preserve the approved first viewport exactly. After it, use one coherent team-owned 미국 서부 journey to explain the product: a representative photo with a short first-person sentence, two lower-weight supporting photos unfolding around it, the photos and sentence becoming one labeled travel record, and that single record reaching the globe so the destination color deepens. Keep the existing lower interactive globe as the separate retrieval proof.
+- Treat the hero plus exactly three post-intro cognitive scenes as four total scenes: one personal moment (the two supporting photos join silently inside this scene), one bundled travel record, and map accumulation. Keep one sentence per scene with a hard maximum of two rendered lines. Do not let a normal wheel step meaningfully skip a cognitive scene, and do not intercept or lock scrolling.
+- Keep the desktop and tablet four-scene hero concise at `340svh`; preserve all cognitive beats while avoiding the earlier `440svh` dwell. The dedicated mobile hero remains a one-screen timed sequence and must not inherit this scroll height.
+- On mobile, reveal the first-screen continuation cue only as a restrained one-time nudge: wait about 400ms after the entry motion completes, animate the arrow once, then leave it dim and static; hide it permanently after the first scroll, and keep it static from the start for reduced motion.
+- On the first viewport, keep `여행의 순간을,` in the primary sans-serif and make `나만의 지도로.` the dominant, personal line through the established Nanum Pen Script handwriting face, larger scale, accent color, and a restrained static glow. Keep the copy and the globe-memory composition side by side on desktop, including compact desktop windows from 681px; only stack the desktop relay below that range, while the dedicated mobile hero remains unchanged at 560px and below. As the intro copy exits, move the map-result composition into the page center so its sentence and globe remain one visible result. Do not give the two headline lines equal hierarchy.
+- Keep the interactive globe visible behind a dimmed modal backdrop when a world memory opens at widths up to 900px. Lock background scrolling and interaction, raise a viewport-level bottom sheet, show each photo uncropped with controls outside the image, and keep swipe support, a prominent icon-and-label close button, and one reversible history entry so browser Back closes the sheet without leaving the page. For a single photo, show only its memory title below the image; do not add a description or overlay text on the photo. Use the same responsive title size and established Nanum Pen Script diary face for single photos, gallery captions, and Korea detail memories. Never force-scroll the page when world or Korea memories open, close, or finish recording.
+- Let the globe respond to the first real horizontal gesture and then change the guidance from movement to the mint-country selection. Selecting a polygon must not recenter or zoom the globe; shortcut selection may rotate quickly while preserving the user's current altitude.
+- Measure experience durations in seconds. Track the first gallery swipe and the sheet close method without collecting photo captions, coordinates, or other free text.
 - Use self-hosted LINE Seed Sans KR Regular/Bold as the single interface and body family. Keep display headings in LINE Seed Bold with relaxed line height and restrained tracking so they feel warm and editorial rather than compressed or rigid; use Regular for body copy. Reserve Nanum Pen Script for actual memory words and record captions only; avoid decorative English eyebrow copy and extra font families.
 - Keep hero scrolling lightweight: isolate its reveal state from the 3D globe, animate large photos with compositor-friendly opacity/transform only, and pause the globe rendering loop while its surface is offscreen.
-- Reveal the second and third hero photos with reversible scroll-distance thresholds near 30px and 120px from the page top. Photos attach one at a time while scrolling down and detach in reverse order while scrolling back up; never lock or block the page scroll.
+- Drive the hero relay from reversible section progress without scroll locking, wheel interception, automatic advancement, API calls, local storage, or database writes. Reduced-motion mode must skip the traveling-photo sequence and keep one stable explanatory composition.
+- Keep the representative photo as the same DOM node and crop from the personal-moment scene through bundling and globe absorption. Supporting photos may arrive sequentially inside the first scene, but must not create extra explanatory beats. A typical 120px wheel step must not skip from the personal moment to map accumulation; achieve this through section travel and progress timing, never wheel interception or scroll locking.
+- Mirror the backend's `NONE / LOW / MEDIUM / HIGH` count buckets only as a clearly bounded landing preview: 0, 1–2, 3–5, and 6+ memories. The current beta client UI still consumes visited/unvisited state, so never claim that the shipped app already renders density levels.
+- Do not count illustrative hero scrolling or photo arrivals as `experience_start`, `memory_open`, or `korea_memory_add`; analytics begins only at the actual interactive proof or an explicit experience CTA.
 - The Korea landing demo may mirror the real app's add-to-map loop using team-owned example photos: add an example, color its province, then browse the added memory. Keep this state in browser memory only; never upload a file, call a persistence API, or write to the database from the landing demo.
 - Keep the Korea add-to-map controls visually attached to the map so adding a photo and seeing the colored province happen in one viewport on desktop; avoid a separate full-width tray that pushes the map below the fold.
 - In the Korea landing demo, let a new example photo finish coloring its province before enabling the next action. Keep level-3 district entry user-directed, then focus the district map and memory panel inside one viewport instead of requiring manual down-and-up scrolling.
 - After a Korea province finishes filling, keep a visible `다른 지역 추가` path until every provided example has been added. Returning to the add tray must preserve every previously colored province and keep added examples available as memory-view actions.
+- After all Korea examples are filled, replace `다른 지역 추가` with a persistent `기록 목록 보기` action instead of removing that slot. On mobile, give level 3 one reversible history entry so browser Back returns to the Korea overview instead of leaving the landing page.
 - Use the selected Map-first Reveal direction for Korea level 2: no pin or place-name label on the province map, no separate guide panel, and no duplicated administrative labels. Let the province fill and outline carry the map state; after completion, expose one attached tray such as `서울 · 기억 1개 / 서울의 기억 보기`. Keep the colored province itself clickable and preserve an explicit accessible tray action.
 - Keep the shared community-memory globe out of the main landing because it can misrepresent Mapmory as a community or travel-statistics product. Treat it only as a future separate experiment or campaign; the executable concept brief lives in `docs/community-memory-globe-experiment.md`.
 - Measure the interactive proof by exact active time, distinct memories actually opened, and sequential funnel drop-off. Count time only while the experience is visible and the tab is active; record a memory only after its separate panel has opened, and never use coarse 10/30/60-second milestones as the primary duration measure.

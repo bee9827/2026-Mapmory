@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -49,7 +50,16 @@ class PhotoLibraryAndroidDeviceTest {
             )
             assertNotNull(previewOnlyPhoto)
             assertNull(previewOnlyPhoto.originalBytes)
-            assertTrue(previewOnlyPhoto.previewBytes?.isNotEmpty() == true)
+            val previewBytes = requireNotNull(previewOnlyPhoto.previewBytes)
+            assertTrue(previewBytes.isNotEmpty())
+            val previewBitmap = BitmapFactory.decodeByteArray(
+                previewBytes,
+                0,
+                previewBytes.size,
+            )
+            assertNotNull(previewBitmap)
+            assertTrue(maxOf(previewBitmap.width, previewBitmap.height) <= RecommendationPreviewSizePx)
+            previewBitmap.recycle()
         } finally {
             context.contentResolver.delete(fixture.uri, null, null)
             fixture.file.delete()
@@ -58,7 +68,7 @@ class PhotoLibraryAndroidDeviceTest {
 
     private fun insertFixturePhoto(context: Context): FixturePhoto {
         val file = File.createTempFile("mapmory-photo-", ".jpg", context.cacheDir)
-        val bitmap = Bitmap.createBitmap(64, 32, Bitmap.Config.ARGB_8888)
+        val bitmap = Bitmap.createBitmap(1600, 900, Bitmap.Config.ARGB_8888)
         try {
             ByteArrayOutputStream().use { output ->
                 check(bitmap.compress(Bitmap.CompressFormat.JPEG, 100, output))

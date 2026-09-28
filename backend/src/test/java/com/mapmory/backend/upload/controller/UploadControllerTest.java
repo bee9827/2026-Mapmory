@@ -49,7 +49,7 @@ class UploadControllerTest {
     void setUp() {
         UploadPolicyProperties properties = new UploadPolicyProperties(
                 DataSize.ofMegabytes(10),
-                10,
+                100,
                 Duration.ofMinutes(5)
         );
         UploadService uploadService = new UploadService(
@@ -98,7 +98,7 @@ class UploadControllerTest {
 
     @Test
     void 개수를_초과한_파일은_400_ProblemDetails로_응답한다() throws Exception {
-        String files = IntStream.range(0, 11)
+        String files = IntStream.range(0, 101)
                 .mapToObj(index -> """
                         {"fileName":"image.jpg","contentType":"image/jpeg","fileSize":1024}
                         """.trim())

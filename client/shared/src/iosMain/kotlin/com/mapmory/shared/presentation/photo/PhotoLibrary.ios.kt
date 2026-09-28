@@ -6,6 +6,7 @@
 package com.mapmory.shared.presentation.photo
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.mapmory.shared.domain.model.Location
@@ -21,6 +22,8 @@ import platform.Foundation.NSData
 import platform.Foundation.NSDate
 import platform.Foundation.NSDateFormatter
 import platform.Foundation.NSLog
+import platform.Foundation.NSNotificationCenter
+import platform.Foundation.NSURL
 import platform.Foundation.getBytes
 import platform.Foundation.NSSortDescriptor
 import platform.ImageIO.CGImageSourceCreateThumbnailAtIndex
@@ -51,6 +54,8 @@ import platform.PhotosUI.PHPickerResult
 import platform.PhotosUI.PHPickerViewController
 import platform.PhotosUI.PHPickerViewControllerDelegateProtocol
 import platform.UIKit.UIApplication
+import platform.UIKit.UIApplicationDidBecomeActiveNotification
+import platform.UIKit.UIApplicationOpenSettingsURLString
 import platform.UIKit.UIImage
 import platform.UIKit.UIImageJPEGRepresentation
 import platform.UIKit.UIViewController
@@ -74,6 +79,7 @@ actual fun rememberPhotoLibraryActions(
     onLoadingChanged: (Boolean) -> Unit,
     @Suppress("UNUSED_PARAMETER") onLoadingProgressChanged: (PhotoLoadingProgress) -> Unit,
     onRecommendationLoadingChanged: (Boolean) -> Unit,
+    onPermissionRequired: (PhotoLibraryPermissionIssue) -> Unit,
 ): PhotoLibraryActions {
     val scope = rememberCoroutineScope()
     val controller = remember(scope) { IosPhotoLibraryController(scope) }
@@ -82,6 +88,11 @@ actual fun rememberPhotoLibraryActions(
     controller.onMessage = onMessage
     controller.onLoadingChanged = onLoadingChanged
     controller.onRecommendationLoadingChanged = onRecommendationLoadingChanged
+    controller.onPermissionRequired = onPermissionRequired
+    DisposableEffect(controller) {
+        controller.startObservingAppActivity()
+        onDispose { controller.stopObservingAppActivity() }
+    }
 
     return remember(controller) {
         PhotoLibraryActions(
@@ -90,6 +101,7 @@ actual fun rememberPhotoLibraryActions(
             loadNextRecommendationPage = controller::loadNextRecommendationPage,
             prepareForAdding = controller::prepareForAdding,
             cancelRecommendation = controller::cancelRecommendation,
+            openAppSettings = controller::openAppSettings,
         )
     }
 }
@@ -124,10 +136,13 @@ private class IosPhotoLibraryController(
     var onMessage: (String) -> Unit = {}
     var onLoadingChanged: (Boolean) -> Unit = {}
     var onRecommendationLoadingChanged: (Boolean) -> Unit = {}
+    var onPermissionRequired: (PhotoLibraryPermissionIssue) -> Unit = {}
     private var recommendationJob: Job? = null
     private var recommendationGeneration = 0
     private var recommendationSession: IosRecommendationSession? = null
     private var isRecommendationPageLoading = false
+    private var pendingRecommendation: Location? = null
+    private var appActiveObserver: Any? = null
 
     private var pickerStartedAtMillis: Long? = null
 
@@ -189,22 +204,73 @@ private class IosPhotoLibraryController(
         val status = PHPhotoLibrary.authorizationStatusForAccessLevel(PHAccessLevelReadWrite)
         when (status) {
             PHAuthorizationStatusAuthorized -> {
+                pendingRecommendation = null
                 findRecommendations(location)
             }
-            PHAuthorizationStatusLimited -> onMessage(FullGalleryAccessMessage)
+            PHAuthorizationStatusLimited -> {
+                pendingRecommendation = location
+                onPermissionRequired(PhotoLibraryPermissionIssue.LIMITED)
+            }
             PHAuthorizationStatusNotDetermined -> {
                 PHPhotoLibrary.requestAuthorizationForAccessLevel(PHAccessLevelReadWrite) { newStatus ->
                     onMain {
                         when (newStatus) {
-                            PHAuthorizationStatusAuthorized -> findRecommendations(location)
-                            PHAuthorizationStatusLimited -> onMessage(FullGalleryAccessMessage)
-                            else -> onMessage("장소 기반 추천을 사용하려면 사진 접근을 허용해 주세요.")
+                            PHAuthorizationStatusAuthorized -> {
+                                pendingRecommendation = null
+                                findRecommendations(location)
+                            }
+                            PHAuthorizationStatusLimited -> {
+                                pendingRecommendation = location
+                                onPermissionRequired(PhotoLibraryPermissionIssue.LIMITED)
+                            }
+                            else -> {
+                                pendingRecommendation = location
+                                onPermissionRequired(newStatus.toPermissionIssue())
+                            }
                         }
                     }
                 }
             }
-            else -> onMessage("장소 기반 추천을 사용하려면 설정에서 사진 접근을 허용해 주세요.")
+            else -> {
+                pendingRecommendation = location
+                onPermissionRequired(status.toPermissionIssue())
+            }
         }
+    }
+
+    fun openAppSettings() {
+        val settingsUrl = NSURL.URLWithString(UIApplicationOpenSettingsURLString) ?: return
+        UIApplication.sharedApplication.openURL(
+            url = settingsUrl,
+            options = emptyMap<Any?, Any>(),
+            completionHandler = { opened ->
+                if (!opened) onMessage("설정 화면을 열지 못했어요.")
+            },
+        )
+    }
+
+    fun startObservingAppActivity() {
+        if (appActiveObserver != null) return
+        appActiveObserver = NSNotificationCenter.defaultCenter.addObserverForName(
+            name = UIApplicationDidBecomeActiveNotification,
+            `object` = null,
+            queue = null,
+        ) {
+            val target = pendingRecommendation
+            if (
+                target != null &&
+                PHPhotoLibrary.authorizationStatusForAccessLevel(PHAccessLevelReadWrite) ==
+                PHAuthorizationStatusAuthorized
+            ) {
+                pendingRecommendation = null
+                findRecommendations(target)
+            }
+        }
+    }
+
+    fun stopObservingAppActivity() {
+        appActiveObserver?.let(NSNotificationCenter.defaultCenter::removeObserver)
+        appActiveObserver = null
     }
 
     private fun findRecommendations(location: Location) {
@@ -396,7 +462,10 @@ private class IosPhotoLibraryController(
         var didComplete = false
         PHImageManager.defaultManager().requestImageForAsset(
             asset = asset,
-            targetSize = CGSizeMake(PreviewSizePx.toDouble(), PreviewSizePx.toDouble()),
+            targetSize = CGSizeMake(
+                RecommendationPreviewSizePx.toDouble(),
+                RecommendationPreviewSizePx.toDouble(),
+            ),
             contentMode = PHImageContentModeAspectFit,
             options = options,
         ) { image, _ ->
@@ -580,6 +649,11 @@ private fun logPhotoPerformance(message: String) {
 }
 
 private const val PreviewSizePx = 1280
+private const val RecommendationPreviewSizePx = 640
 private const val PreviewJpegQuality = 0.85
-private const val FullGalleryAccessMessage =
-    "위치 기반 사진 추천을 사용하려면 전체 갤러리 접근 권한을 허용해 주세요."
+private fun Long.toPermissionIssue(): PhotoLibraryPermissionIssue =
+    if (this == platform.Photos.PHAuthorizationStatusRestricted) {
+        PhotoLibraryPermissionIssue.RESTRICTED
+    } else {
+        PhotoLibraryPermissionIssue.DENIED
+    }
