@@ -1,6 +1,8 @@
 # Mapmory PostHog 운영 대시보드 설정
 
-갱신: 2026-09-05 · 현재 스키마: `analytics_schema_version=2`
+갱신: 2026-09-28 · 현재 스키마: `analytics_schema_version=2`
+
+기존 `Landing · Product Experience v2` 대시보드는 출시 전 기록으로 보존한다. 현재 랜딩 운영 타일은 `landing_version=v4`로 분리하고 최종 전환은 두 스토어의 `download_click`로 본다. 출시 알림 폼을 현재 퍼널에 다시 넣지 않는다.
 
 ## 목적
 
@@ -54,7 +56,11 @@ $pageview → experience_view → experience_start
 → memory_open (open_index = 1) → download_click
 ```
 
-`experience_type`과 기기 유형으로 나눈다. 이 퍼널은 병목 진단용이며 스토어 전환의 필수 경로로 해석하지 않는다.
+`landing_version=v4`로 필터링하고 `experience_type`과 기기 유형으로 나눈다. 이 퍼널은 병목 진단용이며 스토어 전환의 필수 경로로 해석하지 않는다.
+
+### 02-a · 모바일 기억 바텀시트
+
+`landing_version=v4`와 모바일 기기로 필터링해 `memory_open → memory_photo_swiped → memory_sheet_closed` 흐름을 본다. `close_method`, `photos_viewed`, `time_since_memory_open_seconds`로 사진을 넘겨본 뒤 닫았는지, 닫기 버튼과 브라우저 뒤로가기 중 어떤 경로가 쓰였는지 확인한다.
 
 ### 03 · Recap 실제 사진 퍼널
 
@@ -101,9 +107,9 @@ travel_map_recap_view → travel_map_app_bridge_click
 
 ### 07 · 랜딩 체험 깊이
 
-- `experience_end.active_duration_ms`: 중앙값과 25·75 백분위
+- `experience_end.active_duration_seconds`: 중앙값과 25·75 백분위
 - `experience_end.unique_memories_opened`: 0개, 1개, 2개 이상
-- `memory_open(open_index=1).time_since_start_ms`: 중앙값
+- `memory_open(open_index=1).time_since_start_seconds`: 중앙값
 
 평균 체류시간 하나만으로 체험 성공을 판단하지 않는다.
 

@@ -6,7 +6,7 @@
 - Reuse the institution account and its designated roles. Do not create IAM users, access keys or OIDC roles, modify shared policies, widen SSH/network access, or inspect other teams' resources.
 - Every created resource must carry `Service=techcourse`, `Role=techcourse-etc`, `ProjectTeam=Mapmory`. Apply the common tags in `codedeploy/aws-resources.json` to **each** application, deployment group, build project and pipeline; the JSON is a blueprint, not a CLI request.
 - Monthly team limits provided by the institution: August $50, September $60, October onward $70. EC2 estimates are not the complete team bill. Check the team's usage before provisioning; CodeBuild minutes, CodePipeline and S3 add cost. Do not create budgets, dashboards or alarms with extra costs without discussion.
-- Use `techcourse-project-2026-artifact` for frontend source/build/deployment artifacts. CodePipeline generates a Mapmory-identifiable artifact prefix; the live prefix is `mapmory-landing-rele/` (AWS truncates names). Do not change bucket policy, lifecycle or other prefixes. Do not use `techcourse-project-2026` or the backend artifact bucket for frontend serving/deployment.
+- Use `techcourse-project-2026-artifacts` for frontend source/build/deployment artifacts. CodePipeline generates the `mapmory-landing-rele/` artifact prefix (AWS truncates names). Do not change bucket policy, lifecycle or other prefixes. Do not use `techcourse-project-2026` for this pipeline, and keep backend artifacts isolated.
 - Permissions or bucket-role mismatches must be raised in the institution's technical-review channel. Never work around them by changing shared IAM policies. Most deletion permissions are absent; avoid speculative resources.
 
 ## Branch, review and approval
@@ -30,7 +30,7 @@ On 2026-09-03 the user explicitly chose **automatic landing-only deployment with
 1. Inspect existing Mapmory resources and confirm this account/region, the current landing symlink/TLS, the active CodeDeploy agent and the existing backend baseline. Announce the change/risk plan before creating anything.
 2. Inspect and reuse the existing `mapmory-landing` CodeDeploy application and `mapmory-landing-production` deployment group. Verify all three tags, existing `codedeploy-project`, and instance selection matching both `Name=ec2-mapmory` and `ProjectTeam=Mapmory`. Verify in-place, no traffic control, `CodeDeployDefault.AllAtOnce`, and rollback on deployment failure. Do not create replacements or start a deployment during inspection; report configuration mismatches before changing them.
 3. Inspect and reuse existing `mapmory-landing-build`. Verify all three tags, existing `codebuild-project`, `aws/codebuild/standard:7.0`, Node 24, small Linux build, no privileged mode/VPC, concurrency 1 and timeout 15 minutes. Source/artifacts must be CodePipeline, buildspec `landing/buildspec.yml`, and logs `/aws/codebuild/project-2026` with a `mapmory-landing` stream prefix. Do not create another project or start a build during inspection. The landing CodePipeline also already exists; reuse it.
-4. Preserve the live public `VITE_GA_MEASUREMENT_ID`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST`, and optional `VITE_API_BASE_URL` as CodeBuild project environment variables. They are public client build settings, never private tokens. Check against the current live bundle; do not silently drop analytics because the GitHub repository variables are unset. Set `VITE_LANDING_VERSION=v3`.
+4. Preserve the live public `VITE_GA_MEASUREMENT_ID`, `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST`, and optional `VITE_API_BASE_URL` as CodeBuild project environment variables. They are public client build settings, never private tokens. Check against the current live bundle; do not silently drop analytics because the GitHub repository variables are unset. The checked-in CodeBuild command pins `VITE_LANDING_VERSION=v4` so a stale project-level value cannot relabel a release; update that command with the landing measurement plan whenever the version advances.
 5. Inspect and reuse `mapmory-landing-release`, existing `codepipeline-project` and all three tags. The approved type is **V2 / SUPERSEDED**, not PARALLEL; the activation hook also uses a lock. Preserve the frontend artifact bucket. **GitHub (version 1)** targets only the canonical repository's `landing-release` branch. Let the user complete OAuth if needed; never collect credentials or copy another pipeline's masked token. The console-created webhook detects this branch, with polling disabled; verify both to avoid duplicate or missing runs. This legacy webhook is separate from the console's CodeConnections-only Git triggers panel.
 6. Preserve source namespace `SourceVariables` and `SOURCE_COMMIT_ID=#{SourceVariables.CommitId}`. Build outputs `BuildArtifact`; only that artifact feeds `DeployLandingOnly` in app `mapmory-landing`, group `mapmory-landing-production`. The stages are exactly Source, Build, Deploy, with no manual approval or backend action.
 7. Announce production/configuration changes and chargeable execution before starting them. For the first run, verify the reviewed release SHA and server recovery target before execution. Subsequent protected release merges automatically build/test/deploy. Backend pipeline `mapmory-backend-pipeline` and group `mapmory-prod` remain untouched.
@@ -40,6 +40,42 @@ The console created V2 and explicitly disabled V2-to-V1 conversion. The user was
 The EC2 `ec2-project` role is an instance role, not the human console user. It may lack CodePipeline/CodeBuild creation permission even though the signed-in institution user can provision those services. Use the existing console login; do not request a new administrator account or broaden the instance role.
 
 ## Build, deploy and verification
+
+### Trips photo experiment under /trips/
+
+The metadata-only experiment is a third static surface. Source is `landing/trips/src/`;
+`npm --prefix trips run build` emits only `trips/dist/trips/`. The packager adds it as
+`client/trips/`, alongside the unchanged root landing and `client/recap/`.
+All three surfaces are one atomic deployment/rollback unit; no extra AWS resource
+is needed. A missing Trips build fails packaging rather than silently dropping it.
+CI/CodeBuild install, build and test Trips before packaging.
+
+Users may enter `https://map-mory.com/trips`. The canonical address is
+`https://map-mory.com/trips/`, reached by a **308 redirect preserving the query**.
+This keeps the experiment's relative script, CSS, worker, parser and data paths
+inside `/trips/`. Missing files under that prefix return 404, not the root SPA.
+
+Before the first production promotion, inspect the live Mapmory Nginx server block
+and compare it with `nginx/trips.conf`. That file is a reviewed configuration
+example, **not automatically installed** by this PR, package or deployment hook.
+Separately obtain approval to add only those locations, back up the actual config,
+run `nginx -t`, then reload Nginx. Preserve TLS, root, API and Recap configuration.
+Do not claim that a local preview proves the production routes are installed.
+
+The activation hook checks `/trips/release.txt` against the same tested SHA,
+checks that `/trips/` returns the experiment entry (not the landing fallback),
+and checks the 308 redirect and query preservation. A failed check restores the
+previous complete release. Linux fixtures cover missing files, marker mismatch,
+HTTP failure, wrong shell and incorrect redirect in addition to previous cases.
+
+After the release is separately authorized and merged, verify those same public
+URLs, a real `/trips/app.js` request, missing-asset 404, and the unchanged homepage,
+Recap and backend. Physical iOS/Android file-picker behavior requires device
+testing; metadata support does not guarantee every browser can preview HEIC/RAW.
+
+The original fork's `.openai/hosting.json`, experiments, tests, screenshots and
+personal photos are not copied into the deployment output. All photo reading and
+classification remains in browser memory; no photo upload endpoint is deployed.
 
 ### Travel campaign under /recap/
 

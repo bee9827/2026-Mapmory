@@ -58,6 +58,7 @@ test("Recap operator guidance follows the shared automatic landing deployment po
 
 test("CodeBuild binds the tested source SHA to a static-only CodeDeploy bundle", () => {
   assert.match(buildspec, /CODEBUILD_RESOLVED_SOURCE_VERSION.*SOURCE_COMMIT_ID/);
+  assert.match(buildspec, /VITE_LANDING_VERSION=v4 npm run build/);
   assert.ok(buildspec.indexOf("npm run build") < buildspec.indexOf("npm test"));
   assert.match(buildspec, /CODEBUILD_BUILD_SUCCEEDING/);
   assert.match(packager, /dist\/client/);
@@ -74,7 +75,7 @@ test("shared-account resources use approved roles, storage, logs, tags and bound
   assert.equal(resources.codeDeploy.serviceRoleName, "codedeploy-project");
   assert.equal(resources.codeBuild.serviceRoleName, "codebuild-project");
   assert.equal(resources.codePipeline.serviceRoleName, "codepipeline-project");
-  assert.equal(resources.codePipeline.artifactStore.location, "techcourse-project-2026-artifact");
+  assert.equal(resources.codePipeline.artifactStore.location, "techcourse-project-2026-artifacts");
   assert.equal(resources.codeBuild.logsConfig.cloudWatchLogs.groupName, "/aws/codebuild/project-2026");
   assert.equal(resources.codeBuild.concurrentBuildLimit, 1);
   assert.equal(resources.codeBuild.timeoutInMinutes, 15);
@@ -101,8 +102,8 @@ test("deployment shell syntax is valid", { skip: !existsSync(bash) }, () => {
 
 test("all local health checks explicitly bypass proxy environment variables", () => {
   const probes = hook.match(/curl --noproxy '\*'/g) || [];
-  assert.equal(probes.length, 4);
-  assert.equal((hook.match(/--resolve map-mory.com:443:127.0.0.1/g) || []).length, 4);
+  assert.equal(probes.length, 7);
+  assert.equal((hook.match(/--resolve map-mory.com:443:127.0.0.1/g) || []).length, 7);
 });
 
 test("CodeDeploy rejects use from the backend group before filesystem access", () => {
@@ -114,7 +115,7 @@ test("CodeDeploy rejects use from the backend group before filesystem access", (
   assert.match(result.stderr, /only in the landing/);
 });
 
-for (const scenario of ["success", "proxy-env", "reload-failure", "identity-failure", "http-failure", "nginx-failure", "bad-marker", "bad-id", "missing-previous", "outside-previous", "duplicate", "symlink-bundle", "locked", "missing-recap", "bad-recap-marker", "recap-http-failure", "recap-identity-failure", "recap-shell-failure"]) {
+for (const scenario of ["success", "proxy-env", "reload-failure", "identity-failure", "http-failure", "nginx-failure", "bad-marker", "bad-id", "missing-previous", "outside-previous", "duplicate", "symlink-bundle", "locked", "missing-recap", "bad-recap-marker", "recap-http-failure", "recap-identity-failure", "recap-shell-failure", "missing-trips", "bad-trips-marker", "trips-http-failure", "trips-identity-failure", "trips-shell-failure", "trips-redirect-failure"]) {
   test(`CodeDeploy activation fixture: ${scenario}`, { skip: process.platform === "win32" ? "Linux filesystem/flock fixture runs in CI and CodeBuild" : false }, () => {
     const fixture = fileURLToPath(new URL("./fixtures/codedeploy-activation.sh", import.meta.url));
     const result = spawnSync(bash, [fixture, scenario], {encoding: "utf8", timeout: 15000});
