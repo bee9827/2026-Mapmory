@@ -14,9 +14,11 @@ import com.mapmory.shared.data.settings.IosOnboardingPreference
 import com.mapmory.shared.data.settings.IosThemePreference
 
 fun MainViewController(
+    apiBaseUrl: String,
     onThemeChanged: (Boolean) -> Unit,
     analytics: MapmoryAnalytics,
 ) = createGuestRemoteAppContainer(
+    apiBaseUrl = apiBaseUrl,
     tokenStore = IosAuthTokenStore(),
     photoPreviewCache = IosPhotoPreviewCache(),
     mapSummaryCache = IosMapSummaryCache(),

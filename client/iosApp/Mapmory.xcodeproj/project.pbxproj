@@ -229,6 +229,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.2.1;
+				MAPMORY_API_BASE_URL = "https://dev-api.map-mory.com/api/v1";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",
@@ -263,6 +264,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.2.1;
+				MAPMORY_API_BASE_URL = "https://api.map-mory.com/api/v1";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",

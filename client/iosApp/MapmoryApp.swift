@@ -15,6 +15,16 @@ private let darkSystemBarColor = UIColor(
     alpha: 1
 )
 
+private enum AppConfiguration {
+    static let apiBaseUrl: String = {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "MAPMORY_API_BASE_URL") as? String,
+              !value.isEmpty else {
+            fatalError("MAPMORY_API_BASE_URL is missing from the app configuration")
+        }
+        return value
+    }()
+}
+
 @main
 struct MapmoryApp: App {
     @State private var isDarkTheme = false
@@ -51,6 +61,7 @@ private struct ComposeView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIViewController {
         let coordinator = context.coordinator
         let viewController = MainViewControllerKt.MainViewController(
+            apiBaseUrl: AppConfiguration.apiBaseUrl,
             onThemeChanged: { isDark in
                 coordinator.updateTheme(isDark.boolValue)
             },
