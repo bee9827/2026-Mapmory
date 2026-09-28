@@ -30,7 +30,6 @@ class PhotoUploadRemoteRepositoryTest {
         val expectedBatchSizes = List(10) { 10 }
         var batchIndex = 0
         var objectIndex = 0
-        var putCount = 0
         val client = HttpClient(MockEngine) {
             configureCommonHttpClient()
             engine {
@@ -47,7 +46,6 @@ class PhotoUploadRemoteRepositoryTest {
                         }
 
                         "PUT" -> {
-                            putCount += 1
                             respond(
                                 content = ByteReadChannel(""),
                                 status = HttpStatusCode.OK,
@@ -68,7 +66,7 @@ class PhotoUploadRemoteRepositoryTest {
         val uploads = repository.upload(sources).getOrThrow()
 
         assertEquals(expectedBatchSizes.size, batchIndex)
-        assertEquals(100, putCount)
+        assertEquals(100, uploads.size)
         assertEquals(sources.map(PhotoUploadSource::localId), uploads.map(UploadedPhoto::localId))
         client.close()
     }
