@@ -45,7 +45,7 @@ kakao:
 upload:
   policy:
     max-file-size: 10MB
-    max-files-per-request: 10
+    max-files-per-request: 100
     presigned-url-expiration: PT5M
   storage:
     s3:
