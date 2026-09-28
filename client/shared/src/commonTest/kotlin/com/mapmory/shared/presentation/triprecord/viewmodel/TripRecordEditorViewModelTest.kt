@@ -39,13 +39,38 @@ class TripRecordEditorViewModelTest {
         viewModel.initialize(recordId = null, selectedLocation = null)
         viewModel.updateTagInput(" 라멘맛집 ")
         viewModel.createAndSelectTag()
+        assertTrue(repository.getTags().getOrThrow().isEmpty())
         viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
         viewModel.updateTitle("서울 여행")
         viewModel.updateStartDate("2026-08-31")
+        viewModel.addPhotos(listOf(selectedPhoto("content://photo/tagged")))
 
         assertTrue(viewModel.save())
         assertEquals("라멘맛집", repository.getTags().getOrThrow().single().name)
         assertEquals("라멘맛집", repository.getTripRecord(1).getOrThrow().tags.single().name)
+    }
+
+    @Test
+    fun `저장하지_않고_나가면_직접_만든_태그는_저장되지_않는다`() = runSuspend {
+        val repository = FakeTripRecordRepository { "2026-08-31T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+            getTags = GetTagsUseCase(repository),
+            createTag = CreateTagUseCase(repository),
+        )
+
+        viewModel.initialize(recordId = null, selectedLocation = null)
+        viewModel.updateTagInput(" 라멘맛집 ")
+        viewModel.createAndSelectTag()
+
+        assertEquals(listOf("라멘맛집"), viewModel.uiState.pendingTagNames)
+        assertEquals(setOf("라멘맛집"), viewModel.uiState.selectedPendingTagNames)
+        assertTrue(repository.getTags().getOrThrow().isEmpty())
+
+        viewModel.reset()
+
+        assertTrue(repository.getTags().getOrThrow().isEmpty())
     }
 
     @Test
@@ -74,6 +99,7 @@ class TripRecordEditorViewModelTest {
         viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
         viewModel.updateTitle("서울 여행")
         viewModel.updateStartDate("2026-08-01")
+        viewModel.addPhotos(listOf(selectedPhoto("content://photo/pending")))
         viewModel.setPhotoLoading(true)
 
         assertFalse(viewModel.save())
@@ -100,6 +126,7 @@ class TripRecordEditorViewModelTest {
             viewModel.updateTitle("서울 여행")
             viewModel.updateContent("한강을 걸었다.")
             viewModel.updateStartDate("2026-08-01")
+            viewModel.addPhotos(listOf(selectedPhoto("content://photo/create")))
 
             assertTrue(viewModel.save())
             assertEquals(
@@ -124,6 +151,44 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
+    fun `제목과_내용과_종료일과_태그가_없어도_기록을_저장한다`() = runSuspend {
+        val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+
+        viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
+        viewModel.updateStartDate("2026-08-01")
+        viewModel.addPhotos(listOf(selectedPhoto("content://photo/minimum")))
+
+        assertTrue(viewModel.save())
+        val record = repository.getTripRecords(TripRecordQuery()).getOrThrow().records.single()
+        assertEquals("", record.title)
+        assertEquals("", record.content)
+        assertEquals(null, record.endDate)
+        assertTrue(record.tags.isEmpty())
+    }
+
+    @Test
+    fun `사진이_없으면_기록을_저장할_수_없다`() = runSuspend {
+        val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+
+        viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
+        viewModel.updateStartDate("2026-08-01")
+
+        assertFalse(viewModel.save())
+        assertEquals(
+            TripRecordPhotoRules.RequiredMessage,
+            viewModel.uiState.fieldErrors[TripRecordEditorErrorTarget.PHOTOS],
+        )
+    }
+
+    @Test
     fun `저장은_시작일을_요구하고_잘못된_날짜_범위를_거부한다`() {
         runSuspend {
             val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
@@ -135,6 +200,7 @@ class TripRecordEditorViewModelTest {
             viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
             viewModel.updateTitle("서울 여행")
             viewModel.updateEndDate("2026-08-01")
+            viewModel.addPhotos(listOf(selectedPhoto("content://photo/date")))
 
             assertFalse(viewModel.save())
             assertEquals("시작일을 입력해 주세요.", viewModel.uiState.errorMessage)
@@ -175,25 +241,16 @@ class TripRecordEditorViewModelTest {
             assertTrue(viewModel.uiState.fieldErrors.isEmpty())
 
             viewModel.updateTitle(" ")
-            assertEquals(
-                mapOf(TripRecordEditorErrorTarget.TITLE to "제목을 입력해 주세요."),
-                viewModel.uiState.fieldErrors,
-            )
+            assertTrue(viewModel.uiState.fieldErrors.isEmpty())
 
             viewModel.touchLocation()
             assertEquals(
-                mapOf(
-                    TripRecordEditorErrorTarget.LOCATION to "장소를 선택해 주세요.",
-                    TripRecordEditorErrorTarget.TITLE to "제목을 입력해 주세요.",
-                ),
+                mapOf(TripRecordEditorErrorTarget.LOCATION to "장소를 선택해 주세요."),
                 viewModel.uiState.fieldErrors,
             )
 
             viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
-            assertEquals(
-                mapOf(TripRecordEditorErrorTarget.TITLE to "제목을 입력해 주세요."),
-                viewModel.uiState.fieldErrors,
-            )
+            assertTrue(viewModel.uiState.fieldErrors.isEmpty())
             viewModel.updateTitle("서울 여행")
             assertTrue(viewModel.uiState.fieldErrors.isEmpty())
 
@@ -215,6 +272,7 @@ class TripRecordEditorViewModelTest {
         viewModel.selectLocation(Location(1, 1, null, "KR-11", "서울특별시", LocationType.PROVINCE))
         viewModel.updateTitle("서울 여행")
         viewModel.updateStartDate("2026-08-01")
+        viewModel.addPhotos(listOf(selectedPhoto("content://photo/location")))
 
         assertNull(viewModel.uiState.selectedLocation)
         assertFalse(viewModel.save())
@@ -243,7 +301,7 @@ class TripRecordEditorViewModelTest {
     }
 
     @Test
-    fun `기록_수정에서는_기존_사진을_포함해_최대_10장만_추가한다`() {
+    fun `기록_수정에서는_기존_사진을_포함해_최대_100장만_추가한다`() {
         val repository = FakeTripRecordRepository { "2026-08-07T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
             createTripRecord = CreateTripRecordUseCase(repository),
@@ -258,7 +316,7 @@ class TripRecordEditorViewModelTest {
                 content = "",
                 startDate = "2026-08-01",
                 endDate = null,
-                media = (1..9).map { index ->
+                media = (1..99).map { index ->
                     TripRecordMedia(
                         id = index.toLong(),
                         objectKey = "records/1/existing-$index.jpg",
@@ -336,6 +394,7 @@ class TripRecordEditorViewModelTest {
         viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
         viewModel.updateTitle("서울 여행")
         viewModel.updateStartDate("2026-08-31")
+        viewModel.addPhotos(listOf(selectedPhoto("content://photo/upload")))
 
         assertFalse(viewModel.save())
         assertEquals(
@@ -370,6 +429,34 @@ class TripRecordEditorViewModelTest {
             ),
             error.toEditorFieldErrors(),
         )
+    }
+
+    @Test
+    fun `빈_제목을_거부한_서버_오류는_제목_필수_입력_오류로_노출하지_않는다`() = runSuspend {
+        val error = MapmoryApiException(
+            statusCode = 400,
+            code = "VALIDATION_ERROR",
+            title = "요청 값이 올바르지 않습니다.",
+            detail = null,
+            instance = "/api/v1/travel-records",
+            errors = listOf(ProblemFieldErrorDto("title", "제목은 필수입니다.")),
+        )
+        val delegate = FakeTripRecordRepository { "2026-08-31T00:00:00Z" }
+        val repository = object : TripRecordRepository by delegate {
+            override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> =
+                Result.failure(error)
+        }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+        viewModel.selectLocation(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
+        viewModel.updateStartDate("2026-08-31")
+        viewModel.addPhotos(listOf(selectedPhoto("content://photo/blank-title")))
+
+        assertFalse(viewModel.save())
+        assertNull(viewModel.uiState.fieldErrors[TripRecordEditorErrorTarget.TITLE])
+        assertEquals(BlankTitleServerCompatibilityMessage, viewModel.uiState.generalErrorMessage)
     }
 }
 

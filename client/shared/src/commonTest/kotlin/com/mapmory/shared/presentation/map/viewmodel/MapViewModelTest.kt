@@ -94,6 +94,7 @@ class MapViewModelTest {
         assertEquals(setOf("KR", "JP"), viewModel.visitedCountryCodes)
         assertEquals(setOf("KR-11"), viewModel.visitedProvinceCodes)
         assertEquals(setOf("11680"), viewModel.visitedDistrictCodes("KR-11"))
+        assertTrue(viewModel.hasRecords(catalog.requireByCode("KR")))
         assertTrue(viewModel.hasRecords(gangnam))
         assertTrue(viewModel.hasRecords(seoul))
     }
@@ -104,6 +105,6 @@ class MapViewModelTest {
         content = "",
         startDate = "2026-08-01",
         endDate = null,
-        mediaObjectKeys = emptyList(),
+        mediaObjectKeys = listOf("records/$locationId/photo.jpg"),
     )
 }

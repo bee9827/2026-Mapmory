@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -89,10 +88,7 @@ fun TripRecordListScreen(
                     when (uiState) {
                         TripRecordListUiState.Idle,
                         TripRecordListUiState.Loading,
-                        -> CircularProgressIndicator(
-                            color = TripRecordPalette.current.accent,
-                            modifier = Modifier.padding(top = 20.dp),
-                        )
+                        -> TripRecordListSkeleton(modifier = Modifier.weight(1f))
 
                         is TripRecordListUiState.Error -> Text(
                             text = uiState.message,
@@ -274,7 +270,7 @@ private fun JournalTagFilters(
             onClick = {
                 analytics.logEvent(
                     MapmoryAnalyticsEvent.JOURNAL_FILTER_SELECTED,
-                    mapOf("tag" to "전체"),
+                    mapOf("filter_type" to "all"),
                 )
                 onTagClick(null)
             },
@@ -286,7 +282,7 @@ private fun JournalTagFilters(
                 onClick = {
                     analytics.logEvent(
                         MapmoryAnalyticsEvent.JOURNAL_FILTER_SELECTED,
-                        mapOf("tag" to tag.name),
+                        mapOf("filter_type" to "custom_tag"),
                     )
                     onTagClick(tag.id)
                 },

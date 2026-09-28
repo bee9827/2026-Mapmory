@@ -1,5 +1,7 @@
 package com.mapmory.shared.navigation
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
@@ -34,6 +36,11 @@ internal fun MapmoryNavHost(
     NavHost(
         navController = navController,
         startDestination = MapRoute,
+        // Bottom-tab navigation is a state switch, so it should not use push-style motion on iOS.
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None },
     ) {
         composable<MapRoute> { backStackEntry ->
             LaunchedEffect(backStackEntry) {
@@ -46,6 +53,7 @@ internal fun MapmoryNavHost(
                 modifier = Modifier.windowInsetsPadding(contentWindowInsets),
                 viewModel = viewModel,
                 regionCatalog = container.regionCatalog,
+                onboardingPreference = container.onboardingPreference,
                 backHandlerRegistry = backHandlerRegistry,
                 tripRecordRevision = tripRecordRevision,
                 onOpenRecords = navigator::navigateToRecords,
@@ -93,7 +101,7 @@ internal fun MapmoryNavHost(
             }
             TripRecordEditorRoute(
                 modifier = Modifier.windowInsetsPadding(
-                    contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                    contentWindowInsets.only(WindowInsetsSides.Horizontal),
                 ),
                 recordId = route.recordId,
                 selectedLocationId = route.selectedLocationId,
@@ -152,6 +160,7 @@ internal fun MapmoryNavHost(
                 recordId = route.recordId,
                 tripRecordRevision = tripRecordRevision,
                 viewModel = viewModel,
+                backHandlerRegistry = backHandlerRegistry,
                 onBack = { navigator.navigateBack() },
                 onEdit = { recordId ->
                     navigator.navigateToEditor(recordId = recordId)
