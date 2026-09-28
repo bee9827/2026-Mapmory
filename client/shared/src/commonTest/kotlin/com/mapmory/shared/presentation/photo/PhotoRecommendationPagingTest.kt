@@ -12,7 +12,7 @@ class PhotoRecommendationPagingTest {
         val pages = listOf(
             PhotoRecommendationPage(1, (1..24).map { photo(it) }, hasMore = true),
             PhotoRecommendationPage(1, (25..48).map { photo(it) }, hasMore = true),
-            PhotoRecommendationPage(1, (49..50).map { photo(it) }, hasMore = false),
+            PhotoRecommendationPage(1, (49..60).map { photo(it) }, hasMore = false),
         )
 
         val first = PhotoRecommendationPagingState().accept(pages[0])
@@ -24,11 +24,11 @@ class PhotoRecommendationPagingTest {
         assertNotNull(third)
         assertEquals(24, first.photos.size)
         assertEquals(48, second.photos.size)
-        assertEquals(50, third.photos.size)
+        assertEquals(60, third.photos.size)
         assertEquals(2, third.pageIndex)
         assertFalse(third.hasMore)
-        assertEquals(50, third.photos.map(SelectedPhoto::id).toSet().size)
-        assertEquals(10, third.selectedIds.size)
+        assertEquals(60, third.photos.map(SelectedPhoto::id).toSet().size)
+        assertEquals(50, third.selectedIds.size)
     }
 
     @Test

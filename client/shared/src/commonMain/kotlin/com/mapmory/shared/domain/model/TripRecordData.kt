@@ -48,9 +48,9 @@ data class TripRecordDraft(
 )
 
 object TripRecordPhotoRules {
-    const val MaxPhotosPerRecord = 10
+    const val MaxPhotosPerRecord = 50
     const val RequiredMessage = "사진을 한 장 이상 추가해 주세요."
-    const val LimitMessage = "사진은 기록당 최대 10장까지 추가할 수 있습니다."
+    const val LimitMessage = "사진은 기록당 최대 50장까지 추가할 수 있습니다."
 
     fun remainingSlots(currentPhotoCount: Int): Int =
         (MaxPhotosPerRecord - currentPhotoCount).coerceAtLeast(0)
