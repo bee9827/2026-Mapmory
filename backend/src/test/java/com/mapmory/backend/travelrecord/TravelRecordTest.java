@@ -119,6 +119,29 @@ class TravelRecordTest {
         assertTagError(() -> travelRecord.validateTagIds(List.of(1L, 1L)), "VALIDATION_ERROR");
     }
 
+    @Test
+    void 제목이_null이나_공백이면_빈_문자열로_정규화한다() {
+        TravelRecord nullTitleRecord = TravelRecord.of(
+                mock(Member.class),
+                Region.of(null, null, "JP", "일본", RegionType.COUNTRY),
+                null,
+                "본문",
+                LocalDate.of(2026, 8, 11),
+                null
+        );
+        TravelRecord blankTitleRecord = TravelRecord.of(
+                mock(Member.class),
+                Region.of(null, null, "JP", "일본", RegionType.COUNTRY),
+                "   ",
+                "본문",
+                LocalDate.of(2026, 8, 11),
+                null
+        );
+
+        assertThat(nullTitleRecord.getTitle()).isEmpty();
+        assertThat(blankTitleRecord.getTitle()).isEmpty();
+    }
+
     private TravelRecord travelRecord() {
         Region region = Region.of(null, null, "JP", "일본", RegionType.COUNTRY);
 
