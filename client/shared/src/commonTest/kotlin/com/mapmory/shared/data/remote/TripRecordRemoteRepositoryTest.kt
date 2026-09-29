@@ -95,6 +95,37 @@ class TripRecordRemoteRepositoryTest {
     }
 
     @Test
+    fun `빈_제목은_빈_문자열로_전송하고_null_제목_응답을_허용한다`() = runBlocking {
+        val japan = catalog.requireByCode("JP")
+        var requestCount = 0
+        val client = client { request ->
+            requestCount += 1
+            when (requestCount) {
+                1 -> {
+                    assertEquals("POST", request.method.value)
+                    val body = assertIs<io.ktor.http.content.TextContent>(request.body).text
+                    assertTrue("\"title\":\"\"" in body)
+                    jsonResponse("""{"data":{"id":101}}""", HttpStatusCode.Created)
+                }
+
+                else -> jsonResponse(detailResponse(title = null))
+            }
+        }
+
+        val created = repository(client).createTripRecord(
+            TripRecordDraft(
+                locationId = japan.id,
+                startDate = "2026-08-11",
+                mediaObjectKeys = listOf("travel-records/guest/a.jpg"),
+            ),
+        ).getOrThrow()
+
+        assertEquals(2, requestCount)
+        assertEquals("", created.title)
+        client.close()
+    }
+
+    @Test
     fun `기록_수정은_추가_GET_없이_PUT_응답_상세를_사용한다`() = runBlocking {
         val jejuCity = catalog.requireByCode("50110")
         var requestCount = 0
@@ -226,6 +257,8 @@ class TripRecordRemoteRepositoryTest {
         headers = headersOf(HttpHeaders.ContentType, contentType.toString()),
     )
 
-    private fun detailResponse(title: String): String =
-        """{"data":{"id":101,"title":"$title","content":"골목을 걸었다.","region":{"country":{"code":"KR","name":"대한민국"},"province":{"code":"49","name":"제주특별자치도"},"district":{"code":"50110","name":"제주시"}},"startDate":"2026-08-11","endDate":null,"objectKeys":["travel-records/guest/a.jpg"],"tags":[{"id":7,"name":"가족"}],"createdAt":"2026-08-14T10:30:00","updatedAt":"2026-08-15T09:00:00"}}"""
+    private fun detailResponse(title: String?): String {
+        val encodedTitle = title?.let { "\"$it\"" } ?: "null"
+        return """{"data":{"id":101,"title":$encodedTitle,"content":"골목을 걸었다.","region":{"country":{"code":"KR","name":"대한민국"},"province":{"code":"49","name":"제주특별자치도"},"district":{"code":"50110","name":"제주시"}},"startDate":"2026-08-11","endDate":null,"objectKeys":["travel-records/guest/a.jpg"],"tags":[{"id":7,"name":"가족"}],"createdAt":"2026-08-14T10:30:00","updatedAt":"2026-08-15T09:00:00"}}"""
+    }
 }
