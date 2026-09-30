@@ -37,7 +37,7 @@
 
 ```json
 [
-  { "field": "title", "reason": "제목은 필수입니다." }
+  { "field": "countryCode", "reason": "국가 코드는 필수입니다." }
 ]
 ```
 
@@ -161,12 +161,14 @@ Presigned URL 발급 요청은 최대 10개 파일을 받는다. 앱은 기록�
 
 ## 여행 기록 API
 
-여행 기록의 `locationId`는 최종 선택 단계인 `DISTRICT` 지역 ID여야 한다.
-날짜를 입력하지 않으면 두 값 모두 `null`이다. 시작일만 입력하면 서버가 종료일을
-시작일과 같게 저장한다. 종료일만 입력하거나 종료일이 시작일보다 빠르면
+여행지는 지역 코드로 전달한다. 국내 기록은 `countryCode`, `provinceCode`,
+`districtCode`가 모두 필요하고, 해외 기록은 `countryCode`만 전달한다.
+`startDate`는 필수이고 `endDate`는 선택이다. 종료일이 시작일보다 빠르면
 `INVALID_TRAVEL_DATE_RANGE`를 반환한다.
 
-`title`과 `content`는 요청에 포함되어야 하지만 빈 문자열과 공백 문자열을 허용한다.
+`title`과 `content`는 선택이다. 제목은 누락하거나 `null`, 빈 문자열 또는 공백 문자열로
+전달하면 서버가 빈 문자열로 정규화하며, 입력하는 경우 최대 200자다. 본문은 누락하거나
+`null`로 전달하면 빈 문자열로 정규화한다.
 
 ### 생성
 
@@ -176,10 +178,12 @@ Presigned URL 발급 요청은 최대 10개 파일을 받는다. 앱은 기록�
 
 ```json
 {
-  "locationId": 1,
+  "countryCode": "KR",
+  "provinceCode": "11",
+  "districtCode": "11110",
   "title": "비 오는 날의 종로",
   "content": "골목을 걸으며 오래된 가게들을 기록했다.",
-  "startDate": null,
+  "startDate": "2026-09-25",
   "endDate": null,
   "objectKeys": ["travel-records/10/example.jpg"]
 }
