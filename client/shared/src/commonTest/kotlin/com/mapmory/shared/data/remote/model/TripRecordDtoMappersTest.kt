@@ -11,6 +11,32 @@ class ApiDtoMappersTest {
     private val catalog = StaticRegionCatalog()
 
     @Test
+    fun `서버가_제목을_null로_응답하면_빈_제목으로_매핑한다`() {
+        val listItem = TripRecordListItemDto(
+            id = 101,
+            title = null,
+            regionName = "제주시",
+            startDate = "2026-08-27",
+            endDate = null,
+        ).toDomain()
+        val detail = TripRecordDetailDto(
+            id = 101,
+            title = null,
+            content = "",
+            region = TripRecordRegionDto(
+                country = RegionCodeDto("JP", "일본"),
+            ),
+            startDate = "2026-08-27",
+            endDate = null,
+            createdAt = "2026-08-27T10:30:00",
+            updatedAt = "2026-08-27T10:30:00",
+        ).toDomain(catalog)
+
+        assertEquals("", listItem.title)
+        assertEquals("", detail.title)
+    }
+
+    @Test
     fun `목록_썸네일_URL과_만료_시간을_도메인으로_매핑한다`() {
         val result = TripRecordListItemDto(
             id = 101,

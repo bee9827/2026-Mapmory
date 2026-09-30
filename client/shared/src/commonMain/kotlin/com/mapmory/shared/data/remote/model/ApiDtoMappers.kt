@@ -21,7 +21,7 @@ import com.mapmory.shared.domain.region.RegionCatalog
 
 fun TripRecordListItemDto.toDomain(): TripRecordSummary = TripRecordSummary(
     id = id,
-    title = title,
+    title = title.orEmpty(),
     regionName = regionName,
     startDate = startDate,
     endDate = endDate,
@@ -49,7 +49,7 @@ fun TripRecordDetailDto.toDomain(regionCatalog: RegionCatalog): TripRecordData {
     return TripRecordData(
         id = id,
         locationId = location.id,
-        title = title,
+        title = title.orEmpty(),
         content = content,
         startDate = startDate,
         endDate = endDate,
