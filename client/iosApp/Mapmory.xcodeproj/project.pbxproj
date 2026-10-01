@@ -15,6 +15,7 @@
 		A10000000000000000000006 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = C10000000000000000000001 /* FirebaseAnalytics */; };
 		A10000000000000000000007 /* FirebaseAnalyticsLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* FirebaseAnalyticsLogger.swift */; };
 		A10000000000000000000008 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PrivacyInfo.xcprivacy */; };
+		A10000000000000000000009 /* KeychainAuthTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* KeychainAuthTokenStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 		A20000000000000000000008 /* FirebaseAnalyticsLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FirebaseAnalyticsLogger.swift; sourceTree = "<group>"; };
 		A20000000000000000000009 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		A20000000000000000000010 /* Info-Debug.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-Debug.plist"; sourceTree = "<group>"; };
+		A20000000000000000000011 /* KeychainAuthTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainAuthTokenStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,6 +56,7 @@
 				A20000000000000000000006 /* Assets.xcassets */,
 				A20000000000000000000007 /* GoogleService-Info.plist */,
 				A20000000000000000000008 /* FirebaseAnalyticsLogger.swift */,
+				A20000000000000000000011 /* KeychainAuthTokenStore.swift */,
 				A40000000000000000000002 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -171,6 +174,7 @@
 				A10000000000000000000002 /* MediaPermissionManager.swift in Sources */,
 				A10000000000000000000003 /* MediaPermissionView.swift in Sources */,
 				A10000000000000000000007 /* FirebaseAnalyticsLogger.swift in Sources */,
+				A10000000000000000000009 /* KeychainAuthTokenStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

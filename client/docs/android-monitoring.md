@@ -134,6 +134,7 @@ Firebase 이벤트와 파라미터 이름은 영문으로 유지하고, 아래 �
 
 | 이벤트 | 한글 표시명 | 기록 시점 | 주요 파라미터 |
 | --- | --- | --- | --- |
+| `auth_session_refresh_failed` | 인증 세션 갱신 실패 | iOS에 저장된 게스트 세션의 시작·401 후 갱신 실패, 앱 실행당 최대 1회 | `platform`, `stage`, `error_type` |
 | `app_screen_view` | 앱 화면 조회 | 지도·일지·기록 작성·프로필·기록 상세 화면 진입 | `screen_name` (`record_create_flow`, `record_editor` 등) |
 | `bottom_nav_clicked` | 하단 탭 선택 | 하단 지도·일지·프로필 탭 클릭 | `from_tab`, `to_tab` |
 | `map_scope_changed` | 지도 범위 변경 | 대한민국·전세계 전환 | `scope` |

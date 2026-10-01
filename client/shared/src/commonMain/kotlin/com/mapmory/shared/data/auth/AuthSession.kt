@@ -44,11 +44,13 @@ internal class GuestSessionManager(
     private val gateway: AuthGateway,
     private val tokenStore: AuthTokenStore,
     private val nowEpochSeconds: () -> Long = { Clock.System.now().epochSeconds },
+    private val onRefreshFailed: (stage: String, error: Throwable) -> Unit = { _, _ -> },
 ) : AccessTokenProvider {
     private val authenticationMutex = Mutex()
     private var didLoadStoredTokens = false
     private var isAuthenticated = false
     private var tokens: AuthTokens? = null
+    private var didReportRefreshFailure = false
 
     override fun getAccessToken(): String? = tokens?.accessToken
 
@@ -75,7 +77,10 @@ internal class GuestSessionManager(
                 isAuthenticated = true
                 Result.success(Unit)
             },
-            onFailure = Result.Companion::failure,
+            onFailure = { error ->
+                if (tokens != null) reportRefreshFailureOnce("startup", error)
+                Result.failure(error)
+            },
         )
     }
 
@@ -103,7 +108,16 @@ internal class GuestSessionManager(
                     isAuthenticated = true
                     Result.success(Unit)
                 },
-                onFailure = Result.Companion::failure,
+                onFailure = { error ->
+                    reportRefreshFailureOnce("unauthorized", error)
+                    Result.failure(error)
+                },
             )
         }
+
+    private fun reportRefreshFailureOnce(stage: String, error: Throwable) {
+        if (didReportRefreshFailure) return
+        didReportRefreshFailure = true
+        onRefreshFailed(stage, error)
+    }
 }
