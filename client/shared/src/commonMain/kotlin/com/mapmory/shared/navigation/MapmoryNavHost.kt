@@ -4,19 +4,29 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
 import com.mapmory.shared.app.AppContainer
+import com.mapmory.shared.app.BackgroundSaveStatus
 import com.mapmory.shared.logging.mapmoryDebugLog
 import com.mapmory.shared.presentation.map.route.MapRoute as MapScreenRoute
 import com.mapmory.shared.presentation.triprecord.route.TripProfileRoute
@@ -33,15 +43,20 @@ internal fun MapmoryNavHost(
     contentWindowInsets: WindowInsets,
 ) {
     val tripRecordRevision by container.tripRecordRevision.collectAsState()
-    NavHost(
-        navController = navController,
-        startDestination = MapRoute,
-        // Bottom-tab navigation is a state switch, so it should not use push-style motion on iOS.
-        enterTransition = { EnterTransition.None },
-        exitTransition = { ExitTransition.None },
-        popEnterTransition = { EnterTransition.None },
-        popExitTransition = { ExitTransition.None },
-    ) {
+    val backgroundSaves by container.backgroundTripRecordSaver.saves.collectAsState()
+    val visibleSave = backgroundSaves.firstOrNull { save ->
+        save.status == BackgroundSaveStatus.FAILED
+    } ?: backgroundSaves.firstOrNull()
+    Box(Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = MapRoute,
+            // Bottom-tab navigation is a state switch, so it should not use push-style motion on iOS.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
+        ) {
         composable<MapRoute> { backStackEntry ->
             LaunchedEffect(backStackEntry) {
                 mapmoryDebugLog(NavigationLogTag, "screen=map")
@@ -171,6 +186,45 @@ internal fun MapmoryNavHost(
                 onOpenEditor = { navigator.navigateToEditor() },
                 onOpenProfile = navigator::navigateToProfile,
             )
+        }
+        }
+
+        visibleSave?.let { save ->
+            val isFailed = save.status == BackgroundSaveStatus.FAILED
+            Snackbar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(16.dp),
+                action = if (isFailed) {
+                    {
+                        TextButton(onClick = { container.backgroundTripRecordSaver.retry(save.id) }) {
+                            Text("다시 시도")
+                        }
+                    }
+                } else {
+                    null
+                },
+                dismissAction = if (isFailed) {
+                    {
+                        TextButton(
+                            onClick = { container.backgroundTripRecordSaver.dismissFailure(save.id) },
+                        ) {
+                            Text("닫기")
+                        }
+                    }
+                } else {
+                    null
+                },
+            ) {
+                Text(
+                    if (isFailed) {
+                        "${save.title} 저장에 실패했어요."
+                    } else {
+                        "${save.title} 사진 ${save.photoCount}장을 백그라운드에서 저장하고 있어요."
+                    },
+                )
+            }
         }
     }
 }

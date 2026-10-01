@@ -191,8 +191,6 @@ internal fun NewTripRecordFlowScreen(
     var photoLoadingProgress by remember { mutableStateOf<PhotoLoadingProgress?>(null) }
     var isPreparingPhotoPreviews by remember { mutableStateOf(false) }
     var isRecommendationLoading by remember { mutableStateOf(false) }
-    var isPreparingPhotos by remember { mutableStateOf(false) }
-    var photoPreparationGeneration by remember { mutableStateOf(0) }
     var photoPermissionIssue by remember { mutableStateOf<PhotoLibraryPermissionIssue?>(null) }
     var recommendationPagingState by remember {
         mutableStateOf(PhotoRecommendationPagingState())
@@ -276,7 +274,7 @@ internal fun NewTripRecordFlowScreen(
         },
         { message -> photoMessage = message },
         { isLoading ->
-            onPhotoLoadingChanged(isLoading || isPreparingPhotos)
+            onPhotoLoadingChanged(isLoading)
         },
         { progress ->
             photoLoadingProgress = progress
@@ -355,8 +353,6 @@ internal fun NewTripRecordFlowScreen(
                     analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_CANCELLED)
                 }
                 photoLibrary.cancelRecommendation()
-                photoPreparationGeneration += 1
-                isPreparingPhotos = false
                 isPreparingPhotoPreviews = false
                 onPhotoLoadingChanged(false)
                 stepName = NewRecordFlowStep.LOCATION.name
@@ -373,7 +369,6 @@ internal fun NewTripRecordFlowScreen(
             if (step == NewRecordFlowStep.LOCATION) null else ({ latestInternalBackHandler() }),
         )
         onDispose {
-            photoPreparationGeneration += 1
             onInternalBackHandlerChanged(null)
         }
     }
@@ -426,7 +421,7 @@ internal fun NewTripRecordFlowScreen(
     }
 
     fun completePhotoSelection() {
-        if (isPreparingPhotos || uiState.isSaving || pendingSave) return
+        if (uiState.isSaving || pendingSave) return
         val selectedPhotos = recommendationPagingState.photos.filter { photo ->
             photo.id in recommendationPagingState.selectedIds
         }
@@ -434,31 +429,13 @@ internal fun NewTripRecordFlowScreen(
             photoMessage = "앨범에 넣을 사진을 한 장 이상 선택해 주세요."
             return
         }
-        val preparationGeneration = photoPreparationGeneration + 1
-        photoPreparationGeneration = preparationGeneration
-        isPreparingPhotos = true
-        onPhotoLoadingChanged(true)
-        photoLibrary.prepareForAdding(selectedPhotos) { preparedPhotos ->
-            if (
-                preparationGeneration != photoPreparationGeneration ||
-                stepName != NewRecordFlowStep.PHOTO_PICKER.name
-            ) {
-                return@prepareForAdding
-            }
-            isPreparingPhotos = false
-            onPhotoLoadingChanged(isRecommendationLoading)
-            if (preparedPhotos.size != selectedPhotos.size) {
-                photoMessage = "일부 사진의 원본을 읽지 못했어요. 다시 시도하거나 해당 사진을 선택 해제해 주세요."
-            } else {
-                analytics.logEvent(
-                    MapmoryAnalyticsEvent.PHOTOS_ADDED,
-                    mapOf("source" to "recommendation", "count" to preparedPhotos.size.toString()),
-                )
-                replaceEditorPhotos(preparedPhotos)
-                photoMessage = null
-                pendingSave = true
-            }
-        }
+        analytics.logEvent(
+            MapmoryAnalyticsEvent.PHOTOS_ADDED,
+            mapOf("source" to "recommendation", "count" to selectedPhotos.size.toString()),
+        )
+        replaceEditorPhotos(selectedPhotos)
+        photoMessage = null
+        pendingSave = true
     }
 
     TripRecordBackground(
@@ -520,7 +497,7 @@ internal fun NewTripRecordFlowScreen(
                 listState = photoListState,
                 message = uiState.errorMessage ?: photoMessage,
                 isLoadingMore = isRecommendationLoading,
-                isPreparing = isPreparingPhotos || uiState.isSaving || pendingSave,
+                isPreparing = uiState.isSaving || pendingSave,
                 onBackClick = ::returnToPreviousStep,
                 onCompleteClick = ::completePhotoSelection,
                 onPickFromGallery = {
@@ -1123,7 +1100,7 @@ private fun PhotoPickerStep(
         FlowTopBar(
             title = "사진 고르기",
             onBackClick = onBackClick,
-            actionLabel = if (isPreparing) "저장 준비 중" else "기록하기",
+            actionLabel = if (isPreparing) "저장 요청 중" else "기록하기",
             actionEnabled = pagingState.selectedIds.isNotEmpty() && !isPreparing,
             onActionClick = onCompleteClick,
         )

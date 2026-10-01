@@ -7,6 +7,8 @@ import androidx.compose.ui.window.ComposeUIViewController
 import com.mapmory.shared.analytics.MapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.app.createGuestRemoteAppContainer
+import com.mapmory.shared.app.IosBackgroundSaveExecution
+import com.mapmory.shared.app.IosBackgroundSaveFailureNotifier
 import com.mapmory.shared.data.auth.AuthTokenStore
 import com.mapmory.shared.data.media.IosLocalPhotoDataSource
 import com.mapmory.shared.data.media.IosPhotoPreviewCache
@@ -28,6 +30,8 @@ fun MainViewController(
     tokenStore = tokenStore,
     photoPreviewCache = IosPhotoPreviewCache(),
     localPhotoDataSource = IosLocalPhotoDataSource(),
+    backgroundSaveExecution = IosBackgroundSaveExecution(),
+    backgroundSaveFailureNotifier = IosBackgroundSaveFailureNotifier(),
     mapSummaryCache = IosMapSummaryCache(),
     tripStatisticsCache = IosTripStatisticsCache(),
     themePreference = IosThemePreference(),
