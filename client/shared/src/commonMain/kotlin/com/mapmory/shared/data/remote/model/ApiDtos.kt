@@ -91,7 +91,7 @@ data class TagRequestDto(
 @Serializable
 data class TripRecordListItemDto(
     val id: Long,
-    val title: String,
+    val title: String? = null,
     val regionName: String,
     val startDate: String,
     val endDate: String?,
@@ -116,7 +116,7 @@ data class TripRecordRegionDto(
 @Serializable
 data class TripRecordDetailDto(
     val id: Long,
-    val title: String,
+    val title: String? = null,
     val content: String,
     val region: TripRecordRegionDto,
     val startDate: String,
