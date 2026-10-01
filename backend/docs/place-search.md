@@ -7,6 +7,8 @@
 3. 기존 `POST /api/v1/travel-records` 요청에 `placeId`만 추가하면 서버가 추천 지역을 자동 적용한다. 사용자가 추천 지역을 수정한 경우 `countryCode`, `provinceCode`, `districtCode`를 함께 보낸다. 국외 장소는 국가 코드를 자동 적용한다.
 4. 서버가 장소 ID를 Geoapify에 다시 조회해 장소 이름과 출처를 저장한다. 요청 국가와 장소 국가가 다르면 `PLACE_COUNTRY_MISMATCH`로 거절한다. 상세 응답에는 `placeProvider`, `placeId`, `placeName`, `placeAttribution`, `placeAttributionUrl`이 포함된다.
 
+`TravelRecord`는 이 다섯 값을 `RecordedPlace` 값 객체 하나로 다룬다. DB 컬럼과 API 응답 필드는 기존 형태를 유지한다.
+
 예시 저장 요청의 장소·지역 부분:
 
 ```json

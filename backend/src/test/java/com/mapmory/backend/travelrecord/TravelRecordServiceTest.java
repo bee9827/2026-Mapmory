@@ -146,10 +146,9 @@ class TravelRecordServiceTest {
         TravelRecord result = travelRecordService.create(member, command);
 
         assertThat(result.getRegion()).isEqualTo(district);
-        assertThat(result.getPlaceProvider()).isEqualTo("GEOAPIFY");
-        assertThat(result.getPlaceId()).isEqualTo("park-1");
-        assertThat(result.getPlaceName()).isEqualTo("여의도한강공원");
-        assertThat(result.getPlaceAttribution()).isEqualTo("© OpenStreetMap contributors");
+        assertThat(result.getPlace()).isEqualTo(new RecordedPlace(
+                "GEOAPIFY", "park-1", "여의도한강공원",
+                "© OpenStreetMap contributors", "https://www.openstreetmap.org/copyright"));
     }
 
     @Test
@@ -168,7 +167,7 @@ class TravelRecordServiceTest {
         TravelRecord result = travelRecordService.create(member, command);
 
         assertThat(result.getRegion()).isEqualTo(district);
-        assertThat(result.getPlaceName()).isEqualTo("여의도한강공원");
+        assertThat(result.getPlace().name()).isEqualTo("여의도한강공원");
     }
 
     @Test

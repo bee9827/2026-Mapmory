@@ -1,6 +1,7 @@
 package com.mapmory.backend.travelrecord.dto;
 
 import com.mapmory.backend.travelrecord.RecordMedia;
+import com.mapmory.backend.travelrecord.RecordedPlace;
 import com.mapmory.backend.tag.dto.TagSummaryResponse;
 import com.mapmory.backend.travelrecord.TravelRecord;
 import com.mapmory.backend.travelrecord.TravelRecordDetail;
@@ -53,6 +54,7 @@ public record TravelRecordDetailResponse(
 
     public static TravelRecordDetailResponse from(TravelRecordDetail detail) {
         TravelRecord travelRecord = detail.travelRecord();
+        RecordedPlace place = travelRecord.getPlace();
 
         return new TravelRecordDetailResponse(
                 travelRecord.getId(),
@@ -70,11 +72,11 @@ public record TravelRecordDetailResponse(
                 detail.tags().stream().map(TagSummaryResponse::from).toList(),
                 travelRecord.getCreatedAt(),
                 travelRecord.getUpdatedAt(),
-                travelRecord.getPlaceProvider(),
-                travelRecord.getPlaceId(),
-                travelRecord.getPlaceName(),
-                travelRecord.getPlaceAttribution(),
-                travelRecord.getPlaceAttributionUrl()
+                place == null ? null : place.provider(),
+                place == null ? null : place.id(),
+                place == null ? null : place.name(),
+                place == null ? null : place.attribution(),
+                place == null ? null : place.attributionUrl()
         );
     }
 }

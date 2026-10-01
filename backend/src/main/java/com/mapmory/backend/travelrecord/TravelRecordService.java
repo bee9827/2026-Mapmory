@@ -278,12 +278,8 @@ public class TravelRecordService {
     }
 
     private static void setPlace(TravelRecord travelRecord, PlaceDetails place) {
-        if (place == null) {
-            travelRecord.setPlace(null, null, null, null, null);
-        } else {
-            travelRecord.setPlace("GEOAPIFY", place.placeId(), place.name(),
-                    place.attribution(), place.attributionUrl());
-        }
+        travelRecord.setPlace(place == null ? null : new RecordedPlace(
+                "GEOAPIFY", place.placeId(), place.name(), place.attribution(), place.attributionUrl()));
     }
 
     private void validateTravelRecordRegion(TravelRecordCommand command) {
