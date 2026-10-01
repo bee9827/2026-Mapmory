@@ -9,22 +9,22 @@ import org.springframework.stereotype.Service;
 @Service
 public class PlaceSelectionService {
 
-    private final GeoapifyClient geoapifyClient;
+    private final PlaceLookupPort placeLookupPort;
     private final DistrictLocator districtLocator;
     private final RegionResolver regionResolver;
 
     public PlaceSelectionService(
-            GeoapifyClient geoapifyClient,
+            PlaceLookupPort placeLookupPort,
             DistrictLocator districtLocator,
             RegionResolver regionResolver
     ) {
-        this.geoapifyClient = geoapifyClient;
+        this.placeLookupPort = placeLookupPort;
         this.districtLocator = districtLocator;
         this.regionResolver = regionResolver;
     }
 
     public PlaceSelectionResponse select(String placeId) {
-        PlaceDetails place = geoapifyClient.findById(placeId);
+        PlaceDetails place = placeLookupPort.findById(placeId);
         Region region = suggestedRegion(place);
         return new PlaceSelectionResponse(
                 place.placeId(),

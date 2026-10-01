@@ -16,8 +16,8 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.common.monitoring.MonitoredOperation;
 import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
-import com.mapmory.backend.place.GeoapifyClient;
 import com.mapmory.backend.place.PlaceDetails;
+import com.mapmory.backend.place.PlaceLookupPort;
 import com.mapmory.backend.place.PlaceSelectionService;
 import com.mapmory.backend.recordmedia.ExpiringUrl;
 import com.mapmory.backend.recordmedia.RecordMediaUrlService;
@@ -74,7 +74,7 @@ class TravelRecordServiceTest {
     @Mock
     private UploadedObjectVerifier uploadedObjectVerifier;
     @Mock
-    private GeoapifyClient geoapifyClient;
+    private PlaceLookupPort placeLookupPort;
     @Mock
     private PlaceSelectionService placeSelectionService;
     @Spy
@@ -106,7 +106,7 @@ class TravelRecordServiceTest {
                 ),
                 FIXED_CLOCK,
                 uploadedObjectVerifier,
-                geoapifyClient,
+                placeLookupPort,
                 placeSelectionService
         );
     }
@@ -138,8 +138,9 @@ class TravelRecordServiceTest {
                 LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
         );
         when(regionResolver.resolve("KR", "11", "11560")).thenReturn(district);
-        when(geoapifyClient.findById("park-1"))
+        when(placeLookupPort.findById("park-1"))
                 .thenReturn(new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932));
+        when(placeLookupPort.providerCode()).thenReturn("TEST_PROVIDER");
         when(travelRecordRepository.save(any(TravelRecord.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -147,7 +148,7 @@ class TravelRecordServiceTest {
 
         assertThat(result.getRegion()).isEqualTo(district);
         assertThat(result.getPlace()).isEqualTo(new RecordedPlace(
-                "GEOAPIFY", "park-1", "여의도한강공원",
+                "TEST_PROVIDER", "park-1", "여의도한강공원",
                 "© OpenStreetMap contributors", "https://www.openstreetmap.org/copyright"));
     }
 
@@ -159,7 +160,8 @@ class TravelRecordServiceTest {
                 LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
         );
         PlaceDetails place = new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932);
-        when(geoapifyClient.findById("park-1")).thenReturn(place);
+        when(placeLookupPort.findById("park-1")).thenReturn(place);
+        when(placeLookupPort.providerCode()).thenReturn("GEOAPIFY");
         when(placeSelectionService.suggestedRegion(place)).thenReturn(district);
         when(travelRecordRepository.save(any(TravelRecord.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -177,7 +179,7 @@ class TravelRecordServiceTest {
                 LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
         );
         PlaceDetails place = new PlaceDetails("park-1", "한강공원", "KR", 37.5, 127.0);
-        when(geoapifyClient.findById("park-1")).thenReturn(place);
+        when(placeLookupPort.findById("park-1")).thenReturn(place);
 
         assertThatThrownBy(() -> travelRecordService.create(member, command))
                 .isInstanceOf(BusinessException.class)
@@ -192,7 +194,7 @@ class TravelRecordServiceTest {
                 "KR", "11", "11560", "한강 산책", "",
                 LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
         );
-        when(geoapifyClient.findById("park-1"))
+        when(placeLookupPort.findById("park-1"))
                 .thenReturn(new PlaceDetails("park-1", "도쿄 타워", "JP", 35.6586, 139.7454));
 
         assertThatThrownBy(() -> travelRecordService.create(member, command))

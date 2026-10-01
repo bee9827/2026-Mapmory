@@ -17,11 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/places")
 public class PlaceController {
 
-    private final GeoapifyClient geoapifyClient;
+    private final PlaceLookupPort placeLookupPort;
     private final PlaceSelectionService placeSelectionService;
 
-    public PlaceController(GeoapifyClient geoapifyClient, PlaceSelectionService placeSelectionService) {
-        this.geoapifyClient = geoapifyClient;
+    public PlaceController(PlaceLookupPort placeLookupPort, PlaceSelectionService placeSelectionService) {
+        this.placeLookupPort = placeLookupPort;
         this.placeSelectionService = placeSelectionService;
     }
 
@@ -29,7 +29,7 @@ public class PlaceController {
     public ResponseEntity<TravelRecordResponse<List<PlaceCandidate>>> search(
             @RequestParam @NotBlank @Size(max = 100) String query
     ) {
-        return ResponseEntity.ok(TravelRecordResponse.of(geoapifyClient.search(query.strip())));
+        return ResponseEntity.ok(TravelRecordResponse.of(placeLookupPort.search(query.strip())));
     }
 
     @GetMapping("/{placeId}")

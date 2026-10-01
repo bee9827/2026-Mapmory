@@ -13,7 +13,9 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
-public class GeoapifyClient {
+public class GeoapifyClient implements PlaceLookupPort {
+
+    private static final String PROVIDER_CODE = "GEOAPIFY";
 
     private final RestClient restClient;
     private final String apiKey;
@@ -27,6 +29,12 @@ public class GeoapifyClient {
         this.apiKey = apiKey;
     }
 
+    @Override
+    public String providerCode() {
+        return PROVIDER_CODE;
+    }
+
+    @Override
     public List<PlaceCandidate> search(String query) {
         requireConfigured();
         JsonNode response = get(uri -> uri.path("/v1/geocode/autocomplete")
@@ -52,6 +60,7 @@ public class GeoapifyClient {
         return List.copyOf(candidates);
     }
 
+    @Override
     public PlaceDetails findById(String placeId) {
         if (placeId == null || !placeId.matches("[A-Za-z0-9_-]{1,255}")) {
             throw new BusinessException(PlaceErrorCode.INVALID_PLACE_ID);

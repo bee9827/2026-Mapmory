@@ -16,7 +16,7 @@ class PlaceControllerTest {
 
     @Test
     void 검색_후보를_응답한다() throws Exception {
-        GeoapifyClient client = mock(GeoapifyClient.class);
+        PlaceLookupPort client = mock(PlaceLookupPort.class);
         PlaceSelectionService selectionService = mock(PlaceSelectionService.class);
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(client, selectionService)).build();
         when(client.search("한강공원"))
@@ -30,7 +30,7 @@ class PlaceControllerTest {
 
     @Test
     void 선택한_장소의_추천_지역을_응답한다() throws Exception {
-        GeoapifyClient client = mock(GeoapifyClient.class);
+        PlaceLookupPort client = mock(PlaceLookupPort.class);
         PlaceSelectionService selectionService = mock(PlaceSelectionService.class);
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(client, selectionService)).build();
         when(selectionService.select("park-1"))

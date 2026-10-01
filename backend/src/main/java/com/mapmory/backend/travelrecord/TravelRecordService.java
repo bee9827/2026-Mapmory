@@ -4,8 +4,8 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.common.monitoring.MonitoredOperation;
 import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
-import com.mapmory.backend.place.GeoapifyClient;
 import com.mapmory.backend.place.PlaceDetails;
+import com.mapmory.backend.place.PlaceLookupPort;
 import com.mapmory.backend.place.PlaceSelectionService;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
@@ -37,7 +37,7 @@ public class TravelRecordService {
     private final TravelRecordAssembler travelRecordAssembler;
     private final Clock clock;
     private final UploadedObjectVerifier uploadedObjectVerifier;
-    private final GeoapifyClient geoapifyClient;
+    private final PlaceLookupPort placeLookupPort;
     private final PlaceSelectionService placeSelectionService;
 
     public TravelRecordService(
@@ -49,7 +49,7 @@ public class TravelRecordService {
             TravelRecordAssembler travelRecordAssembler,
             Clock clock,
             UploadedObjectVerifier uploadedObjectVerifier,
-            GeoapifyClient geoapifyClient,
+            PlaceLookupPort placeLookupPort,
             PlaceSelectionService placeSelectionService
     ) {
         this.travelRecordRepository = travelRecordRepository;
@@ -60,7 +60,7 @@ public class TravelRecordService {
         this.travelRecordAssembler = travelRecordAssembler;
         this.clock = clock;
         this.uploadedObjectVerifier = uploadedObjectVerifier;
-        this.geoapifyClient = geoapifyClient;
+        this.placeLookupPort = placeLookupPort;
         this.placeSelectionService = placeSelectionService;
     }
 
@@ -269,7 +269,7 @@ public class TravelRecordService {
         if (command.placeId() == null) {
             return null;
         }
-        PlaceDetails place = geoapifyClient.findById(command.placeId());
+        PlaceDetails place = placeLookupPort.findById(command.placeId());
         if (command.countryCode() != null && place.countryCode() != null
                 && !place.countryCode().equals(command.countryCode())) {
             throw new BusinessException(TravelRecordErrorCode.PLACE_COUNTRY_MISMATCH);
@@ -277,9 +277,10 @@ public class TravelRecordService {
         return place;
     }
 
-    private static void setPlace(TravelRecord travelRecord, PlaceDetails place) {
+    private void setPlace(TravelRecord travelRecord, PlaceDetails place) {
         travelRecord.setPlace(place == null ? null : new RecordedPlace(
-                "GEOAPIFY", place.placeId(), place.name(), place.attribution(), place.attributionUrl()));
+                placeLookupPort.providerCode(), place.placeId(), place.name(),
+                place.attribution(), place.attributionUrl()));
     }
 
     private void validateTravelRecordRegion(TravelRecordCommand command) {
