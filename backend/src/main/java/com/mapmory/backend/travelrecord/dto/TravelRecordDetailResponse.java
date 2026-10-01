@@ -19,8 +19,23 @@ public record TravelRecordDetailResponse(
         List<TravelRecordMediaResponse> media,
         List<TagSummaryResponse> tags,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        String placeProvider,
+        String placeId,
+        String placeName,
+        String placeAttribution,
+        String placeAttributionUrl
 ) {
+    public TravelRecordDetailResponse(
+            Long id, String title, String content, RegionDetailResponse region,
+            LocalDate startDate, LocalDate endDate, List<String> objectKeys,
+            List<TravelRecordMediaResponse> media, List<TagSummaryResponse> tags,
+            LocalDateTime createdAt, LocalDateTime updatedAt
+    ) {
+        this(id, title, content, region, startDate, endDate, objectKeys, media, tags,
+                createdAt, updatedAt, null, null, null, null, null);
+    }
+
     public TravelRecordDetailResponse(
             Long id,
             String title,
@@ -32,7 +47,8 @@ public record TravelRecordDetailResponse(
             LocalDateTime createdAt,
             LocalDateTime updatedAt
     ) {
-        this(id, title, content, region, startDate, endDate, objectKeys, List.of(), List.of(), createdAt, updatedAt);
+        this(id, title, content, region, startDate, endDate, objectKeys, List.of(), List.of(),
+                createdAt, updatedAt, null, null, null, null, null);
     }
 
     public static TravelRecordDetailResponse from(TravelRecordDetail detail) {
@@ -53,7 +69,12 @@ public record TravelRecordDetailResponse(
                         .toList(),
                 detail.tags().stream().map(TagSummaryResponse::from).toList(),
                 travelRecord.getCreatedAt(),
-                travelRecord.getUpdatedAt()
+                travelRecord.getUpdatedAt(),
+                travelRecord.getPlaceProvider(),
+                travelRecord.getPlaceId(),
+                travelRecord.getPlaceName(),
+                travelRecord.getPlaceAttribution(),
+                travelRecord.getPlaceAttributionUrl()
         );
     }
 }

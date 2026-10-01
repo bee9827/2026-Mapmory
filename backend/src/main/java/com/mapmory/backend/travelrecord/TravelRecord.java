@@ -44,6 +44,21 @@ public class TravelRecord extends BaseEntity {
     @JoinColumn(name = "region_id", nullable = false)
     private Region region;
 
+    @Column(name = "place_provider", length = 20)
+    private String placeProvider;
+
+    @Column(name = "place_id", length = 255)
+    private String placeId;
+
+    @Column(name = "place_name", length = 500)
+    private String placeName;
+
+    @Column(name = "place_attribution", length = 255)
+    private String placeAttribution;
+
+    @Column(name = "place_attribution_url", length = 500)
+    private String placeAttributionUrl;
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -97,6 +112,15 @@ public class TravelRecord extends BaseEntity {
         this.title = title;
         this.content = normalizeContent(content);
         this.period = TravelPeriod.of(startDate, endDate);
+    }
+
+    public void setPlace(String provider, String placeId, String placeName,
+                         String attribution, String attributionUrl) {
+        this.placeProvider = provider;
+        this.placeId = placeId;
+        this.placeName = placeName;
+        this.placeAttribution = attribution;
+        this.placeAttributionUrl = attributionUrl;
     }
 
     /**
@@ -192,6 +216,16 @@ public class TravelRecord extends BaseEntity {
     public Region getRegion() {
         return region;
     }
+
+    public String getPlaceProvider() { return placeProvider; }
+
+    public String getPlaceId() { return placeId; }
+
+    public String getPlaceName() { return placeName; }
+
+    public String getPlaceAttribution() { return placeAttribution; }
+
+    public String getPlaceAttributionUrl() { return placeAttributionUrl; }
 
     public LocalDate getStartDate() {
         return period.startDate();
