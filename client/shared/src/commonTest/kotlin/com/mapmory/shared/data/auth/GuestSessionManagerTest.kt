@@ -89,6 +89,25 @@ class GuestSessionManagerTest {
     }
 
     @Test
+    fun refreshFailureIsReportedOnlyOncePerAppSession() = runBlocking {
+        val storedTokens = AuthTokens("old-access", "old-refresh")
+        val failure = IllegalStateException("refresh failed")
+        val reportedFailures = mutableListOf<Pair<String, Throwable>>()
+        val session = GuestSessionManager(
+            gateway = FakeAuthGateway(refreshResult = Result.failure(failure)),
+            tokenStore = FakeAuthTokenStore(storedTokens),
+            onRefreshFailed = { stage, error -> reportedFailures += stage to error },
+        )
+
+        session.ensureAuthenticated()
+        session.ensureAuthenticated()
+
+        assertEquals(1, reportedFailures.size)
+        assertEquals("startup", reportedFailures.single().first)
+        assertSame(failure, reportedFailures.single().second)
+    }
+
+    @Test
     fun unauthorizedConcurrentRequestsRotateRefreshTokenOnlyOnce() = runBlocking {
         val firstTokens = AuthTokens("expired-access", "first-refresh")
         val rotatedTokens = AuthTokens("rotated-access", "rotated-refresh")

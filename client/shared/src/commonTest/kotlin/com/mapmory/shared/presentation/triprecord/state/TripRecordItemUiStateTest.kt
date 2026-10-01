@@ -4,6 +4,7 @@ import com.mapmory.shared.domain.model.TripRecordSummary
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class TripRecordItemUiStateTest {
     @Test
@@ -20,6 +21,7 @@ class TripRecordItemUiStateTest {
         ).toTripRecordItemUiState()
 
         assertEquals(1, state.photos.size)
+        assertNull(state.photoCount) // A thumbnail is not the total number of photos.
         assertEquals("thumbnail-101", state.photos.single().id)
         assertContentEquals(thumbnail, state.photos.single().previewBytes?.bytesForDecoding())
     }

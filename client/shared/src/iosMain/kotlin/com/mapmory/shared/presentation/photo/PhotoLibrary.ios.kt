@@ -75,6 +75,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.native.Platform
 
+private val lastRecommendationSearch = LastPhotoSearchCache<List<PHAsset>>()
+
 @Composable
 actual fun rememberPhotoLibraryActions(
     onPhotosPicked: (List<SelectedPhoto>) -> Unit,
@@ -341,7 +343,10 @@ private class IosPhotoLibraryController(
                 return@launch
             }
             val matchingAssets = withContext(Dispatchers.Default) {
-                findAssetsInRegion(region, dateRange)
+                lastRecommendationSearch.get(location.id, dateRange)
+                    ?: findAssetsInRegion(region, dateRange).also {
+                        lastRecommendationSearch.put(location.id, dateRange, it)
+                    }
             }
             if (generation != recommendationGeneration) return@launch
 
@@ -419,17 +424,22 @@ private class IosPhotoLibraryController(
         val result = PHAsset.fetchAssetsWithMediaType(PHAssetMediaTypeImage, options)
         val total = result.count.toInt()
         onMain { onLoadingProgressChanged(PhotoLoadingProgress(processed = 0, total = total)) }
-        return buildList {
+        val candidates = buildList {
             for (index in 0 until total) {
                 val asset = result.objectAtIndex(index.toULong()) as? PHAsset
                 val coordinate = asset?.location?.coordinate
                 val isScreenshot = asset != null &&
                     (asset.mediaSubtypes and PHAssetMediaSubtypePhotoScreenshot) != 0UL
-                if (asset != null && !isScreenshot && coordinate != null) {
-                    val matches = coordinate.useContents {
-                        region.contains(latitude = latitude, longitude = longitude)
-                    }
-                    if (matches) add(asset)
+                if (asset != null && !isScreenshot) {
+                    add(TripPhotoCandidate(
+                        value = asset,
+                        capturedAtMillis = asset.creationDate?.let {
+                            ((it.timeIntervalSinceReferenceDate + NSTimeIntervalSince1970) * 1_000).toLong()
+                        },
+                        matchesRegion = coordinate?.useContents {
+                            region.contains(latitude = latitude, longitude = longitude)
+                        },
+                    ))
                 }
                 val processed = index + 1
                 if (processed == total || processed % IosProgressUpdateInterval == 0) {
@@ -441,6 +451,7 @@ private class IosPhotoLibraryController(
                 }
             }
         }
+        return selectTripPhotos(candidates)
     }
 
     private fun loadRecommendationPage(

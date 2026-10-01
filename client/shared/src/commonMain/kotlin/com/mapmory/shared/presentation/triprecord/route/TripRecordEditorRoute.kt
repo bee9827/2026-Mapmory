@@ -26,6 +26,9 @@ import com.mapmory.shared.presentation.triprecord.screen.TripRecordEditorScreen
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordPalette
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordEditorViewModel
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 @Composable
 internal fun TripRecordEditorRoute(
@@ -76,17 +79,25 @@ internal fun TripRecordEditorRoute(
             exit()
         }
         when {
+            viewModel.uiState.isSaving -> Unit
             viewModel.uiState.isPhotoLoading -> {
                 isPhotoLoadingSaveConfirmation = false
                 pendingPhotoLoadingAction = trackAndExit
             }
-            viewModel.uiState.isDirty -> pendingEditorExit = trackAndExit
+            viewModel.uiState.isDirty || (recordId == null && newFlowBackHandler != null) -> {
+                pendingEditorExit = trackAndExit
+            }
             else -> trackAndExit()
         }
     }
 
     fun save() {
         scope.launch {
+            if (recordId == null) {
+                viewModel.useSelectedPhotoDates(
+                    Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date.toString(),
+                )
+            }
             val state = viewModel.uiState
             val saveParameters = mapOf(
                 "mode" to mode,
@@ -140,10 +151,6 @@ internal fun TripRecordEditorRoute(
             onLocationSelected = viewModel::selectLocation,
             onLocationCleared = viewModel::clearLocation,
             onLocationTouched = viewModel::touchLocation,
-            onTitleChanged = viewModel::updateTitle,
-            onContentChanged = viewModel::updateContent,
-            onStartDateChanged = viewModel::updateStartDate,
-            onEndDateChanged = viewModel::updateEndDate,
             onPhotosAdded = viewModel::addPhotos,
             onPhotoRemoved = viewModel::removeMediaObjectKey,
             onPhotoLoadingChanged = viewModel::setPhotoLoading,

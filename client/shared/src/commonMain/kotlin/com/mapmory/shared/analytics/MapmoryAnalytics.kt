@@ -18,6 +18,7 @@ val LocalMapmoryAnalytics = staticCompositionLocalOf<MapmoryAnalytics> {
 }
 
 object MapmoryAnalyticsEvent {
+    const val AUTH_SESSION_REFRESH_FAILED = "auth_session_refresh_failed"
     const val SCREEN_VIEW = "app_screen_view"
     const val BOTTOM_NAV_CLICKED = "bottom_nav_clicked"
     const val MAP_SCOPE_CHANGED = "map_scope_changed"

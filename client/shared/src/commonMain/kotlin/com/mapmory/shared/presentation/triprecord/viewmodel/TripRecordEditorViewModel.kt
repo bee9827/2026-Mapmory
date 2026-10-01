@@ -350,6 +350,20 @@ class TripRecordEditorViewModel(
         ).revalidatedAfterChange()
     }
 
+    /** Creation derives its dates from the chosen photos; editing keeps explicit dates. */
+    fun useSelectedPhotoDates(today: String) {
+        if (uiState.recordId != null) return
+        val dates = uiState.selectedPhotos.mapNotNull { photo ->
+            photo.capturedAt?.take(10)?.replace('.', '-')?.takeIf { value ->
+                runCatching { kotlinx.datetime.LocalDate.parse(value) }.isSuccess
+            }
+        }.sorted()
+        uiState = uiState.copy(
+            startDate = dates.firstOrNull() ?: today,
+            endDate = dates.lastOrNull()?.takeIf { it != dates.first() }.orEmpty(),
+        )
+    }
+
     suspend fun save(): Boolean {
         val state = uiState
         if (state.isPhotoLoading || state.isSaving) return false
@@ -396,7 +410,7 @@ class TripRecordEditorViewModel(
 
         val draft = TripRecordDraft(
             locationId = location.id,
-            title = state.title.trim(),
+            title = state.title,
             content = state.content.trim().takeIf(String::isNotEmpty),
             startDate = state.startDate,
             endDate = state.endDate.ifBlank { null },
@@ -431,23 +445,16 @@ class TripRecordEditorViewModel(
                 true
             },
             onFailure = { error ->
-                val responseFieldErrors = error.toEditorFieldErrors()
-                val rejectedOptionalBlankTitle = state.title.isBlank() &&
-                    TripRecordEditorErrorTarget.TITLE in responseFieldErrors
-                val fieldErrors = if (rejectedOptionalBlankTitle) {
-                    responseFieldErrors - TripRecordEditorErrorTarget.TITLE
-                } else {
-                    responseFieldErrors
-                }
+                val fieldErrors = error.toEditorFieldErrors()
                 uiState = uiState.copy(
                     isSaving = false,
                     isDirty = true,
                     dirtyFields = uiState.dirtyFields + fieldErrors.keys,
                     fieldErrors = fieldErrors,
-                    generalErrorMessage = when {
-                        fieldErrors.isNotEmpty() -> null
-                        rejectedOptionalBlankTitle -> BlankTitleServerCompatibilityMessage
-                        else -> error.message ?: "여행 기록을 저장하지 못했습니다."
+                    generalErrorMessage = if (fieldErrors.isNotEmpty()) {
+                        null
+                    } else {
+                        error.message ?: "여행 기록을 저장하지 못했습니다."
                     },
                 )
                 false
@@ -539,10 +546,6 @@ private fun TripRecordEditorUiState.validationErrors(
     } else if (!selectedLocation.isSelectableTripRecordDestination()) {
         put(TripRecordEditorErrorTarget.LOCATION, "장소를 선택해 주세요.")
     }
-    if (title.length > MaxTitleLength) {
-        put(TripRecordEditorErrorTarget.TITLE, "제목은 200자 이하여야 합니다.")
-    }
-
     val dateError = TripRecordDraft(
         locationId = selectedLocation?.id ?: 0L,
         title = title,
@@ -561,10 +564,6 @@ private fun TripRecordEditorUiState.validationErrors(
         put(target, dateError)
     }
 }
-
-private const val MaxTitleLength = 200
-internal const val BlankTitleServerCompatibilityMessage =
-    "제목 없는 기록 저장은 서버 반영 후 사용할 수 있어요."
 
 internal fun Throwable.toEditorFieldErrors(): Map<TripRecordEditorErrorTarget, String> {
     val apiError = this as? MapmoryApiException

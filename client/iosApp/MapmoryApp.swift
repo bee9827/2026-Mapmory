@@ -66,6 +66,7 @@ private struct ComposeView: UIViewControllerRepresentable {
                 coordinator.updateTheme(isDark.boolValue)
             },
             analytics: analyticsLogger,
+            tokenStore: KeychainAuthTokenStore(),
         )
         applyTheme(to: viewController)
         return viewController

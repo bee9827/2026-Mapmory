@@ -90,10 +90,10 @@ fun TripRecordListScreen(
                         TripRecordListUiState.Loading,
                         -> TripRecordListSkeleton(modifier = Modifier.weight(1f))
 
-                        is TripRecordListUiState.Error -> Text(
-                            text = uiState.message,
-                            color = TripRecordPalette.current.danger,
-                            modifier = Modifier.padding(top = 20.dp),
+                        is TripRecordListUiState.Error -> TripRecordLoadError(
+                            message = uiState.message,
+                            onRetryClick = onRetryClick,
+                            modifier = Modifier.weight(1f),
                         )
 
                         is TripRecordListUiState.Success -> {
@@ -160,6 +160,7 @@ fun TripRecordListScreen(
 
 @Composable
 private fun TripRecordLoadError(
+    message: String,
     onRetryClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -190,10 +191,11 @@ private fun TripRecordLoadError(
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    text = "인터넷 연결을 확인한 뒤\n다시 시도해 주세요.",
+                    text = message.ifBlank { "인터넷 연결을 확인한 뒤 다시 시도해 주세요." },
                     color = TripRecordPalette.current.bodyText,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center,
+                    maxLines = 3,
                 )
                 Button(
                     onClick = onRetryClick,
@@ -324,68 +326,54 @@ private fun TripRecordCard(
         colors = CardDefaults.cardColors(containerColor = TripRecordPalette.current.surface),
         border = BorderStroke(1.dp, TripRecordPalette.current.border),
     ) {
-        Column {
-            Box {
-                TripPhotoImage(
-                    imageBytes = record.photos.minByOrNull { it.sortOrder }?.previewBytes?.bytesForDecoding(),
-                    contentDescription = record.title,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(190.dp),
-                    placeholderVariant = record.id.toInt(),
-                    shape = RoundedCornerShape(0.dp),
-                )
-                JournalImageBadge(
-                    text = "⌖ ${record.locationName}",
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = 14.dp, top = 14.dp),
-                )
-                if (record.photos.size > 1) {
-                    JournalImageBadge(
-                        text = "${record.photos.size}장",
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(end = 14.dp, top = 14.dp),
-                    )
-                }
-            }
-            Column(Modifier.padding(18.dp)) {
-                formattedDate(record)?.let { date ->
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            TripPhotoImage(
+                imageBytes = record.photos.minByOrNull { it.sortOrder }?.previewBytes?.bytesForDecoding(),
+                contentDescription = record.locationName,
+                modifier = Modifier.size(76.dp),
+                placeholderVariant = record.id.toInt(),
+                shape = RoundedCornerShape(12.dp),
+            )
+            Column(Modifier.weight(1f)) {
+                val latestDate = record.endDate?.takeIf { it.isNotBlank() } ?: record.startDate
+                latestDate?.takeIf { it.isNotBlank() }?.let { date ->
                     Text(
-                        text = date,
+                        text = "${date.replace("-", ". ")} 최근 방문",
                         color = TripRecordPalette.current.secondaryText,
                         fontSize = 11.sp,
                     )
                 }
                 Text(
-                    text = record.title,
+                    text = record.locationName,
                     color = TripRecordPalette.current.headingText,
                     fontSize = 19.sp,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 7.dp),
-                )
-                Text(
-                    text = record.content,
-                    color = TripRecordPalette.current.bodyText,
-                    fontSize = 13.sp,
-                    lineHeight = 20.sp,
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 7.dp),
                 )
-                if (record.tags.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 9.dp)
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    ) {
-                        record.tags.forEach { tag -> TripTagChip(text = tag.name) }
-                    }
-                }
+                Text(
+                    text = record.content.ifBlank { "사진으로 남긴 여행" },
+                    color = TripRecordPalette.current.bodyText,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 7.dp),
+                )
             }
+            record.photoCount?.let { count ->
+                Text(
+                    text = "${count}장",
+                    color = TripRecordPalette.current.accent,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Text("›", color = TripRecordPalette.current.muted, fontSize = 25.sp)
         }
     }
 }
