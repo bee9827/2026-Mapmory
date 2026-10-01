@@ -56,6 +56,8 @@ private data class PendingAndroidRecommendation(
     val dateRange: PhotoRecommendationDateRange?,
 )
 
+private val lastRecommendationSearch = LastPhotoSearchCache<AndroidRecommendationSession>()
+
 @Composable
 actual fun rememberPhotoLibraryActions(
     onPhotosPicked: (List<SelectedPhoto>) -> Unit,
@@ -103,14 +105,12 @@ actual fun rememberPhotoLibraryActions(
         recommendationJob.value = scope.launch {
             try {
                 val session = withContext(Dispatchers.IO) {
-                    context.prepareRecommendationSession(
-                        target,
-                        parentName,
-                        dateRange,
-                        generation,
-                    ) { progress ->
-                        latestLoadingProgressChanged(progress)
-                    }
+                    val cached = lastRecommendationSearch.get(target.id, dateRange)
+                    cached?.copy(generation = generation, nextIndex = 0)
+                        ?: context.prepareRecommendationSession(
+                            target, parentName, dateRange, generation,
+                        ) { progress -> latestLoadingProgressChanged(progress) }
+                            ?.also { lastRecommendationSearch.put(target.id, dateRange, it) }
                 }
                 if (generation != recommendationGeneration.value) return@launch
                 if (session == null) {
@@ -128,6 +128,7 @@ actual fun rememberPhotoLibraryActions(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
+                Log.e("PhotoRecommendation", "Failed to load recommendation", error)
                 if (generation == recommendationGeneration.value) {
                     latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
                 }
@@ -162,6 +163,7 @@ actual fun rememberPhotoLibraryActions(
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
+                Log.e("PhotoRecommendation", "Failed to load recommendation", error)
                 if (generation == recommendationGeneration.value) {
                     latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
                 }
@@ -373,16 +375,17 @@ private suspend fun Context.prepareRecommendationSession(
     val syncMillis = SystemClock.elapsedRealtime() - syncStartedAt
     val regionFilterStartedAt = SystemClock.elapsedRealtime()
     val matchedPhotos = traceSection("photo.recommend.region_filter") {
-        val candidates = syncResult.photos
-            .asSequence()
+        selectTripPhotos(syncResult.photos
             .sortedByDescending { photo -> photo.capturedAtMillis ?: 0L }
-            .mapNotNull { photo ->
-                val latitude = photo.latitude ?: return@mapNotNull null
-                val longitude = photo.longitude ?: return@mapNotNull null
-                LocatedPhoto(photo, latitude, longitude)
-
-            }
-        selectPhotosInRegion(candidates, region)
+            .map { photo ->
+                TripPhotoCandidate(
+                    value = photo,
+                    capturedAtMillis = photo.capturedAtMillis,
+                    matchesRegion = if (photo.latitude != null && photo.longitude != null) {
+                        region.contains(photo.latitude, photo.longitude)
+                    } else null,
+                )
+            })
     }
     val regionFilterMillis = SystemClock.elapsedRealtime() - regionFilterStartedAt
     return AndroidRecommendationSession(
@@ -415,7 +418,9 @@ private suspend fun Context.loadRecommendationPage(
                     readPhoto(
                         uri = Uri.parse(photo.contentUri),
                         knownName = photo.displayName,
-                        knownCoordinates = requireNotNull(photo.latitude) to requireNotNull(photo.longitude),
+                        knownCoordinates = photo.latitude?.let { latitude ->
+                            photo.longitude?.let { longitude -> latitude to longitude }
+                        },
                         knownCapturedAtMillis = photo.capturedAtMillis,
                         includeOriginalBytes = false,
                     )?.also { loaded ->

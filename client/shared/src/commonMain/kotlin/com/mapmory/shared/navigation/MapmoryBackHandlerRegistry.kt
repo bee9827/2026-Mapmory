@@ -1,21 +1,19 @@
 package com.mapmory.shared.navigation
 
 internal class MapmoryBackHandlerRegistry {
-    private var currentRegistration: Registration? = null
+    private val registrations = mutableListOf<Registration>()
 
     fun register(handler: () -> Boolean): Registration {
         val registration = Registration(handler)
-        currentRegistration = registration
+        registrations += registration
         return registration
     }
 
     fun unregister(registration: Registration) {
-        if (currentRegistration === registration) {
-            currentRegistration = null
-        }
+        registrations.remove(registration)
     }
 
-    fun handleBack(): Boolean = currentRegistration?.handler?.invoke() == true
+    fun handleBack(): Boolean = registrations.lastOrNull()?.handler?.invoke() == true
 
     class Registration internal constructor(
         internal val handler: () -> Boolean,

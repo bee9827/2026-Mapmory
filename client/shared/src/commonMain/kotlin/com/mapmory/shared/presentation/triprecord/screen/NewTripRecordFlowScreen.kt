@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,8 +29,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -52,6 +49,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -67,11 +65,7 @@ import com.mapmory.shared.analytics.LocalMapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
-import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordPhotoRules
-import com.mapmory.shared.domain.model.dateValidationError
-import com.mapmory.shared.presentation.date.PlatformDatePicker
-import com.mapmory.shared.presentation.map.ui.WorldGlobe
 import com.mapmory.shared.presentation.photo.PhotoLibraryActionsFactory
 import com.mapmory.shared.presentation.photo.PhotoLibraryPermissionIssue
 import com.mapmory.shared.presentation.photo.PhotoLoadingProgress
@@ -80,33 +74,22 @@ import com.mapmory.shared.presentation.photo.RecommendationLoadKey
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.accept
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
-import com.mapmory.shared.presentation.photo.photoRecommendationDateRange
 import com.mapmory.shared.presentation.photo.shouldLoadNextRecommendationPage
 import com.mapmory.shared.presentation.photo.toggleSelection
-import com.mapmory.shared.presentation.triprecord.endDatePickerMinimumDate
-import com.mapmory.shared.presentation.triprecord.initialSelectableTripRecordDate
 import com.mapmory.shared.presentation.triprecord.selectableTripRecordDestinations
-import com.mapmory.shared.presentation.triprecord.startDatePickerMaximumDate
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
-import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlin.time.Clock
 
 private enum class NewRecordFlowStep {
-    DATE_AND_LOCATION,
+    LOCATION,
     PHOTO_LOADING,
     PHOTO_PICKER,
-    ALBUM_DETAILS,
 }
 
-private const val PhotoListPrefetchGroups = 2
 private const val KoreaCountryId = 1L
+private const val PhotoListPrefetchGroups = 2
 private const val PhotoLimitMessageDurationMillis = 3_000L
-private const val FlowStartDatePickerTarget = "flow-start"
-private const val FlowEndDatePickerTarget = "flow-end"
 
 @Composable
 internal fun NewTripRecordFlowScreen(
@@ -115,10 +98,6 @@ internal fun NewTripRecordFlowScreen(
     onLocationSelected: (Location) -> Unit,
     onLocationCleared: () -> Unit,
     onLocationTouched: () -> Unit,
-    onTitleChanged: (String) -> Unit,
-    onContentChanged: (String) -> Unit,
-    onStartDateChanged: (String) -> Unit,
-    onEndDateChanged: (String) -> Unit,
     onPhotosAdded: (List<SelectedPhoto>) -> Unit,
     onPhotoRemoved: (String) -> Unit,
     onPhotoLoadingChanged: (Boolean) -> Unit,
@@ -148,10 +127,11 @@ internal fun NewTripRecordFlowScreen(
     modifier: Modifier = Modifier,
 ) {
     val analytics = LocalMapmoryAnalytics.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val selectableLocations = remember(locations) {
         locations.selectableTripRecordDestinations()
     }
-    var stepName by rememberSaveable { mutableStateOf(NewRecordFlowStep.DATE_AND_LOCATION.name) }
+    var stepName by rememberSaveable { mutableStateOf(NewRecordFlowStep.LOCATION.name) }
     val step = NewRecordFlowStep.valueOf(stepName)
     val interactedFields = remember { mutableSetOf<String>() }
     var locationSearchQuery by rememberSaveable { mutableStateOf("") }
@@ -170,7 +150,8 @@ internal fun NewTripRecordFlowScreen(
     }
     var lastAutoLoadTriggerKey by remember { mutableStateOf<RecommendationLoadKey?>(null) }
     var previewPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
-    var datePickerTarget by rememberSaveable { mutableStateOf<String?>(null) }
+    var pendingLocation by remember { mutableStateOf<Location?>(null) }
+    var pendingSave by remember { mutableStateOf(false) }
     val photoListState = rememberLazyListState()
 
     fun logFieldInteraction(fieldName: String) {
@@ -184,10 +165,9 @@ internal fun NewTripRecordFlowScreen(
 
     LaunchedEffect(step) {
         val stepName = when (step) {
-            NewRecordFlowStep.DATE_AND_LOCATION -> "date_location"
+            NewRecordFlowStep.LOCATION -> "location"
             NewRecordFlowStep.PHOTO_LOADING -> "photo_loading"
             NewRecordFlowStep.PHOTO_PICKER -> "photo_picker"
-            NewRecordFlowStep.ALBUM_DETAILS -> "album_details"
         }
         analytics.logEvent(
             MapmoryAnalyticsEvent.RECORD_FLOW_STEP_VIEWED,
@@ -220,9 +200,13 @@ internal fun NewTripRecordFlowScreen(
                     MapmoryAnalyticsEvent.PHOTOS_ADDED,
                     mapOf("source" to "gallery", "count" to acceptedPhotos.size.toString()),
                 )
+                recommendationPagingState = PhotoRecommendationPagingState(
+                    photos = acceptedPhotos,
+                    selectedIds = acceptedPhotos.mapTo(mutableSetOf()) { it.id },
+                )
                 replaceEditorPhotos(acceptedPhotos)
                 photoMessage = null
-                stepName = NewRecordFlowStep.ALBUM_DETAILS.name
+                pendingSave = true
             }
         },
         { page ->
@@ -230,7 +214,7 @@ internal fun NewTripRecordFlowScreen(
                 .accept(page, autoSelectNewPhotos = false)
                 ?.let { nextState ->
                     recommendationPagingState = nextState
-                    if (step == NewRecordFlowStep.PHOTO_LOADING) {
+                    if (stepName == NewRecordFlowStep.PHOTO_LOADING.name) {
                         isPreparingPhotoPreviews = false
                         stepName = NewRecordFlowStep.PHOTO_PICKER.name
                     }
@@ -243,8 +227,7 @@ internal fun NewTripRecordFlowScreen(
         },
         { message -> photoMessage = message },
         { isLoading ->
-            onPhotoLoadingChanged(isLoading)
-            if (!isLoading && isPreparingPhotos) isPreparingPhotos = false
+            onPhotoLoadingChanged(isLoading || isPreparingPhotos)
         },
         { progress ->
             photoLoadingProgress = progress
@@ -309,28 +292,25 @@ internal fun NewTripRecordFlowScreen(
     }
 
     fun returnToPreviousStep() {
+        if (uiState.isSaving) return
+        if (previewPhotoId != null) {
+            previewPhotoId = null
+            return
+        }
         when (step) {
-            NewRecordFlowStep.DATE_AND_LOCATION -> onBackClick()
-            NewRecordFlowStep.PHOTO_LOADING -> {
-                analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_CANCELLED)
-                photoLibrary.cancelRecommendation()
-                onPhotoLoadingChanged(false)
-                isPreparingPhotoPreviews = false
-                stepName = NewRecordFlowStep.DATE_AND_LOCATION.name
-            }
-            NewRecordFlowStep.PHOTO_PICKER -> {
+            NewRecordFlowStep.LOCATION -> onBackClick()
+            NewRecordFlowStep.PHOTO_LOADING,
+            NewRecordFlowStep.PHOTO_PICKER,
+            -> {
+                if (step == NewRecordFlowStep.PHOTO_LOADING) {
+                    analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_CANCELLED)
+                }
                 photoLibrary.cancelRecommendation()
                 photoPreparationGeneration += 1
                 isPreparingPhotos = false
+                isPreparingPhotoPreviews = false
                 onPhotoLoadingChanged(false)
-                stepName = NewRecordFlowStep.DATE_AND_LOCATION.name
-            }
-            NewRecordFlowStep.ALBUM_DETAILS -> {
-                stepName = if (recommendationPagingState.photos.isEmpty()) {
-                    NewRecordFlowStep.DATE_AND_LOCATION.name
-                } else {
-                    NewRecordFlowStep.PHOTO_PICKER.name
-                }
+                stepName = NewRecordFlowStep.LOCATION.name
             }
         }
     }
@@ -341,31 +321,20 @@ internal fun NewTripRecordFlowScreen(
     }
     DisposableEffect(step) {
         onInternalBackHandlerChanged(
-            if (step == NewRecordFlowStep.DATE_AND_LOCATION) null else latestInternalBackHandler,
+            if (step == NewRecordFlowStep.LOCATION) null else ({ latestInternalBackHandler() }),
         )
-        onDispose { onInternalBackHandlerChanged(null) }
+        onDispose {
+            photoPreparationGeneration += 1
+            onInternalBackHandlerChanged(null)
+        }
     }
 
     fun beginPhotoSearch() {
         val location = uiState.selectedLocation
-        val dateError = location?.let {
-            TripRecordDraft(
-                locationId = it.id,
-                startDate = uiState.startDate,
-                endDate = uiState.endDate.ifBlank { null },
-                mediaObjectKeys = emptyList(),
-            ).dateValidationError()
-        }
         when {
             location == null -> {
                 onLocationTouched()
                 detailsErrorMessage = "장소를 선택해 주세요."
-            }
-            uiState.startDate.isBlank() -> {
-                detailsErrorMessage = "시작일을 선택해 주세요."
-            }
-            dateError != null -> {
-                detailsErrorMessage = dateError
             }
             !photoLibrary.recommendationsAvailable -> {
                 recommendationPagingState = PhotoRecommendationPagingState()
@@ -386,15 +355,29 @@ internal fun NewTripRecordFlowScreen(
                     mapOf("location_type" to location.type.name.lowercase()),
                 )
                 val parentName = locations.firstOrNull { it.id == location.parentId }?.name
-                val dateRange = requireNotNull(
-                    photoRecommendationDateRange(uiState.startDate, uiState.endDate),
-                )
-                photoLibrary.recommendForLocationInDateRange(location, parentName, dateRange)
+                photoLibrary.recommendForLocation(location, parentName)
             }
         }
     }
 
+    LaunchedEffect(pendingLocation, uiState.selectedLocation) {
+        if (pendingLocation != null && pendingLocation == uiState.selectedLocation) {
+            pendingLocation = null
+            beginPhotoSearch()
+        }
+    }
+
+    // Gallery callbacks may arrive before their loading=false callback.
+    LaunchedEffect(pendingSave, uiState.isPhotoLoading, uiState.selectedPhotos) {
+        if (pendingSave && !uiState.isPhotoLoading && uiState.selectedPhotos.isNotEmpty()) {
+            pendingSave = false
+            stepName = NewRecordFlowStep.PHOTO_PICKER.name
+            onSaveClick()
+        }
+    }
+
     fun completePhotoSelection() {
+        if (isPreparingPhotos || uiState.isSaving || pendingSave) return
         val selectedPhotos = recommendationPagingState.photos.filter { photo ->
             photo.id in recommendationPagingState.selectedIds
         }
@@ -414,9 +397,9 @@ internal fun NewTripRecordFlowScreen(
                 return@prepareForAdding
             }
             isPreparingPhotos = false
-            onPhotoLoadingChanged(false)
-            if (preparedPhotos.isEmpty()) {
-                photoMessage = "선택한 사진의 원본을 읽지 못했어요."
+            onPhotoLoadingChanged(isRecommendationLoading)
+            if (preparedPhotos.size != selectedPhotos.size) {
+                photoMessage = "일부 사진의 원본을 읽지 못했어요. 다시 시도하거나 해당 사진을 선택 해제해 주세요."
             } else {
                 analytics.logEvent(
                     MapmoryAnalyticsEvent.PHOTOS_ADDED,
@@ -424,7 +407,7 @@ internal fun NewTripRecordFlowScreen(
                 )
                 replaceEditorPhotos(preparedPhotos)
                 photoMessage = null
-                stepName = NewRecordFlowStep.ALBUM_DETAILS.name
+                pendingSave = true
             }
         }
     }
@@ -435,13 +418,14 @@ internal fun NewTripRecordFlowScreen(
     ) {
         Box(Modifier.fillMaxSize()) {
             when (step) {
-            NewRecordFlowStep.DATE_AND_LOCATION -> DateAndLocationStep(
+            NewRecordFlowStep.LOCATION -> LocationStep(
                 uiState = uiState,
                 locations = locations,
                 searchQuery = locationSearchQuery,
                 searchResults = filteredLocations,
                 errorMessage = detailsErrorMessage,
                 onSearchQueryChanged = {
+                    onLocationTouched()
                     if (it.isNotBlank()) logFieldInteraction("location")
                     locationSearchQuery = it
                     val selectedName = uiState.selectedLocation?.flowDisplayName(locations)
@@ -457,41 +441,11 @@ internal fun NewTripRecordFlowScreen(
                             "location_type" to location.type.name.lowercase(),
                         ),
                     )
+                    keyboard?.hide()
                     onLocationSelected(location)
+                    pendingLocation = location
                     locationSearchQuery = location.flowDisplayName(locations)
                     detailsErrorMessage = null
-                },
-                onStartDateClick = {
-                    logFieldInteraction("start_date")
-                    datePickerTarget = FlowStartDatePickerTarget
-                },
-                onEndDateClick = {
-                    logFieldInteraction("end_date")
-                    datePickerTarget = FlowEndDatePickerTarget
-                },
-                onGlobeCountryClick = { countryCode ->
-                    val location = selectableLocations.firstOrNull { candidate ->
-                        candidate.regionCode == countryCode
-                    }
-                    if (location == null) {
-                        detailsErrorMessage = if (countryCode == "KR") {
-                            "국내 여행은 위 검색창에서 시·군·구를 선택해 주세요."
-                        } else {
-                            "선택한 나라는 아직 지원하지 않아요."
-                        }
-                    } else {
-                        logFieldInteraction("location")
-                        analytics.logEvent(
-                            MapmoryAnalyticsEvent.RECORD_LOCATION_SELECTED,
-                            mapOf(
-                                "source" to "globe",
-                                "location_type" to location.type.name.lowercase(),
-                            ),
-                        )
-                        onLocationSelected(location)
-                        locationSearchQuery = location.flowDisplayName(locations)
-                        detailsErrorMessage = null
-                    }
                 },
                 onBackClick = ::returnToPreviousStep,
                 onCompleteClick = ::beginPhotoSearch,
@@ -515,9 +469,9 @@ internal fun NewTripRecordFlowScreen(
                 locationName = uiState.selectedLocation?.name ?: "여행지",
                 pagingState = recommendationPagingState,
                 listState = photoListState,
-                message = photoMessage,
+                message = uiState.errorMessage ?: photoMessage,
                 isLoadingMore = isRecommendationLoading,
-                isPreparing = isPreparingPhotos,
+                isPreparing = isPreparingPhotos || uiState.isSaving || pendingSave,
                 onBackClick = ::returnToPreviousStep,
                 onCompleteClick = ::completePhotoSelection,
                 onPickFromGallery = {
@@ -557,19 +511,6 @@ internal fun NewTripRecordFlowScreen(
                 },
             )
 
-            NewRecordFlowStep.ALBUM_DETAILS -> AlbumDetailsStep(
-                uiState = uiState,
-                onTitleChanged = {
-                    logFieldInteraction("title")
-                    onTitleChanged(it)
-                },
-                onContentChanged = {
-                    logFieldInteraction("content")
-                    onContentChanged(it)
-                },
-                onBackClick = ::returnToPreviousStep,
-                onSaveClick = onSaveClick,
-            )
             }
 
             transientPhotoMessage?.let { message ->
@@ -616,53 +557,10 @@ internal fun NewTripRecordFlowScreen(
             )
         }
 
-    val activeDatePickerTarget = datePickerTarget
-    val today = remember(activeDatePickerTarget) {
-        Clock.System.now()
-            .toLocalDateTime(TimeZone.currentSystemDefault())
-            .date
-            .toString()
-    }
-    val minimumDate = if (activeDatePickerTarget == FlowEndDatePickerTarget) {
-        endDatePickerMinimumDate(uiState.startDate, today)
-    } else {
-        null
-    }
-    val maximumDate = if (activeDatePickerTarget == FlowStartDatePickerTarget) {
-        startDatePickerMaximumDate(uiState.endDate, today)
-    } else {
-        today
-    }
-    val selectedDate = when (activeDatePickerTarget) {
-        FlowStartDatePickerTarget -> uiState.startDate
-        FlowEndDatePickerTarget -> uiState.endDate
-        else -> null
-    }
-    PlatformDatePicker(
-        visible = activeDatePickerTarget != null,
-        initialDate = initialSelectableTripRecordDate(
-            selectedDate = selectedDate,
-            fallbackDate = today,
-            minimumDate = minimumDate,
-            maximumDate = maximumDate,
-        ),
-        minimumDate = minimumDate,
-        maximumDate = maximumDate,
-        onDateSelected = { date ->
-            if (activeDatePickerTarget == FlowStartDatePickerTarget) {
-                onStartDateChanged(date)
-            } else if (activeDatePickerTarget == FlowEndDatePickerTarget) {
-                onEndDateChanged(date)
-            }
-            detailsErrorMessage = null
-            datePickerTarget = null
-        },
-        onDismiss = { datePickerTarget = null },
-    )
 }
 
 @Composable
-private fun DateAndLocationStep(
+private fun LocationStep(
     uiState: TripRecordEditorUiState,
     locations: List<Location>,
     searchQuery: String,
@@ -670,15 +568,12 @@ private fun DateAndLocationStep(
     errorMessage: String?,
     onSearchQueryChanged: (String) -> Unit,
     onLocationSelected: (Location) -> Unit,
-    onStartDateClick: () -> Unit,
-    onEndDateClick: () -> Unit,
-    onGlobeCountryClick: (String) -> Unit,
     onBackClick: () -> Unit,
     onCompleteClick: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
         FlowTopBar(
-            title = "일자, 장소 선택",
+            title = "사진 불러오기",
             onBackClick = onBackClick,
             actionLabel = "완료",
             onActionClick = onCompleteClick,
@@ -700,7 +595,7 @@ private fun DateAndLocationStep(
                 letterSpacing = 2.sp,
             )
             Text(
-                text = "여행의 시작을 알려주세요",
+                text = "어디 사진을 불러올까요?",
                 color = TripRecordPalette.current.headingText,
                 fontSize = 26.sp,
                 lineHeight = 34.sp,
@@ -708,24 +603,11 @@ private fun DateAndLocationStep(
                 modifier = Modifier.padding(top = 14.dp),
             )
             Text(
-                text = "장소와 날짜를 고르면 사진첩에서 해당 여행의 사진을 찾아드려요.",
+                text = "해당 장소에서 찍은 사진을 불러와줘요.",
                 color = TripRecordPalette.current.bodyText,
                 fontSize = 14.sp,
                 lineHeight = 21.sp,
                 modifier = Modifier.padding(top = 10.dp),
-            )
-            FlowSectionTitle(
-                title = "여행 일자",
-                badge = "필수",
-                helper = "시작일을 선택해 주세요.",
-                modifier = Modifier.padding(top = 34.dp),
-            )
-            DateRangePicker(
-                startDate = uiState.startDate,
-                endDate = uiState.endDate,
-                onStartDateClick = onStartDateClick,
-                onEndDateClick = onEndDateClick,
-                modifier = Modifier.padding(top = 12.dp),
             )
             FlowSectionTitle(
                 title = "장소",
@@ -756,50 +638,17 @@ private fun DateAndLocationStep(
                 )
             }
             Text(
-                text = "지도에서 직접 선택",
-                color = TripRecordPalette.current.headingText,
+                text = "사진 불러오기",
+                color = TripRecordPalette.current.onPrimary,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(top = 30.dp),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 24.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(TripRecordPalette.current.primary)
+                    .clickable(onClick = onCompleteClick)
+                    .padding(vertical = 18.dp),
             )
-            Text(
-                text = "지구본을 돌려 원하는 나라를 탭해보세요.",
-                color = TripRecordPalette.current.secondaryText,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(top = 6.dp),
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 14.dp)
-                    .height(360.dp)
-                    .clip(RoundedCornerShape(24.dp))
-                    .border(1.dp, TripRecordPalette.current.border, RoundedCornerShape(24.dp)),
-            ) {
-                WorldGlobe(
-                    visitedCountryCodes = uiState.selectedLocation
-                        ?.regionCode
-                        ?.takeIf { uiState.selectedLocation.countryId != KoreaCountryId }
-                        ?.let(::setOf)
-                        .orEmpty(),
-                    onCountryClick = onGlobeCountryClick,
-                )
-                Text(
-                    text = uiState.selectedLocation?.flowDisplayName(locations)
-                        ?: "나라를 선택해보세요!",
-                    color = TripRecordPalette.current.text,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 18.dp)
-                        .background(
-                            TripRecordPalette.current.surface.copy(alpha = 0.88f),
-                            RoundedCornerShape(20.dp),
-                        )
-                        .padding(horizontal = 16.dp, vertical = 9.dp),
-                )
-            }
         }
     }
 }
@@ -877,74 +726,6 @@ private fun FlowSectionTitle(
             fontSize = 11.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun DateRangePicker(
-    startDate: String,
-    endDate: String,
-    onStartDateClick: () -> Unit,
-    onEndDateClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(TripRecordPalette.current.surfaceElevated, RoundedCornerShape(18.dp))
-            .border(1.dp, TripRecordPalette.current.border, RoundedCornerShape(18.dp)),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        DateRangeCell(
-            label = "시작일",
-            value = startDate,
-            onClick = onStartDateClick,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = "—",
-            color = TripRecordPalette.current.muted,
-            fontSize = 18.sp,
-            modifier = Modifier.padding(horizontal = 4.dp),
-        )
-        DateRangeCell(
-            label = "종료일 (선택)",
-            value = endDate,
-            onClick = onEndDateClick,
-            modifier = Modifier.weight(1f),
-        )
-    }
-}
-
-@Composable
-private fun DateRangeCell(
-    label: String,
-    value: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 15.dp),
-    ) {
-        Text(
-            text = label,
-            color = TripRecordPalette.current.secondaryText,
-            fontSize = 10.sp,
-        )
-        Text(
-            text = value.toFlowDateDisplay(),
-            color = if (value.isBlank()) {
-                TripRecordPalette.current.muted
-            } else {
-                TripRecordPalette.current.text
-            },
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            modifier = Modifier.padding(top = 5.dp),
         )
     }
 }
@@ -1271,7 +1052,7 @@ private fun PhotoPickerStep(
         FlowTopBar(
             title = "사진 고르기",
             onBackClick = onBackClick,
-            actionLabel = if (isPreparing) "준비 중" else "완료",
+            actionLabel = if (isPreparing) "저장 준비 중" else "기록하기",
             actionEnabled = pagingState.selectedIds.isNotEmpty() && !isPreparing,
             onActionClick = onCompleteClick,
         )
@@ -1670,154 +1451,6 @@ private fun PhotoPreviewDialog(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun AlbumDetailsStep(
-    uiState: TripRecordEditorUiState,
-    onTitleChanged: (String) -> Unit,
-    onContentChanged: (String) -> Unit,
-    onBackClick: () -> Unit,
-    onSaveClick: () -> Unit,
-) {
-    Column(Modifier.fillMaxSize()) {
-        FlowTopBar(
-            title = "새 앨범 완성하기",
-            onBackClick = onBackClick,
-            actionLabel = if (uiState.isSaving) "저장 중" else "완료",
-            actionEnabled = uiState.isSaveEnabled,
-            onActionClick = onSaveClick,
-        )
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .imePadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 28.dp),
-        ) {
-            Text(
-                text = "ALBUM PREVIEW",
-                color = TripRecordPalette.current.accent,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
-            )
-            Text(
-                text = "새 앨범을 완성해요",
-                color = TripRecordPalette.current.headingText,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 14.dp),
-            )
-            Text(
-                text = "${uiState.selectedLocation?.name ?: "여행지"}에서 고른 " +
-                    "${uiState.selectedPhotos.size}장의 사진이에요.",
-                color = TripRecordPalette.current.secondaryText,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(top = 10.dp),
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 24.dp)
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                uiState.selectedPhotos.forEach { photo ->
-                    AlbumPreviewPhoto(photo)
-                }
-            }
-            AlbumTextField(
-                label = "앨범 제목",
-                helper = "선택",
-                value = uiState.title,
-                placeholder = "여행 제목을 입력해 주세요",
-                singleLine = true,
-                onValueChange = onTitleChanged,
-                modifier = Modifier.padding(top = 32.dp),
-            )
-            AlbumTextField(
-                label = "대표 캡션",
-                helper = "선택",
-                value = uiState.content,
-                placeholder = "이번 여행을 한 문장으로 남겨보세요.",
-                singleLine = false,
-                onValueChange = onContentChanged,
-                modifier = Modifier.padding(top = 24.dp),
-            )
-            uiState.errorMessage?.let { message ->
-                Text(
-                    text = message,
-                    color = TripRecordPalette.current.danger,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AlbumPreviewPhoto(photo: TripRecordPhotoUiState) {
-    TripPhotoImage(
-        imageBytes = photo.previewBytes?.bytesForDecoding(),
-        fallbackBytes = photo.originalBytes?.bytesForDecoding(),
-        contentDescription = photo.displayName,
-        modifier = Modifier.size(width = 146.dp, height = 190.dp),
-        placeholderVariant = photo.id.hashCode(),
-        shape = RoundedCornerShape(18.dp),
-    )
-}
-
-@Composable
-private fun AlbumTextField(
-    label: String,
-    helper: String,
-    value: String,
-    placeholder: String,
-    singleLine: Boolean,
-    onValueChange: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier.fillMaxWidth()) {
-        Text(
-            text = label,
-            color = TripRecordPalette.current.text,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = helper,
-            color = TripRecordPalette.current.secondaryText,
-            fontSize = 11.sp,
-            modifier = Modifier.padding(top = 5.dp),
-        )
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            placeholder = { Text(placeholder) },
-            singleLine = singleLine,
-            minLines = if (singleLine) 1 else 4,
-            maxLines = if (singleLine) 1 else 6,
-            shape = RoundedCornerShape(16.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = TripRecordPalette.current.text,
-                unfocusedTextColor = TripRecordPalette.current.text,
-                cursorColor = TripRecordPalette.current.accent,
-                focusedBorderColor = TripRecordPalette.current.accent,
-                unfocusedBorderColor = TripRecordPalette.current.border,
-                focusedContainerColor = TripRecordPalette.current.surfaceElevated,
-                unfocusedContainerColor = TripRecordPalette.current.surfaceElevated,
-                focusedPlaceholderColor = TripRecordPalette.current.muted,
-                unfocusedPlaceholderColor = TripRecordPalette.current.muted,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 10.dp),
-        )
     }
 }
 

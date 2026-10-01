@@ -93,7 +93,6 @@ internal fun TripRecordQuery.toRegionQuery(regionCatalog: RegionCatalog): Region
     }
 
 internal fun TripRecordDraft.toRequestDto(regionCatalog: RegionCatalog): TripRecordRequestDto {
-    require(title.length <= MaxTitleLength) { "제목은 200자 이하여야 합니다." }
     dateValidationError()?.let { error -> throw IllegalArgumentException(error) }
     require(mediaObjectKeys.isNotEmpty()) { TripRecordPhotoRules.RequiredMessage }
     require(mediaObjectKeys.distinct().size == mediaObjectKeys.size) {
@@ -184,4 +183,3 @@ fun TripStatisticsDto.toDomain(): TripStatistics = TripStatistics(
 private const val KoreaCountryCode = "KR"
 private const val KoreanProvincePrefix = "KR-"
 private const val CountryCodeLength = 2
-private const val MaxTitleLength = 200

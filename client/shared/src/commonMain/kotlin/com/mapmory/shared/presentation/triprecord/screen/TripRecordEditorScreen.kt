@@ -1378,11 +1378,9 @@ fun ErrorTripRecordEditorScreenPreview() {
             uiState = TripRecordEditorUiState(
                 dirtyFields = setOf(
                     TripRecordEditorErrorTarget.LOCATION,
-                    TripRecordEditorErrorTarget.TITLE,
                 ),
                 fieldErrors = mapOf(
                     TripRecordEditorErrorTarget.LOCATION to "여행 장소를 선택해 주세요.",
-                    TripRecordEditorErrorTarget.TITLE to "제목을 입력해 주세요.",
                 ),
             ),
             locations = previewLocations,

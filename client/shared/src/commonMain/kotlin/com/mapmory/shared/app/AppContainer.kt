@@ -260,6 +260,7 @@ fun createGuestRemoteAppContainer(
     tripStatisticsCache: TripStatisticsCache = MemoryTripStatisticsCache(),
     themePreference: ThemePreference = MemoryThemePreference(),
     onboardingPreference: OnboardingPreference = MemoryOnboardingPreference(),
+    onAuthRefreshFailed: (stage: String, error: Throwable) -> Unit = { _, _ -> },
 ): AppContainer {
     val client = createHttpClient()
     return createGuestRemoteAppContainer(
@@ -272,6 +273,7 @@ fun createGuestRemoteAppContainer(
         tripStatisticsCache = tripStatisticsCache,
         themePreference = themePreference,
         onboardingPreference = onboardingPreference,
+        onAuthRefreshFailed = onAuthRefreshFailed,
         onClose = client::close,
     )
 }
@@ -286,6 +288,7 @@ internal fun createGuestRemoteAppContainer(
     tripStatisticsCache: TripStatisticsCache = MemoryTripStatisticsCache(),
     themePreference: ThemePreference = MemoryThemePreference(),
     onboardingPreference: OnboardingPreference = MemoryOnboardingPreference(),
+    onAuthRefreshFailed: (stage: String, error: Throwable) -> Unit = { _, _ -> },
     onClose: () -> Unit = client::close,
 ): AppContainer {
     if (tokenStore.load() == null) {
@@ -295,6 +298,7 @@ internal fun createGuestRemoteAppContainer(
     val session = GuestSessionManager(
         gateway = AuthRemoteRepository(client, apiBaseUrl),
         tokenStore = tokenStore,
+        onRefreshFailed = onAuthRefreshFailed,
     )
     client.installMapmoryAuthRetry(
         session = session,
