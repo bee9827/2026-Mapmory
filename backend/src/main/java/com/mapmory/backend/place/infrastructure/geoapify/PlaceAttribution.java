@@ -1,4 +1,4 @@
-package com.mapmory.backend.place;
+package com.mapmory.backend.place.infrastructure.geoapify;
 
 final class PlaceAttribution {
     static final String OSM_TEXT = "© OpenStreetMap contributors";

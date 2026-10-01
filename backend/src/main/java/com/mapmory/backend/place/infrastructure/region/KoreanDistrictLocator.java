@@ -1,4 +1,6 @@
-package com.mapmory.backend.place;
+package com.mapmory.backend.place.infrastructure.region;
+
+import com.mapmory.backend.place.application.port.DistrictLocator;
 
 import java.io.IOException;
 import java.util.ArrayList;

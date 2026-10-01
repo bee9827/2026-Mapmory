@@ -1,4 +1,4 @@
-package com.mapmory.backend.place;
+package com.mapmory.backend.place.infrastructure.geoapify;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,6 +7,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.place.application.model.PlaceCandidate;
+import com.mapmory.backend.place.application.model.PlaceDetails;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
@@ -32,8 +34,10 @@ class GeoapifyClientTest {
 
         assertThat(client.search("한강공원"))
                 .containsExactly(
-                        new PlaceCandidate("park-1", "여의도한강공원", "서울 영등포구"),
-                        new PlaceCandidate("park-2", "뚝섬한강공원", "서울 광진구")
+                        new PlaceCandidate("park-1", "여의도한강공원", "서울 영등포구",
+                                PlaceAttribution.OSM_TEXT, PlaceAttribution.OSM_URL),
+                        new PlaceCandidate("park-2", "뚝섬한강공원", "서울 광진구",
+                                PlaceAttribution.OSM_TEXT, PlaceAttribution.OSM_URL)
                 );
         server.verify();
     }
@@ -54,7 +58,8 @@ class GeoapifyClientTest {
                         """, MediaType.APPLICATION_JSON));
 
         assertThat(client.findById("park-1"))
-                .isEqualTo(new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932));
+                .isEqualTo(new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932,
+                        PlaceAttribution.OSM_TEXT, PlaceAttribution.OSM_URL));
         server.verify();
     }
 

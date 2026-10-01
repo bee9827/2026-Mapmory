@@ -1,9 +1,12 @@
-package com.mapmory.backend.place;
+package com.mapmory.backend.place.application;
 
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.place.application.model.PlaceDetails;
+import com.mapmory.backend.place.application.model.SelectedPlace;
+import com.mapmory.backend.place.application.port.DistrictLocator;
+import com.mapmory.backend.place.application.port.PlaceLookupPort;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
-import com.mapmory.backend.travelrecord.dto.RegionDetailResponse;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,18 +26,9 @@ public class PlaceSelectionService {
         this.regionResolver = regionResolver;
     }
 
-    public PlaceSelectionResponse select(String placeId) {
+    public SelectedPlace select(String placeId) {
         PlaceDetails place = placeLookupPort.findById(placeId);
-        Region region = suggestedRegion(place);
-        return new PlaceSelectionResponse(
-                place.placeId(),
-                place.name(),
-                place.countryCode(),
-                region == null ? null : RegionDetailResponse.from(region),
-                region == null,
-                place.attribution(),
-                place.attributionUrl()
-        );
+        return new SelectedPlace(place, suggestedRegion(place));
     }
 
     public Region suggestedRegion(PlaceDetails place) {

@@ -1,7 +1,8 @@
-package com.mapmory.backend.place;
+package com.mapmory.backend.place.infrastructure.region;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.mapmory.backend.place.application.port.DistrictLocator;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.Resource;

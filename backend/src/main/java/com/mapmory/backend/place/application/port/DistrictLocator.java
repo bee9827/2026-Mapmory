@@ -1,4 +1,4 @@
-package com.mapmory.backend.place;
+package com.mapmory.backend.place.application.port;
 
 import java.util.Optional;
 

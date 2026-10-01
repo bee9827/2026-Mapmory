@@ -1,7 +1,11 @@
-package com.mapmory.backend.place;
+package com.mapmory.backend.place.infrastructure.geoapify;
 
 import tools.jackson.databind.JsonNode;
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.place.application.PlaceErrorCode;
+import com.mapmory.backend.place.application.model.PlaceCandidate;
+import com.mapmory.backend.place.application.model.PlaceDetails;
+import com.mapmory.backend.place.application.port.PlaceLookupPort;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;

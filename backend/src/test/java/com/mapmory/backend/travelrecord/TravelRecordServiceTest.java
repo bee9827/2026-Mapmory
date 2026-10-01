@@ -16,9 +16,9 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.common.monitoring.MonitoredOperation;
 import com.mapmory.backend.common.monitoring.OperationTimer;
 import com.mapmory.backend.member.Member;
-import com.mapmory.backend.place.PlaceDetails;
-import com.mapmory.backend.place.PlaceLookupPort;
-import com.mapmory.backend.place.PlaceSelectionService;
+import com.mapmory.backend.place.application.PlaceSelectionService;
+import com.mapmory.backend.place.application.model.PlaceDetails;
+import com.mapmory.backend.place.application.port.PlaceLookupPort;
 import com.mapmory.backend.recordmedia.ExpiringUrl;
 import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.region.Region;
@@ -139,7 +139,8 @@ class TravelRecordServiceTest {
         );
         when(regionResolver.resolve("KR", "11", "11560")).thenReturn(district);
         when(placeLookupPort.findById("park-1"))
-                .thenReturn(new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932));
+                .thenReturn(new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932,
+                        "© OpenStreetMap contributors", "https://www.openstreetmap.org/copyright"));
         when(placeLookupPort.providerCode()).thenReturn("TEST_PROVIDER");
         when(travelRecordRepository.save(any(TravelRecord.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -159,7 +160,7 @@ class TravelRecordServiceTest {
                 null, null, null, "한강 산책", "",
                 LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
         );
-        PlaceDetails place = new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932);
+        PlaceDetails place = new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932, null, null);
         when(placeLookupPort.findById("park-1")).thenReturn(place);
         when(placeLookupPort.providerCode()).thenReturn("GEOAPIFY");
         when(placeSelectionService.suggestedRegion(place)).thenReturn(district);
@@ -178,7 +179,7 @@ class TravelRecordServiceTest {
                 null, null, null, "한강 산책", "",
                 LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
         );
-        PlaceDetails place = new PlaceDetails("park-1", "한강공원", "KR", 37.5, 127.0);
+        PlaceDetails place = new PlaceDetails("park-1", "한강공원", "KR", 37.5, 127.0, null, null);
         when(placeLookupPort.findById("park-1")).thenReturn(place);
 
         assertThatThrownBy(() -> travelRecordService.create(member, command))
@@ -195,7 +196,7 @@ class TravelRecordServiceTest {
                 LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
         );
         when(placeLookupPort.findById("park-1"))
-                .thenReturn(new PlaceDetails("park-1", "도쿄 타워", "JP", 35.6586, 139.7454));
+                .thenReturn(new PlaceDetails("park-1", "도쿄 타워", "JP", 35.6586, 139.7454, null, null));
 
         assertThatThrownBy(() -> travelRecordService.create(member, command))
                 .isInstanceOf(BusinessException.class)
