@@ -1,5 +1,6 @@
 package com.mapmory.shared.app
 
+import com.mapmory.shared.data.remote.MapmoryApiException
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.repository.TripRecordRepository
 import com.mapmory.shared.domain.repository.ProgressReportingTripRecordRepository
@@ -123,11 +124,11 @@ class BackgroundTripRecordSaver internal constructor(
         }
 
         val result = execution.run {
-            var latest = create(id, draft)
+            var latest = create(id, draft, attempt = 0)
             if (latest.isFailure) {
+                updateProgress(id, FirstAttemptCompleteProgress)
                 delay(automaticRetryDelayMillis)
-                updateProgress(id, 0)
-                latest = create(id, draft)
+                latest = create(id, draft, attempt = 1)
             }
             latest
         }
@@ -139,7 +140,7 @@ class BackgroundTripRecordSaver internal constructor(
                 onSaved()
             },
             onFailure = { error ->
-                val message = error.message ?: DefaultFailureMessage
+                val message = error.toBackgroundSaveMessage()
                 mutableSaves.update { current ->
                     current.map { save ->
                         if (save.id == id) {
@@ -153,9 +154,15 @@ class BackgroundTripRecordSaver internal constructor(
         )
     }
 
-    private suspend fun create(id: Long, draft: TripRecordDraft) =
+    private suspend fun create(id: Long, draft: TripRecordDraft, attempt: Int) =
         (repository as? ProgressReportingTripRecordRepository)?.createTripRecord(draft) { progress ->
-            updateProgress(id, progress)
+            val bounded = progress.coerceIn(0, 100)
+            val displayed = if (attempt == 0) {
+                bounded / 2
+            } else {
+                FirstAttemptCompleteProgress + bounded / 2
+            }
+            updateProgress(id, displayed)
         } ?: repository.createTripRecord(draft)
 
     private fun updateProgress(id: Long, progress: Int) {
@@ -167,5 +174,18 @@ class BackgroundTripRecordSaver internal constructor(
     }
 }
 
+private fun Throwable.toBackgroundSaveMessage(): String {
+    val fieldErrors = (this as? MapmoryApiException)
+        ?.errors
+        .orEmpty()
+        .map { error -> error.detail.trim() }
+        .filter(String::isNotEmpty)
+        .distinct()
+    return fieldErrors.takeIf { errors -> errors.isNotEmpty() }?.joinToString("\n")
+        ?: message
+        ?: DefaultFailureMessage
+}
+
 private const val AutomaticRetryDelayMillis = 1_000L
+private const val FirstAttemptCompleteProgress = 50
 private const val DefaultFailureMessage = "기록 저장에 실패했어요. 앱에서 다시 시도해 주세요."

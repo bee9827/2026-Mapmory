@@ -22,7 +22,7 @@ class BackgroundTripRecordSaverTest {
                 draft: TripRecordDraft,
                 onProgress: (Int) -> Unit,
             ): Result<TripRecordData> {
-                onProgress(50)
+                onProgress(100)
                 continueSave.await()
                 onProgress(100)
                 return Result.success(draft.toRecord())
@@ -42,6 +42,46 @@ class BackgroundTripRecordSaverTest {
         assertEquals(BackgroundSaveStatus.SAVING, saving.status)
 
         continueSave.complete(Unit)
+        saver.saves.first { saves -> saves.isEmpty() }
+        Unit
+    }
+
+    @Test
+    fun `첫_시도는_최대_50퍼센트이고_두번째_시도는_50퍼센트부터_시작한다`() = runBlocking {
+        var attempts = 0
+        val continueRetry = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val repository = object : EmptyTripRecordRepository(), ProgressReportingTripRecordRepository {
+            override suspend fun createTripRecord(
+                draft: TripRecordDraft,
+                onProgress: (Int) -> Unit,
+            ): Result<TripRecordData> {
+                attempts += 1
+                return if (attempts == 1) {
+                    onProgress(100)
+                    Result.failure(IllegalStateException("temporary"))
+                } else {
+                    onProgress(50)
+                    continueRetry.await()
+                    onProgress(100)
+                    Result.success(draft.toRecord())
+                }
+            }
+        }
+        val saver = BackgroundTripRecordSaver(
+            repository = repository,
+            scope = CoroutineScope(coroutineContext),
+            automaticRetryDelayMillis = 0,
+        )
+
+        saver.enqueue(draft(), locationName = "서울")
+        val retrying = saver.saves.first { saves ->
+            saves.singleOrNull()?.progressPercent == 75
+        }.single()
+
+        assertEquals(75, retrying.progressPercent)
+        assertEquals(2, attempts)
+
+        continueRetry.complete(Unit)
         saver.saves.first { saves -> saves.isEmpty() }
         Unit
     }
