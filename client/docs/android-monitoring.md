@@ -17,6 +17,7 @@ CI·Android Vitals·Logcat·Xcode Console·System Trace를 기본으로 사용�
 - iOS 사진 선택·추천 흐름에도 동일한 `MapmoryPhotoPerf` 측정 로그를 추가했다.
 - Android 앱 시작 시간을 cold start와 hot start로 반복 측정하는 로컬 스크립트를 추가했다.
 - Android·iOS 핵심 사용자 행동을 Firebase Analytics 이벤트로 기록하는 공통 인터페이스와 플랫폼별 구현을 연결했다.
+- Android Firebase Crashlytics SDK와 Gradle 플러그인을 연결하고, Debug 빌드에서는 수집하지 않도록 했다.
 - 지도 선택 정확성, 사진 추천, 기록 저장을 우선 모니터링 대상으로 정했다.
 - 개인정보를 포함하지 않는 로그 규칙을 정했다.
 - Android는 Firebase 설정 파일이 없는 개발·CI 환경에서 Analytics 어댑터가 no-op으로 동작한다. iOS는
@@ -43,6 +44,7 @@ Android 앱은 `com.mapmory.android`, iOS 앱은 `com.mapmory.ios`로 등록되�
 | --- | --- | --- |
 | PR 병합 전 | GitHub Actions CI | 테스트, Lint, Debug 빌드 |
 | 개발 중 | `MapmoryPhotoPerf`, Logcat, `android.os.Trace` | 사진 조회·EXIF·추천 단계별 시간 |
+| Android 안정성 모니터링 | Firebase Crashlytics | 출시 빌드의 크래시·ANR·비치명 오류 |
 | Android·iOS 사용자 행동 분석 | Firebase Analytics, DebugView, Analytics 대시보드 | 화면 진입, 지도 선택, 사진 추천, 기록 저장, 하단 탭 사용 |
 | iOS 개발 중 | `MapmoryPhotoPerf`, Xcode Console | PHPicker·PhotoKit 사진 선택·추천 시간 |
 | 성능 조사 | System Trace·Perfetto·Macrobenchmark | 앱 시작, 지도 전환, UI 응답성 |
@@ -188,8 +190,10 @@ App Store Connect의 `Deletions` 지표로 확인한다.
 ### Android 수집 정책
 
 Android Debug 빌드는 전용 Manifest의 `firebase_analytics_collection_deactivated=true` 설정으로
-Analytics 수집 자체를 비활성화한다. USB 실기기와 에뮬레이터에서 Android Studio의 기본 Debug
-Run을 사용한 경우에도 이벤트를 보내지 않는다. Release 빌드만 운영 Analytics로 전송한다.
+Analytics 수집 자체를 비활성화한다. `firebase_crashlytics_collection_enabled=false` 설정으로
+Crashlytics 수집도 비활성화한다. USB 실기기와 에뮬레이터에서 Android Studio의 기본 Debug Run을
+사용한 경우 Analytics 이벤트와 Crashlytics 보고서를 보내지 않는다. Release 빌드는 Firebase 설정 파일이
+포함되면 두 SDK가 운영 Firebase 프로젝트로 수집한다.
 
 Android 프로젝트의 `google-services.json`은 `client/androidApp/google-services.json`에 두고,
 앱 시작 시 `FirebaseApp.initializeApp()`으로 Firebase Analytics를 초기화한다. 설정 파일이 없는
@@ -277,8 +281,17 @@ Android는 설정 파일이 없으면 no-op으로 동작하지만, iOS는 `Googl
 포함되어야 한다. Firebase Analytics를 실제 출시 빌드에서 활성화하면 개인정보처리방침과 Play
 Console 데이터 보안 응답을 최종 배포 빌드 기준으로 갱신해야 한다.
 
-실제 사용자 환경에서 재현되지 않는 오류를 원격으로 추적해야 할 때 Crashlytics 도입을 별도 결정한다.
-Crashlytics와 Performance Monitoring은 현재 연결하지 않았다.
+Android Crashlytics는 SDK와 Gradle 플러그인을 연결했으며, Analytics도 함께 포함되어 크래시 전후의
+Analytics breadcrumb를 확인할 수 있다. 단, Firebase Console에서 첫 보고서가 실제로 수신되는지까지는
+별도 검증해야 한다. 이 저장소에는 iOS Crashlytics와 Firebase Performance Monitoring을 연결하지 않았다.
+
+### Android Crashlytics 최초 수신 확인
+
+Crashlytics 설정 완료를 확인하려면 Firebase 설정이 포함된 내부 검증용 Release 빌드를 기기에 설치하고,
+테스트용 크래시를 한 번 발생시킨 뒤 앱을 다시 실행한다. Firebase Console의 Crashlytics에 해당 앱 버전의
+보고서가 나타나는지 확인한다. 이 테스트 크래시는 실제 운영 프로젝트에 인위적인 장애 기록을 남기므로,
+팀 내부 기기에서 1회만 실행하고 테스트 시각·앱 버전을 기록한다. Debug 빌드는 수집이 꺼져 있어 이 검증에
+사용하지 않는다.
 
 ## 후속 작업
 
@@ -286,4 +299,4 @@ Crashlytics와 Performance Monitoring은 현재 연결하지 않았다.
 2. 지도 전환 지연이 반복적으로 확인되고 전용 테스트 기기 환경을 운영할 수 있을 때 Macrobenchmark를 추가한다.
 3. 비공개·프로덕션 테스트에서 Android Vitals를 주기적으로 확인한다.
 4. Android·iOS DebugView에서 이벤트 수신을 각각 확인하고, 개인정보처리방침과 Play Console 데이터 보안 응답을 함께 검토한다.
-5. 원격 오류 추적이 필요해지는 시점에만 Crashlytics를 검토한다.
+5. 내부 검증용 Release 빌드에서 최초 Crashlytics 보고서 수신을 확인하고, 테스트 크래시와 앱 버전을 기록한다.

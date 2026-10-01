@@ -7,6 +7,7 @@ plugins {
 
 if (file("google-services.json").exists()) {
     apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 val localProperties = Properties().apply {
@@ -56,6 +57,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling:${libs.versions.androidxCompose.get()}")
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
     implementation(libs.ktor.client.core)
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
