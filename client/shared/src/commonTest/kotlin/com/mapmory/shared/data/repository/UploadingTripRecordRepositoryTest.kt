@@ -22,6 +22,48 @@ import kotlin.test.assertNull
 
 class UploadingTripRecordRepositoryTest {
     @Test
+    fun transientPhotoUploadFailureIsRetriedWithoutRestartingPreviousPhotos() = runBlocking {
+        val attempts = mutableMapOf<String, Int>()
+        val localIds = listOf("content://photo/1", "content://photo/2")
+        val repository = UploadingTripRecordRepository(
+            uploader = PhotoUploader { sources ->
+                val source = sources.single()
+                val attempt = attempts.getOrElse(source.localId) { 0 } + 1
+                attempts[source.localId] = attempt
+                if (source.localId == localIds.last() && attempt == 1) {
+                    Result.failure(IllegalStateException("temporary"))
+                } else {
+                    Result.success(listOf(UploadedPhoto(source, "uploaded/$attempt/${source.localId}")))
+                }
+            },
+            delegate = CapturingTripRecordRepository(),
+            localPhotoDataSource = LocalPhotoDataSource {
+                byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())
+            },
+        )
+
+        repository.createTripRecord(
+            TripRecordDraft(
+                locationId = 1,
+                title = "retry",
+                startDate = "2026-10-02",
+                mediaObjectKeys = localIds,
+                localMedia = localIds.mapIndexed { index, id ->
+                    TripRecordMediaDraft(
+                        objectKey = id,
+                        sortOrder = index,
+                        previewBytes = null,
+                        fileName = "photo-$index.jpg",
+                    )
+                },
+            ),
+        ).getOrThrow()
+
+        assertEquals(1, attempts[localIds.first()])
+        assertEquals(2, attempts[localIds.last()])
+    }
+
+    @Test
     fun localPhotosAreReadAndUploadedOneAtATime() = runBlocking {
         val localIds = (0 until 100).map { index -> "content://photo/$index" }
         val readIds = mutableListOf<String>()
@@ -319,7 +361,7 @@ private class CapturingTripRecordRepository : TripRecordRepository {
             ?: Result.failure(NoSuchElementException())
 
     override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> =
-        Result.failure(UnsupportedOperationException())
+        Result.success(draft.toRecord(100).also { record -> records[record.id] = record })
 
     override suspend fun updateTripRecord(
         id: Long,

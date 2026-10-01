@@ -3,7 +3,6 @@ package com.mapmory.android
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import com.mapmory.shared.app.AppContainer
-import com.mapmory.shared.app.AndroidBackgroundSaveFailureNotifier
 import com.mapmory.shared.app.createGuestRemoteAppContainer
 import com.mapmory.shared.data.auth.AndroidAuthTokenStore
 import com.mapmory.shared.data.media.AndroidLocalPhotoDataSource
@@ -21,7 +20,6 @@ class MapmoryAppViewModel(application: Application) : AndroidViewModel(applicati
         tokenStore = AndroidAuthTokenStore(application),
         photoPreviewCache = AndroidPhotoPreviewCache(application),
         localPhotoDataSource = AndroidLocalPhotoDataSource(application),
-        backgroundSaveFailureNotifier = AndroidBackgroundSaveFailureNotifier(application),
         mapSummaryCache = AndroidMapSummaryCache(application),
         tripStatisticsCache = AndroidTripStatisticsCache(application),
         themePreference = AndroidThemePreference(application),

@@ -150,7 +150,6 @@ private class DefaultAppContainer(
     override val onboardingPreference: OnboardingPreference,
     private val thumbnailLoader: TripRecordThumbnailLoader?,
     backgroundSaveExecution: BackgroundSaveExecution,
-    backgroundSaveFailureNotifier: BackgroundSaveFailureNotifier,
     private val onClose: () -> Unit,
 ) : AppContainer {
     private val backgroundSaveScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -165,7 +164,6 @@ private class DefaultAppContainer(
         repository = tripRecordRepository,
         scope = backgroundSaveScope,
         execution = backgroundSaveExecution,
-        failureNotifier = backgroundSaveFailureNotifier,
         onSaved = notifyTripRecordsChanged,
     )
 
@@ -204,7 +202,6 @@ fun createAppContainer(
     onboardingPreference: OnboardingPreference = MemoryOnboardingPreference(),
     thumbnailLoader: TripRecordThumbnailLoader? = null,
     backgroundSaveExecution: BackgroundSaveExecution = DirectBackgroundSaveExecution,
-    backgroundSaveFailureNotifier: BackgroundSaveFailureNotifier = BackgroundSaveFailureNotifier {},
     onClose: () -> Unit = {},
 ): AppContainer {
     val cachedTripStatistics = CachedTripStatisticsRepository(
@@ -225,7 +222,6 @@ fun createAppContainer(
         onboardingPreference = onboardingPreference,
         thumbnailLoader = thumbnailLoader,
         backgroundSaveExecution = backgroundSaveExecution,
-        backgroundSaveFailureNotifier = backgroundSaveFailureNotifier,
         onClose = onClose,
     )
 }
@@ -289,7 +285,6 @@ fun createGuestRemoteAppContainer(
     onboardingPreference: OnboardingPreference = MemoryOnboardingPreference(),
     localPhotoDataSource: LocalPhotoDataSource? = null,
     backgroundSaveExecution: BackgroundSaveExecution = DirectBackgroundSaveExecution,
-    backgroundSaveFailureNotifier: BackgroundSaveFailureNotifier = BackgroundSaveFailureNotifier {},
     onAuthRefreshFailed: (stage: String, error: Throwable) -> Unit = { _, _ -> },
 ): AppContainer {
     val client = createHttpClient()
@@ -305,7 +300,6 @@ fun createGuestRemoteAppContainer(
         onboardingPreference = onboardingPreference,
         localPhotoDataSource = localPhotoDataSource,
         backgroundSaveExecution = backgroundSaveExecution,
-        backgroundSaveFailureNotifier = backgroundSaveFailureNotifier,
         onAuthRefreshFailed = onAuthRefreshFailed,
         onClose = client::close,
     )
@@ -323,7 +317,6 @@ internal fun createGuestRemoteAppContainer(
     onboardingPreference: OnboardingPreference = MemoryOnboardingPreference(),
     localPhotoDataSource: LocalPhotoDataSource? = null,
     backgroundSaveExecution: BackgroundSaveExecution = DirectBackgroundSaveExecution,
-    backgroundSaveFailureNotifier: BackgroundSaveFailureNotifier = BackgroundSaveFailureNotifier {},
     onAuthRefreshFailed: (stage: String, error: Throwable) -> Unit = { _, _ -> },
     onClose: () -> Unit = client::close,
 ): AppContainer {
@@ -391,7 +384,6 @@ internal fun createGuestRemoteAppContainer(
         onboardingPreference = onboardingPreference,
         thumbnailLoader = CachedTripRecordThumbnailLoader(photoPreviewLoader),
         backgroundSaveExecution = backgroundSaveExecution,
-        backgroundSaveFailureNotifier = backgroundSaveFailureNotifier,
         onClose = onClose,
     )
 }

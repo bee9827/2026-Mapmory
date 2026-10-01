@@ -1,15 +1,11 @@
 package com.mapmory.android
 
-import android.Manifest
 import android.os.Bundle
-import android.os.Build
 import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
@@ -20,8 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,11 +37,6 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val navigation = remember { MapmoryNavigation() }
-            val backgroundSaves by appViewModel.container.backgroundTripRecordSaver.saves.collectAsState()
-            var notificationPermissionRequested by rememberSaveable { mutableStateOf(false) }
-            val notificationPermissionLauncher = rememberLauncherForActivityResult(
-                ActivityResultContracts.RequestPermission(),
-            ) {}
             var lastBackPressedAt by remember { mutableLongStateOf(0L) }
             var isDarkTheme by rememberSaveable { mutableStateOf(false) }
             val systemBarColor = colorResource(
@@ -64,19 +53,6 @@ class MainActivity : ComponentActivity() {
                     statusBarStyle = barStyle,
                     navigationBarStyle = barStyle,
                 )
-            }
-
-            LaunchedEffect(backgroundSaves.isNotEmpty()) {
-                if (
-                    backgroundSaves.isNotEmpty() &&
-                    !notificationPermissionRequested &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
-                    android.content.pm.PackageManager.PERMISSION_GRANTED
-                ) {
-                    notificationPermissionRequested = true
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
             }
 
             Scaffold(

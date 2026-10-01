@@ -2,6 +2,7 @@ package com.mapmory.shared.app
 
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.repository.TripRecordRepository
+import com.mapmory.shared.domain.repository.ProgressReportingTripRecordRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,14 +22,13 @@ enum class BackgroundSaveStatus {
 data class BackgroundTripRecordSave(
     val id: Long,
     val title: String,
+    val locationName: String,
+    val startDate: String,
     val photoCount: Int,
     val status: BackgroundSaveStatus,
+    val progressPercent: Int = 0,
     val errorMessage: String? = null,
 )
-
-fun interface BackgroundSaveFailureNotifier {
-    fun notifyFailure(message: String)
-}
 
 interface BackgroundSaveExecution {
     suspend fun <T> run(block: suspend () -> T): T
@@ -42,7 +42,6 @@ class BackgroundTripRecordSaver internal constructor(
     private val repository: TripRecordRepository,
     private val scope: CoroutineScope,
     private val execution: BackgroundSaveExecution = DirectBackgroundSaveExecution,
-    private val failureNotifier: BackgroundSaveFailureNotifier = BackgroundSaveFailureNotifier {},
     private val onSaved: () -> Unit = {},
     private val automaticRetryDelayMillis: Long = AutomaticRetryDelayMillis,
 ) {
@@ -53,7 +52,7 @@ class BackgroundTripRecordSaver internal constructor(
 
     val saves: StateFlow<List<BackgroundTripRecordSave>> = mutableSaves.asStateFlow()
 
-    fun enqueue(draft: TripRecordDraft): Long {
+    fun enqueue(draft: TripRecordDraft, locationName: String): Long {
         val id = ++nextId
         val compactDraft = draft.copy(
             localMedia = draft.localMedia.map { media ->
@@ -65,6 +64,8 @@ class BackgroundTripRecordSaver internal constructor(
             current + BackgroundTripRecordSave(
                 id = id,
                 title = compactDraft.title.ifBlank { "제목 없는 기록" },
+                locationName = locationName,
+                startDate = compactDraft.startDate,
                 photoCount = compactDraft.mediaObjectKeys.size,
                 status = BackgroundSaveStatus.QUEUED,
             )
@@ -79,7 +80,13 @@ class BackgroundTripRecordSaver internal constructor(
         if (failed.status != BackgroundSaveStatus.FAILED) return
         mutableSaves.update { current ->
             current.map { save ->
-                if (save.id == id) save.copy(status = BackgroundSaveStatus.QUEUED, errorMessage = null)
+                if (save.id == id) {
+                    save.copy(
+                        status = BackgroundSaveStatus.QUEUED,
+                        progressPercent = 0,
+                        errorMessage = null,
+                    )
+                }
                 else save
             }
         }
@@ -104,16 +111,23 @@ class BackgroundTripRecordSaver internal constructor(
         val draft = drafts[id] ?: return
         mutableSaves.update { current ->
             current.map { save ->
-                if (save.id == id) save.copy(status = BackgroundSaveStatus.SAVING, errorMessage = null)
+                if (save.id == id) {
+                    save.copy(
+                        status = BackgroundSaveStatus.SAVING,
+                        progressPercent = 0,
+                        errorMessage = null,
+                    )
+                }
                 else save
             }
         }
 
         val result = execution.run {
-            var latest = repository.createTripRecord(draft)
+            var latest = create(id, draft)
             if (latest.isFailure) {
                 delay(automaticRetryDelayMillis)
-                latest = repository.createTripRecord(draft)
+                updateProgress(id, 0)
+                latest = create(id, draft)
             }
             latest
         }
@@ -135,9 +149,21 @@ class BackgroundTripRecordSaver internal constructor(
                         }
                     }
                 }
-                failureNotifier.notifyFailure(DefaultFailureMessage)
             },
         )
+    }
+
+    private suspend fun create(id: Long, draft: TripRecordDraft) =
+        (repository as? ProgressReportingTripRecordRepository)?.createTripRecord(draft) { progress ->
+            updateProgress(id, progress)
+        } ?: repository.createTripRecord(draft)
+
+    private fun updateProgress(id: Long, progress: Int) {
+        mutableSaves.update { current ->
+            current.map { save ->
+                if (save.id == id) save.copy(progressPercent = progress.coerceIn(0, 100)) else save
+            }
+        }
     }
 }
 

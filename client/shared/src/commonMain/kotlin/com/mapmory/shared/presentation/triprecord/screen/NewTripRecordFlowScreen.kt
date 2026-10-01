@@ -103,7 +103,10 @@ private class PhotoDragSelectionController(
     private val onSelectionChanged: (photoId: String, selected: Boolean) -> Unit,
 ) {
     private val boundsByPhotoId = mutableMapOf<String, Rect>()
-    private val handledPhotoIds = mutableSetOf<String>()
+    private val changedPhotoIds = mutableSetOf<String>()
+    private var initialSelectedIds = emptySet<String>()
+    private var currentSelectedIds = mutableSetOf<String>()
+    private var startPosition: Offset? = null
     private var selectionValue: Boolean? = null
 
     fun updateBounds(photoId: String, bounds: Rect) {
@@ -114,31 +117,48 @@ private class PhotoDragSelectionController(
         boundsByPhotoId.remove(photoId)
     }
 
-    fun start(photoId: String) {
-        handledPhotoIds.clear()
-        selectionValue = photoId !in selectedIds()
-        apply(photoId)
+    fun start(photoId: String, positionInRoot: Offset) {
+        changedPhotoIds.clear()
+        initialSelectedIds = selectedIds().toSet()
+        currentSelectedIds = initialSelectedIds.toMutableSet()
+        startPosition = positionInRoot
+        selectionValue = photoId !in initialSelectedIds
+        moveTo(positionInRoot)
     }
 
     fun moveTo(positionInRoot: Offset) {
-        val photoId = boundsByPhotoId.entries
-            .firstOrNull { (_, bounds) -> bounds.contains(positionInRoot) }
-            ?.key
-            ?: return
-        apply(photoId)
+        val start = startPosition ?: return
+        val selected = selectionValue ?: return
+        val selectionRect = Rect(
+            left = minOf(start.x, positionInRoot.x),
+            top = minOf(start.y, positionInRoot.y),
+            right = maxOf(start.x, positionInRoot.x),
+            bottom = maxOf(start.y, positionInRoot.y),
+        )
+        boundsByPhotoId.forEach { (photoId, bounds) ->
+            val inside = bounds.intersects(selectionRect)
+            if (inside) changedPhotoIds += photoId
+            if (inside || photoId in changedPhotoIds) {
+                val desired = if (inside) selected else photoId in initialSelectedIds
+                if ((photoId in currentSelectedIds) != desired) {
+                    if (desired) currentSelectedIds += photoId else currentSelectedIds -= photoId
+                    onSelectionChanged(photoId, desired)
+                }
+            }
+        }
     }
 
     fun finish() {
+        startPosition = null
         selectionValue = null
-        handledPhotoIds.clear()
-    }
-
-    private fun apply(photoId: String) {
-        val selected = selectionValue ?: return
-        if (!handledPhotoIds.add(photoId)) return
-        onSelectionChanged(photoId, selected)
+        initialSelectedIds = emptySet()
+        currentSelectedIds.clear()
+        changedPhotoIds.clear()
     }
 }
+
+private fun Rect.intersects(other: Rect): Boolean =
+    left <= other.right && right >= other.left && top <= other.bottom && bottom >= other.top
 
 @Composable
 internal fun NewTripRecordFlowScreen(
@@ -1395,8 +1415,10 @@ private fun PhotoSelectionCard(
             }
             .pointerInput(photo.id, dragSelectionController) {
                 detectDragGesturesAfterLongPress(
-                    onDragStart = {
-                        dragSelectionController.start(photo.id)
+                    onDragStart = { offset ->
+                        coordinates
+                            ?.localToRoot(offset)
+                            ?.let { position -> dragSelectionController.start(photo.id, position) }
                     },
                     onDrag = { change, _ ->
                         change.consume()

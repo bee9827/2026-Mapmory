@@ -459,6 +459,7 @@ class TripRecordEditorViewModel(
                 availableTags = state.availableTags,
                 selectedTagIds = state.selectedTagIds,
             ),
+            locationName = requireNotNull(state.selectedLocation).name,
         )
         uiState = uiState.copy(isSaving = false, isDirty = false)
         return true

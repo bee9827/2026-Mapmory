@@ -5,6 +5,7 @@ import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordPage
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.repository.TripRecordRepository
+import com.mapmory.shared.domain.repository.ProgressReportingTripRecordRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -13,6 +14,38 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class BackgroundTripRecordSaverTest {
+    @Test
+    fun `업로드_진행률과_낙관적_기록_정보를_노출한다`() = runBlocking {
+        val continueSave = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val repository = object : EmptyTripRecordRepository(), ProgressReportingTripRecordRepository {
+            override suspend fun createTripRecord(
+                draft: TripRecordDraft,
+                onProgress: (Int) -> Unit,
+            ): Result<TripRecordData> {
+                onProgress(50)
+                continueSave.await()
+                onProgress(100)
+                return Result.success(draft.toRecord())
+            }
+        }
+        val saver = BackgroundTripRecordSaver(
+            repository = repository,
+            scope = CoroutineScope(coroutineContext),
+            automaticRetryDelayMillis = 0,
+        )
+
+        saver.enqueue(draft(), locationName = "서울")
+        val saving = saver.saves.first { saves -> saves.singleOrNull()?.progressPercent == 50 }.single()
+
+        assertEquals("서울", saving.locationName)
+        assertEquals("2026-10-02", saving.startDate)
+        assertEquals(BackgroundSaveStatus.SAVING, saving.status)
+
+        continueSave.complete(Unit)
+        saver.saves.first { saves -> saves.isEmpty() }
+        Unit
+    }
+
     @Test
     fun `첫_저장_실패_후_한번_자동_재시도한다`() = runBlocking {
         var attempts = 0
@@ -31,7 +64,7 @@ class BackgroundTripRecordSaverTest {
             automaticRetryDelayMillis = 0,
         )
 
-        saver.enqueue(draft())
+        saver.enqueue(draft(), locationName = "서울")
         saver.saves.first { saves -> saves.isEmpty() && attempts > 0 }
 
         assertEquals(2, attempts)
@@ -41,7 +74,6 @@ class BackgroundTripRecordSaverTest {
     @Test
     fun `두번_실패하면_알리고_사용자가_다시_시도할_수_있다`() = runBlocking {
         var attempts = 0
-        val notifications = mutableListOf<String>()
         val repository = object : EmptyTripRecordRepository() {
             override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> {
                 attempts += 1
@@ -52,18 +84,18 @@ class BackgroundTripRecordSaverTest {
         val saver = BackgroundTripRecordSaver(
             repository = repository,
             scope = CoroutineScope(coroutineContext),
-            failureNotifier = BackgroundSaveFailureNotifier(notifications::add),
             automaticRetryDelayMillis = 0,
         )
 
-        val id = saver.enqueue(draft())
+        val id = saver.enqueue(draft(), locationName = "서울")
         val failed = saver.saves.first { saves ->
             saves.singleOrNull()?.status == BackgroundSaveStatus.FAILED
         }.single()
 
         assertEquals(id, failed.id)
         assertEquals(2, attempts)
-        assertTrue(notifications.isNotEmpty())
+        assertEquals("서울", failed.locationName)
+        assertTrue(failed.errorMessage?.contains("네트워크 오류") == true)
 
         saver.retry(id)
         saver.saves.first { saves -> saves.isEmpty() }
