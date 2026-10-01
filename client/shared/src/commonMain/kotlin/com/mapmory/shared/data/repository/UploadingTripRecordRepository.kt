@@ -1,5 +1,6 @@
 package com.mapmory.shared.data.repository
 
+import com.mapmory.shared.data.media.LocalPhotoDataSource
 import com.mapmory.shared.data.remote.MapmoryApiException
 import com.mapmory.shared.data.remote.PhotoUploadSource
 import com.mapmory.shared.data.remote.PhotoUploader
@@ -17,6 +18,7 @@ import kotlinx.coroutines.sync.withLock
 internal class UploadingTripRecordRepository(
     private val uploader: PhotoUploader,
     private val delegate: TripRecordRepository,
+    private val localPhotoDataSource: LocalPhotoDataSource? = null,
     private val maxCachedPreviewBytes: Long = DefaultMaxCachedPreviewBytes,
 ) : TripRecordRepository {
     private val mediaCacheMutex = Mutex()
@@ -77,7 +79,7 @@ internal class UploadingTripRecordRepository(
 
     private suspend fun prepareDraft(draft: TripRecordDraft): Result<TripRecordDraft> {
         val mediaByLocalId = draft.localMedia.associateBy(TripRecordMediaDraft::objectKey)
-        val pendingSources = mutableListOf<PhotoUploadSource>()
+        val objectKeyByLocalId = mutableMapOf<String, String>()
 
         draft.mediaObjectKeys.forEachIndexed { index, key ->
             if (key in draft.uploadedMediaObjectKeys) return@forEachIndexed
@@ -87,7 +89,7 @@ internal class UploadingTripRecordRepository(
                         "사진 정보를 확인하지 못했습니다. 잠시 후 다시 저장해 주세요.",
                     ),
                 )
-            val bytes = media.originalBytes
+            val bytes = media.originalBytes ?: localPhotoDataSource?.read(key)
                 ?: return Result.failure(
                     IllegalStateException(
                         "사진 원본을 불러오지 못했습니다. 잠시 후 다시 저장해 주세요.",
@@ -99,22 +101,27 @@ internal class UploadingTripRecordRepository(
                         "지원하지 않는 사진 형식입니다. JPEG, PNG, WEBP 또는 HEIC 사진을 선택해 주세요.",
                     ),
                 )
-            pendingSources += PhotoUploadSource(
+            val source = PhotoUploadSource(
                 localId = key,
                 fileName = normalizedFileName(media.fileName, contentType, index),
                 contentType = contentType,
                 bytes = bytes,
             )
+            val upload = uploader.upload(listOf(source)).getOrElse { error ->
+                return Result.failure(error)
+            }.singleOrNull()
+                ?: return Result.failure(
+                    IllegalStateException("업로드 결과에 누락되거나 중복된 사진이 있습니다."),
+                )
+            if (upload.localId != key || key in objectKeyByLocalId) {
+                return Result.failure(
+                    IllegalStateException("업로드 결과에 누락되거나 중복된 사진이 있습니다."),
+                )
+            }
+            objectKeyByLocalId[key] = upload.objectKey
         }
 
-        if (pendingSources.isEmpty()) return Result.success(draft)
-        val uploads = uploader.upload(pendingSources).getOrElse { error ->
-            return Result.failure(error)
-        }
-        val objectKeyByLocalId = uploads.associate { upload -> upload.localId to upload.objectKey }
-        require(objectKeyByLocalId.size == pendingSources.size) {
-            "업로드 결과에 누락되거나 중복된 사진이 있습니다."
-        }
+        if (objectKeyByLocalId.isEmpty()) return Result.success(draft)
 
         return Result.success(
             draft.copy(

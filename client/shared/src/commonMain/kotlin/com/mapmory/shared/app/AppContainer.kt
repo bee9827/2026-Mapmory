@@ -4,6 +4,7 @@ import com.mapmory.shared.data.auth.AuthTokenStore
 import com.mapmory.shared.data.auth.GuestSessionManager
 import com.mapmory.shared.data.local.StaticRegionCatalog
 import com.mapmory.shared.data.media.CachedTripRecordThumbnailLoader
+import com.mapmory.shared.data.media.LocalPhotoDataSource
 import com.mapmory.shared.data.media.MemoryPhotoPreviewCache
 import com.mapmory.shared.data.media.PhotoPreviewCache
 import com.mapmory.shared.data.media.PhotoPreviewLoader
@@ -260,6 +261,7 @@ fun createGuestRemoteAppContainer(
     tripStatisticsCache: TripStatisticsCache = MemoryTripStatisticsCache(),
     themePreference: ThemePreference = MemoryThemePreference(),
     onboardingPreference: OnboardingPreference = MemoryOnboardingPreference(),
+    localPhotoDataSource: LocalPhotoDataSource? = null,
     onAuthRefreshFailed: (stage: String, error: Throwable) -> Unit = { _, _ -> },
 ): AppContainer {
     val client = createHttpClient()
@@ -273,6 +275,7 @@ fun createGuestRemoteAppContainer(
         tripStatisticsCache = tripStatisticsCache,
         themePreference = themePreference,
         onboardingPreference = onboardingPreference,
+        localPhotoDataSource = localPhotoDataSource,
         onAuthRefreshFailed = onAuthRefreshFailed,
         onClose = client::close,
     )
@@ -288,6 +291,7 @@ internal fun createGuestRemoteAppContainer(
     tripStatisticsCache: TripStatisticsCache = MemoryTripStatisticsCache(),
     themePreference: ThemePreference = MemoryThemePreference(),
     onboardingPreference: OnboardingPreference = MemoryOnboardingPreference(),
+    localPhotoDataSource: LocalPhotoDataSource? = null,
     onAuthRefreshFailed: (stage: String, error: Throwable) -> Unit = { _, _ -> },
     onClose: () -> Unit = client::close,
 ): AppContainer {
@@ -332,6 +336,7 @@ internal fun createGuestRemoteAppContainer(
             accessTokenProvider = session,
         ),
         delegate = remoteTripRecords,
+        localPhotoDataSource = localPhotoDataSource,
     )
     val photoPreviewLoader = PhotoPreviewLoader(
         cache = photoPreviewCache,
