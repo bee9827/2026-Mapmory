@@ -27,6 +27,40 @@ import kotlin.test.assertTrue
 
 class TripRecordEditorViewModelTest {
     @Test
+    fun `사진만으로_생성할_때_촬영일_범위를_사용하고_제목은_비워_둔다`() = runSuspend {
+        val repository = FakeTripRecordRepository { "2026-09-30T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+        viewModel.startCreating(Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT))
+        viewModel.addPhotos(listOf(
+            selectedPhoto("one").copy(capturedAt = "2026.09.16"),
+            selectedPhoto("two").copy(capturedAt = "2026.09.14"),
+            selectedPhoto("three").copy(capturedAt = null),
+        ))
+        viewModel.useSelectedPhotoDates("2026-09-30")
+        assertEquals("2026-09-14", viewModel.uiState.startDate)
+        assertEquals("2026-09-16", viewModel.uiState.endDate)
+        assertEquals("", viewModel.uiState.title)
+        assertTrue(viewModel.save())
+        assertEquals(3, repository.getTripRecord(1).getOrThrow().media.size)
+    }
+
+    @Test
+    fun `촬영일이_없는_사진은_오늘을_사용한다`() {
+        val repository = FakeTripRecordRepository { "2026-09-30T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+        viewModel.addPhotos(listOf(selectedPhoto("one").copy(capturedAt = null)))
+        viewModel.useSelectedPhotoDates("2026-09-30")
+        assertEquals("2026-09-30", viewModel.uiState.startDate)
+        assertEquals("", viewModel.uiState.endDate)
+    }
+
+    @Test
     fun `직접_만든_태그를_선택해_기록에_저장한다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-31T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(
@@ -255,10 +289,7 @@ class TripRecordEditorViewModelTest {
             assertTrue(viewModel.uiState.fieldErrors.isEmpty())
 
             viewModel.updateTitle("가".repeat(201))
-            assertEquals(
-                mapOf(TripRecordEditorErrorTarget.TITLE to "제목은 200자 이하여야 합니다."),
-                viewModel.uiState.fieldErrors,
-            )
+            assertTrue(viewModel.uiState.fieldErrors.isEmpty())
         }
     }
 

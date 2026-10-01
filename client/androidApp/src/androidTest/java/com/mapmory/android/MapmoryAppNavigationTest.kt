@@ -5,6 +5,7 @@ import android.graphics.Color
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
@@ -48,9 +49,12 @@ class MapmoryAppNavigationTest {
             MapmoryApp(container = container)
         }
 
+        composeRule.waitUntil(15_000) {
+            composeRule.onAllNodesWithText("일지").fetchSemanticsNodes().isNotEmpty()
+        }
         composeRule.onNodeWithText("일지").performClick()
-        composeRule.onNodeWithContentDescription("계측 테스트 여행").assertIsDisplayed()
-        composeRule.onNodeWithText("계측 테스트 여행").assertIsDisplayed().performClick()
+        composeRule.onNodeWithContentDescription("강남구").assertIsDisplayed()
+        composeRule.onNodeWithText("강남구").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("강남구 사진첩").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("2026. 08. 24 여행 사진 확대")
             .assertIsDisplayed()
@@ -65,9 +69,9 @@ class MapmoryAppNavigationTest {
             .performTextReplacement("수정된 계측 테스트 여행")
         composeRule.onNodeWithText("저장").performClick()
 
-        composeRule.onNodeWithText("수정된 계측 테스트 여행").assertIsDisplayed()
+        composeRule.onNodeWithText("강남구 사진첩").assertIsDisplayed()
         composeRule.onNodeWithContentDescription("뒤로가기").performClick()
-        composeRule.onNodeWithContentDescription("수정된 계측 테스트 여행")
+        composeRule.onNodeWithContentDescription("강남구")
             .assertIsDisplayed()
             .performClick()
 
@@ -79,13 +83,13 @@ class MapmoryAppNavigationTest {
         composeRule.onNodeWithText("아직 작성한 여행 기록이 없어요.").assertIsDisplayed()
 
         composeRule.onNodeWithContentDescription("새 기록 작성").assertIsDisplayed().performClick()
-        composeRule.onNodeWithText("일자, 장소 선택").assertIsDisplayed()
-        composeRule.onNodeWithText("←").performClick()
+        composeRule.onNodeWithText("어디 사진을 불러올까요?").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("뒤로가기").performClick()
         composeRule.onNodeWithText("아직 작성한 여행 기록이 없어요.").assertIsDisplayed()
 
         composeRule.onNodeWithText("지도").performClick()
         composeRule.onNodeWithContentDescription("새 기록 작성").performClick()
-        composeRule.onNodeWithText("일자, 장소 선택").assertIsDisplayed()
+        composeRule.onNodeWithText("어디 사진을 불러올까요?").assertIsDisplayed()
     }
 
     private fun createPngBytes(): ByteArray {
