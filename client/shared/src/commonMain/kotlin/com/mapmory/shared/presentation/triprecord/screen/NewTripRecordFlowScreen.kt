@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,8 +47,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
@@ -74,6 +80,7 @@ import com.mapmory.shared.presentation.photo.RecommendationLoadKey
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.accept
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
+import com.mapmory.shared.presentation.photo.setSelection
 import com.mapmory.shared.presentation.photo.shouldLoadNextRecommendationPage
 import com.mapmory.shared.presentation.photo.toggleSelection
 import com.mapmory.shared.presentation.triprecord.selectableTripRecordDestinations
@@ -90,6 +97,48 @@ private enum class NewRecordFlowStep {
 private const val KoreaCountryId = 1L
 private const val PhotoListPrefetchGroups = 2
 private const val PhotoLimitMessageDurationMillis = 3_000L
+
+private class PhotoDragSelectionController(
+    private val selectedIds: () -> Set<String>,
+    private val onSelectionChanged: (photoId: String, selected: Boolean) -> Unit,
+) {
+    private val boundsByPhotoId = mutableMapOf<String, Rect>()
+    private val handledPhotoIds = mutableSetOf<String>()
+    private var selectionValue: Boolean? = null
+
+    fun updateBounds(photoId: String, bounds: Rect) {
+        boundsByPhotoId[photoId] = bounds
+    }
+
+    fun remove(photoId: String) {
+        boundsByPhotoId.remove(photoId)
+    }
+
+    fun start(photoId: String) {
+        handledPhotoIds.clear()
+        selectionValue = photoId !in selectedIds()
+        apply(photoId)
+    }
+
+    fun moveTo(positionInRoot: Offset) {
+        val photoId = boundsByPhotoId.entries
+            .firstOrNull { (_, bounds) -> bounds.contains(positionInRoot) }
+            ?.key
+            ?: return
+        apply(photoId)
+    }
+
+    fun finish() {
+        selectionValue = null
+        handledPhotoIds.clear()
+    }
+
+    private fun apply(photoId: String) {
+        val selected = selectionValue ?: return
+        if (!handledPhotoIds.add(photoId)) return
+        onSelectionChanged(photoId, selected)
+    }
+}
 
 @Composable
 internal fun NewTripRecordFlowScreen(
@@ -484,6 +533,17 @@ internal fun NewTripRecordFlowScreen(
                     val next = recommendationPagingState.toggleSelection(photo.id)
                     if (next == recommendationPagingState && photo.id !in next.selectedIds) {
                         previewPhotoId = null
+                        showPhotoLimitMessage()
+                    }
+                    recommendationPagingState = next
+                },
+                onPhotoSelectionChange = { photoId, selected ->
+                    val next = recommendationPagingState.setSelection(photoId, selected)
+                    if (
+                        selected &&
+                        next == recommendationPagingState &&
+                        photoId !in recommendationPagingState.selectedIds
+                    ) {
                         showPhotoLimitMessage()
                     }
                     recommendationPagingState = next
@@ -1044,10 +1104,21 @@ private fun PhotoPickerStep(
     onPickFromGallery: () -> Unit,
     onPhotoPreview: (SelectedPhoto) -> Unit,
     onPhotoToggle: (SelectedPhoto) -> Unit,
+    onPhotoSelectionChange: (photoId: String, selected: Boolean) -> Unit,
     onGroupToggle: (List<String>) -> Unit,
     onAllToggle: () -> Unit,
 ) {
     val groups = remember(pagingState.photos) { pagingState.photos.toPhotoDateGroups() }
+    val latestSelectedIds by rememberUpdatedState(pagingState.selectedIds)
+    val latestSelectionChange by rememberUpdatedState(onPhotoSelectionChange)
+    val dragSelectionController = remember {
+        PhotoDragSelectionController(
+            selectedIds = { latestSelectedIds },
+            onSelectionChanged = { photoId, selected ->
+                latestSelectionChange(photoId, selected)
+            },
+        )
+    }
     Column(Modifier.fillMaxSize()) {
         FlowTopBar(
             title = "사진 고르기",
@@ -1102,6 +1173,7 @@ private fun PhotoPickerStep(
                         onGroupToggle = { onGroupToggle(photos.map(SelectedPhoto::id)) },
                         onPhotoPreview = onPhotoPreview,
                         onPhotoToggle = onPhotoToggle,
+                        dragSelectionController = dragSelectionController,
                     )
                 }
             }
@@ -1167,7 +1239,7 @@ private fun PhotoPickerHeader(
             )
         }
         Text(
-            text = "최신순으로 정리했어요. 사진을 누르면 크게 볼 수 있어요.",
+            text = "사진을 누르면 크게 보고, 길게 누른 채 드래그하면 여러 장을 선택할 수 있어요.",
             color = TripRecordPalette.current.secondaryText,
             fontSize = 13.sp,
             lineHeight = 19.sp,
@@ -1255,6 +1327,7 @@ private fun PhotoDateGroup(
     onGroupToggle: () -> Unit,
     onPhotoPreview: (SelectedPhoto) -> Unit,
     onPhotoToggle: (SelectedPhoto) -> Unit,
+    dragSelectionController: PhotoDragSelectionController,
 ) {
     val allSelected = photos.all { it.id in selectedIds }
     Column {
@@ -1301,6 +1374,7 @@ private fun PhotoDateGroup(
                             selected = photo.id in selectedIds,
                             onPreview = { onPhotoPreview(photo) },
                             onToggle = { onPhotoToggle(photo) },
+                            dragSelectionController = dragSelectionController,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -1317,8 +1391,13 @@ private fun PhotoSelectionCard(
     selected: Boolean,
     onPreview: () -> Unit,
     onToggle: () -> Unit,
+    dragSelectionController: PhotoDragSelectionController,
     modifier: Modifier = Modifier,
 ) {
+    var coordinates by remember(photo.id) { mutableStateOf<LayoutCoordinates?>(null) }
+    DisposableEffect(photo.id, dragSelectionController) {
+        onDispose { dragSelectionController.remove(photo.id) }
+    }
     Box(
         modifier = modifier
             .aspectRatio(1f)
@@ -1330,7 +1409,36 @@ private fun PhotoSelectionCard(
                     Modifier
                 },
             )
+            .onGloballyPositioned { layoutCoordinates ->
+                coordinates = layoutCoordinates
+                dragSelectionController.updateBounds(
+                    photoId = photo.id,
+                    bounds = layoutCoordinates.boundsInRoot(),
+                )
+            }
+            .pointerInput(photo.id, dragSelectionController) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        dragSelectionController.start(photo.id)
+                    },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        coordinates
+                            ?.localToRoot(change.position)
+                            ?.let(dragSelectionController::moveTo)
+                    },
+                    onDragEnd = dragSelectionController::finish,
+                    onDragCancel = dragSelectionController::finish,
+                )
+            }
             .clickable(onClick = onPreview)
+            .semantics {
+                contentDescription = if (selected) {
+                    "${photo.displayName}, 선택됨. 길게 누르고 드래그해 연속 선택 해제"
+                } else {
+                    "${photo.displayName}, 선택 안 됨. 길게 누르고 드래그해 연속 선택"
+                }
+            }
             .testTag("new-record-photo-${photo.id}"),
     ) {
         TripPhotoImage(
