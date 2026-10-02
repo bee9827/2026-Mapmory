@@ -44,6 +44,11 @@ kakao:
 
 geoapify:
   api-key: ${GEOAPIFY_API_KEY:}
+  rate-limit:
+    searches-per-member-per-minute: 20
+    searches-per-day: 2000
+    requests-per-day: 2800
+    requests-per-second: 4
 
 upload:
   policy:

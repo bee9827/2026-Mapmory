@@ -2,11 +2,14 @@ package com.mapmory.backend.place.infrastructure.geoapify;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 
 import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.place.application.PlaceErrorCode;
 import com.mapmory.backend.place.application.model.PlaceCandidate;
 import com.mapmory.backend.place.application.model.PlaceDetails;
 import java.net.URLEncoder;
@@ -22,7 +25,8 @@ class GeoapifyClientTest {
     void 검색_결과에서_장소_ID와_이름을_반환한다() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GeoapifyClient client = new GeoapifyClient(builder, "https://api.geoapify.test", "test-key");
+        GeoapifyClient client = new GeoapifyClient(
+                builder, "https://api.geoapify.test", "test-key", mock(GeoapifyRequestLimiter.class));
         assertThat(client.providerCode()).isEqualTo("GEOAPIFY");
         server.expect(queryParam("text", URLEncoder.encode("한강공원", StandardCharsets.UTF_8)))
                 .andRespond(withSuccess("""
@@ -46,7 +50,8 @@ class GeoapifyClientTest {
     void 선택한_장소는_ID로_다시_조회한다() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GeoapifyClient client = new GeoapifyClient(builder, "https://api.geoapify.test", "test-key");
+        GeoapifyClient client = new GeoapifyClient(
+                builder, "https://api.geoapify.test", "test-key", mock(GeoapifyRequestLimiter.class));
         server.expect(queryParam("id", "park-1"))
                 .andRespond(withSuccess("""
                         {"features":[{"properties":{
@@ -65,7 +70,8 @@ class GeoapifyClientTest {
 
     @Test
     void API_키가_없으면_외부_요청_없이_오류를_반환한다() {
-        GeoapifyClient client = new GeoapifyClient(RestClient.builder(), "https://api.geoapify.test", "");
+        GeoapifyClient client = new GeoapifyClient(
+                RestClient.builder(), "https://api.geoapify.test", "", mock(GeoapifyRequestLimiter.class));
 
         assertThatThrownBy(() -> client.search("한강공원"))
                 .isInstanceOf(BusinessException.class)
@@ -77,7 +83,8 @@ class GeoapifyClientTest {
     void 외부_API_오류에_키가_들어간_예외를_노출하지_않는다() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GeoapifyClient client = new GeoapifyClient(builder, "https://api.geoapify.test", "secret-key");
+        GeoapifyClient client = new GeoapifyClient(
+                builder, "https://api.geoapify.test", "secret-key", mock(GeoapifyRequestLimiter.class));
         server.expect(queryParam("apiKey", "secret-key"))
                 .andRespond(withServerError());
 
@@ -90,5 +97,19 @@ class GeoapifyClientTest {
                     assertThat(error.getMessage()).doesNotContain("secret-key");
                 });
         server.verify();
+    }
+
+    @Test
+    void 한도에_걸리면_외부_API를_호출하지_않는다() {
+        GeoapifyRequestLimiter limiter = mock(GeoapifyRequestLimiter.class);
+        doThrow(new BusinessException(PlaceErrorCode.PLACE_RATE_LIMITED))
+                .when(limiter).reserveSearch();
+        GeoapifyClient client = new GeoapifyClient(
+                RestClient.builder(), "https://api.geoapify.test", "test-key", limiter);
+
+        assertThatThrownBy(() -> client.search("한강공원"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code())
+                        .isEqualTo("PLACE_RATE_LIMITED"));
     }
 }

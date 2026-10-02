@@ -24,15 +24,18 @@ public class GeoapifyClient implements PlaceLookupPort {
 
     private final RestClient restClient;
     private final String apiKey;
+    private final GeoapifyRequestLimiter requestLimiter;
     private final GeoapifyPlaceMapper mapper = new GeoapifyPlaceMapper();
 
     public GeoapifyClient(
             RestClient.Builder builder,
             @Value("${geoapify.base-url:https://api.geoapify.com}") String baseUrl,
-            @Value("${geoapify.api-key:}") String apiKey
+            @Value("${geoapify.api-key:}") String apiKey,
+            GeoapifyRequestLimiter requestLimiter
     ) {
         this.restClient = builder.baseUrl(baseUrl).build();
         this.apiKey = apiKey;
+        this.requestLimiter = requestLimiter;
     }
 
     @Override
@@ -43,6 +46,7 @@ public class GeoapifyClient implements PlaceLookupPort {
     @Override
     public List<PlaceCandidate> search(String query) {
         requireConfigured();
+        requestLimiter.reserveSearch();
         JsonNode response = get(uri -> uri.path("/v1/geocode/autocomplete")
                 .queryParam("text", query)
                 .queryParam("format", "json")
@@ -60,6 +64,7 @@ public class GeoapifyClient implements PlaceLookupPort {
             throw new BusinessException(PlaceErrorCode.INVALID_PLACE_ID);
         }
         requireConfigured();
+        requestLimiter.reserveDetails();
         JsonNode response = get(uri -> uri.path("/v2/place-details")
                 .queryParam("id", placeId)
                 .queryParam("lang", "ko")
