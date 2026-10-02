@@ -72,8 +72,13 @@ class UploadPolicyTest {
     }
 
     @Test
+    void 요청당_최대_파일_개수까지_허용한다() {
+        uploadPolicy.validateFileCount(100);
+    }
+
+    @Test
     void 요청당_최대_파일_개수를_초과하면_예외가_발생한다() {
-        assertThatThrownBy(() -> uploadPolicy.validateFileCount(11))
+        assertThatThrownBy(() -> uploadPolicy.validateFileCount(101))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         org.assertj.core.api.Assertions.assertThat(exception.getErrorCode())
                                 .isEqualTo(UploadErrorCode.TOO_MANY_FILES));
@@ -82,7 +87,7 @@ class UploadPolicyTest {
     private static UploadPolicyProperties properties() {
         return new UploadPolicyProperties(
                 DataSize.ofMegabytes(10),
-                10,
+                100,
                 Duration.ofMinutes(5)
         );
     }

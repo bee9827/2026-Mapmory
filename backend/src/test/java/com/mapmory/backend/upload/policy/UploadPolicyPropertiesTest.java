@@ -17,7 +17,7 @@ class UploadPolicyPropertiesTest {
             .withUserConfiguration(UploadPolicyConfig.class)
             .withPropertyValues(
                     "upload.policy.max-file-size=10MB",
-                    "upload.policy.max-files-per-request=10"
+                    "upload.policy.max-files-per-request=100"
             );
 
     @ParameterizedTest
