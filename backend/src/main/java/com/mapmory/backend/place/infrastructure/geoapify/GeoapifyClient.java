@@ -1,20 +1,21 @@
 package com.mapmory.backend.place.infrastructure.geoapify;
 
-import tools.jackson.databind.JsonNode;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.place.application.PlaceErrorCode;
 import com.mapmory.backend.place.application.model.PlaceCandidate;
 import com.mapmory.backend.place.application.model.PlaceDetails;
 import com.mapmory.backend.place.application.port.PlaceLookupPort;
-import java.util.ArrayList;
+import java.net.URI;
 import java.util.List;
-import java.util.Locale;
+import java.util.function.Function;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.util.UriBuilder;
+import tools.jackson.databind.JsonNode;
 
 @Component
 public class GeoapifyClient implements PlaceLookupPort {
@@ -23,6 +24,7 @@ public class GeoapifyClient implements PlaceLookupPort {
 
     private final RestClient restClient;
     private final String apiKey;
+    private final GeoapifyPlaceMapper mapper = new GeoapifyPlaceMapper();
 
     public GeoapifyClient(
             RestClient.Builder builder,
@@ -49,19 +51,7 @@ public class GeoapifyClient implements PlaceLookupPort {
                 .queryParam("apiKey", apiKey)
                 .build());
 
-        List<PlaceCandidate> candidates = new ArrayList<>();
-        for (JsonNode result : response.path("results")) {
-            String placeId = text(result, "place_id");
-            String name = text(result, "name");
-            if (name == null) {
-                name = text(result, "address_line1");
-            }
-            if (placeId != null && name != null) {
-                candidates.add(new PlaceCandidate(placeId, name, text(result, "formatted"),
-                        attribution(result), attributionUrl(result)));
-            }
-        }
-        return List.copyOf(candidates);
+        return mapper.candidates(response);
     }
 
     @Override
@@ -76,31 +66,11 @@ public class GeoapifyClient implements PlaceLookupPort {
                 .queryParam("apiKey", apiKey)
                 .build());
 
-        for (JsonNode feature : response.path("features")) {
-            JsonNode properties = feature.path("properties");
-            if (!"details".equals(text(properties, "feature_type"))) {
-                continue;
-            }
-            String name = text(properties, "name");
-            if (name == null) {
-                name = text(properties, "address_line1");
-            }
-            String countryCode = text(properties, "country_code");
-            JsonNode lat = properties.path("lat");
-            JsonNode lon = properties.path("lon");
-            if (name == null || !lat.isNumber() || !lon.isNumber()
-                    || lat.asDouble() < -90 || lat.asDouble() > 90
-                    || lon.asDouble() < -180 || lon.asDouble() > 180) {
-                break;
-            }
-            return new PlaceDetails(placeId, name,
-                    countryCode == null ? null : countryCode.toUpperCase(Locale.ROOT), lat.asDouble(), lon.asDouble(),
-                    attribution(properties), attributionUrl(properties));
-        }
-        throw new BusinessException(PlaceErrorCode.PLACE_NOT_FOUND);
+        return mapper.details(response, placeId)
+                .orElseThrow(() -> new BusinessException(PlaceErrorCode.PLACE_NOT_FOUND));
     }
 
-    private JsonNode get(java.util.function.Function<org.springframework.web.util.UriBuilder, java.net.URI> uri) {
+    private JsonNode get(Function<UriBuilder, URI> uri) {
         try {
             JsonNode body = restClient.get().uri(uri).retrieve().body(JsonNode.class);
             if (body == null || body.isNull()) {
@@ -123,21 +93,6 @@ public class GeoapifyClient implements PlaceLookupPort {
             throw new BusinessException(PlaceErrorCode.PLACE_PROVIDER_UNAVAILABLE,
                     "GEOAPIFY_API_KEY가 설정되지 않았습니다.");
         }
-    }
-
-    private static String text(JsonNode node, String key) {
-        JsonNode value = node.path(key);
-        return value.isTextual() && !value.asText().isBlank() ? value.asText() : null;
-    }
-
-    private static String attribution(JsonNode node) {
-        String source = text(node.path("datasource"), "attribution");
-        return source == null ? PlaceAttribution.OSM_TEXT : source;
-    }
-
-    private static String attributionUrl(JsonNode node) {
-        String source = text(node.path("datasource"), "url");
-        return source == null ? PlaceAttribution.OSM_URL : source;
     }
 
     private static BusinessException unavailable() {
