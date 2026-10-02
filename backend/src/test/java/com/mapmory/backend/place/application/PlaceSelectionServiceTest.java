@@ -1,12 +1,18 @@
 package com.mapmory.backend.place.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.mapmory.backend.common.exception.BusinessException;
+import com.mapmory.backend.place.application.PlaceErrorCode;
 import com.mapmory.backend.place.application.model.PlaceDetails;
 import com.mapmory.backend.place.application.model.SelectedPlace;
 import com.mapmory.backend.place.application.port.DistrictLocator;
 import com.mapmory.backend.place.application.port.PlaceLookupPort;
+import com.mapmory.backend.place.application.port.PlaceRateLimitPort;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
 import com.mapmory.backend.region.RegionType;
@@ -21,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class PlaceSelectionServiceTest {
 
     @Mock PlaceLookupPort placeLookupPort;
+    @Mock PlaceRateLimitPort rateLimitPort;
     @Mock DistrictLocator districtLocator;
     @Mock RegionResolver regionResolver;
     @InjectMocks PlaceSelectionService service;
@@ -36,7 +43,7 @@ class PlaceSelectionServiceTest {
                 .thenReturn(Optional.of(new DistrictLocator.DistrictMatch("11", "11560")));
         when(regionResolver.resolve("KR", "11", "11560")).thenReturn(district);
 
-        SelectedPlace result = service.select("park-1");
+        SelectedPlace result = service.select(1L, "park-1");
 
         assertThat(result.suggestedRegion()).isEqualTo(district);
     }
@@ -47,7 +54,7 @@ class PlaceSelectionServiceTest {
                 .thenReturn(new PlaceDetails("park-1", "한강공원", "KR", 37.5, 127.0, null, null));
         when(districtLocator.find(127.0, 37.5)).thenReturn(Optional.empty());
 
-        SelectedPlace result = service.select("park-1");
+        SelectedPlace result = service.select(1L, "park-1");
 
         assertThat(result.suggestedRegion()).isNull();
     }
@@ -57,8 +64,18 @@ class PlaceSelectionServiceTest {
         when(placeLookupPort.findById("place-1"))
                 .thenReturn(new PlaceDetails("place-1", "섬", null, 0.0, 0.0, null, null));
 
-        SelectedPlace result = service.select("place-1");
+        SelectedPlace result = service.select(1L, "place-1");
 
         assertThat(result.suggestedRegion()).isNull();
+    }
+
+    @Test
+    void 선택_한도를_넘으면_제공자를_호출하지_않는다() {
+        doThrow(new BusinessException(PlaceErrorCode.PLACE_RATE_LIMITED))
+                .when(rateLimitPort).checkSelection(1L);
+
+        assertThatThrownBy(() -> service.select(1L, "park-1"))
+                .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(placeLookupPort);
     }
 }

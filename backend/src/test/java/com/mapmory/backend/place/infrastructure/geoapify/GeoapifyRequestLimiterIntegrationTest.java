@@ -15,8 +15,8 @@ class GeoapifyRequestLimiterIntegrationTest extends IntegrationTest {
     MySQLSelectForUpdateBasedProxyManager<String> bucketManager;
 
     @Test
-    void 회원_검색_한도와_전체_한도는_DB에_저장되고_상세_조회_몫은_남긴다() {
-        GeoapifyRateLimitProperties limits = new GeoapifyRateLimitProperties(2, 2, 3, 10_000);
+    void 검색과_선택_한도는_DB에_저장되고_기록용_상세_조회_몫은_남긴다() {
+        GeoapifyRateLimitProperties limits = new GeoapifyRateLimitProperties(2, 1, 2, 2, 5, 10_000);
         GeoapifyRequestLimiter first = new GeoapifyRequestLimiter(bucketManager, limits);
 
         first.checkSearch(1L);
@@ -26,9 +26,15 @@ class GeoapifyRequestLimiterIntegrationTest extends IntegrationTest {
 
         first.reserveSearch();
         first.reserveSearch();
+        first.checkSelection(1L);
+        first.reserveDetails();
 
         GeoapifyRequestLimiter second = new GeoapifyRequestLimiter(bucketManager, limits);
         assertError(second::reserveSearch, "PLACE_SEARCH_BUDGET_EXHAUSTED");
+        assertError(() -> second.checkSelection(1L), "PLACE_RATE_LIMITED");
+        second.checkSelection(2L);
+        second.reserveDetails();
+        assertError(() -> second.checkSelection(3L), "PLACE_SELECTION_BUDGET_EXHAUSTED");
         second.reserveDetails();
         assertError(second::reserveDetails, "PLACE_PROVIDER_BUDGET_EXHAUSTED");
     }

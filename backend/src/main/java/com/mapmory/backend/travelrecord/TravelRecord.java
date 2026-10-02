@@ -73,7 +73,7 @@ public class TravelRecord extends BaseEntity {
     ) {
         this.member = member;
         this.region = region;
-        this.title = title;
+        this.title = normalizeTitle(title);
         this.content = normalizeContent(content);
         this.period = TravelPeriod.of(startDate, endDate);
     }
@@ -97,7 +97,7 @@ public class TravelRecord extends BaseEntity {
             LocalDate endDate
     ) {
         this.region = region;
-        this.title = title;
+        this.title = normalizeTitle(title);
         this.content = normalizeContent(content);
         this.period = TravelPeriod.of(startDate, endDate);
     }
@@ -182,6 +182,10 @@ public class TravelRecord extends BaseEntity {
 
     private static String normalizeContent(String content) {
         return content == null ? "" : content;
+    }
+
+    private static String normalizeTitle(String title) {
+        return title == null || title.isBlank() ? "" : title;
     }
 
     public Long getId() {

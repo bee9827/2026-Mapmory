@@ -2,7 +2,7 @@ package com.mapmory.backend.place.infrastructure.geoapify;
 
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.place.application.PlaceErrorCode;
-import com.mapmory.backend.place.application.port.PlaceSearchRateLimitPort;
+import com.mapmory.backend.place.application.port.PlaceRateLimitPort;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.BucketExceptions.BucketExecutionException;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
@@ -12,15 +12,18 @@ import java.time.ZoneOffset;
 import org.springframework.stereotype.Component;
 
 @Component
-public class GeoapifyRequestLimiter implements PlaceSearchRateLimitPort {
+public class GeoapifyRequestLimiter implements PlaceRateLimitPort {
 
     private static final String SEARCH_BUDGET = "geoapify:search:";
+    private static final String SELECTION_BUDGET = "geoapify:selection:";
     private static final String TOTAL_BUDGET = "geoapify:total:";
     private static final String REQUEST_PACE = "geoapify:pace";
 
     private final ProxyManager<String> bucketManager;
     private final BucketConfiguration memberSearchLimit;
+    private final BucketConfiguration memberSelectionLimit;
     private final BucketConfiguration searchBudget;
+    private final BucketConfiguration selectionBudget;
     private final BucketConfiguration totalBudget;
     private final BucketConfiguration requestPace;
 
@@ -30,7 +33,9 @@ public class GeoapifyRequestLimiter implements PlaceSearchRateLimitPort {
     ) {
         this.bucketManager = bucketManager;
         this.memberSearchLimit = limit(properties.searchesPerMemberPerMinute(), Duration.ofMinutes(1));
+        this.memberSelectionLimit = limit(properties.selectionsPerMemberPerDay(), Duration.ofDays(1));
         this.searchBudget = limit(properties.searchesPerDay(), Duration.ofDays(1));
+        this.selectionBudget = limit(properties.selectionsPerDay(), Duration.ofDays(1));
         this.totalBudget = limit(properties.requestsPerDay(), Duration.ofDays(1));
         this.requestPace = BucketConfiguration.builder()
                 .addLimit(bandwidth -> bandwidth.capacity(1)
@@ -40,10 +45,17 @@ public class GeoapifyRequestLimiter implements PlaceSearchRateLimitPort {
 
     @Override
     public void checkSearch(Long memberId) {
-        if (memberId == null) {
-            throw new IllegalArgumentException("인증된 회원 ID가 필요합니다.");
-        }
-        consume("geoapify:member:" + memberId, memberSearchLimit, PlaceErrorCode.PLACE_RATE_LIMITED);
+        consume("geoapify:member:" + requireMemberId(memberId),
+                memberSearchLimit, PlaceErrorCode.PLACE_RATE_LIMITED);
+    }
+
+    @Override
+    public void checkSelection(Long memberId) {
+        String today = LocalDate.now(ZoneOffset.UTC).toString();
+        consume(SELECTION_BUDGET + "member:" + requireMemberId(memberId) + ":" + today,
+                memberSelectionLimit, PlaceErrorCode.PLACE_RATE_LIMITED);
+        consume(SELECTION_BUDGET + today, selectionBudget,
+                PlaceErrorCode.PLACE_SELECTION_BUDGET_EXHAUSTED);
     }
 
     public void reserveSearch() {
@@ -75,5 +87,12 @@ public class GeoapifyRequestLimiter implements PlaceSearchRateLimitPort {
         return BucketConfiguration.builder()
                 .addLimit(bandwidth -> bandwidth.capacity(capacity).refillIntervally(capacity, period))
                 .build();
+    }
+
+    private static Long requireMemberId(Long memberId) {
+        if (memberId == null) {
+            throw new IllegalArgumentException("인증된 회원 ID가 필요합니다.");
+        }
+        return memberId;
     }
 }

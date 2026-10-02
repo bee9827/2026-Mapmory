@@ -38,7 +38,7 @@ class PlaceControllerTest {
         PlaceSearchService searchService = mock(PlaceSearchService.class);
         PlaceSelectionService selectionService = mock(PlaceSelectionService.class);
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(searchService, selectionService)).build();
-        when(selectionService.select("park-1"))
+        when(selectionService.select(null, "park-1"))
                 .thenReturn(new SelectedPlace(
                         new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932, null, null), null));
 

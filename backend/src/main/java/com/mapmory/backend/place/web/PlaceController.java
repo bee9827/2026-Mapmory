@@ -40,7 +40,11 @@ public class PlaceController {
     }
 
     @GetMapping("/{placeId}")
-    public ResponseEntity<TravelRecordResponse<PlaceSelectionResponse>> select(@PathVariable String placeId) {
-        return ResponseEntity.ok(TravelRecordResponse.of(PlaceSelectionResponse.from(placeSelectionService.select(placeId))));
+    public ResponseEntity<TravelRecordResponse<PlaceSelectionResponse>> select(
+            @AuthenticationPrincipal Long memberId,
+            @PathVariable String placeId
+    ) {
+        return ResponseEntity.ok(TravelRecordResponse.of(
+                PlaceSelectionResponse.from(placeSelectionService.select(memberId, placeId))));
     }
 }
