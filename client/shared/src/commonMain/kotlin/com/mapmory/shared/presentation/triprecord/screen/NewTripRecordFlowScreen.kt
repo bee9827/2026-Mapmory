@@ -2109,7 +2109,9 @@ private fun PhotoPreviewDialog(
                     TripPhotoImage(
                         imageBytes = fullResolutionBytes ?: photo.previewBytes,
                         imageUri = photo.fullResolutionUri,
+                        fallbackUri = photo.previewUri,
                         contentDescription = "${photo.displayName} 확대 사진",
+                        blackLoadingBackground = true,
                         modifier = Modifier.fillMaxSize(),
                         placeholderVariant = photo.id.hashCode(),
                     )

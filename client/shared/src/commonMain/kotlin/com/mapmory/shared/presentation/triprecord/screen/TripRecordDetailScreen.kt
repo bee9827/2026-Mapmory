@@ -424,6 +424,23 @@ private fun ExpandedTripPhotoViewer(
     onBackClick: () -> Unit,
 ) {
     val pagerState = rememberPagerState(initialPage = initialPage) { photos.size }
+    val currentPhoto = photos[pagerState.currentPage]
+    var localPreview by remember(currentPhoto.id) { mutableStateOf<ByteArray?>(null) }
+    var localLookupFinished by remember(currentPhoto.id) { mutableStateOf(false) }
+    val photoLibrary = rememberPhotoLibraryActions({}, {}, {}, {}, {}, {}, {})
+    LaunchedEffect(currentPhoto.id) {
+        val localId = currentPhoto.localPhotoId
+        if (localId != null && currentPhoto.localOriginalUri == null) {
+            localPreview = suspendCancellableCoroutine { continuation ->
+                photoLibrary.loadFullResolutionPreview(
+                    SelectedPhoto(localId, currentPhoto.displayName, null),
+                ) { bytes ->
+                    if (continuation.isActive) continuation.resume(bytes)
+                }
+            }
+        }
+        localLookupFinished = true
+    }
 
     Box(
         modifier = Modifier
@@ -435,11 +452,23 @@ private fun ExpandedTripPhotoViewer(
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val photo = photos[page]
+            val isCurrent = page == pagerState.currentPage
+            val localBytes = localPreview.takeIf { isCurrent }
+            val awaitingLocalPhoto = isCurrent && !localLookupFinished &&
+                photo.localPhotoId != null && photo.localOriginalUri == null
+            if (awaitingLocalPhoto) return@HorizontalPager
             Box(Modifier.fillMaxSize()) {
                 TripPhotoImage(
-                    imageBytes = photo.previewBytes?.bytesForDecoding()
+                    imageBytes = localBytes ?: photo.previewBytes?.bytesForDecoding()
                         ?: photo.originalBytes?.bytesForDecoding(),
-                    imageUri = photo.fullResolutionUri ?: photo.previewUri,
+                    imageUri = when {
+                        localBytes != null -> null
+                        !isCurrent -> photo.previewUri
+                        else -> photo.localOriginalUri ?: photo.fullResolutionUri ?: photo.previewUri
+                    },
+                    cacheKey = "trip-full:${photo.id}",
+                    blackLoadingBackground = true,
+                    fallbackUri = if (photo.localOriginalUri != null) photo.fullResolutionUri ?: photo.previewUri else photo.previewUri,
                     fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                     contentDescription = "$locationName 확대 사진 ${page + 1}",
                     modifier = Modifier

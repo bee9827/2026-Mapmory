@@ -99,7 +99,10 @@ actual fun rememberPhotoLibraryActions(
     controller.onPermissionRequired = onPermissionRequired
     DisposableEffect(controller) {
         controller.startObservingAppActivity()
-        onDispose { controller.stopObservingAppActivity() }
+        onDispose {
+            controller.stopObservingAppActivity()
+            controller.cancelFullResolutionPreview()
+        }
     }
 
     return remember(controller) {
@@ -156,6 +159,7 @@ private class IosPhotoLibraryController(
     var onRecommendationLoadingChanged: (Boolean) -> Unit = {}
     var onPermissionRequired: (PhotoLibraryPermissionIssue) -> Unit = {}
     private var recommendationJob: Job? = null
+    private var fullResolutionRequestId: Int? = null
     private var recommendationGeneration = 0
     private var recommendationSession: IosRecommendationSession? = null
     var excludedPhotoIds: Set<String> = emptySet()
@@ -657,6 +661,7 @@ private class IosPhotoLibraryController(
         photo: SelectedPhoto,
         completion: (ByteArray?) -> Unit,
     ) {
+        cancelFullResolutionPreview()
         val asset = assetForIdentifier(photo.id)
         if (asset == null) {
             completion(photo.originalBytes)
@@ -667,7 +672,7 @@ private class IosPhotoLibraryController(
             deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat
             networkAccessAllowed = true
         }
-        PHImageManager.defaultManager().requestImageForAsset(
+        fullResolutionRequestId = PHImageManager.defaultManager().requestImageForAsset(
             asset = asset,
             targetSize = CGSizeMake(
                 FullResolutionPreviewSizePx.toDouble(),
@@ -681,6 +686,11 @@ private class IosPhotoLibraryController(
                 ?.toByteArray()
             onMain { completion(bytes) }
         }
+    }
+
+    fun cancelFullResolutionPreview() {
+        fullResolutionRequestId?.let { PHImageManager.defaultManager().cancelImageRequest(it) }
+        fullResolutionRequestId = null
     }
 
     private fun assetForIdentifier(identifier: String): PHAsset? =
