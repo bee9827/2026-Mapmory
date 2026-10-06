@@ -15,13 +15,14 @@
 | 인증 | `Authorization: Bearer {accessToken}` |
 | 페이지네이션 | `page` 기본 0, `size` 기본 20·최대 100 |
 
-`/auth/**`와 `/health`를 제외한 API는 유효한 Access Token이 필요하다. `/auth/login/kakao`는 인증 없이 호출하지만, 게스트가 계정을 연결할 때는 게스트 Access Token을 함께 보낸다. 여행 기록과 태그는 비공개이며 소유자 본인만 접근할 수 있다. 다른 회원의 리소스 ID를 요청해도 존재 여부를 숨기기 위해 `404`를 반환한다.
+`/auth/**`와 `/health`를 제외한 API는 유효한 Access Token이 필요하다. `/auth/login/kakao`와 `/auth/login/google`은 인증 없이 호출하지만, 게스트가 계정을 연결할 때는 게스트 Access Token을 함께 보낸다. 여행 기록과 태그는 비공개이며 소유자 본인만 접근할 수 있다. 다른 회원의 리소스 ID를 요청해도 존재 여부를 숨기기 위해 `404`를 반환한다.
 
 ### API 목록
 
 | 상태 | Method | Endpoint | 설명 |
 | --- | --- | --- | --- |
 | 구현됨 | `POST` | `/auth/login/kakao` | 카카오 로그인 |
+| 구현됨 | `POST` | `/auth/login/google` | 구글 로그인 |
 | 구현됨 | `POST` | `/auth/login/guest` | 게스트 로그인 |
 | 구현됨 | `POST` | `/auth/token/refresh` | Access·Refresh Token 회전 재발급 |
 | 구현됨 | `POST` | `/auth/logout` | Refresh Token 폐기 |
@@ -157,6 +158,25 @@ Authorization: Bearer {게스트 accessToken}
 }
 ```
 
+### 구글 로그인
+
+`POST /api/v1/auth/login/google`
+
+앱이 구글 로그인(Android Credential Manager, iOS GoogleSignIn)으로 받은 **ID Token**을 전달하면,
+서버가 구글 공개키로 서명과 `iss`·`aud`·`exp`를 검증한 뒤 Mapmory 토큰을 발급한다.
+Access Token이 아니라 ID Token을 보낸다.
+
+```json
+{
+  "idToken": "google-id-token"
+}
+```
+
+게스트 승격 규칙, 결과 표, 응답 형식은 카카오 로그인과 같다. 게스트로 사용 중이었다면
+게스트 Access Token을 `Authorization` 헤더로 함께 보낸다.
+
+같은 사람이라도 카카오 회원과 구글 회원은 별개 회원이다. 계정 병합은 지원하지 않는다.
+
 ### 게스트 로그인
 
 `POST /api/v1/auth/login/guest`
@@ -229,11 +249,13 @@ Authorization: Bearer {게스트 accessToken}
 | `401` | `INVALID_ACCESS_TOKEN` | Access Token이 유효하지 않음 |
 | `401` | `EXPIRED_ACCESS_TOKEN` | Access Token이 만료됨 |
 | `401` | `INVALID_KAKAO_TOKEN` | 카카오 Access Token이 유효하지 않음 |
+| `401` | `INVALID_GOOGLE_TOKEN` | 구글 ID Token이 유효하지 않음 (서명·발급자·대상 앱·만료) |
 | `401` | `INVALID_REFRESH_TOKEN` | Refresh Token이 유효하지 않거나 폐기됨 |
 | `401` | `EXPIRED_REFRESH_TOKEN` | Refresh Token이 만료됨 |
 | `403` | `ACCESS_DENIED` | 리소스 접근 권한 없음 |
 | `429` | `GUEST_LOGIN_RATE_LIMITED` | 게스트 로그인 요청이 한도를 초과함 |
 | `503` | `KAKAO_UNAVAILABLE` | 카카오 인증 서버를 일시적으로 사용할 수 없음 |
+| `503` | `GOOGLE_UNAVAILABLE` | 구글 공개키를 받아오지 못해 검증할 수 없음 |
 
 ## 3. Upload API
 

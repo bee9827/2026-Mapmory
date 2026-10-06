@@ -1,6 +1,8 @@
 package com.mapmory.backend.auth;
 
 import com.mapmory.backend.auth.exception.AuthErrorCode;
+import com.mapmory.backend.auth.google.GoogleIdTokenVerifier;
+import com.mapmory.backend.auth.google.GoogleUser;
 import com.mapmory.backend.auth.jwt.JwtProvider;
 import com.mapmory.backend.auth.kakao.KakaoApiClient;
 import com.mapmory.backend.auth.kakao.KakaoUserResponse;
@@ -21,40 +23,61 @@ public class AuthService {
     private static final String DEFAULT_NAME_PREFIX = "회원";
 
     private final KakaoApiClient kakaoApiClient;
+    private final GoogleIdTokenVerifier googleIdTokenVerifier;
     private final MemberRepository memberRepository;
     private final JwtProvider jwtProvider;
     private final RefreshTokenService refreshTokenService;
 
     public AuthService(
             KakaoApiClient kakaoApiClient,
+            GoogleIdTokenVerifier googleIdTokenVerifier,
             MemberRepository memberRepository,
             JwtProvider jwtProvider,
             RefreshTokenService refreshTokenService
     ) {
         this.kakaoApiClient = kakaoApiClient;
+        this.googleIdTokenVerifier = googleIdTokenVerifier;
         this.memberRepository = memberRepository;
         this.jwtProvider = jwtProvider;
         this.refreshTokenService = refreshTokenService;
     }
 
     /**
-     * 카카오 로그인.
+     * 카카오 로그인. 구글 로그인도 같은 규칙을 따른다.
      *
      * 게스트로 사용 중이었다면(authenticatedMemberId가 게스트 회원) 새 회원을 만들지 않고
      * 그 회원을 승격해, 게스트로 남긴 기록이 그대로 이어지게 한다.
      *
-     * 이미 같은 카카오 계정으로 가입한 회원이 있으면 한 사람에게 회원 행이 둘인 상황이므로,
+     * 이미 같은 소셜 계정으로 가입한 회원이 있으면 한 사람에게 회원 행이 둘인 상황이므로,
      * 기존 회원을 우선하고 게스트 세션은 끊는다. 이때 게스트가 남긴 기록은 이어지지 않는다.
      * (ADR 0015)
      */
     @Transactional
     public LoginResult loginWithKakao(String kakaoAccessToken, Long authenticatedMemberId) {
         KakaoUserResponse kakaoUser = kakaoApiClient.fetchUser(kakaoAccessToken);
-        String providerId = String.valueOf(kakaoUser.id());
+        return loginWithSocial(
+                AuthProvider.KAKAO, String.valueOf(kakaoUser.id()), kakaoUser.nickname(), authenticatedMemberId);
+    }
+
+    /**
+     * 구글 로그인. 앱이 전달한 ID token을 검증한 뒤 카카오와 같은 규칙으로 가입·승격한다. (ADR 0019)
+     */
+    @Transactional
+    public LoginResult loginWithGoogle(String idToken, Long authenticatedMemberId) {
+        GoogleUser googleUser = googleIdTokenVerifier.verify(idToken);
+        return loginWithSocial(
+                AuthProvider.GOOGLE, googleUser.subject(), googleUser.name(), authenticatedMemberId);
+    }
+
+    private LoginResult loginWithSocial(
+            AuthProvider provider,
+            String providerId,
+            String nickname,
+            Long authenticatedMemberId
+    ) {
         Optional<Member> guest = findGuest(authenticatedMemberId);
 
-        Optional<Member> registered =
-                memberRepository.findByProviderAndProviderId(AuthProvider.KAKAO, providerId);
+        Optional<Member> registered = memberRepository.findByProviderAndProviderId(provider, providerId);
         if (registered.isPresent()) {
             guest.ifPresent(refreshTokenService::revokeAll);
             return issueTokens(registered.get(), false);
@@ -62,12 +85,12 @@ public class AuthService {
 
         if (guest.isPresent()) {
             Member promoted = guest.get();
-            promoted.promote(AuthProvider.KAKAO, providerId, resolveName(kakaoUser.nickname()));
+            promoted.promote(provider, providerId, resolveName(nickname));
             // 게스트로 이미 앱을 사용했으므로 온보딩을 반복하지 않도록 신규로 보지 않는다.
             return issueTokens(promoted, false);
         }
 
-        return issueTokens(register(providerId, kakaoUser.nickname()), true);
+        return issueTokens(register(provider, providerId, nickname), true);
     }
 
     private Optional<Member> findGuest(Long memberId) {
@@ -115,9 +138,9 @@ public class AuthService {
         return new LoginResult(new AuthTokens(accessToken, refreshToken), isNewMember);
     }
 
-    private Member register(String providerId, String nickname) {
+    private Member register(AuthProvider provider, String providerId, String nickname) {
         Member member = Member.ofOAuth(
-                AuthProvider.KAKAO,
+                provider,
                 providerId,
                 resolveName(nickname),
                 UUID.randomUUID()
