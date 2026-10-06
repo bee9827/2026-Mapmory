@@ -35,7 +35,10 @@ class TripRecordEditorViewModel(
     private val getTags: GetTagsUseCase? = null,
     private val createTag: CreateTagUseCase? = null,
     private val backgroundTripRecordSaver: BackgroundTripRecordSaver? = null,
+    private val recordedPhotoIndex: com.mapmory.shared.data.media.RecordedPhotoIndex? = null,
 ) : ViewModel() {
+    val recordedPhotoIds = recordedPhotoIndex?.ids ?: kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>())
+    val pendingPhotoIds = backgroundTripRecordSaver?.pendingPhotoIds ?: kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>())
     private var isRouteInitialized = false
 
     var uiState by mutableStateOf(TripRecordEditorUiState())
@@ -56,6 +59,7 @@ class TripRecordEditorViewModel(
     ) {
         if (isRouteInitialized) return
         isRouteInitialized = true
+        recordedPhotoIndex?.initialize()
         loadTags()
         if (recordId == null) {
             startCreating(selectedLocation)
@@ -110,7 +114,10 @@ class TripRecordEditorViewModel(
                     longitude = media.longitude,
                     capturedAt = media.capturedAt,
                 ).toTripRecordPhotoUiState(media.sortOrder)
-                    .copy(isUploaded = true)
+                    .copy(
+                        isUploaded = true,
+                        localPhotoId = media.localPreviewKey,
+                    )
             },
             availableTags = allTags,
             selectedTagIds = record.tags.mapTo(linkedSetOf()) { it.id },
@@ -483,6 +490,7 @@ class TripRecordEditorViewModel(
                 objectKey = photo.id,
                 sortOrder = index,
                 previewBytes = photo.previewBytes?.bytesForDecoding(),
+                localPreviewKey = photo.localPhotoId ?: photo.id,
                 originalBytes = photo.originalBytes?.bytesForDecoding(),
                 fileName = photo.displayName,
                 latitude = photo.latitude,

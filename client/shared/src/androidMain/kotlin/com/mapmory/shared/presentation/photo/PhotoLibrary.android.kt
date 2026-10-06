@@ -81,6 +81,8 @@ actual fun rememberPhotoLibraryActions(
     val recommendationJob = remember { mutableStateOf<Job?>(null) }
     val recommendationGeneration = remember { mutableStateOf(0) }
     val recommendationSession = remember { mutableStateOf<AndroidRecommendationSession?>(null) }
+    val excludedPhotoIds = remember { mutableStateOf<Set<String>>(emptySet()) }
+    val searchCounts = remember { mutableStateOf(0 to 0) }
 
     fun cancelRecommendations() {
         recommendationGeneration.value += 1
@@ -104,7 +106,7 @@ actual fun rememberPhotoLibraryActions(
         latestLoadingChanged(true)
         recommendationJob.value = scope.launch {
             try {
-                val session = withContext(Dispatchers.IO) {
+                val unfilteredSession = withContext(Dispatchers.IO) {
                     val cached = lastRecommendationSearch.get(target.id, dateRange)
                     cached?.copy(generation = generation, nextIndex = 0)
                         ?: context.prepareRecommendationSession(
@@ -112,7 +114,12 @@ actual fun rememberPhotoLibraryActions(
                         ) { progress -> latestLoadingProgressChanged(progress) }
                             ?.also { lastRecommendationSearch.put(target.id, dateRange, it) }
                 }
+                val session = unfilteredSession?.let { found ->
+                    found.copy(candidates = found.candidates.filterNot { it.contentUri in excludedPhotoIds.value })
+                }
                 if (generation != recommendationGeneration.value) return@launch
+                searchCounts.value = (unfilteredSession?.candidates?.size ?: 0) to
+                    ((unfilteredSession?.candidates?.size ?: 0) - (session?.candidates?.size ?: 0))
                 if (session == null) {
                     latestRecommended(PhotoRecommendationPage(generation, emptyList(), hasMore = false))
                     return@launch
@@ -123,7 +130,10 @@ actual fun rememberPhotoLibraryActions(
                 }
                 if (generation == recommendationGeneration.value) {
                     recommendationSession.value = session.copy(nextIndex = page.nextIndex)
-                    latestRecommended(page.asPublicPage())
+                    latestRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = searchCounts.value.first,
+                        excludedCount = searchCounts.value.second,
+                    ))
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -158,7 +168,10 @@ actual fun rememberPhotoLibraryActions(
                     recommendationSession.value?.generation == generation
                 ) {
                     recommendationSession.value = session.copy(nextIndex = page.nextIndex)
-                    latestRecommended(page.asPublicPage())
+                    latestRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = searchCounts.value.first,
+                        excludedCount = searchCounts.value.second,
+                    ))
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -247,6 +260,7 @@ actual fun rememberPhotoLibraryActions(
 
     return remember(context, galleryPicker, galleryPermissionLauncher, settingsLauncher) {
         PhotoLibraryActions(
+            setExcludedPhotoIds = { excludedPhotoIds.value = it },
             pickFromGallery = {
                 latestLoadingChanged(true)
                 galleryPicker.launch(

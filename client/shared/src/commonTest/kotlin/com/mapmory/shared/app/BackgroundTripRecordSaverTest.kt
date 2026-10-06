@@ -1,7 +1,9 @@
 package com.mapmory.shared.app
 
+import com.mapmory.shared.data.media.MemoryPhotoPreviewCache
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
+import com.mapmory.shared.domain.model.TripRecordMediaDraft
 import com.mapmory.shared.domain.model.TripRecordPage
 import com.mapmory.shared.domain.model.TripRecordQuery
 import com.mapmory.shared.domain.repository.TripRecordRepository
@@ -10,10 +12,67 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class BackgroundTripRecordSaverTest {
+    @Test
+    fun `실패한_업로드의_사진도_예약하고_취소하면_해제한다`() = runBlocking {
+        val saver = BackgroundTripRecordSaver(
+            repository = object : EmptyTripRecordRepository() {
+                override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> =
+                    Result.failure(IllegalStateException("offline"))
+            },
+            scope = CoroutineScope(coroutineContext),
+            automaticRetryDelayMillis = 0,
+        )
+        val id = saver.enqueue(draft().copy(localMedia = listOf(
+            TripRecordMediaDraft("local", 0, null, localPreviewKey = "local"),
+        )), "서울")
+        assertEquals(setOf("local"), saver.pendingPhotoIds.value)
+        saver.saves.first { it.singleOrNull()?.status == BackgroundSaveStatus.FAILED }
+        assertEquals(setOf("local"), saver.pendingPhotoIds.value)
+        saver.dismissFailure(id)
+        assertTrue(saver.pendingPhotoIds.value.isEmpty())
+    }
+
+    @Test
+    fun `백그라운드 저장 전에 미리보기는 디스크 경계에 저장하고 요청에서는 제거한다`() = runBlocking {
+        val cache = MemoryPhotoPreviewCache()
+        var receivedDraft: TripRecordDraft? = null
+        val repository = object : EmptyTripRecordRepository() {
+            override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> {
+                receivedDraft = draft
+                return Result.success(draft.toRecord())
+            }
+        }
+        val saver = BackgroundTripRecordSaver(
+            repository = repository,
+            scope = CoroutineScope(coroutineContext),
+            photoPreviewCache = cache,
+            automaticRetryDelayMillis = 0,
+        )
+        val preview = byteArrayOf(0x01, 0x02)
+        val draft = draft().copy(
+            mediaObjectKeys = listOf("content://photo/1"),
+            localMedia = listOf(
+                TripRecordMediaDraft(
+                    objectKey = "content://photo/1",
+                    sortOrder = 0,
+                    previewBytes = preview,
+                    localPreviewKey = "content://photo/1",
+                ),
+            ),
+        )
+
+        saver.enqueue(draft, locationName = "서울")
+        saver.saves.first { saves -> saves.isEmpty() }
+
+        assertEquals(null, receivedDraft?.localMedia?.single()?.previewBytes)
+        assertContentEquals(preview, cache.read("content://photo/1"))
+    }
+
     @Test
     fun `업로드_진행률과_낙관적_기록_정보를_노출한다`() = runBlocking {
         val continueSave = kotlinx.coroutines.CompletableDeferred<Unit>()

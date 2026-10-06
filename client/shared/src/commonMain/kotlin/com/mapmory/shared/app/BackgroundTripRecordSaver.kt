@@ -1,5 +1,6 @@
 package com.mapmory.shared.app
 
+import com.mapmory.shared.data.media.PhotoPreviewCache
 import com.mapmory.shared.data.remote.MapmoryApiException
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.repository.TripRecordRepository
@@ -43,6 +44,7 @@ class BackgroundTripRecordSaver internal constructor(
     private val repository: TripRecordRepository,
     private val scope: CoroutineScope,
     private val execution: BackgroundSaveExecution = DirectBackgroundSaveExecution,
+    private val photoPreviewCache: PhotoPreviewCache? = null,
     private val onSaved: () -> Unit = {},
     private val automaticRetryDelayMillis: Long = AutomaticRetryDelayMillis,
 ) {
@@ -52,22 +54,26 @@ class BackgroundTripRecordSaver internal constructor(
     private var nextId = 0L
 
     val saves: StateFlow<List<BackgroundTripRecordSave>> = mutableSaves.asStateFlow()
+    private val mutablePendingPhotoIds = MutableStateFlow<Set<String>>(emptySet())
+    val pendingPhotoIds: StateFlow<Set<String>> = mutablePendingPhotoIds.asStateFlow()
+
+    private fun updatePendingPhotoIds() {
+        mutablePendingPhotoIds.value = drafts.values.flatMap { draft ->
+            draft.localMedia.mapNotNull { it.localPreviewKey }
+        }.toSet()
+    }
 
     fun enqueue(draft: TripRecordDraft, locationName: String): Long {
         val id = ++nextId
-        val compactDraft = draft.copy(
-            localMedia = draft.localMedia.map { media ->
-                media.copy(previewBytes = null, originalBytes = null)
-            },
-        )
-        drafts[id] = compactDraft
+        drafts[id] = draft
+        updatePendingPhotoIds()
         mutableSaves.update { current ->
             current + BackgroundTripRecordSave(
                 id = id,
-                title = compactDraft.title.ifBlank { "제목 없는 기록" },
+                title = draft.title.ifBlank { "제목 없는 기록" },
                 locationName = locationName,
-                startDate = compactDraft.startDate,
-                photoCount = compactDraft.mediaObjectKeys.size,
+                startDate = draft.startDate,
+                photoCount = draft.mediaObjectKeys.size,
                 status = BackgroundSaveStatus.QUEUED,
             )
         }
@@ -97,6 +103,7 @@ class BackgroundTripRecordSaver internal constructor(
     fun dismissFailure(id: Long) {
         if (mutableSaves.value.none { it.id == id && it.status == BackgroundSaveStatus.FAILED }) return
         drafts.remove(id)
+        updatePendingPhotoIds()
         mutableSaves.update { current -> current.filterNot { save -> save.id == id } }
     }
 
@@ -109,7 +116,7 @@ class BackgroundTripRecordSaver internal constructor(
     }
 
     private suspend fun save(id: Long) {
-        val draft = drafts[id] ?: return
+        val draft = prepareDraft(id) ?: return
         mutableSaves.update { current ->
             current.map { save ->
                 if (save.id == id) {
@@ -136,6 +143,7 @@ class BackgroundTripRecordSaver internal constructor(
         result.fold(
             onSuccess = {
                 drafts.remove(id)
+                updatePendingPhotoIds()
                 mutableSaves.update { current -> current.filterNot { save -> save.id == id } }
                 onSaved()
             },
@@ -152,6 +160,23 @@ class BackgroundTripRecordSaver internal constructor(
                 }
             },
         )
+    }
+
+    private suspend fun prepareDraft(id: Long): TripRecordDraft? {
+        val draft = drafts[id] ?: return null
+        photoPreviewCache?.let { cache ->
+            draft.localMedia.forEach { media ->
+                media.previewBytes?.let { bytes ->
+                    val cacheKey = media.localPreviewKey ?: media.objectKey
+                    cache.write(cacheKey, bytes)
+                }
+            }
+        }
+        return draft.copy(
+            localMedia = draft.localMedia.map { media ->
+                media.copy(previewBytes = null, originalBytes = null)
+            },
+        ).also { compact -> drafts[id] = compact }
     }
 
     private suspend fun create(id: Long, draft: TripRecordDraft, attempt: Int) =

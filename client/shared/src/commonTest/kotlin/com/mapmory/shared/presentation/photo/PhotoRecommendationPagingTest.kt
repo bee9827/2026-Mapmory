@@ -106,6 +106,43 @@ class PhotoRecommendationPagingTest {
     }
 
     @Test
+    fun `편집할_때_기기_사진_식별자가_같은_사진만_기존_선택으로_복원한다`() {
+        val result = PhotoRecommendationPagingState(maxSelectionCount = 100)
+            .accept(
+                page = PhotoRecommendationPage(
+                    generation = 1,
+                    photos = (1..5).map(::photo),
+                    hasMore = false,
+                ),
+                autoSelectNewPhotos = false,
+                preselectedIds = setOf("2", "4", "missing"),
+            )
+
+        assertNotNull(result)
+        assertEquals(setOf("2", "4"), result.selectedIds)
+    }
+
+    @Test
+    fun `모두_선택은_현재_페이지를_누적하면서도_최대_100장을_넘지_않는다`() {
+        val first = requireNotNull(
+            PhotoRecommendationPagingState(maxSelectionCount = 100).accept(
+                PhotoRecommendationPage(1, (1..72).map(::photo), hasMore = true),
+                autoSelectNewPhotos = false,
+            ),
+        ).selectAllLoadedPhotos()
+        val second = requireNotNull(
+            first.accept(
+                PhotoRecommendationPage(1, (73..120).map(::photo), hasMore = true),
+                autoSelectNewPhotos = false,
+            ),
+        ).selectAllLoadedPhotos()
+
+        assertEquals(72, first.selectedIds.size)
+        assertEquals(100, second.selectedIds.size)
+        assertEquals((1..100).map(Int::toString).toSet(), second.selectedIds)
+    }
+
+    @Test
     fun `빈_추가_페이지는_기존_사진과_선택을_보존한다`() {
         val first = PhotoRecommendationPagingState()
             .accept(PhotoRecommendationPage(1, listOf(photo(1), photo(2)), hasMore = true))

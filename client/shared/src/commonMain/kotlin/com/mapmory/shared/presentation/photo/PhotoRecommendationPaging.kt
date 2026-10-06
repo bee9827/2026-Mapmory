@@ -25,6 +25,7 @@ internal const val PhotoRecommendationPageSize = 24
 internal fun PhotoRecommendationPagingState.accept(
     page: PhotoRecommendationPage,
     autoSelectNewPhotos: Boolean = true,
+    preselectedIds: Set<String> = emptySet(),
 ): PhotoRecommendationPagingState? {
     if (generation != null && generation != page.generation) return null
 
@@ -39,12 +40,21 @@ internal fun PhotoRecommendationPagingState.accept(
     }
 
     val nextPhotos = if (isFirstPage) incoming else photos + incoming
+    val remainingSlots = (maxSelectionCount - selectedIds.size).coerceAtLeast(0)
+    val matchingPreselectedIds = incoming
+        .asSequence()
+        .map(SelectedPhoto::id)
+        .filter(preselectedIds::contains)
+        .filterNot(selectedIds::contains)
+        .take(remainingSlots)
+        .toSet()
     val selectedFromIncoming = if (autoSelectNewPhotos) {
         incoming
             .asSequence()
             .map(SelectedPhoto::id)
             .filterNot(selectedIds::contains)
-            .take((maxSelectionCount - selectedIds.size).coerceAtLeast(0))
+            .filterNot(matchingPreselectedIds::contains)
+            .take((remainingSlots - matchingPreselectedIds.size).coerceAtLeast(0))
             .toSet()
     } else {
         emptySet()
@@ -52,10 +62,22 @@ internal fun PhotoRecommendationPagingState.accept(
     return copy(
         generation = page.generation,
         photos = nextPhotos,
-        selectedIds = selectedIds + selectedFromIncoming,
+        selectedIds = selectedIds + matchingPreselectedIds + selectedFromIncoming,
         pageIndex = if (isFirstPage) 0 else pageIndex + 1,
         hasMore = page.hasMore,
     )
+}
+
+internal fun PhotoRecommendationPagingState.selectAllLoadedPhotos(): PhotoRecommendationPagingState {
+    if (selectedIds.size >= maxSelectionCount) return this
+    val idsToAdd = photos
+        .asSequence()
+        .map(SelectedPhoto::id)
+        .filterNot(selectedIds::contains)
+        .distinct()
+        .take((maxSelectionCount - selectedIds.size).coerceAtLeast(0))
+        .toSet()
+    return if (idsToAdd.isEmpty()) this else copy(selectedIds = selectedIds + idsToAdd)
 }
 
 internal fun PhotoRecommendationPagingState.toggleSelection(

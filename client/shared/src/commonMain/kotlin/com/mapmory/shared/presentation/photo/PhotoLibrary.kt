@@ -33,6 +33,8 @@ data class PhotoRecommendationPage(
     val generation: Int,
     val photos: List<SelectedPhoto>,
     val hasMore: Boolean,
+    val totalMatchingCount: Int? = null,
+    val excludedCount: Int = 0,
 )
 
 data class PhotoRecommendationDateRange(
@@ -48,6 +50,7 @@ enum class PhotoLibraryPermissionIssue {
 
 data class PhotoLibraryActions(
     val pickFromGallery: () -> Unit,
+    val setExcludedPhotoIds: (Set<String>) -> Unit = {},
     val recommendForLocation: (Location, String?) -> Unit,
     val recommendForLocationInDateRange: (
         Location,

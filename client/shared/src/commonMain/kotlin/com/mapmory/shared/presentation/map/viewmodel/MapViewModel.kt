@@ -16,7 +16,7 @@ import com.mapmory.shared.presentation.map.domain.MapScope
 import com.mapmory.shared.presentation.map.state.KoreaMapUiState
 
 data class MapUiState(
-    val scope: MapScope = MapScope.KOREA,
+    val scope: MapScope = MapScope.WORLD,
     val koreaMap: KoreaMapUiState = KoreaMapUiState.ProvinceOverview,
     val rootRegions: List<MapRegionSummary> = emptyList(),
     val koreaProvinces: List<MapRegionSummary> = emptyList(),

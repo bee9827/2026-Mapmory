@@ -84,13 +84,6 @@ class AppContainerTest {
                             respondJson(detailResponse("travel-records/10/server-photo.jpg"))
                         }
 
-                        6 -> {
-                            assertEquals("GET", request.method.value)
-                            assertEquals("/api/v1/travel-records/101", request.url.encodedPath)
-                            assertEquals("Bearer guest-access", request.headers[HttpHeaders.Authorization])
-                            respondJson(detailResponse("travel-records/10/server-photo.jpg"))
-                        }
-
                         else -> {
                             assertEquals("GET", request.method.value)
                             assertEquals("/api/v1/travel-records", request.url.encodedPath)
@@ -145,7 +138,7 @@ class AppContainerTest {
             listState.records.single().photos.single().previewBytes?.bytesForDecoding(),
         )
         assertEquals(AuthTokens("guest-access", "guest-refresh"), tokenStore.tokens)
-        assertEquals(7, requestCount)
+        assertEquals(6, requestCount)
         container.close()
     }
 
@@ -192,7 +185,7 @@ class AppContainerTest {
 
         assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), first.media.single().previewBytes)
         assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), second.media.single().previewBytes)
-        assertEquals(4, requestCount)
+        assertEquals(3, requestCount)
         container.close()
     }
 
@@ -203,7 +196,7 @@ class AppContainerTest {
             accessTokenProvider = AccessTokenProvider { "guest-token" },
         )
 
-        assertIs<TripRecordRemoteRepository>(container.tripRecordRepository)
+        assertIs<com.mapmory.shared.data.repository.PhotoUsageTripRecordRepository>(container.tripRecordRepository)
         assertEquals(null, container.mapSummaryRepository.getCachedRootRegions())
         assertEquals(null, container.tripStatisticsRepository.getCachedStatistics())
         container.close()
@@ -224,7 +217,7 @@ class AppContainerTest {
             onboardingPreference = onboardingPreference,
         )
 
-        assertSame(repository, container.tripRecordRepository)
+        assertIs<com.mapmory.shared.data.repository.PhotoUsageTripRecordRepository>(container.tripRecordRepository)
         assertSame(themePreference, container.themePreference)
         assertSame(onboardingPreference, container.onboardingPreference)
         assertTrue(container.themePreference.loadIsDarkTheme())

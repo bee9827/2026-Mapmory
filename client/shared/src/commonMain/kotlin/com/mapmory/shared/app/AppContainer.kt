@@ -93,6 +93,7 @@ interface MapmoryViewModelFactory {
 }
 
 private class DefaultMapmoryViewModelFactory(
+    private val recordedPhotoIndex: com.mapmory.shared.data.media.RecordedPhotoIndex,
     private val repository: TripRecordRepository,
     private val mapSummaryRepository: MapSummaryRepository,
     private val tripStatisticsRepository: TripStatisticsRepository,
@@ -137,21 +138,26 @@ private class DefaultMapmoryViewModelFactory(
             getTags = GetTagsUseCase(tagRepository),
             createTag = CreateTagUseCase(tagRepository),
             backgroundTripRecordSaver = backgroundTripRecordSaver,
+            recordedPhotoIndex = recordedPhotoIndex,
         )
 }
 
 private class DefaultAppContainer(
     override val regionCatalog: RegionCatalog,
-    override val tripRecordRepository: TripRecordRepository,
+    tripRecordRepository: TripRecordRepository,
     override val mapSummaryRepository: MapSummaryRepository,
     override val tripStatisticsRepository: TripStatisticsRepository,
     override val tagRepository: TagRepository,
     override val themePreference: ThemePreference,
     override val onboardingPreference: OnboardingPreference,
     private val thumbnailLoader: TripRecordThumbnailLoader?,
+    private val photoPreviewCache: PhotoPreviewCache?,
     backgroundSaveExecution: BackgroundSaveExecution,
     private val onClose: () -> Unit,
 ) : AppContainer {
+    private val recordedPhotoIndex = com.mapmory.shared.data.media.RecordedPhotoIndex(photoPreviewCache)
+    override val tripRecordRepository: TripRecordRepository =
+        com.mapmory.shared.data.repository.PhotoUsageTripRecordRepository(tripRecordRepository, recordedPhotoIndex)
     private val backgroundSaveScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mutableTripRecordRevision = MutableStateFlow(0L)
     override val tripRecordRevision: StateFlow<Long> = mutableTripRecordRevision.asStateFlow()
@@ -161,14 +167,16 @@ private class DefaultAppContainer(
         mutableTripRecordRevision.update { revision -> revision + 1 }
     }
     override val backgroundTripRecordSaver = BackgroundTripRecordSaver(
-        repository = tripRecordRepository,
+        repository = this.tripRecordRepository,
         scope = backgroundSaveScope,
         execution = backgroundSaveExecution,
+        photoPreviewCache = photoPreviewCache,
         onSaved = notifyTripRecordsChanged,
     )
 
     override val viewModelFactory: MapmoryViewModelFactory = DefaultMapmoryViewModelFactory(
-        repository = tripRecordRepository,
+        recordedPhotoIndex = recordedPhotoIndex,
+        repository = this.tripRecordRepository,
         mapSummaryRepository = mapSummaryRepository,
         tripStatisticsRepository = tripStatisticsRepository,
         tagRepository = tagRepository,
@@ -201,6 +209,7 @@ fun createAppContainer(
     themePreference: ThemePreference = MemoryThemePreference(),
     onboardingPreference: OnboardingPreference = MemoryOnboardingPreference(),
     thumbnailLoader: TripRecordThumbnailLoader? = null,
+    photoPreviewCache: PhotoPreviewCache? = null,
     backgroundSaveExecution: BackgroundSaveExecution = DirectBackgroundSaveExecution,
     onClose: () -> Unit = {},
 ): AppContainer {
@@ -221,6 +230,7 @@ fun createAppContainer(
         themePreference = themePreference,
         onboardingPreference = onboardingPreference,
         thumbnailLoader = thumbnailLoader,
+        photoPreviewCache = photoPreviewCache,
         backgroundSaveExecution = backgroundSaveExecution,
         onClose = onClose,
     )
@@ -383,6 +393,7 @@ internal fun createGuestRemoteAppContainer(
         themePreference = themePreference,
         onboardingPreference = onboardingPreference,
         thumbnailLoader = CachedTripRecordThumbnailLoader(photoPreviewLoader),
+        photoPreviewCache = photoPreviewCache,
         backgroundSaveExecution = backgroundSaveExecution,
         onClose = onClose,
     )

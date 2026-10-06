@@ -102,6 +102,7 @@ actual fun rememberPhotoLibraryActions(
 
     return remember(controller) {
         PhotoLibraryActions(
+            setExcludedPhotoIds = { controller.excludedPhotoIds = it },
             pickFromGallery = controller::presentPicker,
             recommendForLocation = controller::recommend,
             recommendForLocationInDateRange = controller::recommendInDateRange,
@@ -153,6 +154,9 @@ private class IosPhotoLibraryController(
     private var recommendationJob: Job? = null
     private var recommendationGeneration = 0
     private var recommendationSession: IosRecommendationSession? = null
+    var excludedPhotoIds: Set<String> = emptySet()
+    private var totalMatchingCount = 0
+    private var excludedCount = 0
     private var isRecommendationPageLoading = false
     private var pendingRecommendation: PendingIosRecommendation? = null
     private var appActiveObserver: Any? = null
@@ -349,7 +353,9 @@ private class IosPhotoLibraryController(
             }
             if (generation != recommendationGeneration) return@launch
 
-            val session = IosRecommendationSession(generation, matchingAssets)
+            val session = IosRecommendationSession(generation, matchingAssets.filterNot { it.localIdentifier in excludedPhotoIds })
+            totalMatchingCount = matchingAssets.size
+            excludedCount = matchingAssets.size - session.assets.size
             recommendationSession = session
             loadRecommendationPage(session) { page ->
                 if (generation == recommendationGeneration) {
@@ -358,7 +364,10 @@ private class IosPhotoLibraryController(
                         "recommend_total_ms=${elapsedMillis(startedAtMillis)} " +
                             "recommended_photos=${page.photos.size}",
                     )
-                    onPhotosRecommended(page.asPublicPage())
+                    onPhotosRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = totalMatchingCount,
+                        excludedCount = excludedCount,
+                    ))
                     finishRecommendationLoading()
                 }
             }
@@ -377,7 +386,10 @@ private class IosPhotoLibraryController(
             loadRecommendationPage(session) { page ->
                 if (generation == recommendationGeneration) {
                     recommendationSession = session.copy(nextIndex = page.nextIndex)
-                    onPhotosRecommended(page.asPublicPage())
+                    onPhotosRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = totalMatchingCount,
+                        excludedCount = excludedCount,
+                    ))
                     finishRecommendationLoading()
                 }
             }

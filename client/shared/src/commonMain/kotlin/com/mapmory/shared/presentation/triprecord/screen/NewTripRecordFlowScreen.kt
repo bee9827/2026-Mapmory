@@ -4,7 +4,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -28,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -51,10 +56,11 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -79,7 +85,9 @@ import com.mapmory.shared.presentation.photo.PhotoRecommendationPagingState
 import com.mapmory.shared.presentation.photo.RecommendationLoadKey
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.photo.accept
+import com.mapmory.shared.presentation.photo.photoRecommendationDateRange
 import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
+import com.mapmory.shared.presentation.photo.selectAllLoadedPhotos
 import com.mapmory.shared.presentation.photo.setSelection
 import com.mapmory.shared.presentation.photo.shouldLoadNextRecommendationPage
 import com.mapmory.shared.presentation.photo.toggleSelection
@@ -87,27 +95,129 @@ import com.mapmory.shared.presentation.triprecord.selectableTripRecordDestinatio
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.isActive
+import kotlin.math.roundToInt
 
-private enum class NewRecordFlowStep {
+internal enum class NewRecordFlowStep {
     LOCATION,
     PHOTO_LOADING,
     PHOTO_PICKER,
 }
 
+internal enum class NewRecordBackAction {
+    IGNORE,
+    CLOSE_PREVIEW,
+    CONFIRM_PHOTO_LOADING,
+    CONFIRM_PHOTO_PICKER,
+    EXIT_FLOW,
+}
+
+internal fun newRecordBackAction(
+    step: NewRecordFlowStep,
+    isSaving: Boolean,
+    hasOpenPhotoPreview: Boolean,
+    isPhotoLoading: Boolean,
+): NewRecordBackAction = when {
+    isSaving -> NewRecordBackAction.IGNORE
+    hasOpenPhotoPreview -> NewRecordBackAction.CLOSE_PREVIEW
+    step == NewRecordFlowStep.PHOTO_LOADING && isPhotoLoading -> {
+        NewRecordBackAction.CONFIRM_PHOTO_LOADING
+    }
+    step == NewRecordFlowStep.PHOTO_PICKER -> NewRecordBackAction.CONFIRM_PHOTO_PICKER
+    else -> NewRecordBackAction.EXIT_FLOW
+}
+
 private const val KoreaCountryId = 1L
 private const val PhotoListPrefetchGroups = 2
 private const val PhotoLimitMessageDurationMillis = 3_000L
+private const val DragAutoScrollFrameMillis = 16L
 
-private class PhotoDragSelectionController(
+internal data class PhotoPickerScrollBarMetrics(
+    val thumbFraction: Float,
+    val scrollFraction: Float,
+)
+
+internal data class PhotoPickerScrollTarget(
+    val itemIndex: Int,
+    val itemScrollOffset: Int,
+)
+
+internal fun photoPickerScrollTarget(
+    scrollFraction: Float,
+    viewportSize: Int,
+    itemSizes: List<Int>,
+    itemSpacing: Int,
+    contentPaddingBefore: Int,
+    contentPaddingAfter: Int,
+): PhotoPickerScrollTarget? {
+    if (viewportSize <= 0 || itemSizes.isEmpty()) return null
+    val contentSize = contentPaddingBefore + contentPaddingAfter +
+        itemSizes.sum() + itemSpacing * (itemSizes.size - 1).coerceAtLeast(0)
+    val maximumScrollOffset = (contentSize - viewportSize).coerceAtLeast(0)
+    var remainingOffset =
+        (scrollFraction.coerceIn(0f, 1f) * maximumScrollOffset).roundToInt() - contentPaddingBefore
+    if (remainingOffset <= 0) return PhotoPickerScrollTarget(0, 0)
+
+    itemSizes.forEachIndexed { index, itemSize ->
+        if (remainingOffset < itemSize + itemSpacing || index == itemSizes.lastIndex) {
+            return PhotoPickerScrollTarget(
+                itemIndex = index,
+                itemScrollOffset = remainingOffset.coerceIn(0, itemSize),
+            )
+        }
+        remainingOffset -= itemSize + itemSpacing
+    }
+    return PhotoPickerScrollTarget(itemSizes.lastIndex, itemSizes.last())
+}
+
+internal fun photoPickerScrollBarMetrics(
+    scrollOffset: Int,
+    viewportSize: Int,
+    contentSize: Int,
+): PhotoPickerScrollBarMetrics? {
+    if (viewportSize <= 0 || contentSize <= viewportSize) return null
+    val maxScrollOffset = contentSize - viewportSize
+    return PhotoPickerScrollBarMetrics(
+        thumbFraction = (viewportSize.toFloat() / contentSize).coerceIn(0f, 1f),
+        scrollFraction = (scrollOffset.toFloat() / maxScrollOffset).coerceIn(0f, 1f),
+    )
+}
+
+internal fun photoDragAutoScrollVelocity(
+    pointerY: Float,
+    viewportTop: Float,
+    viewportBottom: Float,
+    edgeSize: Float,
+    maximumStep: Float,
+): Float {
+    if (edgeSize <= 0f || viewportBottom <= viewportTop) return 0f
+    return when {
+        pointerY < viewportTop + edgeSize -> {
+            val proximity = ((viewportTop + edgeSize - pointerY) / edgeSize).coerceIn(0f, 1f)
+            -maximumStep * proximity * proximity
+        }
+        pointerY > viewportBottom - edgeSize -> {
+            val proximity = ((pointerY - (viewportBottom - edgeSize)) / edgeSize).coerceIn(0f, 1f)
+            maximumStep * proximity * proximity
+        }
+        else -> 0f
+    }
+}
+
+internal class PhotoDragSelectionController(
     private val selectedIds: () -> Set<String>,
     private val onSelectionChanged: (photoId: String, selected: Boolean) -> Unit,
+    private val orderedIds: () -> List<String> = { emptyList() },
+    private val maxSelectionCount: Int = TripRecordPhotoRules.MaxPhotosPerRecord,
 ) {
     private val boundsByPhotoId = mutableMapOf<String, Rect>()
-    private val changedPhotoIds = mutableSetOf<String>()
     private var initialSelectedIds = emptySet<String>()
     private var currentSelectedIds = mutableSetOf<String>()
-    private var startPosition: Offset? = null
+    private var anchorId: String? = null
     private var selectionValue: Boolean? = null
+
+    fun photoAt(position: Offset): String? = boundsByPhotoId.entries
+        .firstOrNull { (_, bounds) -> bounds.contains(position) }?.key
 
     fun updateBounds(photoId: String, bounds: Rect) {
         boundsByPhotoId[photoId] = bounds
@@ -118,47 +228,46 @@ private class PhotoDragSelectionController(
     }
 
     fun start(photoId: String, positionInRoot: Offset) {
-        changedPhotoIds.clear()
         initialSelectedIds = selectedIds().toSet()
         currentSelectedIds = initialSelectedIds.toMutableSet()
-        startPosition = positionInRoot
-        selectionValue = photoId !in initialSelectedIds
+        anchorId = photoId
+        selectionValue = photoId !in currentSelectedIds
         moveTo(positionInRoot)
     }
 
     fun moveTo(positionInRoot: Offset) {
-        val start = startPosition ?: return
+        val anchor = anchorId ?: return
         val selected = selectionValue ?: return
-        val selectionRect = Rect(
-            left = minOf(start.x, positionInRoot.x),
-            top = minOf(start.y, positionInRoot.y),
-            right = maxOf(start.x, positionInRoot.x),
-            bottom = maxOf(start.y, positionInRoot.y),
-        )
-        boundsByPhotoId.forEach { (photoId, bounds) ->
-            val inside = bounds.intersects(selectionRect)
-            if (inside) changedPhotoIds += photoId
-            if (inside || photoId in changedPhotoIds) {
-                val desired = if (inside) selected else photoId in initialSelectedIds
-                if ((photoId in currentSelectedIds) != desired) {
-                    if (desired) currentSelectedIds += photoId else currentSelectedIds -= photoId
-                    onSelectionChanged(photoId, desired)
-                }
-            }
+        val target = photoAt(positionInRoot) ?: boundsByPhotoId.entries.minByOrNull { (_, bounds) ->
+            val dx = positionInRoot.x - positionInRoot.x.coerceIn(bounds.left, bounds.right)
+            val dy = positionInRoot.y - positionInRoot.y.coerceIn(bounds.top, bounds.bottom)
+            dx * dx + dy * dy
+        }?.key ?: return
+        val ids = orderedIds().ifEmpty { boundsByPhotoId.keys.toList() }
+        val start = ids.indexOf(anchor)
+        val end = ids.indexOf(target)
+        if (start < 0 || end < 0) return
+        val range = if (start <= end) start..end else start downTo end
+        val rangeIds = range.map { ids[it] }
+        val desired = if (selected) {
+            initialSelectedIds + rangeIds.filterNot(initialSelectedIds::contains)
+                .take((maxSelectionCount - initialSelectedIds.size).coerceAtLeast(0))
+        } else {
+            initialSelectedIds - rangeIds.toSet()
         }
+        // Restore contracted ranges before adding new items so the limit never blocks restoration.
+        (currentSelectedIds - desired).forEach { onSelectionChanged(it, false) }
+        (desired - currentSelectedIds).forEach { onSelectionChanged(it, true) }
+        currentSelectedIds = desired.toMutableSet()
     }
 
     fun finish() {
-        startPosition = null
+        anchorId = null
         selectionValue = null
         initialSelectedIds = emptySet()
         currentSelectedIds.clear()
-        changedPhotoIds.clear()
     }
 }
-
-private fun Rect.intersects(other: Rect): Boolean =
-    left <= other.right && right >= other.left && top <= other.bottom && bottom >= other.top
 
 @Composable
 internal fun NewTripRecordFlowScreen(
@@ -172,6 +281,11 @@ internal fun NewTripRecordFlowScreen(
     onPhotoLoadingChanged: (Boolean) -> Unit,
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
+    onConfirmedPhotoLoadingBackClick: () -> Unit = onBackClick,
+    recordedPhotoIds: Set<String> = emptySet(),
+    photoUsageReady: Boolean = true,
+    startWithPhotoSearch: Boolean = false,
+    saveActionLabel: String = "기록하기",
     onInternalBackHandlerChanged: (handler: (() -> Boolean)?) -> Unit = {},
     photoLibraryActionsFactory: PhotoLibraryActionsFactory =
         {
@@ -200,8 +314,18 @@ internal fun NewTripRecordFlowScreen(
     val selectableLocations = remember(locations) {
         locations.selectableTripRecordDestinations()
     }
-    var stepName by rememberSaveable { mutableStateOf(NewRecordFlowStep.LOCATION.name) }
+    var stepName by rememberSaveable(startWithPhotoSearch) {
+        mutableStateOf(
+            if (startWithPhotoSearch) {
+                NewRecordFlowStep.PHOTO_LOADING.name
+            } else {
+                NewRecordFlowStep.LOCATION.name
+            },
+        )
+    }
     val step = NewRecordFlowStep.valueOf(stepName)
+    var excludeRecordedPhotos by rememberSaveable { mutableStateOf(!startWithPhotoSearch) }
+    var photoCounts by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val interactedFields = remember { mutableSetOf<String>() }
     var locationSearchQuery by rememberSaveable { mutableStateOf("") }
     var detailsErrorMessage by remember { mutableStateOf<String?>(null) }
@@ -216,10 +340,32 @@ internal fun NewTripRecordFlowScreen(
         mutableStateOf(PhotoRecommendationPagingState())
     }
     var lastAutoLoadTriggerKey by remember { mutableStateOf<RecommendationLoadKey?>(null) }
+    var lastSelectAllLoadTriggerKey by remember { mutableStateOf<RecommendationLoadKey?>(null) }
+    var isSelectingAllPhotos by remember { mutableStateOf(false) }
+    var isRefreshingRecordedPhotoFilter by remember { mutableStateOf(false) }
+    var showPhotoLoadingBackConfirmation by remember { mutableStateOf(false) }
+    var showPhotoPickerBackConfirmation by remember { mutableStateOf(false) }
     var previewPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingLocation by remember { mutableStateOf<Location?>(null) }
     var pendingSave by remember { mutableStateOf(false) }
+    var hasStartedInitialPhotoSearch by rememberSaveable(startWithPhotoSearch) { mutableStateOf(false) }
     val photoListState = rememberLazyListState()
+    val preselectedLocalPhotoIds = remember(
+        startWithPhotoSearch,
+        uiState.recordId,
+        uiState.selectedPhotos,
+    ) {
+        if (startWithPhotoSearch) {
+            uiState.selectedPhotos
+                .asSequence()
+                .mapNotNull { photo -> photo.localPhotoId }
+                .distinct()
+                .take(TripRecordPhotoRules.MaxPhotosPerRecord)
+                .toSet()
+        } else {
+            emptySet()
+        }
+    }
 
     fun logFieldInteraction(fieldName: String) {
         if (interactedFields.add(fieldName)) {
@@ -245,6 +391,11 @@ internal fun NewTripRecordFlowScreen(
     fun showPhotoLimitMessage() {
         transientPhotoMessage = TripRecordPhotoRules.LimitMessage
         transientPhotoMessageVersion += 1
+    }
+
+    fun cancelSelectAllContinuation() {
+        isSelectingAllPhotos = false
+        lastSelectAllLoadTriggerKey = null
     }
 
     LaunchedEffect(transientPhotoMessageVersion) {
@@ -277,22 +428,44 @@ internal fun NewTripRecordFlowScreen(
             }
         },
         { page ->
-            recommendationPagingState
-                .accept(page, autoSelectNewPhotos = false)
+            photoCounts = page.totalMatchingCount?.let { it to page.excludedCount }
+            val pagingStateToUpdate = if (isRefreshingRecordedPhotoFilter) {
+                PhotoRecommendationPagingState()
+            } else {
+                recommendationPagingState
+            }
+            pagingStateToUpdate
+                .accept(
+                    page = page,
+                    autoSelectNewPhotos = false,
+                    preselectedIds = preselectedLocalPhotoIds,
+                )
                 ?.let { nextState ->
-                    recommendationPagingState = nextState
+                    recommendationPagingState = if (isSelectingAllPhotos) {
+                        nextState.selectAllLoadedPhotos()
+                    } else {
+                        nextState
+                    }
+                    isRefreshingRecordedPhotoFilter = false
                     if (stepName == NewRecordFlowStep.PHOTO_LOADING.name) {
                         isPreparingPhotoPreviews = false
                         stepName = NewRecordFlowStep.PHOTO_PICKER.name
                     }
                     if (nextState.photos.isEmpty() && !page.hasMore) {
-                        photoMessage = "선택한 장소에서 촬영된 사진을 찾지 못했어요."
+                        photoMessage = if (page.excludedCount > 0) {
+                            "이 장소의 사진을 모두 기록했어요. 제외 옵션을 끄면 다시 선택할 수 있어요."
+                        } else {
+                            "선택한 장소에서 촬영된 사진을 찾지 못했어요."
+                        }
                     } else if (nextState.photos.isNotEmpty()) {
                         photoMessage = null
                     }
                 }
         },
-        { message -> photoMessage = message },
+        { message ->
+            photoMessage = message
+            isRefreshingRecordedPhotoFilter = false
+        },
         { isLoading ->
             onPhotoLoadingChanged(isLoading)
         },
@@ -303,6 +476,39 @@ internal fun NewTripRecordFlowScreen(
         { isLoading -> isRecommendationLoading = isLoading },
         { issue -> photoPermissionIssue = issue },
     )
+
+    LaunchedEffect(
+        isSelectingAllPhotos,
+        recommendationPagingState.generation,
+        recommendationPagingState.photos.size,
+        recommendationPagingState.selectedIds.size,
+        recommendationPagingState.hasMore,
+        isRecommendationLoading,
+    ) {
+        if (!isSelectingAllPhotos) return@LaunchedEffect
+
+        val selectedState = recommendationPagingState.selectAllLoadedPhotos()
+        if (selectedState != recommendationPagingState) {
+            recommendationPagingState = selectedState
+            return@LaunchedEffect
+        }
+        if (
+            selectedState.selectedIds.size >= selectedState.maxSelectionCount ||
+            !selectedState.hasMore
+        ) {
+            isSelectingAllPhotos = false
+            lastSelectAllLoadTriggerKey = null
+            return@LaunchedEffect
+        }
+        if (isRecommendationLoading) return@LaunchedEffect
+
+        val generation = selectedState.generation ?: return@LaunchedEffect
+        val currentKey = RecommendationLoadKey(generation, selectedState.photos.size)
+        if (lastSelectAllLoadTriggerKey != currentKey) {
+            lastSelectAllLoadTriggerKey = currentKey
+            photoLibrary.loadNextRecommendationPage()
+        }
+    }
 
     val filteredLocations = remember(locationSearchQuery, selectableLocations, locations) {
         val query = locationSearchQuery.trim()
@@ -329,8 +535,13 @@ internal fun NewTripRecordFlowScreen(
         recommendationPagingState.photos.size,
         recommendationPagingState.hasMore,
         isRecommendationLoading,
+        isSelectingAllPhotos,
     ) {
-        if (step != NewRecordFlowStep.PHOTO_PICKER || isRecommendationLoading) {
+        if (
+            step != NewRecordFlowStep.PHOTO_PICKER ||
+            isRecommendationLoading ||
+            isSelectingAllPhotos
+        ) {
             return@LaunchedEffect
         }
         snapshotFlow {
@@ -359,23 +570,35 @@ internal fun NewTripRecordFlowScreen(
     }
 
     fun returnToPreviousStep() {
-        if (uiState.isSaving) return
-        if (previewPhotoId != null) {
-            previewPhotoId = null
-            return
-        }
-        when (step) {
-            NewRecordFlowStep.LOCATION -> onBackClick()
-            NewRecordFlowStep.PHOTO_LOADING,
-            NewRecordFlowStep.PHOTO_PICKER,
-            -> {
-                if (step == NewRecordFlowStep.PHOTO_LOADING) {
-                    analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_CANCELLED)
+        when (
+            newRecordBackAction(
+                step = step,
+                isSaving = uiState.isSaving,
+                hasOpenPhotoPreview = previewPhotoId != null,
+                isPhotoLoading = uiState.isPhotoLoading ||
+                    isRecommendationLoading ||
+                    isPreparingPhotoPreviews ||
+                    isRefreshingRecordedPhotoFilter,
+            )
+        ) {
+            NewRecordBackAction.IGNORE -> Unit
+            NewRecordBackAction.CLOSE_PREVIEW -> previewPhotoId = null
+            NewRecordBackAction.CONFIRM_PHOTO_LOADING -> {
+                showPhotoLoadingBackConfirmation = true
+            }
+            NewRecordBackAction.CONFIRM_PHOTO_PICKER -> {
+                showPhotoPickerBackConfirmation = true
+            }
+            NewRecordBackAction.EXIT_FLOW -> {
+                if (startWithPhotoSearch || step == NewRecordFlowStep.LOCATION) {
+                    onBackClick()
+                } else {
+                    photoLibrary.cancelRecommendation()
+                    isPreparingPhotoPreviews = false
+                    isRefreshingRecordedPhotoFilter = false
+                    onPhotoLoadingChanged(false)
+                    stepName = NewRecordFlowStep.LOCATION.name
                 }
-                photoLibrary.cancelRecommendation()
-                isPreparingPhotoPreviews = false
-                onPhotoLoadingChanged(false)
-                stepName = NewRecordFlowStep.LOCATION.name
             }
         }
     }
@@ -393,7 +616,17 @@ internal fun NewTripRecordFlowScreen(
         }
     }
 
-    fun beginPhotoSearch() {
+    fun beginPhotoSearch(
+        keepPhotoPickerVisible: Boolean = false,
+        shouldExcludeRecordedPhotos: Boolean = excludeRecordedPhotos,
+    ) {
+        if (!photoUsageReady) {
+            detailsErrorMessage = "기록한 사진을 확인하고 있어요. 잠시 후 다시 눌러주세요."
+            return
+        }
+        photoLibrary.setExcludedPhotoIds(
+            if (shouldExcludeRecordedPhotos) recordedPhotoIds else emptySet(),
+        )
         val location = uiState.selectedLocation
         when {
             location == null -> {
@@ -408,18 +641,34 @@ internal fun NewTripRecordFlowScreen(
             else -> {
                 logFieldInteraction("photos")
                 detailsErrorMessage = null
-                photoMessage = null
+                if (!keepPhotoPickerVisible) photoMessage = null
                 photoLoadingProgress = null
                 isPreparingPhotoPreviews = false
-                recommendationPagingState = PhotoRecommendationPagingState()
+                if (!keepPhotoPickerVisible) {
+                    recommendationPagingState = PhotoRecommendationPagingState()
+                }
                 lastAutoLoadTriggerKey = null
-                stepName = NewRecordFlowStep.PHOTO_LOADING.name
+                lastSelectAllLoadTriggerKey = null
+                isSelectingAllPhotos = false
+                isRefreshingRecordedPhotoFilter = keepPhotoPickerVisible
+                if (!keepPhotoPickerVisible) {
+                    stepName = NewRecordFlowStep.PHOTO_LOADING.name
+                }
                 analytics.logEvent(
                     MapmoryAnalyticsEvent.PHOTO_RECOMMENDATION_STARTED,
                     mapOf("location_type" to location.type.name.lowercase()),
                 )
                 val parentName = locations.firstOrNull { it.id == location.parentId }?.name
-                photoLibrary.recommendForLocation(location, parentName)
+                val dateRange = if (startWithPhotoSearch) {
+                    photoRecommendationDateRange(uiState.startDate, uiState.endDate)
+                } else {
+                    null
+                }
+                if (dateRange == null) {
+                    photoLibrary.recommendForLocation(location, parentName)
+                } else {
+                    photoLibrary.recommendForLocationInDateRange(location, parentName, dateRange)
+                }
             }
         }
     }
@@ -427,6 +676,19 @@ internal fun NewTripRecordFlowScreen(
     LaunchedEffect(pendingLocation, uiState.selectedLocation) {
         if (pendingLocation != null && pendingLocation == uiState.selectedLocation) {
             pendingLocation = null
+            beginPhotoSearch()
+        }
+    }
+
+    LaunchedEffect(startWithPhotoSearch, uiState.recordId, uiState.selectedLocation, photoUsageReady) {
+        if (
+            startWithPhotoSearch &&
+            photoUsageReady &&
+            !hasStartedInitialPhotoSearch &&
+            uiState.recordId != null &&
+            uiState.selectedLocation != null
+        ) {
+            hasStartedInitialPhotoSearch = true
             beginPhotoSearch()
         }
     }
@@ -453,7 +715,20 @@ internal fun NewTripRecordFlowScreen(
             MapmoryAnalyticsEvent.PHOTOS_ADDED,
             mapOf("source" to "recommendation", "count" to selectedPhotos.size.toString()),
         )
-        replaceEditorPhotos(selectedPhotos)
+        if (startWithPhotoSearch) {
+            val retainedLocalPhotoIds = uiState.selectedPhotos
+                .asSequence()
+                .filter { photo -> photo.isUploaded }
+                .mapNotNull { photo -> photo.localPhotoId }
+                .filter(recommendationPagingState.selectedIds::contains)
+                .toSet()
+            uiState.selectedPhotos
+                .filterNot { photo -> photo.isUploaded && photo.localPhotoId in retainedLocalPhotoIds }
+                .forEach { photo -> onPhotoRemoved(photo.id) }
+            onPhotosAdded(selectedPhotos.filterNot { photo -> photo.id in retainedLocalPhotoIds })
+        } else {
+            replaceEditorPhotos(selectedPhotos)
+        }
         photoMessage = null
         pendingSave = true
     }
@@ -518,6 +793,20 @@ internal fun NewTripRecordFlowScreen(
                 message = uiState.errorMessage ?: photoMessage,
                 isLoadingMore = isRecommendationLoading,
                 isPreparing = uiState.isSaving || pendingSave,
+                isSelectingAll = isSelectingAllPhotos,
+                isRefreshingFilter = isRefreshingRecordedPhotoFilter,
+                actionLabel = saveActionLabel,
+                photoCounts = photoCounts,
+                recordedPhotoIds = recordedPhotoIds,
+                excludeRecordedPhotos = excludeRecordedPhotos,
+                showRecordedFilter = !startWithPhotoSearch,
+                onRecordedFilterChanged = {
+                    excludeRecordedPhotos = it
+                    beginPhotoSearch(
+                        keepPhotoPickerVisible = true,
+                        shouldExcludeRecordedPhotos = it,
+                    )
+                },
                 onBackClick = ::returnToPreviousStep,
                 onCompleteClick = ::completePhotoSelection,
                 onPickFromGallery = {
@@ -527,6 +816,8 @@ internal fun NewTripRecordFlowScreen(
                 },
                 onPhotoPreview = { previewPhotoId = it.id },
                 onPhotoToggle = { photo ->
+                    if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
+                    cancelSelectAllContinuation()
                     val next = recommendationPagingState.toggleSelection(photo.id)
                     if (next == recommendationPagingState && photo.id !in next.selectedIds) {
                         previewPhotoId = null
@@ -535,6 +826,8 @@ internal fun NewTripRecordFlowScreen(
                     recommendationPagingState = next
                 },
                 onPhotoSelectionChange = { photoId, selected ->
+                    if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
+                    cancelSelectAllContinuation()
                     val next = recommendationPagingState.setSelection(photoId, selected)
                     if (
                         selected &&
@@ -546,6 +839,8 @@ internal fun NewTripRecordFlowScreen(
                     recommendationPagingState = next
                 },
                 onGroupToggle = { ids ->
+                    if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
+                    cancelSelectAllContinuation()
                     val nextState = recommendationPagingState.toggleGroup(ids)
                     recommendationPagingState = nextState
                     if (
@@ -556,14 +851,13 @@ internal fun NewTripRecordFlowScreen(
                     }
                 },
                 onAllToggle = {
-                    val allIds = recommendationPagingState.photos.map(SelectedPhoto::id)
-                    val nextState = recommendationPagingState.toggleGroup(allIds)
-                    recommendationPagingState = nextState
-                    if (
-                        allIds.any { it !in nextState.selectedIds } &&
-                        nextState.selectedIds.size == nextState.maxSelectionCount
-                    ) {
-                        showPhotoLimitMessage()
+                    if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
+                    if (recommendationPagingState.isAllSelectionActive()) {
+                        cancelSelectAllContinuation()
+                        recommendationPagingState = recommendationPagingState.copy(selectedIds = emptySet())
+                    } else {
+                        isSelectingAllPhotos = true
+                        recommendationPagingState = recommendationPagingState.selectAllLoadedPhotos()
                     }
                 },
             )
@@ -613,6 +907,89 @@ internal fun NewTripRecordFlowScreen(
                 onDismiss = { previewPhotoId = null },
             )
         }
+
+    if (showPhotoLoadingBackConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showPhotoLoadingBackConfirmation = false },
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = true,
+            ),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = TripRecordPalette.current.surface,
+            titleContentColor = TripRecordPalette.current.text,
+            textContentColor = TripRecordPalette.current.bodyText,
+            title = { Text("사진을 불러오는 중이에요") },
+            text = {
+                Text("불러오는 중에 뒤로 가면 사진을 다시 찾아야 합니다. 이전 단계로 가시겠습니까?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPhotoLoadingBackConfirmation = false
+                        photoLibrary.cancelRecommendation()
+                        isPreparingPhotoPreviews = false
+                        isRefreshingRecordedPhotoFilter = false
+                        onPhotoLoadingChanged(false)
+                        if (startWithPhotoSearch) {
+                            onConfirmedPhotoLoadingBackClick()
+                        } else {
+                            stepName = NewRecordFlowStep.LOCATION.name
+                        }
+                    },
+                ) {
+                    Text("이전 단계로", color = TripRecordPalette.current.danger)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPhotoLoadingBackConfirmation = false }) {
+                    Text("계속 불러오기", color = TripRecordPalette.current.accent)
+                }
+            },
+        )
+    }
+
+    if (showPhotoPickerBackConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showPhotoPickerBackConfirmation = false },
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = true,
+            ),
+            shape = RoundedCornerShape(20.dp),
+            containerColor = TripRecordPalette.current.surface,
+            titleContentColor = TripRecordPalette.current.text,
+            textContentColor = TripRecordPalette.current.bodyText,
+            title = { Text("사진 선택을 그만둘까요?") },
+            text = {
+                Text("이전 단계로 가면 선택한 사진과 검색 결과가 사라집니다. 계속할까요?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showPhotoPickerBackConfirmation = false
+                        photoLibrary.cancelRecommendation()
+                        cancelSelectAllContinuation()
+                        isPreparingPhotoPreviews = false
+                        isRefreshingRecordedPhotoFilter = false
+                        onPhotoLoadingChanged(false)
+                        if (startWithPhotoSearch) {
+                            onConfirmedPhotoLoadingBackClick()
+                        } else {
+                            stepName = NewRecordFlowStep.LOCATION.name
+                        }
+                    },
+                ) {
+                    Text("이전 단계로", color = TripRecordPalette.current.danger)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPhotoPickerBackConfirmation = false }) {
+                    Text("계속 선택", color = TripRecordPalette.current.accent)
+                }
+            },
+        )
+    }
 
 }
 
@@ -1096,6 +1473,14 @@ private fun PhotoPickerStep(
     message: String?,
     isLoadingMore: Boolean,
     isPreparing: Boolean,
+    isSelectingAll: Boolean,
+    isRefreshingFilter: Boolean,
+    actionLabel: String,
+    photoCounts: Pair<Int, Int>?,
+    recordedPhotoIds: Set<String>,
+    excludeRecordedPhotos: Boolean,
+    showRecordedFilter: Boolean,
+    onRecordedFilterChanged: (Boolean) -> Unit,
     onBackClick: () -> Unit,
     onCompleteClick: () -> Unit,
     onPickFromGallery: () -> Unit,
@@ -1106,96 +1491,292 @@ private fun PhotoPickerStep(
     onAllToggle: () -> Unit,
 ) {
     val groups = remember(pagingState.photos) { pagingState.photos.toPhotoDateGroups() }
+    val density = LocalDensity.current
+    val autoScrollEdgeSize = with(density) { 104.dp.toPx() }
+    val maximumAutoScrollStep = with(density) { 30.dp.toPx() }
+    var listBounds by remember { mutableStateOf<Rect?>(null) }
+    var dragPointerPosition by remember { mutableStateOf<Offset?>(null) }
     val latestSelectedIds by rememberUpdatedState(pagingState.selectedIds)
+    val orderedPhotoIds = remember(groups) { groups.flatMap { it.second }.map { it.id } }
+    val latestOrderedIds by rememberUpdatedState(orderedPhotoIds)
     val latestSelectionChange by rememberUpdatedState(onPhotoSelectionChange)
     val dragSelectionController = remember {
         PhotoDragSelectionController(
             selectedIds = { latestSelectedIds },
+            orderedIds = { latestOrderedIds },
+            maxSelectionCount = pagingState.maxSelectionCount,
             onSelectionChanged = { photoId, selected ->
                 latestSelectionChange(photoId, selected)
             },
         )
     }
+    LaunchedEffect(listState, dragPointerPosition, listBounds) {
+        val pointer = dragPointerPosition ?: return@LaunchedEffect
+        val bounds = listBounds ?: return@LaunchedEffect
+        while (isActive) {
+            val velocity = photoDragAutoScrollVelocity(
+                pointerY = pointer.y,
+                viewportTop = bounds.top,
+                viewportBottom = bounds.bottom,
+                edgeSize = autoScrollEdgeSize,
+                maximumStep = maximumAutoScrollStep,
+            )
+            if (velocity != 0f) listState.scrollBy(velocity)
+            delay(DragAutoScrollFrameMillis)
+            dragSelectionController.moveTo(
+                Offset(pointer.x, pointer.y.coerceIn(bounds.top + 1f, bounds.bottom - 1f)),
+            )
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         FlowTopBar(
             title = "사진 고르기",
             onBackClick = onBackClick,
-            actionLabel = if (isPreparing) "저장 요청 중" else "기록하기",
-            actionEnabled = pagingState.selectedIds.isNotEmpty() && !isPreparing,
+            actionLabel = when {
+                isPreparing -> "저장 요청 중"
+                isSelectingAll -> "사진 불러오는 중"
+                isRefreshingFilter -> "필터 적용 중"
+                else -> actionLabel
+            },
+            actionEnabled = pagingState.selectedIds.isNotEmpty() &&
+                !isPreparing &&
+                !isSelectingAll &&
+                !isRefreshingFilter,
             onActionClick = onCompleteClick,
         )
-        LazyColumn(
-            state = listState,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f)
-                .navigationBarsPadding()
-                .clipToBounds(),
-            contentPadding = PaddingValues(start = 20.dp, top = 24.dp, end = 20.dp, bottom = 36.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+                .weight(1f),
         ) {
-            item {
-                PhotoPickerHeader(
-                    locationName = locationName,
-                    selectedCount = pagingState.selectedIds.size,
-                    allSelected = pagingState.photos.isNotEmpty() &&
-                        pagingState.photos.all { it.id in pagingState.selectedIds },
-                    onAllToggle = onAllToggle,
-                    onPickFromGallery = onPickFromGallery,
-                )
-            }
-            message?.let { currentMessage ->
-                item {
-                    Text(
-                        text = currentMessage,
-                        color = if (pagingState.photos.isEmpty()) {
-                            TripRecordPalette.current.secondaryText
-                        } else {
-                            TripRecordPalette.current.danger
-                        },
-                        fontSize = 12.sp,
-                    )
-                }
-            }
-            if (groups.isEmpty()) {
-                item {
-                    EmptyPhotoPicker(onPickFromGallery = onPickFromGallery)
-                }
-            } else {
-                items(groups, key = { it.first }) { (date, photos) ->
-                    PhotoDateGroup(
-                        date = date,
-                        photos = photos,
-                        selectedIds = pagingState.selectedIds,
-                        onGroupToggle = { onGroupToggle(photos.map(SelectedPhoto::id)) },
-                        onPhotoPreview = onPhotoPreview,
-                        onPhotoToggle = onPhotoToggle,
-                        dragSelectionController = dragSelectionController,
-                    )
-                }
-            }
-            if (isLoadingMore) {
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = TripRecordPalette.current.accent,
-                            strokeWidth = 2.dp,
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding()
+                    .clipToBounds()
+                    .onGloballyPositioned { coordinates -> listBounds = coordinates.boundsInRoot() }
+                    .pointerInput(dragSelectionController) {
+                        // The list owns the gesture even when its starting card leaves composition.
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offset ->
+                                val bounds = listBounds
+                                if (bounds != null) {
+                                    val position = bounds.topLeft + offset
+                                    dragSelectionController.photoAt(position)?.let { id ->
+                                        dragSelectionController.start(id, position)
+                                        dragPointerPosition = position
+                                    }
+                                }
+                            },
+                            onDrag = { change, _ ->
+                                if (dragPointerPosition != null) {
+                                    change.consume()
+                                    listBounds?.let { bounds ->
+                                        val position = bounds.topLeft + change.position
+                                        dragPointerPosition = position
+                                        dragSelectionController.moveTo(position)
+                                    }
+                                }
+                            },
+                            onDragEnd = {
+                                dragSelectionController.finish()
+                                dragPointerPosition = null
+                            },
+                            onDragCancel = {
+                                dragSelectionController.finish()
+                                dragPointerPosition = null
+                            },
                         )
+                    },
+                contentPadding = PaddingValues(start = 20.dp, top = 24.dp, end = 24.dp, bottom = 36.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                item {
+                    PhotoPickerHeader(
+                        locationName = locationName,
+                        selectedCount = pagingState.selectedIds.size,
+                        allSelected = pagingState.isAllSelectionActive(),
+                        onAllToggle = onAllToggle,
+                        onPickFromGallery = onPickFromGallery,
+                    )
+                    if (showRecordedFilter) {
+                        photoCounts?.let { (total, excluded) ->
+                            Text(
+                                "전체 ${total}장 · 제외 ${excluded}장 · 선택 가능 ${total - excluded}장",
+                                color = TripRecordPalette.current.secondaryText,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(top = 12.dp),
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Checkbox(
+                                checked = excludeRecordedPhotos,
+                                enabled = !isRefreshingFilter,
+                                onCheckedChange = onRecordedFilterChanged,
+                            )
+                            Text("기록한 사진 제외", color = TripRecordPalette.current.text)
+                        }
                         Text(
-                            text = "사진을 더 불러오는 중…",
+                            "저장 중인 사진도 제외해요. 필터를 바꾸면 선택이 초기화돼요.",
                             color = TripRecordPalette.current.secondaryText,
                             fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 8.dp),
                         )
                     }
                 }
+                message?.let { currentMessage ->
+                    item {
+                        Text(
+                            text = currentMessage,
+                            color = if (pagingState.photos.isEmpty()) {
+                                TripRecordPalette.current.secondaryText
+                            } else {
+                                TripRecordPalette.current.danger
+                            },
+                            fontSize = 12.sp,
+                        )
+                    }
+                }
+                if (groups.isEmpty()) {
+                    item {
+                        EmptyPhotoPicker(onPickFromGallery = onPickFromGallery)
+                    }
+                } else {
+                    items(groups, key = { it.first }) { (date, photos) ->
+                        PhotoDateGroup(
+                            date = date,
+                            photos = photos,
+                            selectedIds = pagingState.selectedIds,
+                            onGroupToggle = { onGroupToggle(photos.map(SelectedPhoto::id)) },
+                            onPhotoPreview = onPhotoPreview,
+                            onPhotoToggle = onPhotoToggle,
+                            dragSelectionController = dragSelectionController,
+                            recordedPhotoIds = recordedPhotoIds,
+                        )
+                    }
+                }
+                if (isLoadingMore) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = TripRecordPalette.current.accent,
+                                strokeWidth = 2.dp,
+                            )
+                            Text(
+                                text = "사진을 더 불러오는 중…",
+                                color = TripRecordPalette.current.secondaryText,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(start = 8.dp),
+                            )
+                        }
+                    }
+                }
             }
+            PhotoPickerScrollBar(
+                listState = listState,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 5.dp, top = 8.dp, bottom = 8.dp),
+            )
         }
+    }
+}
+
+@Composable
+private fun PhotoPickerScrollBar(
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    modifier: Modifier = Modifier,
+) {
+    val layoutInfo = listState.layoutInfo
+    if (layoutInfo.visibleItemsInfo.isEmpty() || layoutInfo.totalItemsCount <= 0) return
+    val density = LocalDensity.current
+    val itemSpacing = with(density) { 24.dp.roundToPx() }
+    val contentPaddingBefore = with(density) { 24.dp.roundToPx() }
+    val contentPaddingAfter = with(density) { 36.dp.roundToPx() }
+    val knownItemSizes = remember(listState) { mutableMapOf<Int, Int>() }
+    layoutInfo.visibleItemsInfo.forEach { item -> knownItemSizes[item.index] = item.size }
+    val estimatedItemSize = knownItemSizes.values.average().roundToInt().coerceAtLeast(1)
+    val estimatedItemSizes = (0 until layoutInfo.totalItemsCount).map { index ->
+        knownItemSizes[index] ?: estimatedItemSize
+    }
+    val estimatedContentSize = contentPaddingBefore + contentPaddingAfter +
+        estimatedItemSizes.sum() +
+        itemSpacing * (layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+    val estimatedScrollOffset = (0 until listState.firstVisibleItemIndex).sumOf { index ->
+        (knownItemSizes[index] ?: estimatedItemSize) + itemSpacing
+    } + listState.firstVisibleItemScrollOffset
+    val viewportSize = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+    val scrollOffset = when {
+        !listState.canScrollBackward -> 0
+        !listState.canScrollForward -> estimatedContentSize - viewportSize
+        else -> estimatedScrollOffset
+    }
+    val metrics = photoPickerScrollBarMetrics(
+        scrollOffset = scrollOffset,
+        viewportSize = viewportSize,
+        contentSize = estimatedContentSize,
+    ) ?: return
+    val trackColor = TripRecordPalette.current.line.copy(alpha = 0.65f)
+    val thumbColor = TripRecordPalette.current.accent.copy(alpha = 0.9f)
+    var scrollRequestVersion by remember { mutableStateOf(0) }
+    var requestedScroll by remember { mutableStateOf<Pair<Int, Float>?>(null) }
+    LaunchedEffect(requestedScroll) {
+        val fraction = requestedScroll?.second ?: return@LaunchedEffect
+        val target = photoPickerScrollTarget(
+            scrollFraction = fraction,
+            viewportSize = viewportSize,
+            itemSizes = estimatedItemSizes,
+            itemSpacing = itemSpacing,
+            contentPaddingBefore = contentPaddingBefore,
+            contentPaddingAfter = contentPaddingAfter,
+        ) ?: return@LaunchedEffect
+        listState.scrollToItem(target.itemIndex, target.itemScrollOffset)
+    }
+    Canvas(
+        modifier = modifier
+            .width(24.dp)
+            .fillMaxHeight()
+            .testTag("photo-picker-scrollbar")
+            .semantics { contentDescription = "사진 목록 스크롤바" }
+            .pointerInput(estimatedContentSize, viewportSize) {
+                fun updateScrollPosition(pointerY: Float) {
+                    scrollRequestVersion += 1
+                    requestedScroll = scrollRequestVersion to
+                        (pointerY / size.height.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
+                }
+                detectDragGestures(
+                    onDragStart = { offset -> updateScrollPosition(offset.y) },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        updateScrollPosition(change.position.y)
+                    },
+                )
+            },
+    ) {
+        val thumbHeight = (size.height * metrics.thumbFraction)
+            .coerceAtLeast(44.dp.toPx())
+            .coerceAtMost(size.height)
+        val thumbOffset = (size.height - thumbHeight) * metrics.scrollFraction
+        val barWidth = 4.dp.toPx()
+        val barOffsetX = (size.width - barWidth) / 2f
+        val cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
+        drawRoundRect(
+            color = trackColor,
+            topLeft = Offset(barOffsetX, 0f),
+            size = androidx.compose.ui.geometry.Size(barWidth, size.height),
+            cornerRadius = cornerRadius,
+        )
+        drawRoundRect(
+            color = thumbColor,
+            topLeft = Offset(barOffsetX, thumbOffset),
+            size = androidx.compose.ui.geometry.Size(barWidth, thumbHeight),
+            cornerRadius = cornerRadius,
+        )
     }
 }
 
@@ -1235,27 +1816,14 @@ private fun PhotoPickerHeader(
                 fontWeight = FontWeight.Bold,
             )
         }
-        Text(
-            text = "사진을 누르면 크게 보고, 길게 누른 채 드래그하면 여러 장을 선택할 수 있어요.",
-            color = TripRecordPalette.current.secondaryText,
-            fontSize = 13.sp,
-            lineHeight = 19.sp,
-            modifier = Modifier.padding(top = 14.dp),
-        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 20.dp)
-                .background(TripRecordPalette.current.surfaceElevated, RoundedCornerShape(16.dp))
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(vertical = 2.dp),
+            horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = "필요한 순간만 골라보세요.",
-                color = TripRecordPalette.current.secondaryText,
-                fontSize = 12.sp,
-                modifier = Modifier.weight(1f),
-            )
             Text(
                 text = if (allSelected) "모두 해제" else "모두 선택",
                 color = TripRecordPalette.current.accent,
@@ -1325,6 +1893,7 @@ private fun PhotoDateGroup(
     onPhotoPreview: (SelectedPhoto) -> Unit,
     onPhotoToggle: (SelectedPhoto) -> Unit,
     dragSelectionController: PhotoDragSelectionController,
+    recordedPhotoIds: Set<String>,
 ) {
     val allSelected = photos.all { it.id in selectedIds }
     Column {
@@ -1372,6 +1941,7 @@ private fun PhotoDateGroup(
                             onPreview = { onPhotoPreview(photo) },
                             onToggle = { onPhotoToggle(photo) },
                             dragSelectionController = dragSelectionController,
+                            recorded = photo.id in recordedPhotoIds,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -1389,9 +1959,9 @@ private fun PhotoSelectionCard(
     onPreview: () -> Unit,
     onToggle: () -> Unit,
     dragSelectionController: PhotoDragSelectionController,
+    recorded: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    var coordinates by remember(photo.id) { mutableStateOf<LayoutCoordinates?>(null) }
     DisposableEffect(photo.id, dragSelectionController) {
         onDispose { dragSelectionController.remove(photo.id) }
     }
@@ -1407,35 +1977,23 @@ private fun PhotoSelectionCard(
                 },
             )
             .onGloballyPositioned { layoutCoordinates ->
-                coordinates = layoutCoordinates
                 dragSelectionController.updateBounds(
                     photoId = photo.id,
-                    bounds = layoutCoordinates.boundsInRoot(),
+                    bounds = Rect(
+                        layoutCoordinates.positionInRoot(),
+                        androidx.compose.ui.geometry.Size(
+                            layoutCoordinates.size.width.toFloat(),
+                            layoutCoordinates.size.height.toFloat(),
+                        ),
+                    ),
                 )
             }
-            .pointerInput(photo.id, dragSelectionController) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = { offset ->
-                        coordinates
-                            ?.localToRoot(offset)
-                            ?.let { position -> dragSelectionController.start(photo.id, position) }
-                    },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        coordinates
-                            ?.localToRoot(change.position)
-                            ?.let(dragSelectionController::moveTo)
-                    },
-                    onDragEnd = dragSelectionController::finish,
-                    onDragCancel = dragSelectionController::finish,
-                )
-            }
-            .clickable(onClick = onPreview)
+            .clickable(onClick = onToggle)
             .semantics {
                 contentDescription = if (selected) {
-                    "${photo.displayName}, 선택됨. 길게 누르고 드래그해 연속 선택 해제"
+                    "${photo.displayName}, 선택됨. 누르면 선택 해제, 길게 누르고 드래그해 연속 선택 해제"
                 } else {
-                    "${photo.displayName}, 선택 안 됨. 길게 누르고 드래그해 연속 선택"
+                    "${photo.displayName}, 선택 안 됨. 누르면 선택, 길게 누르고 드래그해 연속 선택"
                 }
             }
             .testTag("new-record-photo-${photo.id}"),
@@ -1446,12 +2004,17 @@ private fun PhotoSelectionCard(
             modifier = Modifier.fillMaxSize(),
             placeholderVariant = photo.id.hashCode(),
         )
-        Text(
-            text = if (selected) "✓" else "+",
-            color = TripRecordPalette.current.contentOnMedia,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
+        if (recorded) {
+            Text(
+                "기록됨 · 저장 중 포함",
+                color = TripRecordPalette.current.contentOnMedia,
+                fontSize = 11.sp,
+                modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                    .background(TripRecordPalette.current.mediaScrim, RoundedCornerShape(6.dp))
+                    .padding(6.dp),
+            )
+        }
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(8.dp)
@@ -1464,9 +2027,15 @@ private fun PhotoSelectionCard(
                     },
                     CircleShape,
                 )
-                .clickable(role = Role.Checkbox, onClick = onToggle)
-                .padding(top = 6.dp),
-        )
+                .clickable(role = Role.Button, onClick = onPreview)
+                .semantics { contentDescription = "${photo.displayName} 크게 보기" },
+            contentAlignment = Alignment.Center,
+        ) {
+            SearchIcon(
+                color = TripRecordPalette.current.contentOnMedia,
+                modifier = Modifier.size(19.dp),
+            )
+        }
     }
 }
 
@@ -1596,4 +2165,18 @@ private fun PhotoRecommendationPagingState.toggleGroup(
         .filterNot(selectedIds::contains)
         .take(remainingSlots)
     return copy(selectedIds = selectedIds + idsToAdd)
+}
+
+internal fun PhotoRecommendationPagingState.isAllSelectionActive(): Boolean =
+    photos.isNotEmpty() && selectedIds.isNotEmpty() &&
+        (selectedIds.size >= maxSelectionCount || photos.all { photo -> photo.id in selectedIds })
+
+internal fun PhotoRecommendationPagingState.toggleAllPhotos(): PhotoRecommendationPagingState {
+    if (isAllSelectionActive()) return copy(selectedIds = emptySet())
+    val selected = photos.asSequence()
+        .map(SelectedPhoto::id)
+        .distinct()
+        .take(maxSelectionCount)
+        .toSet()
+    return copy(selectedIds = selected)
 }
