@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.google;
+package com.mapmory.backend.auth.infrastructure.google;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

@@ -1,16 +1,17 @@
 package com.mapmory.backend.auth;
 
+import com.mapmory.backend.auth.application.model.SocialIdentity;
+import com.mapmory.backend.auth.application.port.SocialIdentityPort;
 import com.mapmory.backend.auth.exception.AuthErrorCode;
-import com.mapmory.backend.auth.google.GoogleIdTokenVerifier;
-import com.mapmory.backend.auth.google.GoogleUser;
 import com.mapmory.backend.auth.jwt.JwtProvider;
-import com.mapmory.backend.auth.kakao.KakaoApiClient;
-import com.mapmory.backend.auth.kakao.KakaoUserResponse;
 import com.mapmory.backend.auth.refresh.RefreshTokenService;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -22,28 +23,26 @@ public class AuthService {
 
     private static final String DEFAULT_NAME_PREFIX = "회원";
 
-    private final KakaoApiClient kakaoApiClient;
-    private final GoogleIdTokenVerifier googleIdTokenVerifier;
+    private final Map<AuthProvider, SocialIdentityPort> socialIdentityPorts;
     private final MemberRepository memberRepository;
     private final JwtProvider jwtProvider;
     private final RefreshTokenService refreshTokenService;
 
     public AuthService(
-            KakaoApiClient kakaoApiClient,
-            GoogleIdTokenVerifier googleIdTokenVerifier,
+            List<SocialIdentityPort> socialIdentityPorts,
             MemberRepository memberRepository,
             JwtProvider jwtProvider,
             RefreshTokenService refreshTokenService
     ) {
-        this.kakaoApiClient = kakaoApiClient;
-        this.googleIdTokenVerifier = googleIdTokenVerifier;
+        this.socialIdentityPorts = new EnumMap<>(AuthProvider.class);
+        socialIdentityPorts.forEach(port -> this.socialIdentityPorts.put(port.provider(), port));
         this.memberRepository = memberRepository;
         this.jwtProvider = jwtProvider;
         this.refreshTokenService = refreshTokenService;
     }
 
     /**
-     * 카카오 로그인. 구글 로그인도 같은 규칙을 따른다.
+     * 소셜 로그인. 제공자에 맞는 포트로 토큰을 확인한 뒤 가입·승격·토큰 발급은 공통으로 처리한다.
      *
      * 게스트로 사용 중이었다면(authenticatedMemberId가 게스트 회원) 새 회원을 만들지 않고
      * 그 회원을 승격해, 게스트로 남긴 기록이 그대로 이어지게 한다.
@@ -53,28 +52,9 @@ public class AuthService {
      * (ADR 0015)
      */
     @Transactional
-    public LoginResult loginWithKakao(String kakaoAccessToken, Long authenticatedMemberId) {
-        KakaoUserResponse kakaoUser = kakaoApiClient.fetchUser(kakaoAccessToken);
-        return loginWithSocial(
-                AuthProvider.KAKAO, String.valueOf(kakaoUser.id()), kakaoUser.nickname(), authenticatedMemberId);
-    }
-
-    /**
-     * 구글 로그인. 앱이 전달한 ID token을 검증한 뒤 카카오와 같은 규칙으로 가입·승격한다. (ADR 0019)
-     */
-    @Transactional
-    public LoginResult loginWithGoogle(String idToken, Long authenticatedMemberId) {
-        GoogleUser googleUser = googleIdTokenVerifier.verify(idToken);
-        return loginWithSocial(
-                AuthProvider.GOOGLE, googleUser.subject(), googleUser.name(), authenticatedMemberId);
-    }
-
-    private LoginResult loginWithSocial(
-            AuthProvider provider,
-            String providerId,
-            String nickname,
-            Long authenticatedMemberId
-    ) {
+    public LoginResult loginWithSocial(AuthProvider provider, String token, Long authenticatedMemberId) {
+        SocialIdentity identity = socialIdentityPort(provider).verify(token);
+        String providerId = identity.providerId();
         Optional<Member> guest = findGuest(authenticatedMemberId);
 
         Optional<Member> registered = memberRepository.findByProviderAndProviderId(provider, providerId);
@@ -85,12 +65,20 @@ public class AuthService {
 
         if (guest.isPresent()) {
             Member promoted = guest.get();
-            promoted.promote(provider, providerId, resolveName(nickname));
+            promoted.promote(provider, providerId, resolveName(identity.name()));
             // 게스트로 이미 앱을 사용했으므로 온보딩을 반복하지 않도록 신규로 보지 않는다.
             return issueTokens(promoted, false);
         }
 
-        return issueTokens(register(provider, providerId, nickname), true);
+        return issueTokens(register(provider, providerId, identity.name()), true);
+    }
+
+    private SocialIdentityPort socialIdentityPort(AuthProvider provider) {
+        SocialIdentityPort port = socialIdentityPorts.get(provider);
+        if (port == null) {
+            throw new IllegalArgumentException("소셜 로그인을 지원하지 않는 제공자입니다: " + provider);
+        }
+        return port;
     }
 
     private Optional<Member> findGuest(Long memberId) {

@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.google;
+package com.mapmory.backend.auth.infrastructure.google;
 
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;

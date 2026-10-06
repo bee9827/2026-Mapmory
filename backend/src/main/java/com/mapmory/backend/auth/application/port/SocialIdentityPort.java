@@ -1,0 +1,17 @@
+package com.mapmory.backend.auth.application.port;
+
+import com.mapmory.backend.auth.application.model.SocialIdentity;
+import com.mapmory.backend.member.AuthProvider;
+
+/**
+ * 앱이 소셜 SDK로 받은 토큰을 제공자에게 확인해 신원을 돌려주는 포트.
+ *
+ * 제공자마다 구현이 하나씩 있고, AuthService는 provider()로 구현을 고른다.
+ * 토큰이 잘못되면 401, 제공자 장애면 503에 해당하는 BusinessException을 던진다.
+ */
+public interface SocialIdentityPort {
+
+    AuthProvider provider();
+
+    SocialIdentity verify(String token);
+}

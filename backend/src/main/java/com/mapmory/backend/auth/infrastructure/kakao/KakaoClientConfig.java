@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.kakao;
+package com.mapmory.backend.auth.infrastructure.kakao;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;

@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.kakao;
+package com.mapmory.backend.auth.infrastructure.kakao;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
