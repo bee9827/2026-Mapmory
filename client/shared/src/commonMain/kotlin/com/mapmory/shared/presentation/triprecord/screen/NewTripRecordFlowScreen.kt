@@ -467,7 +467,7 @@ internal fun NewTripRecordFlowScreen(
                         photoMessage = if (page.excludedCount > 0) {
                             "이 장소의 사진을 모두 기록했어요. 제외 옵션을 끄면 다시 선택할 수 있어요."
                         } else {
-                            "선택한 장소에서 촬영된 사진을 찾지 못했어요."
+                            null
                         }
                     } else if (nextState.photos.isNotEmpty()) {
                         photoMessage = null
@@ -1643,6 +1643,7 @@ private fun PhotoPickerStep(
                     PhotoPickerHeader(
                         locationName = locationName,
                         selectedCount = pagingState.selectedIds.size,
+                        hasPhotos = pagingState.photos.isNotEmpty(),
                         allSelected = pagingState.isAllSelectionActive() && !isSelectingAll,
                         onAllToggle = onAllToggle,
                         onPickFromGallery = onPickFromGallery,
@@ -1818,6 +1819,7 @@ private fun PhotoPickerScrollBar(
 private fun PhotoPickerHeader(
     locationName: String,
     selectedCount: Int,
+    hasPhotos: Boolean,
     allSelected: Boolean,
     onAllToggle: () -> Unit,
     onPickFromGallery: () -> Unit,
@@ -1858,7 +1860,7 @@ private fun PhotoPickerHeader(
             horizontalArrangement = Arrangement.End,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
+            if (hasPhotos) Text(
                 text = if (allSelected) "모두 해제" else "모두 선택",
                 color = TripRecordPalette.current.accent,
                 fontSize = 12.sp,

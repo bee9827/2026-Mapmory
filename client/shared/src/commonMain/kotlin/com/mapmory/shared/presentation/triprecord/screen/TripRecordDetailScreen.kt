@@ -208,7 +208,6 @@ private fun TripRecordPhotoAlbum(
             ) {
                 AlbumHeading(
                     locationName = record.locationName,
-                    photoCount = record.photos.size,
                 )
                 if (groups.isEmpty()) {
                     EmptyPhotoAlbum()
@@ -236,7 +235,6 @@ private fun TripRecordPhotoAlbum(
 @Composable
 private fun AlbumHeading(
     locationName: String,
-    photoCount: Int,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -245,47 +243,16 @@ private fun AlbumHeading(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "PHOTO LIBRARY",
-                color = TripRecordPalette.current.accent,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
-            )
-            Text(
                 text = "$locationName 사진첩",
                 color = TripRecordPalette.current.headingText,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 16.dp),
             )
             Text(
                 text = "날짜별로 모아둔 여행 사진이에요.",
                 color = TripRecordPalette.current.secondaryText,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(top = 10.dp),
-            )
-        }
-        Column(
-            modifier = Modifier
-                .padding(start = 16.dp)
-                .background(
-                    color = TripRecordPalette.current.surface,
-                    shape = RoundedCornerShape(18.dp),
-                )
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = photoCount.toString(),
-                color = TripRecordPalette.current.accent,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "장",
-                color = TripRecordPalette.current.secondaryText,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
             )
         }
     }
@@ -324,18 +291,6 @@ private fun PhotoDateGroup(
                 color = TripRecordPalette.current.headingText,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "${group.photos.size}장",
-                color = TripRecordPalette.current.accent,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .background(
-                        color = TripRecordPalette.current.primarySoft,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
             )
         }
         Column(

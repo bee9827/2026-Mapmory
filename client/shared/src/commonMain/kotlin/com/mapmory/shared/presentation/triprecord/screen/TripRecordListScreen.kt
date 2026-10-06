@@ -459,14 +459,6 @@ private fun TripRecordCard(
                     modifier = Modifier.padding(top = 7.dp),
                 )
             }
-            record.photoCount?.let { count ->
-                Text(
-                    text = "${count}장",
-                    color = TripRecordPalette.current.accent,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
             Text("›", color = TripRecordPalette.current.muted, fontSize = 25.sp)
         }
     }
