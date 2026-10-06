@@ -432,7 +432,7 @@ private fun ExpandedTripPhotoViewer(
                 TripPhotoImage(
                     imageBytes = photo.previewBytes?.bytesForDecoding()
                         ?: photo.originalBytes?.bytesForDecoding(),
-                    imageUri = photo.previewUri,
+                    imageUri = photo.fullResolutionUri ?: photo.previewUri,
                     fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                     contentDescription = "$locationName 확대 사진 ${page + 1}",
                     modifier = Modifier

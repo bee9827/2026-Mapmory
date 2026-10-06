@@ -324,8 +324,7 @@ internal fun NewTripRecordFlowScreen(
         )
     }
     val step = NewRecordFlowStep.valueOf(stepName)
-    var excludeRecordedPhotos by rememberSaveable { mutableStateOf(!startWithPhotoSearch) }
-    var photoCounts by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var excludeRecordedPhotos by rememberSaveable { mutableStateOf(true) }
     val interactedFields = remember { mutableSetOf<String>() }
     var locationSearchQuery by rememberSaveable { mutableStateOf("") }
     var detailsErrorMessage by remember { mutableStateOf<String?>(null) }
@@ -346,6 +345,7 @@ internal fun NewTripRecordFlowScreen(
     var showPhotoLoadingBackConfirmation by remember { mutableStateOf(false) }
     var showPhotoPickerBackConfirmation by remember { mutableStateOf(false) }
     var previewPhotoId by rememberSaveable { mutableStateOf<String?>(null) }
+    var fullResolutionPreviewBytes by remember { mutableStateOf<ByteArray?>(null) }
     var pendingLocation by remember { mutableStateOf<Location?>(null) }
     var pendingSave by remember { mutableStateOf(false) }
     var hasStartedInitialPhotoSearch by rememberSaveable(startWithPhotoSearch) { mutableStateOf(false) }
@@ -428,7 +428,6 @@ internal fun NewTripRecordFlowScreen(
             }
         },
         { page ->
-            photoCounts = page.totalMatchingCount?.let { it to page.excludedCount }
             val pagingStateToUpdate = if (isRefreshingRecordedPhotoFilter) {
                 PhotoRecommendationPagingState()
             } else {
@@ -476,6 +475,21 @@ internal fun NewTripRecordFlowScreen(
         { isLoading -> isRecommendationLoading = isLoading },
         { issue -> photoPermissionIssue = issue },
     )
+
+    LaunchedEffect(previewPhotoId) {
+        val photoId = previewPhotoId ?: run {
+            fullResolutionPreviewBytes = null
+            return@LaunchedEffect
+        }
+        val photo = recommendationPagingState.photos.firstOrNull { it.id == photoId }
+            ?: return@LaunchedEffect
+        fullResolutionPreviewBytes = null
+        if (photo.fullResolutionUri == null) {
+            photoLibrary.loadFullResolutionPreview(photo) { bytes ->
+                if (previewPhotoId == photoId) fullResolutionPreviewBytes = bytes
+            }
+        }
+    }
 
     LaunchedEffect(
         isSelectingAllPhotos,
@@ -796,7 +810,6 @@ internal fun NewTripRecordFlowScreen(
                 isSelectingAll = isSelectingAllPhotos,
                 isRefreshingFilter = isRefreshingRecordedPhotoFilter,
                 actionLabel = saveActionLabel,
-                photoCounts = photoCounts,
                 recordedPhotoIds = recordedPhotoIds,
                 excludeRecordedPhotos = excludeRecordedPhotos,
                 showRecordedFilter = !startWithPhotoSearch,
@@ -851,13 +864,18 @@ internal fun NewTripRecordFlowScreen(
                     }
                 },
                 onAllToggle = {
-                    if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
+                    if (isRefreshingRecordedPhotoFilter || isSelectingAllPhotos) {
+                        return@PhotoPickerStep
+                    }
                     if (recommendationPagingState.isAllSelectionActive()) {
                         cancelSelectAllContinuation()
                         recommendationPagingState = recommendationPagingState.copy(selectedIds = emptySet())
                     } else {
                         isSelectingAllPhotos = true
                         recommendationPagingState = recommendationPagingState.selectAllLoadedPhotos()
+                        photoLibrary.loadRecommendationPagesForSelection(
+                            recommendationPagingState.maxSelectionCount,
+                        )
                     }
                 },
             )
@@ -895,6 +913,7 @@ internal fun NewTripRecordFlowScreen(
         ?.let { photo ->
             PhotoPreviewDialog(
                 photo = photo,
+                fullResolutionBytes = fullResolutionPreviewBytes,
                 selected = photo.id in recommendationPagingState.selectedIds,
                 onToggle = {
                     val next = recommendationPagingState.toggleSelection(photo.id)
@@ -1476,7 +1495,6 @@ private fun PhotoPickerStep(
     isSelectingAll: Boolean,
     isRefreshingFilter: Boolean,
     actionLabel: String,
-    photoCounts: Pair<Int, Int>?,
     recordedPhotoIds: Set<String>,
     excludeRecordedPhotos: Boolean,
     showRecordedFilter: Boolean,
@@ -1596,19 +1614,11 @@ private fun PhotoPickerStep(
                     PhotoPickerHeader(
                         locationName = locationName,
                         selectedCount = pagingState.selectedIds.size,
-                        allSelected = pagingState.isAllSelectionActive(),
+                        allSelected = pagingState.isAllSelectionActive() && !isSelectingAll,
                         onAllToggle = onAllToggle,
                         onPickFromGallery = onPickFromGallery,
                     )
                     if (showRecordedFilter) {
-                        photoCounts?.let { (total, excluded) ->
-                            Text(
-                                "전체 ${total}장 · 제외 ${excluded}장 · 선택 가능 ${total - excluded}장",
-                                color = TripRecordPalette.current.secondaryText,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 12.dp),
-                            )
-                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             androidx.compose.material3.Checkbox(
                                 checked = excludeRecordedPhotos,
@@ -1617,11 +1627,6 @@ private fun PhotoPickerStep(
                             )
                             Text("기록한 사진 제외", color = TripRecordPalette.current.text)
                         }
-                        Text(
-                            "저장 중인 사진도 제외해요. 필터를 바꾸면 선택이 초기화돼요.",
-                            color = TripRecordPalette.current.secondaryText,
-                            fontSize = 12.sp,
-                        )
                     }
                 }
                 message?.let { currentMessage ->
@@ -2042,6 +2047,7 @@ private fun PhotoSelectionCard(
 @Composable
 private fun PhotoPreviewDialog(
     photo: SelectedPhoto,
+    fullResolutionBytes: ByteArray?,
     selected: Boolean,
     onToggle: () -> Unit,
     onDismiss: () -> Unit,
@@ -2071,7 +2077,8 @@ private fun PhotoPreviewDialog(
                         .aspectRatio(1f),
                 ) {
                     TripPhotoImage(
-                        imageBytes = photo.previewBytes,
+                        imageBytes = fullResolutionBytes ?: photo.previewBytes,
+                        imageUri = photo.fullResolutionUri,
                         contentDescription = "${photo.displayName} 확대 사진",
                         modifier = Modifier.fillMaxSize(),
                         placeholderVariant = photo.id.hashCode(),

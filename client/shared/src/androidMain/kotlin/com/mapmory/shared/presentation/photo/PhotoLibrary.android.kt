@@ -190,6 +190,44 @@ actual fun rememberPhotoLibraryActions(
         }
     }
 
+    fun loadRecommendationPagesForSelection(maxPhotos: Int) {
+        val initialSession = recommendationSession.value ?: return
+        if (!initialSession.hasMore || recommendationJob.value?.isActive == true) return
+
+        val generation = initialSession.generation
+        latestRecommendationLoadingChanged(true)
+        latestLoadingChanged(true)
+        recommendationJob.value = scope.launch {
+            try {
+                var session = initialSession
+                while (session.hasMore && session.nextIndex < maxPhotos) {
+                    val page = withContext(Dispatchers.IO) {
+                        context.loadRecommendationPage(session)
+                    }
+                    if (generation != recommendationGeneration.value) return@launch
+                    session = session.copy(nextIndex = page.nextIndex)
+                    recommendationSession.value = session
+                    latestRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = searchCounts.value.first,
+                        excludedCount = searchCounts.value.second,
+                    ))
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (generation == recommendationGeneration.value) {
+                    latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+                }
+            } finally {
+                if (generation == recommendationGeneration.value) {
+                    latestRecommendationLoadingChanged(false)
+                    latestLoadingChanged(false)
+                    recommendationJob.value = null
+                }
+            }
+        }
+    }
+
     val galleryPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
     ) {
@@ -268,6 +306,7 @@ actual fun rememberPhotoLibraryActions(
                 )
             },
             loadNextRecommendationPage = ::loadNextRecommendationPage,
+            loadRecommendationPagesForSelection = ::loadRecommendationPagesForSelection,
             prepareForAdding = { photos, onReady ->
                 scope.launch {
                     val preparedPhotos = withContext(Dispatchers.IO) {
@@ -471,6 +510,7 @@ private fun PhotoMetadataEntity.toSelectedPhoto(previewBytes: ByteArray): Select
         id = contentUri,
         displayName = displayName,
         previewBytes = previewBytes,
+        fullResolutionUri = contentUri,
         latitude = latitude,
         longitude = longitude,
         capturedAt = formatDate(capturedAtMillis),
@@ -705,6 +745,7 @@ internal fun Context.readPhoto(
             id = uri.toString(),
             displayName = displayName,
             previewBytes = previewBytes,
+            fullResolutionUri = uri.toString(),
             latitude = coordinates?.first,
             longitude = coordinates?.second,
             capturedAt = capturedAt,
@@ -724,6 +765,7 @@ internal fun Context.readPhoto(
         id = uri.toString(),
         displayName = displayName,
         previewBytes = previewBytes,
+        fullResolutionUri = uri.toString(),
         latitude = coordinates?.first,
         longitude = coordinates?.second,
         capturedAt = capturedAt,

@@ -24,6 +24,7 @@ fun MainViewController(
     onThemeChanged: (Boolean) -> Unit,
     analytics: MapmoryAnalytics,
     tokenStore: AuthTokenStore,
+    navigation: MapmoryNavigation,
 ) = createGuestRemoteAppContainer(
     apiBaseUrl = apiBaseUrl,
     tokenStore = tokenStore,
@@ -54,6 +55,7 @@ fun MainViewController(
 
         MapmoryApp(
             container = container,
+            navigation = navigation,
             contentWindowInsets = WindowInsets.safeDrawing,
             onThemeChanged = onThemeChanged,
             analytics = analytics,

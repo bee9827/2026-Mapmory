@@ -71,7 +71,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 import kotlin.native.Platform
 
 private val lastRecommendationSearch = LastPhotoSearchCache<List<PHAsset>>()
@@ -107,7 +109,9 @@ actual fun rememberPhotoLibraryActions(
             recommendForLocation = controller::recommend,
             recommendForLocationInDateRange = controller::recommendInDateRange,
             loadNextRecommendationPage = controller::loadNextRecommendationPage,
+            loadRecommendationPagesForSelection = controller::loadRecommendationPagesForSelection,
             prepareForAdding = controller::prepareForAdding,
+            loadFullResolutionPreview = controller::loadFullResolutionPreview,
             cancelRecommendation = controller::cancelRecommendation,
             openAppSettings = controller::openAppSettings,
         )
@@ -396,6 +400,39 @@ private class IosPhotoLibraryController(
         }
     }
 
+    fun loadRecommendationPagesForSelection(maxPhotos: Int) {
+        val initialSession = recommendationSession ?: return
+        if (!initialSession.hasMore || isRecommendationPageLoading) return
+
+        val generation = initialSession.generation
+        isRecommendationPageLoading = true
+        onRecommendationLoadingChanged(true)
+        onLoadingChanged(true)
+        recommendationJob = scope.launch {
+            try {
+                var session = initialSession
+                while (session.hasMore && session.nextIndex < maxPhotos) {
+                    val page = loadRecommendationPageSuspending(session)
+                    if (generation != recommendationGeneration) return@launch
+                    session = session.copy(nextIndex = page.nextIndex)
+                    recommendationSession = session
+                    onPhotosRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = totalMatchingCount,
+                        excludedCount = excludedCount,
+                    ))
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (generation == recommendationGeneration) {
+                    onMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+                }
+            } finally {
+                if (generation == recommendationGeneration) finishRecommendationLoading()
+            }
+        }
+    }
+
     fun cancelRecommendation() {
         ++recommendationGeneration
         recommendationJob?.cancel()
@@ -481,6 +518,12 @@ private class IosPhotoLibraryController(
                 ),
             )
         }
+    }
+
+    private suspend fun loadRecommendationPageSuspending(
+        session: IosRecommendationSession,
+    ): IosRecommendationPage = suspendCancellableCoroutine { continuation ->
+        loadRecommendationPage(session, continuation::resume)
     }
 
     private fun loadPickerResult(result: PHPickerResult, completion: (SelectedPhoto?) -> Unit) {
@@ -594,6 +637,36 @@ private class IosPhotoLibraryController(
         }
     }
 
+    fun loadFullResolutionPreview(
+        photo: SelectedPhoto,
+        completion: (ByteArray?) -> Unit,
+    ) {
+        val asset = assetForIdentifier(photo.id)
+        if (asset == null) {
+            completion(photo.originalBytes)
+            return
+        }
+        val options = PHImageRequestOptions().apply {
+            version = PHImageRequestOptionsVersionCurrent
+            deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat
+            networkAccessAllowed = true
+        }
+        PHImageManager.defaultManager().requestImageForAsset(
+            asset = asset,
+            targetSize = CGSizeMake(
+                FullResolutionPreviewSizePx.toDouble(),
+                FullResolutionPreviewSizePx.toDouble(),
+            ),
+            contentMode = PHImageContentModeAspectFit,
+            options = options,
+        ) { image, _ ->
+            val bytes = image
+                ?.let { UIImageJPEGRepresentation(it, FullResolutionPreviewJpegQuality) }
+                ?.toByteArray()
+            onMain { completion(bytes) }
+        }
+    }
+
     private fun assetForIdentifier(identifier: String): PHAsset? =
         PHAsset.fetchAssetsWithLocalIdentifiers(listOf(identifier), null).firstObject as? PHAsset
 }
@@ -695,6 +768,8 @@ private fun logPhotoPerformance(message: String) {
 
 private const val RecommendationPreviewSizePx = 640
 private const val PreviewJpegQuality = 0.85
+private const val FullResolutionPreviewSizePx = 2_048
+private const val FullResolutionPreviewJpegQuality = 0.92
 private const val IosProgressUpdateInterval = 25
 private fun Long.toPermissionIssue(): PhotoLibraryPermissionIssue =
     if (this == platform.Photos.PHAuthorizationStatusRestricted) {

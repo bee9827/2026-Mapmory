@@ -14,6 +14,8 @@ data class SelectedPhoto(
     val id: String,
     val displayName: String,
     val previewBytes: ByteArray?,
+    /** 확대 화면에서만 사용하는 원본 로컬 URI. 목록에서는 [previewBytes]를 사용한다. */
+    val fullResolutionUri: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
     val capturedAt: String? = null,
@@ -58,10 +60,16 @@ data class PhotoLibraryActions(
         PhotoRecommendationDateRange,
     ) -> Unit = { location, parentName, _ -> recommendForLocation(location, parentName) },
     val loadNextRecommendationPage: () -> Unit = {},
+    /** 전체 선택에 필요한 페이지를 최대 [Int]장까지 순차적으로 준비한다. */
+    val loadRecommendationPagesForSelection: (Int) -> Unit = {},
     val prepareForAdding: (
         photos: List<SelectedPhoto>,
         onReady: (List<SelectedPhoto>) -> Unit,
     ) -> Unit = { photos, onReady -> onReady(photos) },
+    val loadFullResolutionPreview: (
+        photo: SelectedPhoto,
+        onReady: (ByteArray?) -> Unit,
+    ) -> Unit = { photo, onReady -> onReady(photo.originalBytes) },
     val recommendationsAvailable: Boolean = true,
     val cancelRecommendation: () -> Unit = {},
     val openAppSettings: () -> Unit = {},
