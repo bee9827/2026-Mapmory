@@ -3,7 +3,6 @@ package com.mapmory.shared.presentation.triprecord.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,7 +25,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mapmory.shared.domain.model.Tag
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
 import com.mapmory.shared.presentation.map.domain.MapScope
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
@@ -42,9 +39,6 @@ fun TripMapScreen(
     mapScope: MapScope = MapScope.WORLD,
     visitedCount: Int = 0,
     onMapScopeChange: (MapScope) -> Unit = {},
-    tags: List<Tag> = emptyList(),
-    selectedTagId: Long? = null,
-    onTagSelected: (Long?) -> Unit = {},
     onBackClick: () -> Unit,
     mapDetailTitle: String? = null,
     mapDetailTotal: Int? = null,
@@ -67,9 +61,6 @@ fun TripMapScreen(
                 mapScope = mapScope,
                 visitedCount = visitedCount,
                 onMapScopeChange = onMapScopeChange,
-                tags = tags,
-                selectedTagId = selectedTagId,
-                onTagSelected = onTagSelected,
                 mapDetailTitle = mapDetailTitle,
                 mapDetailTotal = mapDetailTotal,
                 onMapDetailBackClick = onMapDetailBackClick,
@@ -116,9 +107,6 @@ private fun MapHeaderOverlay(
     mapScope: MapScope,
     visitedCount: Int,
     onMapScopeChange: (MapScope) -> Unit,
-    tags: List<Tag>,
-    selectedTagId: Long?,
-    onTagSelected: (Long?) -> Unit,
     mapDetailTitle: String?,
     mapDetailTotal: Int?,
     onMapDetailBackClick: () -> Unit,
@@ -159,13 +147,6 @@ private fun MapHeaderOverlay(
             mapDetailTotal = mapDetailTotal,
             onMapDetailBackClick = onMapDetailBackClick,
             modifier = Modifier.padding(horizontal = 12.dp),
-        )
-        Spacer(Modifier.height(8.dp))
-        MapTagFilter(
-            tags = tags,
-            selectedTagId = selectedTagId,
-            onTagSelected = onTagSelected,
-            modifier = Modifier.padding(horizontal = 18.dp),
         )
         Spacer(Modifier.height(6.dp))
     }
@@ -222,31 +203,6 @@ private fun MapScopeChip(
             .clickable(onClick = onClick)
             .padding(vertical = 6.dp),
     )
-}
-
-@Composable
-private fun MapTagFilter(
-    tags: List<Tag>,
-    selectedTagId: Long?,
-    onTagSelected: (Long?) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        val filterTags = listOf<Tag?>(null) + tags
-        filterTags.forEach { tag ->
-            val selected = selectedTagId == tag?.id
-            TripTagChip(
-                text = tag?.name ?: "전체",
-                selected = selected,
-                onClick = { onTagSelected(tag?.id) },
-            )
-        }
-    }
 }
 
 @Composable
@@ -397,16 +353,6 @@ private fun MapScopeChipPreview() {
         label = "대한민국",
         selected = true,
         onClick = {},
-    )
-}
-
-@Preview
-@Composable
-private fun MapTagFilterPreview() {
-    MapTagFilter(
-        tags = listOf(Tag(1L, "가족"), Tag(2L, "맛집")),
-        selectedTagId = 1L,
-        onTagSelected = {},
     )
 }
 

@@ -38,7 +38,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
@@ -52,6 +51,11 @@ import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+import com.mapmory.shared.presentation.triprecord.state.localOriginalUri
+import com.mapmory.shared.presentation.photo.SelectedPhoto
+import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewUiRecords
 
@@ -70,6 +74,7 @@ fun TripRecordDetailScreen(
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var expandedPhotoIndex by remember { mutableStateOf<Int?>(null) }
+    val albumScrollState = rememberScrollState()
     val latestPhotoViewerBackHandler by rememberUpdatedState {
         expandedPhotoIndex = null
         true
@@ -108,6 +113,7 @@ fun TripRecordDetailScreen(
 
             is TripRecordDetailUiState.Success -> {
                 val record = uiState.record
+                LaunchedEffect(record.id) { albumScrollState.scrollTo(0) }
                 val groups = remember(record.id, record.photos, record.startDate) {
                     groupTripRecordPhotosByDate(record.photos, record.startDate)
                 }
@@ -128,6 +134,7 @@ fun TripRecordDetailScreen(
                         onBackClick = onBackClick,
                         onEditClick = onEditClick,
                         onDeleteClick = { showDeleteDialog = true },
+                        scrollState = albumScrollState,
                         onPhotoClick = { photo ->
                             expandedPhotoIndex = orderedPhotos.indexOfFirst { it.id == photo.id }
                                 .takeIf { it >= 0 }
@@ -167,11 +174,9 @@ private fun TripRecordPhotoAlbum(
     onBackClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    scrollState: androidx.compose.foundation.ScrollState,
     onPhotoClick: (TripRecordPhotoUiState) -> Unit,
 ) {
-    val scrollState = rememberScrollState()
-    LaunchedEffect(record.id) { scrollState.scrollTo(0) }
-
     Column(Modifier.fillMaxSize()) {
         TripRecordTopBar(
             title = record.locationName,
@@ -203,7 +208,6 @@ private fun TripRecordPhotoAlbum(
             ) {
                 AlbumHeading(
                     locationName = record.locationName,
-                    photoCount = record.photos.size,
                 )
                 if (groups.isEmpty()) {
                     EmptyPhotoAlbum()
@@ -231,7 +235,6 @@ private fun TripRecordPhotoAlbum(
 @Composable
 private fun AlbumHeading(
     locationName: String,
-    photoCount: Int,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -240,47 +243,16 @@ private fun AlbumHeading(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "PHOTO LIBRARY",
-                color = TripRecordPalette.current.accent,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp,
-            )
-            Text(
                 text = "$locationName 사진첩",
                 color = TripRecordPalette.current.headingText,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(top = 16.dp),
             )
             Text(
                 text = "날짜별로 모아둔 여행 사진이에요.",
                 color = TripRecordPalette.current.secondaryText,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(top = 10.dp),
-            )
-        }
-        Column(
-            modifier = Modifier
-                .padding(start = 16.dp)
-                .background(
-                    color = TripRecordPalette.current.surface,
-                    shape = RoundedCornerShape(18.dp),
-                )
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(
-                text = photoCount.toString(),
-                color = TripRecordPalette.current.accent,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                text = "장",
-                color = TripRecordPalette.current.secondaryText,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
             )
         }
     }
@@ -320,18 +292,6 @@ private fun PhotoDateGroup(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            Text(
-                text = "${group.photos.size}장",
-                color = TripRecordPalette.current.accent,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .background(
-                        color = TripRecordPalette.current.primarySoft,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-            )
         }
         Column(
             modifier = Modifier.padding(top = 14.dp),
@@ -346,6 +306,9 @@ private fun PhotoDateGroup(
                         TripPhotoImage(
                             imageBytes = photo.previewBytes?.bytesForDecoding()
                                 ?: photo.originalBytes?.bytesForDecoding(),
+                            imageUri = photo.previewUri ?: photo.localOriginalUri ?: photo.fullResolutionUri,
+                            cacheKey = "trip-preview:${photo.id}",
+                            fallbackUri = photo.fullResolutionUri,
                             fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                             contentDescription = "${group.displayDate} 여행 사진 확대",
                             modifier = Modifier
@@ -416,37 +379,51 @@ private fun ExpandedTripPhotoViewer(
     onBackClick: () -> Unit,
 ) {
     val pagerState = rememberPagerState(initialPage = initialPage) { photos.size }
+    val currentPhoto = photos[pagerState.currentPage]
+    var localPreview by remember(currentPhoto.id) { mutableStateOf<ByteArray?>(null) }
+    var localLookupFinished by remember(currentPhoto.id) { mutableStateOf(false) }
+    val photoLibrary = rememberPhotoLibraryActions({}, {}, {}, {}, {}, {}, {})
+    LaunchedEffect(currentPhoto.id) {
+        val localId = currentPhoto.localPhotoId
+        if (localId != null && currentPhoto.localOriginalUri == null) {
+            localPreview = suspendCancellableCoroutine { continuation ->
+                photoLibrary.loadFullResolutionPreview(
+                    SelectedPhoto(localId, currentPhoto.displayName, null),
+                ) { bytes ->
+                    if (continuation.isActive) continuation.resume(bytes)
+                }
+            }
+        }
+        localLookupFinished = true
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(TripRecordPalette.current.background),
+            .background(Color.Black),
     ) {
         HorizontalPager(
             state = pagerState,
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val photo = photos[page]
+            val isCurrent = page == pagerState.currentPage
+            val localBytes = localPreview.takeIf { isCurrent }
+            val awaitingLocalPhoto = isCurrent && !localLookupFinished &&
+                photo.localPhotoId != null && photo.localOriginalUri == null
+            if (awaitingLocalPhoto) return@HorizontalPager
             Box(Modifier.fillMaxSize()) {
                 TripPhotoImage(
-                    imageBytes = photo.previewBytes?.bytesForDecoding()
+                    imageBytes = localBytes ?: photo.previewBytes?.bytesForDecoding()
                         ?: photo.originalBytes?.bytesForDecoding(),
-                    fallbackBytes = photo.originalBytes?.bytesForDecoding(),
-                    contentDescription = "$locationName 사진 배경",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .alpha(0.48f),
-                    placeholderVariant = photo.id.hashCode(),
-                    shape = RectangleShape,
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(TripRecordPalette.current.mediaScrim.copy(alpha = 0.28f)),
-                )
-                TripPhotoImage(
-                    imageBytes = photo.previewBytes?.bytesForDecoding()
-                        ?: photo.originalBytes?.bytesForDecoding(),
+                    imageUri = when {
+                        localBytes != null -> null
+                        !isCurrent -> photo.previewUri
+                        else -> photo.localOriginalUri ?: photo.fullResolutionUri ?: photo.previewUri
+                    },
+                    cacheKey = "trip-full:${photo.id}",
+                    blackLoadingBackground = true,
+                    fallbackUri = if (photo.localOriginalUri != null) photo.fullResolutionUri ?: photo.previewUri else photo.previewUri,
                     fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                     contentDescription = "$locationName 확대 사진 ${page + 1}",
                     modifier = Modifier

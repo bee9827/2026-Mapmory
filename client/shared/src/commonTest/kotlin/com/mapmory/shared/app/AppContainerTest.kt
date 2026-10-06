@@ -84,13 +84,6 @@ class AppContainerTest {
                             respondJson(detailResponse("travel-records/10/server-photo.jpg"))
                         }
 
-                        6 -> {
-                            assertEquals("GET", request.method.value)
-                            assertEquals("/api/v1/travel-records/101", request.url.encodedPath)
-                            assertEquals("Bearer guest-access", request.headers[HttpHeaders.Authorization])
-                            respondJson(detailResponse("travel-records/10/server-photo.jpg"))
-                        }
-
                         else -> {
                             assertEquals("GET", request.method.value)
                             assertEquals("/api/v1/travel-records", request.url.encodedPath)
@@ -145,12 +138,12 @@ class AppContainerTest {
             listState.records.single().photos.single().previewBytes?.bytesForDecoding(),
         )
         assertEquals(AuthTokens("guest-access", "guest-refresh"), tokenStore.tokens)
-        assertEquals(7, requestCount)
+        assertEquals(6, requestCount)
         container.close()
     }
 
     @Test
-    fun `조회용_URL은_Object_Key_캐시를_사용해_S3에서_한_번만_읽는다`() = runBlocking {
+    fun `상세 조회는 사진 다운로드 없이 URL을 반환한다`() = runBlocking {
         var requestCount = 0
         val client = HttpClient(MockEngine) {
             configureCommonHttpClient()
@@ -167,16 +160,10 @@ class AppContainerTest {
                             respondJson(detailResponseWithViewUrl("signature=first"))
                         }
 
-                        3 -> {
-                            assertEquals("bucket.example.com", request.url.host)
-                            assertEquals(null, request.headers[HttpHeaders.Authorization])
-                            respond(
-                                content = ByteReadChannel(byteArrayOf(0x01, 0x02, 0x03)),
-                                status = HttpStatusCode.OK,
-                            )
+                        else -> {
+                            assertEquals("api.example.com", request.url.host)
+                            respondJson(detailResponseWithViewUrl("signature=rotated"))
                         }
-
-                        else -> respondJson(detailResponseWithViewUrl("signature=rotated"))
                     }
                 }
             }
@@ -190,9 +177,10 @@ class AppContainerTest {
         val first = container.tripRecordRepository.getTripRecord(101).getOrThrow()
         val second = container.tripRecordRepository.getTripRecord(101).getOrThrow()
 
-        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), first.media.single().previewBytes)
-        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), second.media.single().previewBytes)
-        assertEquals(4, requestCount)
+        assertEquals(null, first.media.single().previewBytes)
+        assertEquals(null, second.media.single().previewBytes)
+        assertEquals(first.media.single().url, second.media.single().url)
+        assertEquals(2, requestCount)
         container.close()
     }
 
@@ -203,7 +191,7 @@ class AppContainerTest {
             accessTokenProvider = AccessTokenProvider { "guest-token" },
         )
 
-        assertIs<TripRecordRemoteRepository>(container.tripRecordRepository)
+        assertIs<com.mapmory.shared.data.repository.PhotoUsageTripRecordRepository>(container.tripRecordRepository)
         assertEquals(null, container.mapSummaryRepository.getCachedRootRegions())
         assertEquals(null, container.tripStatisticsRepository.getCachedStatistics())
         container.close()
@@ -224,7 +212,7 @@ class AppContainerTest {
             onboardingPreference = onboardingPreference,
         )
 
-        assertSame(repository, container.tripRecordRepository)
+        assertIs<com.mapmory.shared.data.repository.PhotoUsageTripRecordRepository>(container.tripRecordRepository)
         assertSame(themePreference, container.themePreference)
         assertSame(onboardingPreference, container.onboardingPreference)
         assertTrue(container.themePreference.loadIsDarkTheme())

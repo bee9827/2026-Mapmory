@@ -3,8 +3,8 @@ package com.mapmory.shared.navigation
 internal class MapmoryBackHandlerRegistry {
     private val registrations = mutableListOf<Registration>()
 
-    fun register(handler: () -> Boolean): Registration {
-        val registration = Registration(handler)
+    fun register(ownerId: String, handler: () -> Boolean): Registration {
+        val registration = Registration(ownerId, handler)
         registrations += registration
         return registration
     }
@@ -13,9 +13,15 @@ internal class MapmoryBackHandlerRegistry {
         registrations.remove(registration)
     }
 
-    fun handleBack(): Boolean = registrations.lastOrNull()?.handler?.invoke() == true
+    fun handleBack(ownerId: String?): Boolean {
+        return registrations
+            .lastOrNull { registration -> registration.ownerId == ownerId }
+            ?.handler
+            ?.invoke() == true
+    }
 
     class Registration internal constructor(
+        internal val ownerId: String,
         internal val handler: () -> Boolean,
     )
 }

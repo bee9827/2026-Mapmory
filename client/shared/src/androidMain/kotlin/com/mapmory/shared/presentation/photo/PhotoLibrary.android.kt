@@ -81,6 +81,8 @@ actual fun rememberPhotoLibraryActions(
     val recommendationJob = remember { mutableStateOf<Job?>(null) }
     val recommendationGeneration = remember { mutableStateOf(0) }
     val recommendationSession = remember { mutableStateOf<AndroidRecommendationSession?>(null) }
+    val excludedPhotoIds = remember { mutableStateOf<Set<String>>(emptySet()) }
+    val searchCounts = remember { mutableStateOf(0 to 0) }
 
     fun cancelRecommendations() {
         recommendationGeneration.value += 1
@@ -104,7 +106,7 @@ actual fun rememberPhotoLibraryActions(
         latestLoadingChanged(true)
         recommendationJob.value = scope.launch {
             try {
-                val session = withContext(Dispatchers.IO) {
+                val unfilteredSession = withContext(Dispatchers.IO) {
                     val cached = lastRecommendationSearch.get(target.id, dateRange)
                     cached?.copy(generation = generation, nextIndex = 0)
                         ?: context.prepareRecommendationSession(
@@ -112,7 +114,12 @@ actual fun rememberPhotoLibraryActions(
                         ) { progress -> latestLoadingProgressChanged(progress) }
                             ?.also { lastRecommendationSearch.put(target.id, dateRange, it) }
                 }
+                val session = unfilteredSession?.let { found ->
+                    found.copy(candidates = found.candidates.filterNot { it.contentUri in excludedPhotoIds.value })
+                }
                 if (generation != recommendationGeneration.value) return@launch
+                searchCounts.value = (unfilteredSession?.candidates?.size ?: 0) to
+                    ((unfilteredSession?.candidates?.size ?: 0) - (session?.candidates?.size ?: 0))
                 if (session == null) {
                     latestRecommended(PhotoRecommendationPage(generation, emptyList(), hasMore = false))
                     return@launch
@@ -123,7 +130,10 @@ actual fun rememberPhotoLibraryActions(
                 }
                 if (generation == recommendationGeneration.value) {
                     recommendationSession.value = session.copy(nextIndex = page.nextIndex)
-                    latestRecommended(page.asPublicPage())
+                    latestRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = searchCounts.value.first,
+                        excludedCount = searchCounts.value.second,
+                    ))
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -147,7 +157,6 @@ actual fun rememberPhotoLibraryActions(
         if (!session.hasMore || recommendationJob.value?.isActive == true) return
         val generation = session.generation
         latestRecommendationLoadingChanged(true)
-        latestLoadingChanged(true)
         recommendationJob.value = scope.launch {
             try {
                 val page = withContext(Dispatchers.IO) {
@@ -158,12 +167,69 @@ actual fun rememberPhotoLibraryActions(
                     recommendationSession.value?.generation == generation
                 ) {
                     recommendationSession.value = session.copy(nextIndex = page.nextIndex)
-                    latestRecommended(page.asPublicPage())
+                    latestRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = searchCounts.value.first,
+                        excludedCount = searchCounts.value.second,
+                    ))
                 }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
                 Log.e("PhotoRecommendation", "Failed to load recommendation", error)
+                if (generation == recommendationGeneration.value) {
+                    latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+                }
+            } finally {
+                if (generation == recommendationGeneration.value) {
+                    latestRecommendationLoadingChanged(false)
+                    latestLoadingChanged(false)
+                    recommendationJob.value = null
+                }
+            }
+        }
+    }
+
+    fun loadRecommendationPagesForSelection(maxPhotos: Int) {
+        val initialSession = recommendationSession.value ?: return
+        latestRecommended(PhotoRecommendationPage(
+            generation = initialSession.generation,
+            photos = initialSession.candidates.take(maxPhotos).map { it.toSelectedPhoto(null) },
+            hasMore = initialSession.hasMore,
+            totalMatchingCount = searchCounts.value.first,
+            excludedCount = searchCounts.value.second,
+        ))
+        if (!initialSession.hasMore) return
+        val activeJob = recommendationJob.value
+        if (activeJob?.isActive == true) {
+            scope.launch {
+                activeJob.join()
+                if (initialSession.generation == recommendationGeneration.value) {
+                    loadRecommendationPagesForSelection(maxPhotos)
+                }
+            }
+            return
+        }
+
+        val generation = initialSession.generation
+        latestRecommendationLoadingChanged(true)
+        recommendationJob.value = scope.launch {
+            try {
+                var session = initialSession
+                while (session.hasMore && session.nextIndex < maxPhotos) {
+                    val page = withContext(Dispatchers.IO) {
+                        context.loadRecommendationPage(session)
+                    }
+                    if (generation != recommendationGeneration.value) return@launch
+                    session = session.copy(nextIndex = page.nextIndex)
+                    recommendationSession.value = session
+                    latestRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = searchCounts.value.first,
+                        excludedCount = searchCounts.value.second,
+                    ))
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
                 if (generation == recommendationGeneration.value) {
                     latestMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
                 }
@@ -220,7 +286,9 @@ actual fun rememberPhotoLibraryActions(
                 val startedAt = SystemClock.elapsedRealtime()
                 try {
                     val result = traceSection("photo.pick.read") {
-                        uris.mapNotNull { uri -> context.readPhoto(uri) }
+                        uris.mapNotNull { uri ->
+                            context.readPhoto(uri, includeOriginalBytes = false)
+                        }
                     }
                     logPhotoPickPerformance(
                         totalMillis = SystemClock.elapsedRealtime() - startedAt,
@@ -245,6 +313,7 @@ actual fun rememberPhotoLibraryActions(
 
     return remember(context, galleryPicker, galleryPermissionLauncher, settingsLauncher) {
         PhotoLibraryActions(
+            setExcludedPhotoIds = { excludedPhotoIds.value = it },
             pickFromGallery = {
                 latestLoadingChanged(true)
                 galleryPicker.launch(
@@ -252,13 +321,12 @@ actual fun rememberPhotoLibraryActions(
                 )
             },
             loadNextRecommendationPage = ::loadNextRecommendationPage,
+            loadRecommendationPagesForSelection = ::loadRecommendationPagesForSelection,
             prepareForAdding = { photos, onReady ->
                 scope.launch {
                     val preparedPhotos = withContext(Dispatchers.IO) {
                         photos.mapNotNull { photo ->
-                            val originalBytes = photo.originalBytes
-                                ?: context.readOriginalBytes(Uri.parse(photo.id))
-                            originalBytes?.let { photo.copy(originalBytes = it) }
+                            photo.takeIf { context.canOpenPhoto(Uri.parse(photo.id)) }
                         }
                     }
                     onReady(preparedPhotos)
@@ -452,11 +520,12 @@ private suspend fun Context.loadRecommendationPage(
 private fun PhotoMetadataEntity.localRecommendationPreviewCacheKey(): String =
     "local-android:$contentUri:$modifiedAtSeconds:$RecommendationPreviewSizePx"
 
-private fun PhotoMetadataEntity.toSelectedPhoto(previewBytes: ByteArray): SelectedPhoto =
+private fun PhotoMetadataEntity.toSelectedPhoto(previewBytes: ByteArray?): SelectedPhoto =
     SelectedPhoto(
         id = contentUri,
         displayName = displayName,
         previewBytes = previewBytes,
+        fullResolutionUri = contentUri,
         latitude = latitude,
         longitude = longitude,
         capturedAt = formatDate(capturedAtMillis),
@@ -668,7 +737,7 @@ internal fun Context.readPhoto(
     knownName: String? = null,
     knownCoordinates: Pair<Double, Double>? = null,
     knownCapturedAtMillis: Long? = null,
-    includeOriginalBytes: Boolean = true,
+    includeOriginalBytes: Boolean = false,
 ): SelectedPhoto? = try {
 
     val metadata = traceSection("photo.read.metadata") {
@@ -691,6 +760,7 @@ internal fun Context.readPhoto(
             id = uri.toString(),
             displayName = displayName,
             previewBytes = previewBytes,
+            fullResolutionUri = uri.toString(),
             latitude = coordinates?.first,
             longitude = coordinates?.second,
             capturedAt = capturedAt,
@@ -710,6 +780,7 @@ internal fun Context.readPhoto(
         id = uri.toString(),
         displayName = displayName,
         previewBytes = previewBytes,
+        fullResolutionUri = uri.toString(),
         latitude = coordinates?.first,
         longitude = coordinates?.second,
         capturedAt = capturedAt,
@@ -720,6 +791,10 @@ internal fun Context.readPhoto(
 } catch (error: Exception) {
     null
 }
+
+private fun Context.canOpenPhoto(uri: Uri): Boolean = runCatching {
+    contentResolver.openAssetFileDescriptor(uri, "r")?.use { true } ?: false
+}.getOrDefault(false)
 
 private fun Context.readPreviewBytes(uri: Uri, maxDimension: Int): ByteArray? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return null
@@ -748,11 +823,6 @@ private fun Context.readPreviewBytes(uri: Uri, maxDimension: Int): ByteArray? {
         bitmap.recycle()
     }
 }
-
-private fun Context.readOriginalBytes(uri: Uri): ByteArray? = runCatching {
-    contentResolver.openInputStream(uri)?.use { input -> input.readBytes() }
-        ?.takeIf(ByteArray::isNotEmpty)
-}.getOrNull()
 
 private fun ByteArray.normalizeOrientation(): ByteArray {
     val orientation = try {

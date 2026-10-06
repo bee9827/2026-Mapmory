@@ -10,6 +10,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import com.mapmory.shared.data.media.IosPhotoPreviewCache
+import com.mapmory.shared.data.media.cacheIosPickerPhoto
+import com.mapmory.shared.data.media.isIosLocalPhotoAvailable
 import com.mapmory.shared.domain.model.Location
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.reinterpret
@@ -39,9 +41,6 @@ import platform.Photos.PHAsset
 import platform.Photos.PHAssetMediaTypeImage
 import platform.Photos.PHAssetMediaSubtypePhotoScreenshot
 import platform.Photos.PHAssetResource
-import platform.Photos.PHAssetResourceManager
-import platform.Photos.PHAssetResourceRequestOptions
-import platform.Photos.PHAssetResourceTypePhoto
 import platform.Photos.PHAuthorizationStatusAuthorized
 import platform.Photos.PHAuthorizationStatusLimited
 import platform.Photos.PHAuthorizationStatusNotDetermined
@@ -72,7 +71,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 import kotlin.native.Platform
 
 private val lastRecommendationSearch = LastPhotoSearchCache<List<PHAsset>>()
@@ -98,16 +99,22 @@ actual fun rememberPhotoLibraryActions(
     controller.onPermissionRequired = onPermissionRequired
     DisposableEffect(controller) {
         controller.startObservingAppActivity()
-        onDispose { controller.stopObservingAppActivity() }
+        onDispose {
+            controller.stopObservingAppActivity()
+            controller.cancelFullResolutionPreview()
+        }
     }
 
     return remember(controller) {
         PhotoLibraryActions(
+            setExcludedPhotoIds = { controller.excludedPhotoIds = it },
             pickFromGallery = controller::presentPicker,
             recommendForLocation = controller::recommend,
             recommendForLocationInDateRange = controller::recommendInDateRange,
             loadNextRecommendationPage = controller::loadNextRecommendationPage,
+            loadRecommendationPagesForSelection = controller::loadRecommendationPagesForSelection,
             prepareForAdding = controller::prepareForAdding,
+            loadFullResolutionPreview = controller::loadFullResolutionPreview,
             cancelRecommendation = controller::cancelRecommendation,
             openAppSettings = controller::openAppSettings,
         )
@@ -152,8 +159,12 @@ private class IosPhotoLibraryController(
     var onRecommendationLoadingChanged: (Boolean) -> Unit = {}
     var onPermissionRequired: (PhotoLibraryPermissionIssue) -> Unit = {}
     private var recommendationJob: Job? = null
+    private var fullResolutionRequestId: Int? = null
     private var recommendationGeneration = 0
     private var recommendationSession: IosRecommendationSession? = null
+    var excludedPhotoIds: Set<String> = emptySet()
+    private var totalMatchingCount = 0
+    private var excludedCount = 0
     private var isRecommendationPageLoading = false
     private var pendingRecommendation: PendingIosRecommendation? = null
     private var appActiveObserver: Any? = null
@@ -191,27 +202,27 @@ private class IosPhotoLibraryController(
             return
         }
 
-        val loaded = MutableList<SelectedPhoto?>(results.size) { null }
-        var remaining = results.size
-        results.forEachIndexed { index, result ->
-            loadPickerResult(result) { photo ->
-                loaded[index] = photo
-                remaining -= 1
-                if (remaining == 0) {
-                    val photos = loaded.filterNotNull()
-                    logPhotoPerformance(
-                        "pick_total_ms=${startedAtMillis?.let(::elapsedMillis) ?: 0} " +
-                            "requested_photos=${results.size} loaded_photos=${photos.size}",
-                    )
-                    if (photos.isEmpty()) {
-                        onMessage("선택한 사진을 읽지 못했어요.")
-                    } else {
-                        onPhotosPicked(photos)
-                    }
-                    onLoadingChanged(false)
+        val loaded = mutableListOf<SelectedPhoto>()
+        fun loadNext(index: Int) {
+            if (index >= results.size) {
+                logPhotoPerformance(
+                    "pick_total_ms=${startedAtMillis?.let(::elapsedMillis) ?: 0} " +
+                        "requested_photos=${results.size} loaded_photos=${loaded.size}",
+                )
+                if (loaded.isEmpty()) {
+                    onMessage("선택한 사진을 읽지 못했어요.")
+                } else {
+                    onPhotosPicked(loaded)
                 }
+                onLoadingChanged(false)
+                return
+            }
+            loadPickerResult(results[index]) { photo ->
+                photo?.let(loaded::add)
+                loadNext(index + 1)
             }
         }
+        loadNext(0)
     }
 
     @Suppress("UNUSED_PARAMETER")
@@ -350,7 +361,9 @@ private class IosPhotoLibraryController(
             }
             if (generation != recommendationGeneration) return@launch
 
-            val session = IosRecommendationSession(generation, matchingAssets)
+            val session = IosRecommendationSession(generation, matchingAssets.filterNot { it.localIdentifier in excludedPhotoIds })
+            totalMatchingCount = matchingAssets.size
+            excludedCount = matchingAssets.size - session.assets.size
             recommendationSession = session
             loadRecommendationPage(session) { page ->
                 if (generation == recommendationGeneration) {
@@ -359,7 +372,10 @@ private class IosPhotoLibraryController(
                         "recommend_total_ms=${elapsedMillis(startedAtMillis)} " +
                             "recommended_photos=${page.photos.size}",
                     )
-                    onPhotosRecommended(page.asPublicPage())
+                    onPhotosRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = totalMatchingCount,
+                        excludedCount = excludedCount,
+                    ))
                     finishRecommendationLoading()
                 }
             }
@@ -373,14 +389,66 @@ private class IosPhotoLibraryController(
         val generation = session.generation
         isRecommendationPageLoading = true
         onRecommendationLoadingChanged(true)
-        onLoadingChanged(true)
         recommendationJob = scope.launch {
             loadRecommendationPage(session) { page ->
                 if (generation == recommendationGeneration) {
                     recommendationSession = session.copy(nextIndex = page.nextIndex)
-                    onPhotosRecommended(page.asPublicPage())
+                    onPhotosRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = totalMatchingCount,
+                        excludedCount = excludedCount,
+                    ))
                     finishRecommendationLoading()
                 }
+            }
+        }
+    }
+
+    fun loadRecommendationPagesForSelection(maxPhotos: Int) {
+        val initialSession = recommendationSession ?: return
+        onPhotosRecommended(PhotoRecommendationPage(
+            generation = initialSession.generation,
+            photos = initialSession.assets.take(maxPhotos).map { it.toSelectedPhoto(null) },
+            hasMore = initialSession.hasMore,
+            totalMatchingCount = totalMatchingCount,
+            excludedCount = excludedCount,
+        ))
+        if (!initialSession.hasMore) return
+        if (isRecommendationPageLoading) {
+            scope.launch {
+                while (isRecommendationPageLoading && initialSession.generation == recommendationGeneration) {
+                    kotlinx.coroutines.delay(50)
+                }
+                if (initialSession.generation == recommendationGeneration) {
+                    loadRecommendationPagesForSelection(maxPhotos)
+                }
+            }
+            return
+        }
+
+        val generation = initialSession.generation
+        isRecommendationPageLoading = true
+        onRecommendationLoadingChanged(true)
+        recommendationJob = scope.launch {
+            try {
+                var session = initialSession
+                while (session.hasMore && session.nextIndex < maxPhotos) {
+                    val page = loadRecommendationPageSuspending(session)
+                    if (generation != recommendationGeneration) return@launch
+                    session = session.copy(nextIndex = page.nextIndex)
+                    recommendationSession = session
+                    onPhotosRecommended(page.asPublicPage().copy(
+                        totalMatchingCount = totalMatchingCount,
+                        excludedCount = excludedCount,
+                    ))
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                if (generation == recommendationGeneration) {
+                    onMessage("사진 추천을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.")
+                }
+            } finally {
+                if (generation == recommendationGeneration) finishRecommendationLoading()
             }
         }
     }
@@ -472,18 +540,16 @@ private class IosPhotoLibraryController(
         }
     }
 
+    private suspend fun loadRecommendationPageSuspending(
+        session: IosRecommendationSession,
+    ): IosRecommendationPage = suspendCancellableCoroutine { continuation ->
+        loadRecommendationPage(session, continuation::resume)
+    }
+
     private fun loadPickerResult(result: PHPickerResult, completion: (SelectedPhoto?) -> Unit) {
         val asset = result.assetIdentifier?.let(::assetForIdentifier)
         if (asset != null) {
-            loadAssetPreview(asset) { preview ->
-                if (preview == null) {
-                    completion(null)
-                } else {
-                    prepareForAdding(listOf(preview)) { prepared ->
-                        completion(prepared.firstOrNull())
-                    }
-                }
-            }
+            loadAssetPreview(asset, completion)
             return
         }
         result.itemProvider.loadDataRepresentationForTypeIdentifier("public.image") { data, _ ->
@@ -491,16 +557,16 @@ private class IosPhotoLibraryController(
                 onMain { completion(null) }
                 return@loadDataRepresentationForTypeIdentifier
             }
-            val originalBytes = data.toByteArray()
-            val previewBytes = data.toPreviewByteArray() ?: originalBytes
+            val localId = cacheIosPickerPhoto(data)
+            val previewBytes = data.toPreviewByteArray(RecommendationPreviewSizePx)
             onMain {
                 completion(
-                    SelectedPhoto(
-                        id = result.assetIdentifier ?: "ios-${data.hash}",
+                    if (localId != null && previewBytes != null) SelectedPhoto(
+                        id = localId,
                         displayName = result.itemProvider.suggestedName ?: "여행 사진",
                         previewBytes = previewBytes,
-                        originalBytes = originalBytes,
-                    ),
+                        originalBytes = null,
+                    ) else null,
                 )
             }
         }
@@ -584,64 +650,47 @@ private class IosPhotoLibraryController(
         photos: List<SelectedPhoto>,
         completion: (List<SelectedPhoto>) -> Unit,
     ) {
-        if (photos.isEmpty()) {
-            completion(emptyList())
-            return
-        }
-
-        val prepared = MutableList<SelectedPhoto?>(photos.size) { null }
-        var remaining = photos.size
-        fun completeOne(index: Int, photo: SelectedPhoto?) {
-            prepared[index] = photo
-            remaining -= 1
-            if (remaining == 0) {
-                val result = prepared.filterNotNull()
-                completion(result)
-                if (result.size != photos.size) {
-                    onMessage("일부 사진의 원본을 읽지 못했어요.")
-                }
-            }
-        }
-
-        photos.forEachIndexed { index, photo ->
-            if (photo.originalBytes != null) {
-                completeOne(index, photo)
-                return@forEachIndexed
-            }
-            val asset = assetForIdentifier(photo.id)
-            if (asset == null) {
-                completeOne(index, null)
-                return@forEachIndexed
-            }
-            loadOriginalBytes(asset) { bytes ->
-                completeOne(index, bytes?.let { photo.copy(originalBytes = it) })
-            }
+        val available = photos.filter { photo -> isIosLocalPhotoAvailable(photo.id) }
+        completion(available)
+        if (available.size != photos.size) {
+            onMessage("일부 사진의 원본을 읽지 못했어요.")
         }
     }
 
-    private fun loadOriginalBytes(asset: PHAsset, completion: (ByteArray?) -> Unit) {
-        val resources = PHAssetResource.assetResourcesForAsset(asset)
-            .filterIsInstance<PHAssetResource>()
-        val resource = resources.firstOrNull { it.type == PHAssetResourceTypePhoto }
-            ?: resources.firstOrNull()
-        if (resource == null) {
-            completion(null)
+    fun loadFullResolutionPreview(
+        photo: SelectedPhoto,
+        completion: (ByteArray?) -> Unit,
+    ) {
+        cancelFullResolutionPreview()
+        val asset = assetForIdentifier(photo.id)
+        if (asset == null) {
+            completion(photo.originalBytes)
             return
         }
-
-        val chunks = mutableListOf<ByteArray>()
-        val options = PHAssetResourceRequestOptions().apply {
+        val options = PHImageRequestOptions().apply {
+            version = PHImageRequestOptionsVersionCurrent
+            deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat
             networkAccessAllowed = true
         }
-        PHAssetResourceManager.defaultManager().requestDataForAssetResource(
-            resource,
-            options,
-            dataReceivedHandler = { data -> data?.let { chunks += it.toByteArray() } },
-            completionHandler = { error ->
-                val bytes = if (error == null) chunks.joinToByteArray() else null
-                onMain { completion(bytes) }
-            },
-        )
+        fullResolutionRequestId = PHImageManager.defaultManager().requestImageForAsset(
+            asset = asset,
+            targetSize = CGSizeMake(
+                FullResolutionPreviewSizePx.toDouble(),
+                FullResolutionPreviewSizePx.toDouble(),
+            ),
+            contentMode = PHImageContentModeAspectFit,
+            options = options,
+        ) { image, _ ->
+            val bytes = image
+                ?.let { UIImageJPEGRepresentation(it, FullResolutionPreviewJpegQuality) }
+                ?.toByteArray()
+            onMain { completion(bytes) }
+        }
+    }
+
+    fun cancelFullResolutionPreview() {
+        fullResolutionRequestId?.let { PHImageManager.defaultManager().cancelImageRequest(it) }
+        fullResolutionRequestId = null
     }
 
     private fun assetForIdentifier(identifier: String): PHAsset? =
@@ -665,7 +714,7 @@ private fun PHAsset.localRecommendationPreviewCacheKey(): String {
     return "local-ios:$localIdentifier:$version:$RecommendationPreviewSizePx"
 }
 
-private fun PHAsset.toSelectedPhoto(previewBytes: ByteArray): SelectedPhoto {
+private fun PHAsset.toSelectedPhoto(previewBytes: ByteArray?): SelectedPhoto {
     val coordinate = location?.coordinate
     return SelectedPhoto(
         id = localIdentifier,
@@ -684,17 +733,7 @@ private fun NSData.toByteArray(): ByteArray {
     }
 }
 
-private fun List<ByteArray>.joinToByteArray(): ByteArray {
-    val result = ByteArray(sumOf(ByteArray::size))
-    var offset = 0
-    forEach { chunk ->
-        chunk.copyInto(result, destinationOffset = offset)
-        offset += chunk.size
-    }
-    return result
-}
-
-private fun NSData.toPreviewByteArray(): ByteArray? {
+private fun NSData.toPreviewByteArray(maxDimension: Int): ByteArray? {
     val retainedData = CFBridgingRetain(this) ?: return null
     val imageSource = CGImageSourceCreateWithData(retainedData.reinterpret(), null)
     CFRelease(retainedData)
@@ -703,7 +742,7 @@ private fun NSData.toPreviewByteArray(): ByteArray? {
     val thumbnailOptions = mapOf(
         kCGImageSourceCreateThumbnailFromImageAlways to true,
         kCGImageSourceCreateThumbnailWithTransform to true,
-        kCGImageSourceThumbnailMaxPixelSize to PreviewSizePx,
+        kCGImageSourceThumbnailMaxPixelSize to maxDimension,
     )
     val retainedOptions = CFBridgingRetain(thumbnailOptions) ?: run {
         CFRelease(imageSource.reinterpret())
@@ -753,9 +792,10 @@ private fun logPhotoPerformance(message: String) {
     }
 }
 
-private const val PreviewSizePx = 1280
 private const val RecommendationPreviewSizePx = 640
 private const val PreviewJpegQuality = 0.85
+private const val FullResolutionPreviewSizePx = 2_048
+private const val FullResolutionPreviewJpegQuality = 0.92
 private const val IosProgressUpdateInterval = 25
 private fun Long.toPermissionIssue(): PhotoLibraryPermissionIssue =
     if (this == platform.Photos.PHAuthorizationStatusRestricted) {

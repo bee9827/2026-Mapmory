@@ -4,6 +4,8 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
@@ -33,15 +35,17 @@ internal fun MapmoryNavHost(
     contentWindowInsets: WindowInsets,
 ) {
     val tripRecordRevision by container.tripRecordRevision.collectAsState()
-    NavHost(
-        navController = navController,
-        startDestination = MapRoute,
-        // Bottom-tab navigation is a state switch, so it should not use push-style motion on iOS.
-        enterTransition = { EnterTransition.None },
-        exitTransition = { ExitTransition.None },
-        popEnterTransition = { EnterTransition.None },
-        popExitTransition = { ExitTransition.None },
-    ) {
+    val backgroundSaves by container.backgroundTripRecordSaver.saves.collectAsState()
+    Box(Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = MapRoute,
+            // Bottom-tab navigation is a state switch, so it should not use push-style motion on iOS.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
+        ) {
         composable<MapRoute> { backStackEntry ->
             LaunchedEffect(backStackEntry) {
                 mapmoryDebugLog(NavigationLogTag, "screen=map")
@@ -55,6 +59,7 @@ internal fun MapmoryNavHost(
                 regionCatalog = container.regionCatalog,
                 onboardingPreference = container.onboardingPreference,
                 backHandlerRegistry = backHandlerRegistry,
+                backHandlerOwnerId = backStackEntry.id,
                 tripRecordRevision = tripRecordRevision,
                 onOpenRecords = navigator::navigateToRecords,
                 onOpenEditor = { locationId ->
@@ -80,6 +85,9 @@ internal fun MapmoryNavHost(
                 viewModel = viewModel,
                 initialLocationId = route.locationId,
                 tripRecordRevision = tripRecordRevision,
+                pendingSaves = backgroundSaves,
+                onRetryPendingSave = container.backgroundTripRecordSaver::retry,
+                onDismissPendingSave = container.backgroundTripRecordSaver::dismissFailure,
                 onOpenMap = navigator::navigateToMap,
                 onOpenEditor = { navigator.navigateToEditor() },
                 onOpenDetail = navigator::navigateToDetail,
@@ -108,6 +116,7 @@ internal fun MapmoryNavHost(
                 viewModel = viewModel,
                 regionCatalog = container.regionCatalog,
                 backHandlerRegistry = backHandlerRegistry,
+                backHandlerOwnerId = backStackEntry.id,
                 onBack = { navigator.navigateBack() },
                 onSaved = { wasEditing, recordId ->
                     if (wasEditing) {
@@ -161,6 +170,7 @@ internal fun MapmoryNavHost(
                 tripRecordRevision = tripRecordRevision,
                 viewModel = viewModel,
                 backHandlerRegistry = backHandlerRegistry,
+                backHandlerOwnerId = backStackEntry.id,
                 onBack = { navigator.navigateBack() },
                 onEdit = { recordId ->
                     navigator.navigateToEditor(recordId = recordId)
@@ -172,6 +182,8 @@ internal fun MapmoryNavHost(
                 onOpenProfile = navigator::navigateToProfile,
             )
         }
+        }
+
     }
 }
 

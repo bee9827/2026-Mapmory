@@ -1,6 +1,7 @@
 import FirebaseCore
 import Shared
 import SwiftUI
+import UIKit
 
 private let lightSystemBarColor = UIColor(
     red: 250.0 / 255.0,
@@ -60,13 +61,19 @@ private struct ComposeView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIViewController {
         let coordinator = context.coordinator
-        let viewController = MainViewControllerKt.MainViewController(
+        let navigation = MapmoryNavigation()
+        let composeViewController = MainViewControllerKt.MainViewController(
             apiBaseUrl: AppConfiguration.apiBaseUrl,
             onThemeChanged: { isDark in
                 coordinator.updateTheme(isDark.boolValue)
             },
             analytics: analyticsLogger,
             tokenStore: KeychainAuthTokenStore(),
+            navigation: navigation,
+        )
+        let viewController = SystemBackHandlingViewController(
+            contentViewController: composeViewController,
+            navigation: navigation,
         )
         applyTheme(to: viewController)
         return viewController
@@ -98,5 +105,62 @@ private struct ComposeView: UIViewControllerRepresentable {
                 self?.isDarkTheme.wrappedValue = isDark
             }
         }
+    }
+}
+
+/// iOS에는 Android처럼 시스템 BackHandler가 없기 때문에 가장자리 스와이프를
+/// 공통 navigation 객체로 전달해 작성 중 이탈 확인을 동일하게 처리한다.
+private final class SystemBackHandlingViewController: UIViewController,
+    UIGestureRecognizerDelegate {
+    private let contentViewController: UIViewController
+    private let navigation: MapmoryNavigation
+
+    init(
+        contentViewController: UIViewController,
+        navigation: MapmoryNavigation,
+    ) {
+        self.contentViewController = contentViewController
+        self.navigation = navigation
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        addChild(contentViewController)
+        view.addSubview(contentViewController.view)
+        contentViewController.view.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            contentViewController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            contentViewController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            contentViewController.view.topAnchor.constraint(equalTo: view.topAnchor),
+            contentViewController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        contentViewController.didMove(toParent: self)
+
+        let edgePan = UIScreenEdgePanGestureRecognizer(
+            target: self,
+            action: #selector(handleBackGesture(_:)),
+        )
+        edgePan.edges = .left
+        edgePan.delegate = self
+        edgePan.cancelsTouchesInView = false
+        view.addGestureRecognizer(edgePan)
+    }
+
+    @objc private func handleBackGesture(_ gesture: UIScreenEdgePanGestureRecognizer) {
+        guard gesture.state == .ended else { return }
+        _ = navigation.popBackStack()
+    }
+
+    func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer,
+    ) -> Bool {
+        true
     }
 }

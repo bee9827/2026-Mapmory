@@ -1209,6 +1209,7 @@ private fun PhotoPreview(photo: SelectedPhoto, modifier: Modifier = Modifier) {
 private fun PhotoPreview(photo: TripRecordPhotoUiState, modifier: Modifier = Modifier) {
     TripPhotoImage(
         imageBytes = photo.previewBytes?.bytesForDecoding(),
+        imageUri = photo.previewUri,
         contentDescription = photo.displayName,
         modifier = modifier,
         placeholderVariant = photo.id.hashCode(),

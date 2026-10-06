@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import com.mapmory.shared.analytics.LocalMapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.navigation.MapmoryBackHandlerRegistry
+import com.mapmory.shared.navigation.PlatformBackHandler
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordDetailScreen
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordDetailViewModel
 import kotlinx.coroutines.launch
@@ -23,6 +24,7 @@ internal fun TripRecordDetailRoute(
     tripRecordRevision: Long,
     viewModel: TripRecordDetailViewModel,
     backHandlerRegistry: MapmoryBackHandlerRegistry,
+    backHandlerOwnerId: String,
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
     onDeleted: () -> Unit,
@@ -40,9 +42,15 @@ internal fun TripRecordDetailRoute(
     }
 
     DisposableEffect(viewModel, backHandlerRegistry) {
-        val registration = backHandlerRegistry.register { latestBackHandler() }
+        val registration = backHandlerRegistry.register(backHandlerOwnerId) {
+            latestBackHandler()
+        }
         onDispose { backHandlerRegistry.unregister(registration) }
     }
+    PlatformBackHandler(
+        enabled = photoViewerBackHandler != null,
+        onBack = { latestBackHandler() },
+    )
 
     LaunchedEffect(Unit) {
         analytics.logEvent(

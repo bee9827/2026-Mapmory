@@ -60,7 +60,8 @@ fun MapmoryApp(
     val navigator = remember(navController) { MapmoryNavigator(navController) }
     val backHandlerRegistry = remember { MapmoryBackHandlerRegistry() }
     val latestNavigateBack = rememberUpdatedState {
-        backHandlerRegistry.handleBack() || navigator.navigateBack()
+        backHandlerRegistry.handleBack(navController.currentBackStackEntry?.id) ||
+            navigator.navigateBack()
     }
     var showSplash by rememberSaveable { mutableStateOf(true) }
 
