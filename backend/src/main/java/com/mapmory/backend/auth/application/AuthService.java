@@ -3,16 +3,13 @@ package com.mapmory.backend.auth.application;
 import com.mapmory.backend.auth.application.model.AuthTokens;
 import com.mapmory.backend.auth.application.model.LoginResult;
 import com.mapmory.backend.auth.application.model.SocialIdentity;
-import com.mapmory.backend.auth.application.port.SocialIdentityPort;
+import com.mapmory.backend.auth.application.port.SocialIdentityPorts;
 import com.mapmory.backend.auth.token.jwt.JwtProvider;
 import com.mapmory.backend.auth.token.refresh.RefreshTokenService;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -24,19 +21,18 @@ public class AuthService {
 
     private static final String DEFAULT_NAME_PREFIX = "회원";
 
-    private final Map<AuthProvider, SocialIdentityPort> socialIdentityPorts;
+    private final SocialIdentityPorts socialIdentityPorts;
     private final MemberRepository memberRepository;
     private final JwtProvider jwtProvider;
     private final RefreshTokenService refreshTokenService;
 
     public AuthService(
-            List<SocialIdentityPort> socialIdentityPorts,
+            SocialIdentityPorts socialIdentityPorts,
             MemberRepository memberRepository,
             JwtProvider jwtProvider,
             RefreshTokenService refreshTokenService
     ) {
-        this.socialIdentityPorts = new EnumMap<>(AuthProvider.class);
-        socialIdentityPorts.forEach(port -> this.socialIdentityPorts.put(port.provider(), port));
+        this.socialIdentityPorts = socialIdentityPorts;
         this.memberRepository = memberRepository;
         this.jwtProvider = jwtProvider;
         this.refreshTokenService = refreshTokenService;
@@ -54,7 +50,7 @@ public class AuthService {
      */
     @Transactional
     public LoginResult loginWithSocial(AuthProvider provider, String token, Long authenticatedMemberId) {
-        SocialIdentity identity = socialIdentityPort(provider).verify(token);
+        SocialIdentity identity = socialIdentityPorts.verify(provider, token);
         String providerId = identity.providerId();
         Optional<Member> guest = findGuest(authenticatedMemberId);
 
@@ -72,14 +68,6 @@ public class AuthService {
         }
 
         return issueTokens(register(provider, providerId, identity.name()), true);
-    }
-
-    private SocialIdentityPort socialIdentityPort(AuthProvider provider) {
-        SocialIdentityPort port = socialIdentityPorts.get(provider);
-        if (port == null) {
-            throw new IllegalArgumentException("소셜 로그인을 지원하지 않는 제공자입니다: " + provider);
-        }
-        return port;
     }
 
     private Optional<Member> findGuest(Long memberId) {
