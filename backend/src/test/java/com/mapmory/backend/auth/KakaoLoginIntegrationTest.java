@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.mapmory.backend.IntegrationTest;
-import com.mapmory.backend.auth.exception.AuthErrorCode;
+import com.mapmory.backend.auth.application.AuthErrorCode;
 import com.mapmory.backend.auth.infrastructure.kakao.KakaoApiClient;
 import com.mapmory.backend.auth.infrastructure.kakao.KakaoUserResponse;
 import com.mapmory.backend.auth.infrastructure.kakao.KakaoUserResponse.KakaoAccount;

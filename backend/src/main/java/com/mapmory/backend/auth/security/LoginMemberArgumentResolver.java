@@ -1,6 +1,6 @@
 package com.mapmory.backend.auth.security;
 
-import com.mapmory.backend.auth.exception.AuthErrorCode;
+import com.mapmory.backend.auth.application.AuthErrorCode;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;

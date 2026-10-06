@@ -10,7 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
-import com.mapmory.backend.auth.exception.AuthErrorCode;
+import com.mapmory.backend.auth.application.AuthErrorCode;
 import com.mapmory.backend.auth.infrastructure.google.GoogleIdTokenVerifier;
 import com.mapmory.backend.auth.infrastructure.google.GoogleUser;
 import com.mapmory.backend.common.exception.BusinessException;

@@ -14,7 +14,7 @@ import com.mapmory.backend.auth.infrastructure.kakao.KakaoApiClient;
 import com.mapmory.backend.auth.infrastructure.kakao.KakaoUserResponse;
 import com.mapmory.backend.auth.infrastructure.kakao.KakaoUserResponse.KakaoAccount;
 import com.mapmory.backend.auth.infrastructure.kakao.KakaoUserResponse.KakaoAccount.Profile;
-import com.mapmory.backend.auth.refresh.RefreshTokenRepository;
+import com.mapmory.backend.auth.token.refresh.RefreshTokenRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;

@@ -3,7 +3,7 @@ package com.mapmory.backend.auth.infrastructure.google;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.mapmory.backend.auth.exception.AuthErrorCode;
+import com.mapmory.backend.auth.application.AuthErrorCode;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
