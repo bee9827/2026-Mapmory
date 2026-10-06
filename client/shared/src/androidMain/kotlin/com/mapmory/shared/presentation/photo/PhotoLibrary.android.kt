@@ -157,7 +157,6 @@ actual fun rememberPhotoLibraryActions(
         if (!session.hasMore || recommendationJob.value?.isActive == true) return
         val generation = session.generation
         latestRecommendationLoadingChanged(true)
-        latestLoadingChanged(true)
         recommendationJob.value = scope.launch {
             try {
                 val page = withContext(Dispatchers.IO) {
@@ -192,11 +191,27 @@ actual fun rememberPhotoLibraryActions(
 
     fun loadRecommendationPagesForSelection(maxPhotos: Int) {
         val initialSession = recommendationSession.value ?: return
-        if (!initialSession.hasMore || recommendationJob.value?.isActive == true) return
+        latestRecommended(PhotoRecommendationPage(
+            generation = initialSession.generation,
+            photos = initialSession.candidates.take(maxPhotos).map { it.toSelectedPhoto(null) },
+            hasMore = initialSession.hasMore,
+            totalMatchingCount = searchCounts.value.first,
+            excludedCount = searchCounts.value.second,
+        ))
+        if (!initialSession.hasMore) return
+        val activeJob = recommendationJob.value
+        if (activeJob?.isActive == true) {
+            scope.launch {
+                activeJob.join()
+                if (initialSession.generation == recommendationGeneration.value) {
+                    loadRecommendationPagesForSelection(maxPhotos)
+                }
+            }
+            return
+        }
 
         val generation = initialSession.generation
         latestRecommendationLoadingChanged(true)
-        latestLoadingChanged(true)
         recommendationJob.value = scope.launch {
             try {
                 var session = initialSession
@@ -505,7 +520,7 @@ private suspend fun Context.loadRecommendationPage(
 private fun PhotoMetadataEntity.localRecommendationPreviewCacheKey(): String =
     "local-android:$contentUri:$modifiedAtSeconds:$RecommendationPreviewSizePx"
 
-private fun PhotoMetadataEntity.toSelectedPhoto(previewBytes: ByteArray): SelectedPhoto =
+private fun PhotoMetadataEntity.toSelectedPhoto(previewBytes: ByteArray?): SelectedPhoto =
     SelectedPhoto(
         id = contentUri,
         displayName = displayName,

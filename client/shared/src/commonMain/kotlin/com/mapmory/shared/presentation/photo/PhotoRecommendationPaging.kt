@@ -34,12 +34,14 @@ internal fun PhotoRecommendationPagingState.accept(
         .filterNot { photo -> photo.id in existingIds }
         .distinctBy(SelectedPhoto::id)
     val isFirstPage = generation == null
+    val previews = page.photos.filter { it.previewBytes != null }.associateBy(SelectedPhoto::id)
+    val refreshedPhotos = photos.map { previews[it.id] ?: it }
 
     if (!isFirstPage && incoming.isEmpty()) {
-        return copy(hasMore = page.hasMore)
+        return copy(photos = refreshedPhotos, hasMore = page.hasMore)
     }
 
-    val nextPhotos = if (isFirstPage) incoming else photos + incoming
+    val nextPhotos = refreshedPhotos + incoming
     val remainingSlots = (maxSelectionCount - selectedIds.size).coerceAtLeast(0)
     val matchingPreselectedIds = incoming
         .asSequence()

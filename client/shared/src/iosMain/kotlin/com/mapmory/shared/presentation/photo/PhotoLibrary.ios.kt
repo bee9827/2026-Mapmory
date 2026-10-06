@@ -385,7 +385,6 @@ private class IosPhotoLibraryController(
         val generation = session.generation
         isRecommendationPageLoading = true
         onRecommendationLoadingChanged(true)
-        onLoadingChanged(true)
         recommendationJob = scope.launch {
             loadRecommendationPage(session) { page ->
                 if (generation == recommendationGeneration) {
@@ -402,12 +401,29 @@ private class IosPhotoLibraryController(
 
     fun loadRecommendationPagesForSelection(maxPhotos: Int) {
         val initialSession = recommendationSession ?: return
-        if (!initialSession.hasMore || isRecommendationPageLoading) return
+        onPhotosRecommended(PhotoRecommendationPage(
+            generation = initialSession.generation,
+            photos = initialSession.assets.take(maxPhotos).map { it.toSelectedPhoto(null) },
+            hasMore = initialSession.hasMore,
+            totalMatchingCount = totalMatchingCount,
+            excludedCount = excludedCount,
+        ))
+        if (!initialSession.hasMore) return
+        if (isRecommendationPageLoading) {
+            scope.launch {
+                while (isRecommendationPageLoading && initialSession.generation == recommendationGeneration) {
+                    kotlinx.coroutines.delay(50)
+                }
+                if (initialSession.generation == recommendationGeneration) {
+                    loadRecommendationPagesForSelection(maxPhotos)
+                }
+            }
+            return
+        }
 
         val generation = initialSession.generation
         isRecommendationPageLoading = true
         onRecommendationLoadingChanged(true)
-        onLoadingChanged(true)
         recommendationJob = scope.launch {
             try {
                 var session = initialSession
@@ -688,7 +704,7 @@ private fun PHAsset.localRecommendationPreviewCacheKey(): String {
     return "local-ios:$localIdentifier:$version:$RecommendationPreviewSizePx"
 }
 
-private fun PHAsset.toSelectedPhoto(previewBytes: ByteArray): SelectedPhoto {
+private fun PHAsset.toSelectedPhoto(previewBytes: ByteArray?): SelectedPhoto {
     val coordinate = location?.coordinate
     return SelectedPhoto(
         id = localIdentifier,

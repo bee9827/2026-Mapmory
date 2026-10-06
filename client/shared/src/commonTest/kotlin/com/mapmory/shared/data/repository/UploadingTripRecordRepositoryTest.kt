@@ -64,7 +64,7 @@ class UploadingTripRecordRepositoryTest {
     }
 
     @Test
-    fun localPhotosAreReadAndUploadedOneAtATime() = runBlocking {
+    fun hundredPhotosWithoutPreviewsAreReadAndUploadedOneAtATime() = runBlocking {
         val localIds = (0 until 100).map { index -> "content://photo/$index" }
         val readIds = mutableListOf<String>()
         val uploadBatchSizes = mutableListOf<Int>()
@@ -101,7 +101,7 @@ class UploadingTripRecordRepositoryTest {
                     TripRecordMediaDraft(
                         objectKey = localId,
                         sortOrder = index,
-                        previewBytes = byteArrayOf(index.toByte()),
+                        previewBytes = null,
                         originalBytes = null,
                         fileName = "photo-$index.jpg",
                     )

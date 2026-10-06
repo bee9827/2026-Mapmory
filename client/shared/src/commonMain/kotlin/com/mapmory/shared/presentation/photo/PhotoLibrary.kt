@@ -20,6 +20,7 @@ data class SelectedPhoto(
     val longitude: Double? = null,
     val capturedAt: String? = null,
     val originalBytes: ByteArray? = null,
+    val previewUri: String? = null,
 )
 
 data class PhotoLoadingProgress(
@@ -60,7 +61,7 @@ data class PhotoLibraryActions(
         PhotoRecommendationDateRange,
     ) -> Unit = { location, parentName, _ -> recommendForLocation(location, parentName) },
     val loadNextRecommendationPage: () -> Unit = {},
-    /** 전체 선택에 필요한 페이지를 최대 [Int]장까지 순차적으로 준비한다. */
+    /** 선택할 사진의 메타데이터를 즉시 전달하고, 미리보기는 이후 페이지 단위로 채운다. */
     val loadRecommendationPagesForSelection: (Int) -> Unit = {},
     val prepareForAdding: (
         photos: List<SelectedPhoto>,

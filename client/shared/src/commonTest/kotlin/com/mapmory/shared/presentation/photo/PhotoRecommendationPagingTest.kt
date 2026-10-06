@@ -8,6 +8,47 @@ import kotlin.test.assertTrue
 
 class PhotoRecommendationPagingTest {
     @Test
+    fun `편집 중 기존 사진은 첫 검색 페이지와 병합되고 해제 후 다시 선택되지 않는다`() {
+        val existing = photo(100)
+        val initial = PhotoRecommendationPagingState(
+            photos = listOf(existing), selectedIds = setOf(existing.id),
+        )
+        val first = initial.accept(
+            PhotoRecommendationPage(1, listOf(photo(1)), true), false,
+        )!!
+        assertEquals(listOf(existing.id, photo(1).id), first.photos.map { it.id })
+        val deselected = first.toggleSelection(existing.id)
+        val next = deselected.accept(
+            PhotoRecommendationPage(1, listOf(existing, photo(2)), false), false,
+            preselectedIds = setOf(existing.id),
+        )!!
+        assertFalse(existing.id in next.selectedIds)
+        assertEquals(3, next.photos.size)
+        assertTrue(photo(2).id in next.toggleSelection(photo(2).id).selectedIds)
+    }
+
+    @Test
+    fun `미리보기 없이 100장을 먼저 선택하고 미리보기 도착 시 선택을 유지한다`() {
+        val metadata = (1..100).map { photo(it).copy(previewBytes = null) }
+        val selected = PhotoRecommendationPagingState()
+            .accept(PhotoRecommendationPage(1, metadata, hasMore = true), autoSelectNewPhotos = false)!!
+            .selectAllLoadedPhotos()
+        assertEquals(100, selected.selectedIds.size)
+        assertTrue(selected.photos.all { it.previewBytes == null })
+
+        val deselected = selected.toggleSelection(metadata.first().id)
+        val hydrated = deselected.accept(
+            PhotoRecommendationPage(1, metadata.take(24).map { it.copy(previewBytes = byteArrayOf(1)) }, true),
+            autoSelectNewPhotos = false,
+        )!!
+        assertEquals(deselected.selectedIds, hydrated.selectedIds)
+        assertEquals(100, hydrated.photos.size)
+        assertTrue(hydrated.photos.take(24).all { it.previewBytes != null })
+        val repeated = hydrated.accept(PhotoRecommendationPage(1, metadata, true), false)!!
+        assertTrue(repeated.photos.take(24).all { it.previewBytes != null })
+    }
+
+    @Test
     fun `추천_사진은_24장_단위로_누적된다`() {
         val pages = listOf(
             PhotoRecommendationPage(1, (1..24).map { photo(it) }, hasMore = true),
