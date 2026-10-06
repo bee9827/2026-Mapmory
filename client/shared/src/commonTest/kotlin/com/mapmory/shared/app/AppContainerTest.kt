@@ -143,7 +143,7 @@ class AppContainerTest {
     }
 
     @Test
-    fun `조회용_URL은_Object_Key_캐시를_사용해_S3에서_한_번만_읽는다`() = runBlocking {
+    fun `상세 조회는 사진 다운로드 없이 URL을 반환한다`() = runBlocking {
         var requestCount = 0
         val client = HttpClient(MockEngine) {
             configureCommonHttpClient()
@@ -160,16 +160,10 @@ class AppContainerTest {
                             respondJson(detailResponseWithViewUrl("signature=first"))
                         }
 
-                        3 -> {
-                            assertEquals("bucket.example.com", request.url.host)
-                            assertEquals(null, request.headers[HttpHeaders.Authorization])
-                            respond(
-                                content = ByteReadChannel(byteArrayOf(0x01, 0x02, 0x03)),
-                                status = HttpStatusCode.OK,
-                            )
+                        else -> {
+                            assertEquals("api.example.com", request.url.host)
+                            respondJson(detailResponseWithViewUrl("signature=rotated"))
                         }
-
-                        else -> respondJson(detailResponseWithViewUrl("signature=rotated"))
                     }
                 }
             }
@@ -183,9 +177,10 @@ class AppContainerTest {
         val first = container.tripRecordRepository.getTripRecord(101).getOrThrow()
         val second = container.tripRecordRepository.getTripRecord(101).getOrThrow()
 
-        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), first.media.single().previewBytes)
-        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03), second.media.single().previewBytes)
-        assertEquals(3, requestCount)
+        assertEquals(null, first.media.single().previewBytes)
+        assertEquals(null, second.media.single().previewBytes)
+        assertEquals(first.media.single().url, second.media.single().url)
+        assertEquals(2, requestCount)
         container.close()
     }
 

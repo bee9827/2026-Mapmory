@@ -10,6 +10,17 @@ import kotlin.test.assertNull
 
 class TripRecordItemUiStateTest {
     @Test
+    fun `기기 URI만 로컬 원본으로 사용하고 iOS 식별자는 URL로 처리하지 않는다`() {
+        val photo = TripRecordPhotoUiState(
+            id = "server-key", localPhotoId = "content://media/42",
+            displayName = "photo", previewBytes = null, sortOrder = 0,
+        )
+        assertEquals("content://media/42", photo.localOriginalUri)
+        assertNull(photo.copy(localPhotoId = "asset-id/L0/001").localOriginalUri)
+        assertNull(photo.copy(localPhotoId = null).localOriginalUri)
+    }
+
+    @Test
     fun `상세 사진은 썸네일과 별도로 원본 URL을 보존한다`() {
         val originalUrl = "https://bucket.example.com/original.jpg?signature=fresh"
         val state = TripRecordData(

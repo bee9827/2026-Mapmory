@@ -52,6 +52,9 @@ import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.presentation.map.ui.KoreaMapArtwork
 import com.mapmory.shared.preview.PreviewSurface
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 
 @Composable
 internal fun TripRecordTopBar(
@@ -490,22 +493,42 @@ internal fun TripPhotoImage(
     imageBytes: ByteArray?,
     imageUri: String? = null,
     fallbackBytes: ByteArray? = null,
+    fallbackUri: String? = null,
+    cacheKey: String? = null,
+    blackLoadingBackground: Boolean = false,
     contentDescription: String,
     modifier: Modifier = Modifier,
     placeholderVariant: Int = 0,
     shape: Shape = RoundedCornerShape(18.dp),
     contentScale: ContentScale = ContentScale.Crop,
 ) {
-    var useFallback by remember(imageBytes, imageUri, fallbackBytes) { mutableStateOf(false) }
-    var showPlaceholder by remember(imageBytes, imageUri, fallbackBytes) { mutableStateOf(true) }
+    var useFallback by remember(imageBytes, imageUri, fallbackBytes, fallbackUri) { mutableStateOf(false) }
+    var showPlaceholder by remember(imageBytes, imageUri, fallbackBytes, fallbackUri) { mutableStateOf(true) }
     val primaryModel: Any? = imageUri ?: imageBytes
-    val model = if (useFallback || primaryModel == null) fallbackBytes else primaryModel
+    val fallbackModel: Any? = fallbackUri ?: fallbackBytes ?: imageBytes
+    val model = if (useFallback || primaryModel == null) fallbackModel else primaryModel
+    val context = LocalPlatformContext.current
+    val request = remember(context, model, cacheKey, useFallback, blackLoadingBackground) {
+        ImageRequest.Builder(context).data(model).apply {
+            if (blackLoadingBackground) crossfade(180)
+            cacheKey?.let { key ->
+                memoryCacheKey("$key:$useFallback")
+                diskCacheKey("$key:$useFallback")
+            }
+        }.build()
+    }
 
     if (model == null) {
-        TripPhotoPlaceholder(modifier, placeholderVariant, shape)
+        if (blackLoadingBackground) {
+            Box(modifier.clip(shape).background(Color.Black))
+        } else {
+            TripPhotoPlaceholder(modifier, placeholderVariant, shape)
+        }
     } else {
-        Box(modifier = modifier.clip(shape)) {
-            if (showPlaceholder) {
+        Box(modifier = modifier.clip(shape).then(
+            if (blackLoadingBackground) Modifier.background(Color.Black) else Modifier,
+        )) {
+            if (showPlaceholder && !blackLoadingBackground) {
                 TripPhotoPlaceholder(
                     modifier = Modifier.fillMaxSize(),
                     variant = placeholderVariant,
@@ -513,7 +536,7 @@ internal fun TripPhotoImage(
                 )
             }
             AsyncImage(
-                model = model,
+                model = request,
                 contentDescription = contentDescription,
                 contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
@@ -521,7 +544,7 @@ internal fun TripPhotoImage(
                 onSuccess = { showPlaceholder = false },
                 onError = {
                     showPlaceholder = true
-                    if (!useFallback && primaryModel != null && fallbackBytes != null) {
+                    if (!useFallback && primaryModel != null && fallbackModel != null && fallbackModel != primaryModel) {
                         useFallback = true
                     }
                 },

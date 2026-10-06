@@ -51,6 +51,11 @@ import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordItemUiState
 import com.mapmory.shared.presentation.triprecord.state.TripRecordPhotoUiState
+import com.mapmory.shared.presentation.triprecord.state.localOriginalUri
+import com.mapmory.shared.presentation.photo.SelectedPhoto
+import com.mapmory.shared.presentation.photo.rememberPhotoLibraryActions
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewUiRecords
 
@@ -346,7 +351,9 @@ private fun PhotoDateGroup(
                         TripPhotoImage(
                             imageBytes = photo.previewBytes?.bytesForDecoding()
                                 ?: photo.originalBytes?.bytesForDecoding(),
-                            imageUri = photo.previewUri,
+                            imageUri = photo.previewUri ?: photo.localOriginalUri ?: photo.fullResolutionUri,
+                            cacheKey = "trip-preview:${photo.id}",
+                            fallbackUri = photo.fullResolutionUri,
                             fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                             contentDescription = "${group.displayDate} 여행 사진 확대",
                             modifier = Modifier

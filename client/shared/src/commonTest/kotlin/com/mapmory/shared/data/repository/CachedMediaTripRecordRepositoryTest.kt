@@ -42,7 +42,7 @@ class CachedMediaTripRecordRepositoryTest {
     }
 
     @Test
-    fun expiredGetUrlRefreshesDetailAndDownloadsWithNewUrlOnce() = runBlocking {
+    fun detailDoesNotWaitForPhotoDownloads() = runBlocking {
         val delegate = RefreshingDetailRepository()
         val requestedUrls = mutableListOf<String>()
         val repository = CachedMediaTripRecordRepository(
@@ -59,10 +59,10 @@ class CachedMediaTripRecordRepositoryTest {
 
         val record = repository.getTripRecord(101).getOrThrow()
 
-        assertEquals(2, delegate.detailRequestCount)
-        assertEquals(listOf(ExpiredUrl, RefreshedUrl), requestedUrls)
-        assertContentEquals(byteArrayOf(0x01, 0x02), record.media.single().previewBytes)
-        assertEquals(RefreshedUrl, record.media.single().url)
+        assertEquals(1, delegate.detailRequestCount)
+        assertEquals(emptyList(), requestedUrls)
+        assertNull(record.media.single().previewBytes)
+        assertEquals(ExpiredUrl, record.media.single().url)
     }
 
     @Test

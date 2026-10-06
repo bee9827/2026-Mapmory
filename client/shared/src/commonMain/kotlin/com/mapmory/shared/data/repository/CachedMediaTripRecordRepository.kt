@@ -1,7 +1,6 @@
 package com.mapmory.shared.data.repository
 
 import com.mapmory.shared.data.media.PhotoPreviewLoader
-import com.mapmory.shared.data.media.isExpiredPresignedGetUrl
 import com.mapmory.shared.domain.model.TripRecordData
 import com.mapmory.shared.domain.model.TripRecordDraft
 import com.mapmory.shared.domain.model.TripRecordMedia
@@ -34,12 +33,10 @@ internal class CachedMediaTripRecordRepository(
 
     override suspend fun getTripRecord(id: Long): Result<TripRecordData> {
         val record = delegate.getTripRecord(id).getOrElse { error -> return Result.failure(error) }
-        val firstLoad = record.loadPreviews()
-        if (!firstLoad.hasExpiredUrl) return Result.success(firstLoad.record)
-
-        // 상세 재조회가 새 Presigned GET URL을 발급하는 서버 계약을 사용한다.
-        val refreshed = delegate.getTripRecord(id).getOrNull() ?: return Result.success(firstLoad.record)
-        return Result.success(refreshed.loadPreviews().record)
+        // 사진 다운로드는 화면에 보이는 항목만 이미지 로더가 처리한다.
+        return Result.success(record.copy(
+            media = record.media.sortedBy(TripRecordMedia::sortOrder).map { it.withCachedPreviewUri() },
+        ))
     }
 
     override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> =
@@ -62,16 +59,6 @@ internal class CachedMediaTripRecordRepository(
 
     override suspend fun deleteTripRecord(id: Long): Result<Unit> = delegate.deleteTripRecord(id)
 
-    private suspend fun TripRecordData.loadPreviews(): PreviewLoad {
-        var hasExpiredUrl = false
-        val loaded = media.sortedBy(TripRecordMedia::sortOrder).map { item ->
-            val result = item.withLoadedPreview()
-            if (result.hasExpiredUrl) hasExpiredUrl = true
-            result.media
-        }
-        return PreviewLoad(copy(media = loaded), hasExpiredUrl)
-    }
-
     private suspend fun TripRecordData.cacheAvailablePreviews(): TripRecordData = copy(
         media = media.map { item ->
             item.localPreviewKey?.let { key ->
@@ -83,45 +70,11 @@ internal class CachedMediaTripRecordRepository(
         },
     )
 
-    private suspend fun TripRecordMedia.withLoadedPreview(): MediaLoad {
-        val resolvedLocalPreviewKey = localPreviewKey ?: loader.localSourceKey(objectKey)
-        resolvedLocalPreviewKey?.let { key -> loader.copyCached(key, objectKey) }
-        val resolvedMedia = if (resolvedLocalPreviewKey == localPreviewKey) {
-            this
-        } else {
-            copy(localPreviewKey = resolvedLocalPreviewKey)
-        }
-        loader.cachedForDisplay(objectKey)?.let { preview ->
-            return MediaLoad(
-                resolvedMedia.copy(
-                    previewUri = preview.uri,
-                    previewBytes = preview.bytes,
-                    originalBytes = null,
-                ),
-                false,
-            )
-        }
-        resolvedMedia.previewBytes?.let { bytes ->
-            loader.loadFromLocal(objectKey, bytes)
-            return MediaLoad(resolvedMedia.withCachedPreviewUri(), hasExpiredUrl = false)
-        }
-        val getUrl = resolvedMedia.url ?: return MediaLoad(resolvedMedia, hasExpiredUrl = false)
-        val result = loader.loadForDisplay(objectKey, getUrl)
-        return MediaLoad(
-            media = result.getOrNull()?.let { preview ->
-                resolvedMedia.copy(
-                    previewUri = preview.uri,
-                    previewBytes = preview.bytes,
-                    originalBytes = null,
-                )
-            } ?: resolvedMedia,
-            hasExpiredUrl = result.exceptionOrNull()?.isExpiredPresignedGetUrl() == true,
-        )
-    }
-
     private suspend fun TripRecordMedia.withCachedPreviewUri(): TripRecordMedia {
         val resolvedLocalPreviewKey = localPreviewKey ?: loader.localSourceKey(objectKey)
-        resolvedLocalPreviewKey?.let { key -> loader.copyCached(key, objectKey) }
+        if (loader.cachedUri(objectKey) == null) {
+            resolvedLocalPreviewKey?.let { key -> loader.copyCached(key, objectKey) }
+        }
         val resolvedMedia = if (resolvedLocalPreviewKey == localPreviewKey) {
             this
         } else {
@@ -143,13 +96,3 @@ private suspend fun PhotoPreviewLoader.loadFromLocal(objectKey: String, bytes: B
     // 로컬에서 선택한 미리보기도 같은 Object Key로 저장해 다음 앱 실행에서 재사용한다.
     store(objectKey, bytes)
 }
-
-private data class PreviewLoad(
-    val record: TripRecordData,
-    val hasExpiredUrl: Boolean,
-)
-
-private data class MediaLoad(
-    val media: TripRecordMedia,
-    val hasExpiredUrl: Boolean,
-)

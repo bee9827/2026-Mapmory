@@ -36,6 +36,10 @@ data class TripRecordPhotoUiState(
     val originalBytes: PhotoPreviewBytes? = null,
 )
 
+/** Android 원본은 복사·다운로드 없이 읽는다. iOS Photos 식별자는 URI가 아니므로 제외한다. */
+internal val TripRecordPhotoUiState.localOriginalUri: String?
+    get() = localPhotoId?.takeIf { it.startsWith("content://") || it.startsWith("file://") }
+
 /** 사진 디코딩 전용 바이트. 생성 이후 배열을 변경하지 않는 소유권 규칙으로 불필요한 복사를 피한다. */
 class PhotoPreviewBytes private constructor(
     private val value: ByteArray,
@@ -62,7 +66,8 @@ fun SelectedPhoto.toTripRecordPhotoUiState(sortOrder: Int): TripRecordPhotoUiSta
         localPhotoId = id,
         displayName = displayName,
         previewBytes = PhotoPreviewBytes.from(previewBytes),
-        previewUri = null,
+        previewUri = previewUri,
+        fullResolutionUri = fullResolutionUri,
         sortOrder = sortOrder,
         latitude = latitude,
         longitude = longitude,
