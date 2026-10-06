@@ -278,7 +278,7 @@ class UploadingTripRecordRepositoryTest {
     }
 
     @Test
-    fun listCacheKeepsOnlyTheFirstPreviewAndNeverKeepsOriginalBytes() = runBlocking {
+    fun listCacheKeepsPhotoMetadataWithoutKeepingAnyImageBytes() = runBlocking {
         val uploader = indexedUploader()
         val delegate = CapturingTripRecordRepository()
         val repository = UploadingTripRecordRepository(uploader, delegate)
@@ -298,36 +298,35 @@ class UploadingTripRecordRepositoryTest {
             .records.single().media
 
         assertEquals(2, media.size)
-        assertContentEquals(byteArrayOf(0x01, 0x02), media[0].previewBytes)
-        assertNull(media[1].previewBytes)
-        media.forEach { assertNull(it.originalBytes) }
+        media.forEach { item ->
+            assertNull(item.previewBytes)
+            assertNull(item.originalBytes)
+        }
+        assertEquals("content://photo/0", media[0].localPreviewKey)
     }
 
     @Test
-    fun previewCacheEvictsOldRecordsWhenItReachesTheByteLimit() = runBlocking {
-        val delegate = CapturingTripRecordRepository()
-        val repository = UploadingTripRecordRepository(
-            uploader = indexedUploader(),
-            delegate = delegate,
-            maxCachedPreviewBytes = 3,
-        )
-
+    fun newlySavedDetailIsReturnedWithoutWaitingForAnotherServerRequest() = runBlocking {
+        val baseDelegate = CapturingTripRecordRepository()
+        var detailRequestCount = 0
+        val delegate = object : TripRecordRepository by baseDelegate {
+            override suspend fun getTripRecord(id: Long): Result<TripRecordData> {
+                detailRequestCount += 1
+                return baseDelegate.getTripRecord(id)
+            }
+        }
+        val repository = UploadingTripRecordRepository(indexedUploader(), delegate)
         repository.updateTripRecord(
             id = 101,
-            draft = draftWithPhotos("첫 기록", listOf(byteArrayOf(0x01, 0x02))),
-        ).getOrThrow()
-        repository.updateTripRecord(
-            id = 102,
-            draft = draftWithPhotos("둘째 기록", listOf(byteArrayOf(0x03, 0x04))),
+            draft = draftWithPhotos("바로 보이는 기록", listOf(byteArrayOf(0x01, 0x02))),
         ).getOrThrow()
 
-        val records = repository.getTripRecords(TripRecordQuery()).getOrThrow().records
+        val record = repository.getTripRecord(101).getOrThrow()
 
-        assertEquals(emptyList(), records.first { it.id == 101L }.media)
-        assertContentEquals(
-            byteArrayOf(0x03, 0x04),
-            records.first { it.id == 102L }.media.single().previewBytes,
-        )
+        assertEquals("바로 보이는 기록", record.title)
+        assertEquals(0, detailRequestCount)
+        assertNull(record.media.single().previewBytes)
+        assertNull(record.media.single().originalBytes)
     }
 }
 
@@ -408,6 +407,7 @@ private fun draftWithPhotos(
             objectKey = "content://photo/$index",
             sortOrder = index,
             previewBytes = bytes,
+            localPreviewKey = "content://photo/$index",
             originalBytes = bytes,
             fileName = "photo-$index.jpg",
         )

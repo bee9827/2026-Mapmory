@@ -21,8 +21,11 @@ data class TripRecordItemUiState(
 
 data class TripRecordPhotoUiState(
     val id: String,
+    /** 기기 사진첩의 경량 식별자. 편집 시 기존 선택 표시용이며 원본 바이트를 보관하지 않는다. */
+    val localPhotoId: String? = null,
     val displayName: String,
     val previewBytes: PhotoPreviewBytes?,
+    val previewUri: String? = null,
     val sortOrder: Int,
     val isUploaded: Boolean = false,
     val latitude: Double? = null,
@@ -54,8 +57,10 @@ class PhotoPreviewBytes private constructor(
 fun SelectedPhoto.toTripRecordPhotoUiState(sortOrder: Int): TripRecordPhotoUiState =
     TripRecordPhotoUiState(
         id = id,
+        localPhotoId = id,
         displayName = displayName,
         previewBytes = PhotoPreviewBytes.from(previewBytes),
+        previewUri = null,
         sortOrder = sortOrder,
         latitude = latitude,
         longitude = longitude,
@@ -78,8 +83,10 @@ fun TripRecordData.toTripRecordItemUiState(
         .map { media ->
             TripRecordPhotoUiState(
                 id = media.objectKey,
+                localPhotoId = media.localPreviewKey,
                 displayName = media.objectKey.substringAfterLast('/'),
                 previewBytes = PhotoPreviewBytes.from(media.previewBytes ?: media.originalBytes),
+                previewUri = media.previewUri,
                 sortOrder = media.sortOrder,
                 isUploaded = true,
                 latitude = media.latitude,
@@ -115,12 +122,14 @@ fun TripRecordSummary.toTripRecordItemUiState(
         .mapIndexed { index, media ->
             TripRecordPhotoUiState(
                 id = media.objectKey,
+                localPhotoId = media.localPreviewKey,
                 displayName = media.objectKey.substringAfterLast('/'),
                 previewBytes = if (index == 0) {
                     PhotoPreviewBytes.from(media.previewBytes ?: media.originalBytes)
                 } else {
                     null
                 },
+                previewUri = if (index == 0) media.previewUri else null,
                 sortOrder = media.sortOrder,
                 isUploaded = true,
                 latitude = media.latitude,

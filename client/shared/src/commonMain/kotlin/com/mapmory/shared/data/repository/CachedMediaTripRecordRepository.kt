@@ -20,7 +20,17 @@ internal class CachedMediaTripRecordRepository(
 ) : ProgressReportingTripRecordRepository {
     // 목록 데이터는 사진 다운로드를 기다리지 않고 즉시 반환한다.
     override suspend fun getTripRecords(query: TripRecordQuery): Result<TripRecordPage> =
-        delegate.getTripRecords(query)
+        delegate.getTripRecords(query).map { page ->
+            page.copy(
+                records = page.records.map { record ->
+                    record.copy(
+                        media = record.media.sortedBy(TripRecordMedia::sortOrder).mapIndexed { index, media ->
+                            if (index == 0) media.withCachedPreviewUri() else media.withoutInMemoryPhoto()
+                        },
+                    )
+                },
+            )
+        }
 
     override suspend fun getTripRecord(id: Long): Result<TripRecordData> {
         val record = delegate.getTripRecord(id).getOrElse { error -> return Result.failure(error) }
@@ -64,24 +74,70 @@ internal class CachedMediaTripRecordRepository(
 
     private suspend fun TripRecordData.cacheAvailablePreviews(): TripRecordData = copy(
         media = media.map { item ->
+            item.localPreviewKey?.let { key ->
+                loader.rememberLocalSource(item.objectKey, key)
+                loader.copyCached(key, item.objectKey)
+            }
             item.previewBytes?.let { bytes -> loader.loadFromLocal(item.objectKey, bytes) }
-            item
+            item.withCachedPreviewUri()
         },
     )
 
     private suspend fun TripRecordMedia.withLoadedPreview(): MediaLoad {
-        previewBytes?.let { bytes ->
-            loader.loadFromLocal(objectKey, bytes)
-            return MediaLoad(this, hasExpiredUrl = false)
+        val resolvedLocalPreviewKey = localPreviewKey ?: loader.localSourceKey(objectKey)
+        resolvedLocalPreviewKey?.let { key -> loader.copyCached(key, objectKey) }
+        val resolvedMedia = if (resolvedLocalPreviewKey == localPreviewKey) {
+            this
+        } else {
+            copy(localPreviewKey = resolvedLocalPreviewKey)
         }
-        val getUrl = url ?: return MediaLoad(this, hasExpiredUrl = false)
-        val result = loader.load(objectKey, getUrl)
+        loader.cachedForDisplay(objectKey)?.let { preview ->
+            return MediaLoad(
+                resolvedMedia.copy(
+                    previewUri = preview.uri,
+                    previewBytes = preview.bytes,
+                    originalBytes = null,
+                ),
+                false,
+            )
+        }
+        resolvedMedia.previewBytes?.let { bytes ->
+            loader.loadFromLocal(objectKey, bytes)
+            return MediaLoad(resolvedMedia.withCachedPreviewUri(), hasExpiredUrl = false)
+        }
+        val getUrl = resolvedMedia.url ?: return MediaLoad(resolvedMedia, hasExpiredUrl = false)
+        val result = loader.loadForDisplay(objectKey, getUrl)
         return MediaLoad(
-            media = result.getOrNull()?.let { bytes -> copy(previewBytes = bytes) } ?: this,
+            media = result.getOrNull()?.let { preview ->
+                resolvedMedia.copy(
+                    previewUri = preview.uri,
+                    previewBytes = preview.bytes,
+                    originalBytes = null,
+                )
+            } ?: resolvedMedia,
             hasExpiredUrl = result.exceptionOrNull()?.isExpiredPresignedGetUrl() == true,
         )
     }
+
+    private suspend fun TripRecordMedia.withCachedPreviewUri(): TripRecordMedia {
+        val resolvedLocalPreviewKey = localPreviewKey ?: loader.localSourceKey(objectKey)
+        resolvedLocalPreviewKey?.let { key -> loader.copyCached(key, objectKey) }
+        val resolvedMedia = if (resolvedLocalPreviewKey == localPreviewKey) {
+            this
+        } else {
+            copy(localPreviewKey = resolvedLocalPreviewKey)
+        }
+        val preview = loader.cachedForDisplay(objectKey) ?: return resolvedMedia.withoutInMemoryPhoto()
+        return resolvedMedia.copy(
+            previewUri = preview.uri,
+            previewBytes = preview.bytes,
+            originalBytes = null,
+        )
+    }
 }
+
+private fun TripRecordMedia.withoutInMemoryPhoto(): TripRecordMedia =
+    copy(previewBytes = null, originalBytes = null)
 
 private suspend fun PhotoPreviewLoader.loadFromLocal(objectKey: String, bytes: ByteArray) {
     // 로컬에서 선택한 미리보기도 같은 Object Key로 저장해 다음 앱 실행에서 재사용한다.

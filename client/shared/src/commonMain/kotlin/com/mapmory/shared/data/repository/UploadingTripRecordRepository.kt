@@ -21,29 +21,30 @@ internal class UploadingTripRecordRepository(
     private val uploader: PhotoUploader,
     private val delegate: TripRecordRepository,
     private val localPhotoDataSource: LocalPhotoDataSource? = null,
-    private val maxCachedPreviewBytes: Long = DefaultMaxCachedPreviewBytes,
 ) : ProgressReportingTripRecordRepository {
     private val mediaCacheMutex = Mutex()
-    private val cachedMediaByRecordId = mutableMapOf<Long, List<TripRecordMedia>>()
+    private val cachedRecordById = mutableMapOf<Long, TripRecordData>()
     private val cachedRecordOrder = mutableListOf<Long>()
-    private var cachedPreviewBytes = 0L
 
     override suspend fun getTripRecords(query: TripRecordQuery): Result<TripRecordPage> {
         val page = delegate.getTripRecords(query).getOrElse { error -> return Result.failure(error) }
-        val cachedByRecordId = mediaCacheMutex.withLock { cachedMediaByRecordId.toMap() }
+        val cachedByRecordId = mediaCacheMutex.withLock { cachedRecordById.toMap() }
         return Result.success(
             page.copy(
                 records = page.records.map { record ->
                     cachedByRecordId[record.id]
-                        ?.let { media -> record.copy(media = media.toListMedia()) }
+                        ?.let { cached -> record.copy(media = cached.media.toListMedia()) }
                         ?: record
                 },
             ),
         )
     }
 
-    override suspend fun getTripRecord(id: Long): Result<TripRecordData> =
-        delegate.getTripRecord(id).withCachedMedia()
+    override suspend fun getTripRecord(id: Long): Result<TripRecordData> {
+        mediaCacheMutex.withLock { cachedRecordById[id] }
+            ?.let { cached -> return Result.success(cached) }
+        return delegate.getTripRecord(id).withCachedMedia()
+    }
 
     override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> =
         createTripRecord(draft) {}
@@ -178,7 +179,8 @@ internal class UploadingTripRecordRepository(
     ): Result<TripRecordData> {
         val record = getOrElse { error -> return Result.failure(error) }
         return mediaCacheMutex.withLock {
-            val previousByObjectKey = cachedMediaByRecordId[record.id]
+            val previousByObjectKey = cachedRecordById[record.id]
+                ?.media
                 .orEmpty()
                 .associateBy(TripRecordMedia::objectKey)
             val localByObjectKey = localMedia.associateBy(TripRecordMediaDraft::objectKey)
@@ -188,6 +190,8 @@ internal class UploadingTripRecordRepository(
                     val cached = previousByObjectKey[media.objectKey]
                     media.copy(
                         previewBytes = local?.previewBytes ?: cached?.previewBytes,
+                        previewUri = cached?.previewUri,
+                        localPreviewKey = local?.localPreviewKey ?: cached?.localPreviewKey,
                         originalBytes = null,
                         latitude = local?.latitude ?: cached?.latitude,
                         longitude = local?.longitude ?: cached?.longitude,
@@ -195,37 +199,34 @@ internal class UploadingTripRecordRepository(
                     )
                 },
             )
-            cacheRecordMedia(record.id, enriched.media)
+            cacheRecord(enriched)
             Result.success(enriched)
         }
     }
 
-    private fun cacheRecordMedia(recordId: Long, media: List<TripRecordMedia>) {
-        removeCachedRecord(recordId)
-        val compactMedia = media.map { item -> item.copy(originalBytes = null) }
-        val previewBytes = compactMedia.sumOf { item -> item.previewBytes?.size?.toLong() ?: 0L }
-        if (previewBytes > maxCachedPreviewBytes) return
-
-        cachedMediaByRecordId[recordId] = compactMedia
-        cachedRecordOrder += recordId
-        cachedPreviewBytes += previewBytes
-        while (cachedPreviewBytes > maxCachedPreviewBytes && cachedRecordOrder.isNotEmpty()) {
+    private fun cacheRecord(record: TripRecordData) {
+        removeCachedRecord(record.id)
+        cachedRecordById[record.id] = record.copy(
+            media = record.media.map { item ->
+                item.copy(previewBytes = null, originalBytes = null)
+            },
+        )
+        cachedRecordOrder += record.id
+        while (cachedRecordOrder.size > MaxCachedRecords) {
             removeCachedRecord(cachedRecordOrder.first())
         }
     }
 
     private fun removeCachedRecord(recordId: Long) {
-        val removed = cachedMediaByRecordId.remove(recordId) ?: return
+        cachedRecordById.remove(recordId) ?: return
         cachedRecordOrder.remove(recordId)
-        cachedPreviewBytes -= removed.sumOf { item ->
-            item.previewBytes?.size?.toLong() ?: 0L
-        }
     }
 }
 
 private const val ServerSaveProgress = 95
 private const val PhotoUploadRetryCount = 2
 private const val PhotoUploadRetryDelayMillis = 400L
+private const val MaxCachedRecords = 20
 
 private fun TripRecordDraft.canRetryWithFreshObjectKeys(error: Throwable?): Boolean =
     mediaObjectKeys.any { key -> key !in uploadedMediaObjectKeys } &&
@@ -233,9 +234,9 @@ private fun TripRecordDraft.canRetryWithFreshObjectKeys(error: Throwable?): Bool
         error.code == InvalidObjectKeyCode
 
 private fun List<TripRecordMedia>.toListMedia(): List<TripRecordMedia> =
-    sortedBy(TripRecordMedia::sortOrder).mapIndexed { index, media ->
+    sortedBy(TripRecordMedia::sortOrder).map { media ->
         media.copy(
-            previewBytes = media.previewBytes.takeIf { index == 0 },
+            previewBytes = null,
             originalBytes = null,
         )
     }
@@ -301,5 +302,4 @@ private fun ByteArray.hasAsciiAt(offset: Int, expected: String): Boolean =
 private fun ByteArray.hasAnyAsciiAt(offset: Int, vararg expected: String): Boolean =
     expected.any { value -> hasAsciiAt(offset, value) }
 
-private const val DefaultMaxCachedPreviewBytes = 32L * 1024L * 1024L
 private const val InvalidObjectKeyCode = "INVALID_OBJECT_KEY"

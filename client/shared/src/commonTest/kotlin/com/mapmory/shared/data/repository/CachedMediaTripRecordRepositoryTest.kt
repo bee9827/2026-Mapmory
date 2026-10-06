@@ -1,6 +1,7 @@
 package com.mapmory.shared.data.repository
 
 import com.mapmory.shared.data.media.MemoryPhotoPreviewCache
+import com.mapmory.shared.data.media.PhotoPreviewCache
 import com.mapmory.shared.data.media.PhotoPreviewLoader
 import com.mapmory.shared.data.media.PhotoRemoteSource
 import com.mapmory.shared.data.remote.MapmoryApiException
@@ -14,8 +15,32 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 class CachedMediaTripRecordRepositoryTest {
+    @Test
+    fun diskCacheUriIsReturnedWithoutKeepingPreviewBytesInTheRecord() = runBlocking {
+        val cache = UriPhotoPreviewCache()
+        cache.write(ObjectKey, byteArrayOf(0x01, 0x02))
+        var downloadCount = 0
+        val repository = CachedMediaTripRecordRepository(
+            delegate = RefreshingDetailRepository(),
+            loader = PhotoPreviewLoader(
+                cache = cache,
+                remoteSource = PhotoRemoteSource {
+                    downloadCount += 1
+                    Result.success(byteArrayOf(0x03))
+                },
+            ),
+        )
+
+        val media = repository.getTripRecord(101).getOrThrow().media.single()
+
+        assertEquals("file:///cache/$ObjectKey", media.previewUri)
+        assertNull(media.previewBytes)
+        assertEquals(0, downloadCount)
+    }
+
     @Test
     fun expiredGetUrlRefreshesDetailAndDownloadsWithNewUrlOnce() = runBlocking {
         val delegate = RefreshingDetailRepository()
@@ -61,6 +86,39 @@ class CachedMediaTripRecordRepositoryTest {
         assertEquals(0, downloadCount)
         assertContentEquals(byteArrayOf(0x0A), record.media.single().previewBytes)
     }
+
+    @Test
+    fun localPhotoIdentifierIsRestoredWithoutKeepingOriginalPhotoBytes() = runBlocking {
+        val cache = MemoryPhotoPreviewCache()
+        cache.write(ObjectKey, byteArrayOf(0x0A))
+        cache.linkLocalSource(ObjectKey, "content://photos/selected-42")
+        val repository = CachedMediaTripRecordRepository(
+            delegate = RefreshingDetailRepository(),
+            loader = PhotoPreviewLoader(
+                cache = cache,
+                remoteSource = PhotoRemoteSource { Result.failure(AssertionError("network")) },
+            ),
+        )
+
+        val media = repository.getTripRecord(101).getOrThrow().media.single()
+
+        assertEquals("content://photos/selected-42", media.localPreviewKey)
+        assertContentEquals(byteArrayOf(0x0A), media.previewBytes)
+        assertNull(media.originalBytes)
+    }
+}
+
+private class UriPhotoPreviewCache : PhotoPreviewCache {
+    private val values = mutableMapOf<String, ByteArray>()
+
+    override suspend fun read(objectKey: String): ByteArray? = values[objectKey]
+
+    override suspend fun write(objectKey: String, bytes: ByteArray) {
+        values[objectKey] = bytes.copyOf()
+    }
+
+    override suspend fun uri(objectKey: String): String? =
+        objectKey.takeIf(values::containsKey)?.let { "file:///cache/$it" }
 }
 
 private class RefreshingDetailRepository : TripRecordRepository {

@@ -28,6 +28,11 @@ import platform.ImageIO.kCGImageSourceThumbnailMaxPixelSize
 import platform.UIKit.UIImageJPEGRepresentation
 
 class IosPhotoPreviewCache : PhotoPreviewCache {
+    override suspend fun readRecordedPhotoIndex(): String? =
+        platform.Foundation.NSUserDefaults.standardUserDefaults.stringForKey("mapmory_recorded_photos")
+    override suspend fun writeRecordedPhotoIndex(value: String) {
+        platform.Foundation.NSUserDefaults.standardUserDefaults.setObject(value, forKey = "mapmory_recorded_photos")
+    }
     private val fileManager = NSFileManager.defaultManager
     private val directory: String? =
         NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true)
@@ -53,6 +58,53 @@ class IosPhotoPreviewCache : PhotoPreviewCache {
             path = "$directory/${objectKeyCacheFileName(objectKey)}",
             atomically = true,
         )
+    }
+
+    override suspend fun uri(objectKey: String): String? {
+        val directory = directory ?: return null
+        val path = "$directory/${objectKeyCacheFileName(objectKey)}"
+        return path.takeIf(fileManager::fileExistsAtPath)?.let { "file://$it" }
+    }
+
+    override suspend fun copy(fromObjectKey: String, toObjectKey: String) {
+        val directory = directory ?: return
+        if (fromObjectKey == toObjectKey || toObjectKey.isBlank()) return
+        val source = "$directory/${objectKeyCacheFileName(fromObjectKey)}"
+        if (!fileManager.fileExistsAtPath(source)) return
+        fileManager.createDirectoryAtPath(
+            path = directory,
+            withIntermediateDirectories = true,
+            attributes = null,
+            error = null,
+        )
+        val destination = "$directory/${objectKeyCacheFileName(toObjectKey)}"
+        fileManager.removeItemAtPath(destination, null)
+        fileManager.copyItemAtPath(source, destination, null)
+    }
+
+    override suspend fun linkLocalSource(objectKey: String, localSourceKey: String) {
+        val directory = directory ?: return
+        if (objectKey.isBlank() || localSourceKey.isBlank()) return
+        fileManager.createDirectoryAtPath(
+            path = directory,
+            withIntermediateDirectories = true,
+            attributes = null,
+            error = null,
+        )
+        localSourceKey.encodeToByteArray().toNSData().writeToFile(
+            path = "$directory/${objectKeyCacheFileName(objectKey)}$LocalSourceSuffix",
+            atomically = true,
+        )
+    }
+
+    override suspend fun localSourceKey(objectKey: String): String? {
+        val directory = directory ?: return null
+        val path = "$directory/${objectKeyCacheFileName(objectKey)}$LocalSourceSuffix"
+        return NSData.dataWithContentsOfFile(path)
+            ?.takeIf { it.length in 1UL..MaxLocalSourceKeyBytes }
+            ?.toByteArray()
+            ?.decodeToString()
+            ?.takeIf(String::isNotBlank)
     }
 }
 
@@ -104,3 +156,5 @@ private const val CacheDirectoryName = "mapmory-photo-previews"
 private const val MaxPreviewCacheEntryBytes = 5 * 1024 * 1024
 private const val PreviewSizePx = 1280
 private const val PreviewJpegQuality = 0.85
+private const val LocalSourceSuffix = ".source"
+private const val MaxLocalSourceKeyBytes = 4_096UL

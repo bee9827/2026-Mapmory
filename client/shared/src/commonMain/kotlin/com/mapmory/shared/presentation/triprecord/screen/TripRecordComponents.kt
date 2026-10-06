@@ -488,6 +488,7 @@ internal fun TripPhotoPlaceholder(
 @Composable
 internal fun TripPhotoImage(
     imageBytes: ByteArray?,
+    imageUri: String? = null,
     fallbackBytes: ByteArray? = null,
     contentDescription: String,
     modifier: Modifier = Modifier,
@@ -495,9 +496,10 @@ internal fun TripPhotoImage(
     shape: Shape = RoundedCornerShape(18.dp),
     contentScale: ContentScale = ContentScale.Crop,
 ) {
-    var useFallback by remember(imageBytes, fallbackBytes) { mutableStateOf(false) }
-    var showPlaceholder by remember(imageBytes, fallbackBytes) { mutableStateOf(true) }
-    val model = if (useFallback || imageBytes == null) fallbackBytes else imageBytes
+    var useFallback by remember(imageBytes, imageUri, fallbackBytes) { mutableStateOf(false) }
+    var showPlaceholder by remember(imageBytes, imageUri, fallbackBytes) { mutableStateOf(true) }
+    val primaryModel: Any? = imageUri ?: imageBytes
+    val model = if (useFallback || primaryModel == null) fallbackBytes else primaryModel
 
     if (model == null) {
         TripPhotoPlaceholder(modifier, placeholderVariant, shape)
@@ -519,7 +521,7 @@ internal fun TripPhotoImage(
                 onSuccess = { showPlaceholder = false },
                 onError = {
                     showPlaceholder = true
-                    if (!useFallback && imageBytes != null && fallbackBytes != null) {
+                    if (!useFallback && primaryModel != null && fallbackBytes != null) {
                         useFallback = true
                     }
                 },
