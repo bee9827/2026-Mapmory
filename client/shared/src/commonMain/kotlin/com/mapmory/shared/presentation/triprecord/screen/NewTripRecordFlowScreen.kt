@@ -418,13 +418,26 @@ internal fun NewTripRecordFlowScreen(
                     MapmoryAnalyticsEvent.PHOTOS_ADDED,
                     mapOf("source" to "gallery", "count" to acceptedPhotos.size.toString()),
                 )
-                recommendationPagingState = PhotoRecommendationPagingState(
-                    photos = acceptedPhotos,
-                    selectedIds = acceptedPhotos.mapTo(mutableSetOf()) { it.id },
-                )
-                replaceEditorPhotos(acceptedPhotos)
+                if (startWithPhotoSearch) {
+                    val current = recommendationPagingState
+                    val combined = (current.photos + acceptedPhotos).distinctBy { it.id }
+                    recommendationPagingState = current.copy(
+                        photos = combined,
+                        selectedIds = (current.selectedIds + acceptedPhotos.map { it.id })
+                            .take(TripRecordPhotoRules.MaxPhotosPerRecord).toSet(),
+                    )
+                    if (current.selectedIds.size + acceptedPhotos.count { it.id !in current.selectedIds } >
+                        TripRecordPhotoRules.MaxPhotosPerRecord
+                    ) showPhotoLimitMessage()
+                } else {
+                    recommendationPagingState = PhotoRecommendationPagingState(
+                        photos = acceptedPhotos,
+                        selectedIds = acceptedPhotos.mapTo(mutableSetOf()) { it.id },
+                    )
+                    replaceEditorPhotos(acceptedPhotos)
+                    pendingSave = true
+                }
                 photoMessage = null
-                pendingSave = true
             }
         },
         { page ->
@@ -639,8 +652,28 @@ internal fun NewTripRecordFlowScreen(
             return
         }
         photoLibrary.setExcludedPhotoIds(
-            if (shouldExcludeRecordedPhotos) recordedPhotoIds else emptySet(),
+            if (shouldExcludeRecordedPhotos && !startWithPhotoSearch) recordedPhotoIds else emptySet(),
         )
+        if (!keepPhotoPickerVisible) {
+            val existingPhotos = if (startWithPhotoSearch) {
+                uiState.selectedPhotos.map { photo ->
+                    SelectedPhoto(
+                        id = photo.localPhotoId ?: photo.id,
+                        displayName = photo.displayName,
+                        previewBytes = photo.previewBytes?.bytesForDecoding(),
+                        previewUri = photo.previewUri,
+                        fullResolutionUri = photo.fullResolutionUri ?: photo.previewUri,
+                        latitude = photo.latitude,
+                        longitude = photo.longitude,
+                        capturedAt = photo.capturedAt,
+                    )
+                }
+            } else emptyList()
+            recommendationPagingState = PhotoRecommendationPagingState(
+                photos = existingPhotos,
+                selectedIds = existingPhotos.mapTo(mutableSetOf()) { it.id },
+            )
+        }
         val location = uiState.selectedLocation
         when {
             location == null -> {
@@ -648,7 +681,6 @@ internal fun NewTripRecordFlowScreen(
                 detailsErrorMessage = "장소를 선택해 주세요."
             }
             !photoLibrary.recommendationsAvailable -> {
-                recommendationPagingState = PhotoRecommendationPagingState()
                 photoMessage = "이 기기에서는 위치로 사진을 찾을 수 없어요. 사진첩에서 직접 골라주세요."
                 stepName = NewRecordFlowStep.PHOTO_PICKER.name
             }
@@ -658,9 +690,6 @@ internal fun NewTripRecordFlowScreen(
                 if (!keepPhotoPickerVisible) photoMessage = null
                 photoLoadingProgress = null
                 isPreparingPhotoPreviews = false
-                if (!keepPhotoPickerVisible) {
-                    recommendationPagingState = PhotoRecommendationPagingState()
-                }
                 lastAutoLoadTriggerKey = null
                 lastSelectAllLoadTriggerKey = null
                 isSelectingAllPhotos = false
@@ -733,11 +762,11 @@ internal fun NewTripRecordFlowScreen(
             val retainedLocalPhotoIds = uiState.selectedPhotos
                 .asSequence()
                 .filter { photo -> photo.isUploaded }
-                .mapNotNull { photo -> photo.localPhotoId }
+                .map { photo -> photo.localPhotoId ?: photo.id }
                 .filter(recommendationPagingState.selectedIds::contains)
                 .toSet()
             uiState.selectedPhotos
-                .filterNot { photo -> photo.isUploaded && photo.localPhotoId in retainedLocalPhotoIds }
+                .filterNot { photo -> photo.isUploaded && (photo.localPhotoId ?: photo.id) in retainedLocalPhotoIds }
                 .forEach { photo -> onPhotoRemoved(photo.id) }
             onPhotosAdded(selectedPhotos.filterNot { photo -> photo.id in retainedLocalPhotoIds })
         } else {
@@ -2005,6 +2034,7 @@ private fun PhotoSelectionCard(
     ) {
         TripPhotoImage(
             imageBytes = photo.previewBytes,
+            imageUri = photo.previewUri ?: photo.fullResolutionUri.takeIf { photo.previewBytes == null },
             contentDescription = photo.displayName,
             modifier = Modifier.fillMaxSize(),
             placeholderVariant = photo.id.hashCode(),

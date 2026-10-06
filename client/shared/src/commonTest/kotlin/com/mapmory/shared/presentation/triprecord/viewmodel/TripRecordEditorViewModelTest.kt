@@ -27,6 +27,25 @@ import kotlin.test.assertTrue
 
 class TripRecordEditorViewModelTest {
     @Test
+    fun `수정 저장은 해제한 기존 사진을 빼고 새 사진을 추가한다`() = runSuspend {
+        val repository = FakeTripRecordRepository { "2026-09-30T00:00:00Z" }
+        val viewModel = TripRecordEditorViewModel(
+            createTripRecord = CreateTripRecordUseCase(repository),
+            updateTripRecord = UpdateTripRecordUseCase(repository),
+        )
+        val location = Location(101, 1, 1, "11680", "강남구", LocationType.DISTRICT)
+        viewModel.startCreating(location)
+        viewModel.addPhotos(listOf(selectedPhoto("old-1"), selectedPhoto("old-2")))
+        viewModel.useSelectedPhotoDates("2026-09-30")
+        assertTrue(viewModel.save())
+        viewModel.startEditing(repository.getTripRecord(1).getOrThrow(), location)
+        viewModel.removeMediaObjectKey("old-1")
+        viewModel.addPhotos(listOf(selectedPhoto("new-1")))
+        assertTrue(viewModel.save())
+        assertEquals(listOf("old-2", "new-1"), repository.getTripRecord(1).getOrThrow().media.map { it.objectKey })
+    }
+
+    @Test
     fun `사진만으로_생성할_때_촬영일_범위를_사용하고_제목은_비워_둔다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-09-30T00:00:00Z" }
         val viewModel = TripRecordEditorViewModel(

@@ -117,6 +117,8 @@ class TripRecordEditorViewModel(
                     .copy(
                         isUploaded = true,
                         localPhotoId = media.localPreviewKey,
+                        previewUri = media.previewUri,
+                        fullResolutionUri = media.url,
                     )
             },
             availableTags = allTags,
