@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.google;
+package com.mapmory.backend.auth.oauth.google;
 
 /**
  * 검증을 마친 구글 ID token에서 우리가 쓰는 값만 꺼낸다.

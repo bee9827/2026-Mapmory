@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.kakao;
+package com.mapmory.backend.auth.oauth.kakao;
 
 import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.common.exception.BusinessException;

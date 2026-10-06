@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.kakao;
+package com.mapmory.backend.auth.oauth.kakao;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

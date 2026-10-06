@@ -10,10 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
-import com.mapmory.backend.auth.kakao.KakaoApiClient;
-import com.mapmory.backend.auth.kakao.KakaoUserResponse;
-import com.mapmory.backend.auth.kakao.KakaoUserResponse.KakaoAccount;
-import com.mapmory.backend.auth.kakao.KakaoUserResponse.KakaoAccount.Profile;
+import com.mapmory.backend.auth.oauth.kakao.KakaoApiClient;
+import com.mapmory.backend.auth.oauth.kakao.KakaoUserResponse;
+import com.mapmory.backend.auth.oauth.kakao.KakaoUserResponse.KakaoAccount;
+import com.mapmory.backend.auth.oauth.kakao.KakaoUserResponse.KakaoAccount.Profile;
 import com.mapmory.backend.auth.refresh.RefreshTokenRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -7,6 +7,7 @@ import com.mapmory.backend.auth.dto.LogoutRequest;
 import com.mapmory.backend.auth.dto.RefreshRequest;
 import com.mapmory.backend.auth.dto.TokenResponse;
 import com.mapmory.backend.common.dto.ApiResponse;
+import com.mapmory.backend.member.AuthProvider;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,7 +36,7 @@ public class AuthController {
             @AuthenticationPrincipal Long authenticatedMemberId
     ) {
         return ApiResponse.from(LoginResponse.from(
-                authService.loginWithKakao(request.kakaoAccessToken(), authenticatedMemberId)));
+                authService.loginWithSocial(AuthProvider.KAKAO, request.kakaoAccessToken(), authenticatedMemberId)));
     }
 
     /**
@@ -47,7 +48,7 @@ public class AuthController {
             @AuthenticationPrincipal Long authenticatedMemberId
     ) {
         return ApiResponse.from(LoginResponse.from(
-                authService.loginWithGoogle(request.idToken(), authenticatedMemberId)));
+                authService.loginWithSocial(AuthProvider.GOOGLE, request.idToken(), authenticatedMemberId)));
     }
 
     @PostMapping("/login/guest")

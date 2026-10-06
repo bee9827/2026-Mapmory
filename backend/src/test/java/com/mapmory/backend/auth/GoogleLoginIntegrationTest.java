@@ -11,8 +11,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.auth.exception.AuthErrorCode;
-import com.mapmory.backend.auth.google.GoogleIdTokenVerifier;
-import com.mapmory.backend.auth.google.GoogleUser;
+import com.mapmory.backend.auth.oauth.google.GoogleIdTokenVerifier;
+import com.mapmory.backend.auth.oauth.google.GoogleUser;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
 import com.mapmory.backend.member.Member;
