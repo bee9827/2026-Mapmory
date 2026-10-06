@@ -59,6 +59,7 @@ internal fun MapmoryNavHost(
                 regionCatalog = container.regionCatalog,
                 onboardingPreference = container.onboardingPreference,
                 backHandlerRegistry = backHandlerRegistry,
+                backHandlerOwnerId = backStackEntry.id,
                 tripRecordRevision = tripRecordRevision,
                 onOpenRecords = navigator::navigateToRecords,
                 onOpenEditor = { locationId ->
@@ -115,6 +116,7 @@ internal fun MapmoryNavHost(
                 viewModel = viewModel,
                 regionCatalog = container.regionCatalog,
                 backHandlerRegistry = backHandlerRegistry,
+                backHandlerOwnerId = backStackEntry.id,
                 onBack = { navigator.navigateBack() },
                 onSaved = { wasEditing, recordId ->
                     if (wasEditing) {
@@ -168,6 +170,7 @@ internal fun MapmoryNavHost(
                 tripRecordRevision = tripRecordRevision,
                 viewModel = viewModel,
                 backHandlerRegistry = backHandlerRegistry,
+                backHandlerOwnerId = backStackEntry.id,
                 onBack = { navigator.navigateBack() },
                 onEdit = { recordId ->
                     navigator.navigateToEditor(recordId = recordId)

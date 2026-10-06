@@ -38,7 +38,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
@@ -70,6 +69,7 @@ fun TripRecordDetailScreen(
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var expandedPhotoIndex by remember { mutableStateOf<Int?>(null) }
+    val albumScrollState = rememberScrollState()
     val latestPhotoViewerBackHandler by rememberUpdatedState {
         expandedPhotoIndex = null
         true
@@ -108,6 +108,7 @@ fun TripRecordDetailScreen(
 
             is TripRecordDetailUiState.Success -> {
                 val record = uiState.record
+                LaunchedEffect(record.id) { albumScrollState.scrollTo(0) }
                 val groups = remember(record.id, record.photos, record.startDate) {
                     groupTripRecordPhotosByDate(record.photos, record.startDate)
                 }
@@ -128,6 +129,7 @@ fun TripRecordDetailScreen(
                         onBackClick = onBackClick,
                         onEditClick = onEditClick,
                         onDeleteClick = { showDeleteDialog = true },
+                        scrollState = albumScrollState,
                         onPhotoClick = { photo ->
                             expandedPhotoIndex = orderedPhotos.indexOfFirst { it.id == photo.id }
                                 .takeIf { it >= 0 }
@@ -167,11 +169,9 @@ private fun TripRecordPhotoAlbum(
     onBackClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
+    scrollState: androidx.compose.foundation.ScrollState,
     onPhotoClick: (TripRecordPhotoUiState) -> Unit,
 ) {
-    val scrollState = rememberScrollState()
-    LaunchedEffect(record.id) { scrollState.scrollTo(0) }
-
     Column(Modifier.fillMaxSize()) {
         TripRecordTopBar(
             title = record.locationName,
@@ -346,6 +346,7 @@ private fun PhotoDateGroup(
                         TripPhotoImage(
                             imageBytes = photo.previewBytes?.bytesForDecoding()
                                 ?: photo.originalBytes?.bytesForDecoding(),
+                            imageUri = photo.previewUri,
                             fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                             contentDescription = "${group.displayDate} 여행 사진 확대",
                             modifier = Modifier
@@ -420,7 +421,7 @@ private fun ExpandedTripPhotoViewer(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(TripRecordPalette.current.background),
+            .background(Color.Black),
     ) {
         HorizontalPager(
             state = pagerState,
@@ -431,22 +432,7 @@ private fun ExpandedTripPhotoViewer(
                 TripPhotoImage(
                     imageBytes = photo.previewBytes?.bytesForDecoding()
                         ?: photo.originalBytes?.bytesForDecoding(),
-                    fallbackBytes = photo.originalBytes?.bytesForDecoding(),
-                    contentDescription = "$locationName 사진 배경",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .alpha(0.48f),
-                    placeholderVariant = photo.id.hashCode(),
-                    shape = RectangleShape,
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(TripRecordPalette.current.mediaScrim.copy(alpha = 0.28f)),
-                )
-                TripPhotoImage(
-                    imageBytes = photo.previewBytes?.bytesForDecoding()
-                        ?: photo.originalBytes?.bytesForDecoding(),
+                    imageUri = photo.previewUri,
                     fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                     contentDescription = "$locationName 확대 사진 ${page + 1}",
                     modifier = Modifier
