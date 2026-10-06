@@ -34,6 +34,7 @@ internal fun MapRoute(
     regionCatalog: RegionCatalog,
     onboardingPreference: OnboardingPreference,
     backHandlerRegistry: MapmoryBackHandlerRegistry,
+    backHandlerOwnerId: String,
     tripRecordRevision: Long,
     onOpenRecords: (Long?) -> Unit,
     onOpenEditor: (Long?) -> Unit,
@@ -60,7 +61,7 @@ internal fun MapRoute(
     }
 
     DisposableEffect(viewModel, backHandlerRegistry) {
-        val registration = backHandlerRegistry.register {
+        val registration = backHandlerRegistry.register(backHandlerOwnerId) {
             latestNestedBack.value()
         }
         onDispose {
@@ -104,11 +105,6 @@ internal fun MapRoute(
                     mapOf("scope" to selectedScope.name.lowercase()),
                 )
                 viewModel.changeScope(selectedScope)
-            },
-            tags = uiState.tags,
-            selectedTagId = uiState.selectedTagId,
-            onTagSelected = { tagId ->
-                scope.launch { viewModel.selectTag(tagId) }
             },
             mapContent = {
                 when (uiState.scope) {

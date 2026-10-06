@@ -51,9 +51,6 @@ internal fun TripRecordListRoute(
         pendingSaves = pendingSaves,
         onRetryPendingSave = onRetryPendingSave,
         onDismissPendingSave = onDismissPendingSave,
-        onTagClick = { tagId ->
-            scope.launch { viewModel.selectTag(tagId) }
-        },
         onPreviousPageClick = {
             scope.launch { viewModel.previousPage() }
         },

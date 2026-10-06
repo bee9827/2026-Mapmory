@@ -3,7 +3,6 @@ package com.mapmory.shared.presentation.triprecord.screen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
@@ -35,7 +33,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mapmory.shared.domain.model.Tag
 import com.mapmory.shared.app.BackgroundSaveStatus
 import com.mapmory.shared.app.BackgroundTripRecordSave
 import com.mapmory.shared.analytics.LocalMapmoryAnalytics
@@ -55,7 +52,6 @@ fun TripRecordListScreen(
     onDismissPendingSave: (Long) -> Unit = {},
     onPreviousPageClick: () -> Unit,
     onNextPageClick: () -> Unit,
-    onTagClick: (Long?) -> Unit = {},
     onCreateClick: () -> Unit,
     onMapClick: () -> Unit,
     onRecordClick: (Long) -> Unit,
@@ -85,12 +81,6 @@ fun TripRecordListScreen(
                         .padding(horizontal = 18.dp),
                 ) {
                     Spacer(Modifier.height(14.dp))
-                    JournalTagFilters(
-                        tags = filter.tags,
-                        selectedTagId = filter.selectedTagId,
-                        onTagClick = onTagClick,
-                    )
-                    Spacer(Modifier.height(18.dp))
 
                     when (uiState) {
                         TripRecordListUiState.Idle,
@@ -286,46 +276,6 @@ private fun JournalHeader(recordCount: Int) {
 }
 
 @Composable
-private fun JournalTagFilters(
-    tags: List<Tag>,
-    selectedTagId: Long?,
-    onTagClick: (Long?) -> Unit,
-) {
-    val analytics = LocalMapmoryAnalytics.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        TripTagChip(
-            text = "전체",
-            selected = selectedTagId == null,
-            onClick = {
-                analytics.logEvent(
-                    MapmoryAnalyticsEvent.JOURNAL_FILTER_SELECTED,
-                    mapOf("filter_type" to "all"),
-                )
-                onTagClick(null)
-            },
-        )
-        tags.forEach { tag ->
-            TripTagChip(
-                text = tag.name,
-                selected = selectedTagId == tag.id,
-                onClick = {
-                    analytics.logEvent(
-                        MapmoryAnalyticsEvent.JOURNAL_FILTER_SELECTED,
-                        mapOf("filter_type" to "custom_tag"),
-                    )
-                    onTagClick(tag.id)
-                },
-            )
-        }
-    }
-}
-
-@Composable
 private fun TripRecordList(
     records: List<TripRecordItemUiState>,
     pendingSaves: List<BackgroundTripRecordSave>,
@@ -476,6 +426,7 @@ private fun TripRecordCard(
         ) {
             TripPhotoImage(
                 imageBytes = record.photos.minByOrNull { it.sortOrder }?.previewBytes?.bytesForDecoding(),
+                imageUri = record.photos.minByOrNull { it.sortOrder }?.previewUri,
                 contentDescription = record.locationName,
                 modifier = Modifier.size(76.dp),
                 placeholderVariant = record.id.toInt(),
