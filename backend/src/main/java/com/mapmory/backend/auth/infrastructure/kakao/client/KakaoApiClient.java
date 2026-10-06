@@ -1,6 +1,7 @@
-package com.mapmory.backend.auth.infrastructure.kakao;
+package com.mapmory.backend.auth.infrastructure.kakao.client;
 
 import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.infrastructure.kakao.config.KakaoProperties;
 import com.mapmory.backend.common.exception.BusinessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;

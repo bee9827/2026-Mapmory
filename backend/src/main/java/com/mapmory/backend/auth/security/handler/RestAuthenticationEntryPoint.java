@@ -1,6 +1,7 @@
-package com.mapmory.backend.auth.security;
+package com.mapmory.backend.auth.security.handler;
 
 import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.security.filter.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;

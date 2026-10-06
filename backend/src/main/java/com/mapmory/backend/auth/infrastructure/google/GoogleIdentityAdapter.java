@@ -2,6 +2,8 @@ package com.mapmory.backend.auth.infrastructure.google;
 
 import com.mapmory.backend.auth.application.model.SocialIdentity;
 import com.mapmory.backend.auth.application.port.SocialIdentityPort;
+import com.mapmory.backend.auth.infrastructure.google.client.GoogleIdTokenVerifier;
+import com.mapmory.backend.auth.infrastructure.google.client.GoogleUser;
 import com.mapmory.backend.member.AuthProvider;
 import org.springframework.stereotype.Component;
 

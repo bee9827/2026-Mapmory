@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.security;
+package com.mapmory.backend.auth.security.filter;
 
 import com.mapmory.backend.auth.application.AuthErrorCode;
 import com.mapmory.backend.auth.token.jwt.JwtProvider;

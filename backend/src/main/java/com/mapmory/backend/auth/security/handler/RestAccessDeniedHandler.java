@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.security;
+package com.mapmory.backend.auth.security.handler;
 
 import com.mapmory.backend.auth.application.AuthErrorCode;
 import jakarta.servlet.http.HttpServletRequest;

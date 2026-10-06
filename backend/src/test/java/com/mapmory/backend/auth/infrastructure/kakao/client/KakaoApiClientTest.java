@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.infrastructure.kakao;
+package com.mapmory.backend.auth.infrastructure.kakao.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,6 +7,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.infrastructure.kakao.config.KakaoProperties;
 import com.mapmory.backend.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

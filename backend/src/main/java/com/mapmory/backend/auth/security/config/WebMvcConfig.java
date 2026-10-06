@@ -1,5 +1,6 @@
-package com.mapmory.backend.auth.security;
+package com.mapmory.backend.auth.security.config;
 
+import com.mapmory.backend.auth.security.resolver.LoginMemberArgumentResolver;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;

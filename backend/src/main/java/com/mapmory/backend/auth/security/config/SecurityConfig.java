@@ -1,5 +1,8 @@
-package com.mapmory.backend.auth.security;
+package com.mapmory.backend.auth.security.config;
 
+import com.mapmory.backend.auth.security.filter.JwtAuthenticationFilter;
+import com.mapmory.backend.auth.security.handler.RestAccessDeniedHandler;
+import com.mapmory.backend.auth.security.handler.RestAuthenticationEntryPoint;
 import jakarta.servlet.DispatcherType;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;

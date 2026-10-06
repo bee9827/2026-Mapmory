@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.infrastructure.google;
+package com.mapmory.backend.auth.infrastructure.google.client;
 
 import java.util.Collection;
 import java.util.List;

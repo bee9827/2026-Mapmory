@@ -10,10 +10,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.auth.application.AuthErrorCode;
-import com.mapmory.backend.auth.infrastructure.kakao.KakaoApiClient;
-import com.mapmory.backend.auth.infrastructure.kakao.KakaoUserResponse;
-import com.mapmory.backend.auth.infrastructure.kakao.KakaoUserResponse.KakaoAccount;
-import com.mapmory.backend.auth.infrastructure.kakao.KakaoUserResponse.KakaoAccount.Profile;
+import com.mapmory.backend.auth.infrastructure.kakao.client.KakaoApiClient;
+import com.mapmory.backend.auth.infrastructure.kakao.client.KakaoUserResponse;
+import com.mapmory.backend.auth.infrastructure.kakao.client.KakaoUserResponse.KakaoAccount;
+import com.mapmory.backend.auth.infrastructure.kakao.client.KakaoUserResponse.KakaoAccount.Profile;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
 import com.mapmory.backend.member.MemberRepository;

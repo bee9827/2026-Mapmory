@@ -1,5 +1,6 @@
-package com.mapmory.backend.auth.infrastructure.google;
+package com.mapmory.backend.auth.infrastructure.google.config;
 
+import com.mapmory.backend.auth.infrastructure.google.client.GoogleIdTokenValidators;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.restclient.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;

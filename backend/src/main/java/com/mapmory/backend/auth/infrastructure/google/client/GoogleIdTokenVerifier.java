@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.infrastructure.google;
+package com.mapmory.backend.auth.infrastructure.google.client;
 
 import com.mapmory.backend.auth.application.AuthErrorCode;
 import com.mapmory.backend.common.exception.BusinessException;
