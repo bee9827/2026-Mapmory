@@ -11,7 +11,7 @@ public class KakaoIdentityAdapter implements SocialIdentityPort {
 
     private final KakaoApiClient kakaoApiClient;
 
-    public KakaoIdentityAdapter(KakaoApiClient kakaoApiClient) {
+    KakaoIdentityAdapter(KakaoApiClient kakaoApiClient) {
         this.kakaoApiClient = kakaoApiClient;
     }
 
@@ -23,6 +23,6 @@ public class KakaoIdentityAdapter implements SocialIdentityPort {
     @Override
     public SocialIdentity verify(String kakaoAccessToken) {
         KakaoUserResponse kakaoUser = kakaoApiClient.fetchUser(kakaoAccessToken);
-        return new SocialIdentity(String.valueOf(kakaoUser.id()), kakaoUser.nickname());
+        return new SocialIdentity(Long.toString(kakaoUser.id()), kakaoUser.nickname());
     }
 }

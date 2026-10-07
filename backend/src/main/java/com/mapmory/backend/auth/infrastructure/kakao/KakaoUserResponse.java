@@ -13,13 +13,13 @@ record KakaoUserResponse(
         @JsonProperty("kakao_account") KakaoAccount kakaoAccount
 ) {
 
-    public record KakaoAccount(Profile profile) {
+    record KakaoAccount(Profile profile) {
 
-        public record Profile(String nickname) {
+        record Profile(String nickname) {
         }
     }
 
-    public String nickname() {
+    String nickname() {
         if (kakaoAccount == null || kakaoAccount.profile() == null) {
             return null;
         }

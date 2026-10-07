@@ -75,4 +75,14 @@ class KakaoApiClientTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.KAKAO_UNAVAILABLE));
     }
+
+    @Test
+    void 빈_응답은_KAKAO_UNAVAILABLE로_변환한다() {
+        server.expect(requestTo(USER_INFO_URI))
+                .andRespond(withSuccess("", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> kakaoApiClient.fetchUser("token"))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.KAKAO_UNAVAILABLE));
+    }
 }

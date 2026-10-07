@@ -19,17 +19,17 @@ import tools.jackson.databind.json.JsonMapper;
  * ProblemDetailFactory로 만든 본문을 HttpServletResponse에 직접 기록한다.
  */
 @Component
-public class ProblemResponseWriter {
+class ProblemResponseWriter {
 
     private final ProblemDetailFactory problemDetailFactory;
     private final JsonMapper jsonMapper;
 
-    public ProblemResponseWriter(ProblemDetailFactory problemDetailFactory, JsonMapper jsonMapper) {
+    ProblemResponseWriter(ProblemDetailFactory problemDetailFactory, JsonMapper jsonMapper) {
         this.problemDetailFactory = problemDetailFactory;
         this.jsonMapper = jsonMapper;
     }
 
-    public void write(
+    void write(
             HttpServletRequest request,
             HttpServletResponse response,
             HttpStatus status,

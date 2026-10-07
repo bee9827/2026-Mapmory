@@ -49,7 +49,7 @@ class GuestPromotionIntegrationTest extends IntegrationTest {
         String guestAccessToken = guestLogin("accessToken");
         createTravelRecord(guestAccessToken, "제주도 여행");
         long memberCountBeforePromotion = memberRepository.count();
-        willReturn(kakaoUser(200_001L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
+        willReturn(kakaoIdentity(200_001L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
 
         String promotedAccessToken = kakaoLogin(guestAccessToken, "accessToken");
 
@@ -68,7 +68,7 @@ class GuestPromotionIntegrationTest extends IntegrationTest {
     void 승격된_회원은_카카오_닉네임을_이름으로_갖는다() throws Exception {
         String guestAccessToken = guestLogin("accessToken");
         long memberCountBeforePromotion = memberRepository.count();
-        willReturn(kakaoUser(200_002L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
+        willReturn(kakaoIdentity(200_002L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
 
         kakaoLogin(guestAccessToken, "accessToken");
 
@@ -82,7 +82,7 @@ class GuestPromotionIntegrationTest extends IntegrationTest {
 
     @Test
     void 이미_가입한_카카오_계정이면_기존_회원으로_로그인되고_게스트_기록은_이어지지_않는다() throws Exception {
-        willReturn(kakaoUser(200_003L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
+        willReturn(kakaoIdentity(200_003L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
         kakaoLogin(null, "accessToken");
 
         String guestAccessToken = guestLogin("accessToken");
@@ -98,7 +98,7 @@ class GuestPromotionIntegrationTest extends IntegrationTest {
 
     @Test
     void 충돌로_버려진_게스트는_토큰을_재발급받을_수_없다() throws Exception {
-        willReturn(kakaoUser(200_004L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
+        willReturn(kakaoIdentity(200_004L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
         kakaoLogin(null, "accessToken");
 
         // 같은 게스트의 access/refresh 여야 하므로 한 번만 로그인한다
@@ -116,7 +116,7 @@ class GuestPromotionIntegrationTest extends IntegrationTest {
 
     @Test
     void 게스트_토큰_없이_카카오_로그인하면_새_회원이_생성된다() throws Exception {
-        willReturn(kakaoUser(200_005L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
+        willReturn(kakaoIdentity(200_005L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
         long before = memberRepository.count();
 
         mockMvc.perform(post("/api/v1/auth/login/kakao")
@@ -171,7 +171,7 @@ class GuestPromotionIntegrationTest extends IntegrationTest {
                 .andExpect(status().isCreated());
     }
 
-    private SocialIdentity kakaoUser(Long id, String nickname) {
+    private SocialIdentity kakaoIdentity(Long id, String nickname) {
         return new SocialIdentity(String.valueOf(id), nickname);
     }
 }

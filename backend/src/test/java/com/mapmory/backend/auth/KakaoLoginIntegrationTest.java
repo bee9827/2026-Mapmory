@@ -39,7 +39,7 @@ class KakaoLoginIntegrationTest extends IntegrationTest {
 
     @Test
     void 신규_카카오_사용자는_회원으로_생성되고_토큰을_받는다() throws Exception {
-        willReturn(kakaoUser(100_001L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
+        willReturn(kakaoIdentity(100_001L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
 
         mockMvc.perform(post("/api/v1/auth/login/kakao")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -54,7 +54,7 @@ class KakaoLoginIntegrationTest extends IntegrationTest {
 
     @Test
     void 기존_회원은_재로그인시_동일_회원으로_매핑되고_isNewMember는_false다() throws Exception {
-        willReturn(kakaoUser(100_002L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
+        willReturn(kakaoIdentity(100_002L, "소현")).given(kakaoIdentityAdapter).verify(anyString());
 
         mockMvc.perform(post("/api/v1/auth/login/kakao")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,7 +82,7 @@ class KakaoLoginIntegrationTest extends IntegrationTest {
                 .andExpect(jsonPath("$.code").value("INVALID_KAKAO_TOKEN"));
     }
 
-    private SocialIdentity kakaoUser(Long id, String nickname) {
+    private SocialIdentity kakaoIdentity(Long id, String nickname) {
         return new SocialIdentity(String.valueOf(id), nickname);
     }
 }

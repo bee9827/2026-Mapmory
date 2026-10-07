@@ -2,9 +2,8 @@ package com.mapmory.backend.auth.application;
 
 import com.mapmory.backend.auth.application.model.SocialIdentity;
 import com.mapmory.backend.auth.application.port.SocialIdentityPort;
-import com.mapmory.backend.auth.exception.AuthErrorCode;
-import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -13,8 +12,8 @@ import org.springframework.stereotype.Component;
 /**
  * 소셜 로그인 제공자별 신원 확인 포트 모음.
  *
- * 제공자 하나에 포트는 하나여야 한다. 같은 제공자의 포트가 둘이면 어느 쪽으로 확인할지
- * 정할 수 없으므로 애플리케이션이 뜰 때 실패시킨다.
+ * 소셜 제공자(게스트 제외)마다 포트가 정확히 하나 있어야 한다. 포트가 없거나 둘이면 설정 오류이므로
+ * 애플리케이션이 뜰 때 실패시킨다. 제공자는 컨트롤러가 정하므로 클라이언트 입력 오류가 아니다.
  */
 @Component
 public class SocialIdentityPorts {
@@ -23,6 +22,13 @@ public class SocialIdentityPorts {
 
     public SocialIdentityPorts(List<SocialIdentityPort> socialIdentityPorts) {
         socialIdentityPorts.forEach(this::register);
+        Arrays.stream(AuthProvider.values())
+                .filter(provider -> provider != AuthProvider.GUEST)
+                .filter(provider -> !ports.containsKey(provider))
+                .findFirst()
+                .ifPresent(provider -> {
+                    throw new IllegalStateException("소셜 로그인 포트가 없는 제공자입니다: " + provider);
+                });
     }
 
     private void register(SocialIdentityPort port) {
@@ -44,7 +50,7 @@ public class SocialIdentityPorts {
     private SocialIdentityPort find(AuthProvider provider) {
         SocialIdentityPort port = ports.get(provider);
         if (port == null) {
-            throw new BusinessException(AuthErrorCode.UNSUPPORTED_SOCIAL_PROVIDER);
+            throw new IllegalStateException("소셜 로그인 제공자가 아닙니다: " + provider);
         }
         return port;
     }

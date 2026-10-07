@@ -11,7 +11,7 @@ public class GoogleIdentityAdapter implements SocialIdentityPort {
 
     private final GoogleIdTokenVerifier googleIdTokenVerifier;
 
-    public GoogleIdentityAdapter(GoogleIdTokenVerifier googleIdTokenVerifier) {
+    GoogleIdentityAdapter(GoogleIdTokenVerifier googleIdTokenVerifier) {
         this.googleIdTokenVerifier = googleIdTokenVerifier;
     }
 

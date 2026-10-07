@@ -24,12 +24,12 @@ class KakaoApiClient {
     private final RestClient restClient;
     private final String userInfoUri;
 
-    public KakaoApiClient(RestClient kakaoRestClient, KakaoProperties kakaoProperties) {
+    KakaoApiClient(RestClient kakaoRestClient, KakaoProperties kakaoProperties) {
         this.restClient = kakaoRestClient;
         this.userInfoUri = kakaoProperties.userInfoUri();
     }
 
-    public KakaoUserResponse fetchUser(String kakaoAccessToken) {
+    KakaoUserResponse fetchUser(String kakaoAccessToken) {
         KakaoUserResponse response = request(kakaoAccessToken);
         if (response == null || response.id() == null) {
             // 회원번호 없이 provider_id를 만들면 서로 다른 사람이 한 회원으로 묶이므로 로그인시키지 않는다.

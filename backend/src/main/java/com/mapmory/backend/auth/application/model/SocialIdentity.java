@@ -11,7 +11,8 @@ public record SocialIdentity(
         String name
 ) {
 
-    // provider_id가 비면 서로 다른 사람이 한 회원으로 묶이므로, 어떤 제공자든 여기서 막는다.
+    // provider_id가 비면 서로 다른 사람이 한 회원으로 묶인다. 제공자 응답에 식별자가 없으면 각 Adapter가
+    // 먼저 제공자 오류로 바꾸고, 여기서는 그 검사를 빠뜨린 경우를 마지막으로 막는다.
     public SocialIdentity {
         if (providerId == null || providerId.isBlank()) {
             throw new IllegalArgumentException("소셜 제공자의 회원 식별자가 비어 있습니다.");

@@ -27,11 +27,11 @@ class GoogleIdTokenVerifier {
 
     private final JwtDecoder googleIdTokenDecoder;
 
-    public GoogleIdTokenVerifier(JwtDecoder googleIdTokenDecoder) {
+    GoogleIdTokenVerifier(JwtDecoder googleIdTokenDecoder) {
         this.googleIdTokenDecoder = googleIdTokenDecoder;
     }
 
-    public GoogleUser verify(String idToken) {
+    GoogleUser verify(String idToken) {
         Jwt jwt = decode(idToken);
         return new GoogleUser(jwt.getSubject(), jwt.getClaimAsString("name"));
     }
