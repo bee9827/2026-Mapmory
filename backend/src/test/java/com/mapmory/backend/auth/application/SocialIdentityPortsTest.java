@@ -1,9 +1,12 @@
-package com.mapmory.backend.auth.application.port;
+package com.mapmory.backend.auth.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.mapmory.backend.auth.application.model.SocialIdentity;
+import com.mapmory.backend.auth.application.port.SocialIdentityPort;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
+import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -23,11 +26,11 @@ class SocialIdentityPortsTest {
     }
 
     @Test
-    void 포트가_없는_제공자면_예외가_발생한다() {
+    void 포트가_없는_제공자면_UNSUPPORTED_SOCIAL_PROVIDER다() {
         SocialIdentityPorts ports = new SocialIdentityPorts(List.of(new FakePort(AuthProvider.KAKAO, "kakao-id")));
 
-        assertThatThrownBy(() -> ports.verify(AuthProvider.GOOGLE, "token"))
-                .isInstanceOf(IllegalArgumentException.class);
+        assertUnsupported(ports, AuthProvider.GOOGLE);
+        assertUnsupported(ports, AuthProvider.GUEST);
     }
 
     @Test
@@ -39,6 +42,21 @@ class SocialIdentityPortsTest {
 
         assertThatThrownBy(() -> new SocialIdentityPorts(duplicated))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void provider가_null인_포트는_원인을_밝히며_실패한다() {
+        List<SocialIdentityPort> unnamed = List.of(new FakePort(null, "id"));
+
+        assertThatThrownBy(() -> new SocialIdentityPorts(unnamed))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("provider()가 null");
+    }
+
+    private void assertUnsupported(SocialIdentityPorts ports, AuthProvider provider) {
+        assertThatThrownBy(() -> ports.verify(provider, "token"))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.UNSUPPORTED_SOCIAL_PROVIDER));
     }
 
     private record FakePort(AuthProvider provider, String providerId) implements SocialIdentityPort {

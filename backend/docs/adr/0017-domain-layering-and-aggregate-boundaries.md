@@ -329,3 +329,16 @@ delete from travel_record where id=?
 
 **측정에서 얻은 교훈:** 애그리거트 소유 관계를 바꿀 때는 조회뿐 아니라 **삭제 경로도 함께**
 측정한다. 조회는 LAZY로 막을 수 있지만 삭제는 cascade가 반드시 개입한다.
+
+---
+
+## 2026-10-07 보완: 외부 제공자를 감싸는 기능의 패키지
+
+결정 6은 TravelRecord에만 적용한다. 외부 제공자를 감싸는 기능(`place`, `auth`)은
+`web` / `application` / `infrastructure`로 나눈다. 제공자 코드가 응용 계층으로 새지 않게 하는 것이
+이 기능들의 핵심 규칙이라, 이름 규칙보다 패키지 경계로 지키는 편이 확실하기 때문이다.
+
+- `application`은 포트(`application/port`)와 제공자 중립 모델만 안다. `web`과 `infrastructure`를 import하지 않는다.
+- `infrastructure/<제공자>`는 포트 구현체(Adapter)만 `public`으로 두고, 클라이언트·외부 응답 DTO는
+  package-private으로 숨긴다. 설정 클래스는 같은 패키지에 둬도 되고(`place`), 제공자별로 여럿이면 `config/`로 뺀다(`auth`).
+- 여러 하위 패키지가 함께 쓰는 에러 코드는 `auth/exception`처럼 기능 루트 바로 아래에 둬서 패키지 순환을 막는다.

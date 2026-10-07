@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.security.resolver;
+package com.mapmory.backend.auth.security;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

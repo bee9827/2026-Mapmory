@@ -1,6 +1,5 @@
 package com.mapmory.backend.auth.infrastructure.google.config;
 
-import com.mapmory.backend.auth.infrastructure.google.client.GoogleIdTokenValidators;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

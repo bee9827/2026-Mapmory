@@ -1,6 +1,6 @@
 package com.mapmory.backend.travelrecord.mapsummary.controller;
 
-import com.mapmory.backend.auth.security.resolver.LoginMember;
+import com.mapmory.backend.auth.security.LoginMember;
 import com.mapmory.backend.common.dto.ApiResponse;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.travelrecord.mapsummary.dto.RegionMapSummaryResponse;

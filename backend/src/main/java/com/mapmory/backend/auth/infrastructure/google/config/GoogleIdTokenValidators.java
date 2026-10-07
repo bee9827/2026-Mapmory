@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.infrastructure.google.client;
+package com.mapmory.backend.auth.infrastructure.google.config;
 
 import java.util.List;
 import java.util.Set;
@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
  * - iss     : accounts.google.com 또는 https://accounts.google.com
  * - aud     : 우리 앱의 OAuth 클라이언트 ID 중 하나 (다른 앱용으로 발급된 토큰 재사용 차단)
  * - azp     : aud가 여러 개면 azp도 우리 클라이언트 ID여야 한다 (구글 권장)
+ * - sub     : 비어 있지 않을 것 (provider_id로 저장한다)
  */
 public final class GoogleIdTokenValidators {
 
@@ -35,7 +36,8 @@ public final class GoogleIdTokenValidators {
                 timestampValidator,
                 new JwtClaimValidator<Object>(JwtClaimNames.ISS,
                         issuer -> issuer != null && ISSUERS.contains(issuer.toString())),
-                audienceValidator(clientIds)
+                audienceValidator(clientIds),
+                new JwtClaimValidator<String>(JwtClaimNames.SUB, subject -> subject != null && !subject.isBlank())
         );
     }
 

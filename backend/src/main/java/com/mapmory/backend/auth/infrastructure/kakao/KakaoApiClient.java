@@ -1,6 +1,6 @@
-package com.mapmory.backend.auth.infrastructure.kakao.client;
+package com.mapmory.backend.auth.infrastructure.kakao;
 
-import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.auth.infrastructure.kakao.config.KakaoProperties;
 import com.mapmory.backend.common.exception.BusinessException;
 import org.springframework.http.HttpHeaders;
@@ -16,10 +16,10 @@ import org.springframework.web.client.RestClientResponseException;
  *
  * 오류를 구분한다.
  *   - 카카오 4xx (토큰 만료·위조 등, 사용자 책임) → INVALID_KAKAO_TOKEN (401, 재로그인)
- *   - 카카오 5xx / 응답 없음 (카카오 장애) → KAKAO_UNAVAILABLE (503, 재시도)
+ *   - 카카오 5xx / 응답 없음 / 회원번호 없는 응답 (카카오 장애) → KAKAO_UNAVAILABLE (503, 재시도)
  */
 @Component
-public class KakaoApiClient {
+class KakaoApiClient {
 
     private final RestClient restClient;
     private final String userInfoUri;
@@ -30,6 +30,15 @@ public class KakaoApiClient {
     }
 
     public KakaoUserResponse fetchUser(String kakaoAccessToken) {
+        KakaoUserResponse response = request(kakaoAccessToken);
+        if (response == null || response.id() == null) {
+            // 회원번호 없이 provider_id를 만들면 서로 다른 사람이 한 회원으로 묶이므로 로그인시키지 않는다.
+            throw new BusinessException(AuthErrorCode.KAKAO_UNAVAILABLE);
+        }
+        return response;
+    }
+
+    private KakaoUserResponse request(String kakaoAccessToken) {
         try {
             return restClient.get()
                     .uri(userInfoUri)

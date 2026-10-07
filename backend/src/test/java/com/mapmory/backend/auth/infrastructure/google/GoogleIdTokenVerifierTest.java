@@ -1,9 +1,10 @@
-package com.mapmory.backend.auth.infrastructure.google.client;
+package com.mapmory.backend.auth.infrastructure.google;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
+import com.mapmory.backend.auth.infrastructure.google.config.GoogleIdTokenValidators;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -94,6 +95,13 @@ class GoogleIdTokenVerifierTest {
     @Test
     void exp가_없는_토큰은_INVALID_GOOGLE_TOKEN이다() throws Exception {
         String idToken = sign(googleKey, claims().expirationTime(null).build());
+
+        assertInvalid(idToken);
+    }
+
+    @Test
+    void sub가_없는_토큰은_INVALID_GOOGLE_TOKEN이다() throws Exception {
+        String idToken = sign(googleKey, claims().subject(null).build());
 
         assertInvalid(idToken);
     }

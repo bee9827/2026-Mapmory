@@ -3,7 +3,7 @@ package com.mapmory.backend.auth.application;
 import com.mapmory.backend.auth.application.model.AuthTokens;
 import com.mapmory.backend.auth.application.model.LoginResult;
 import com.mapmory.backend.auth.application.model.SocialIdentity;
-import com.mapmory.backend.auth.application.port.SocialIdentityPorts;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.auth.token.jwt.JwtProvider;
 import com.mapmory.backend.auth.token.refresh.RefreshTokenService;
 import com.mapmory.backend.common.exception.BusinessException;

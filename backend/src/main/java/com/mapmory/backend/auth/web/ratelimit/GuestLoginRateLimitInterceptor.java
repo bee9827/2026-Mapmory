@@ -1,6 +1,6 @@
 package com.mapmory.backend.auth.web.ratelimit;
 
-import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.common.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

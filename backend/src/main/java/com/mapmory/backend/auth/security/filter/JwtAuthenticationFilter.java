@@ -1,6 +1,6 @@
 package com.mapmory.backend.auth.security.filter;
 
-import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.auth.token.jwt.JwtProvider;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;

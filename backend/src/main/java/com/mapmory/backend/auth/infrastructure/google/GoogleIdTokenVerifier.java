@@ -1,6 +1,6 @@
-package com.mapmory.backend.auth.infrastructure.google.client;
+package com.mapmory.backend.auth.infrastructure.google;
 
-import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.common.exception.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
  *   - JWKS를 받아오지 못함 (구글 장애)          → GOOGLE_UNAVAILABLE (503, 재시도)
  */
 @Component
-public class GoogleIdTokenVerifier {
+class GoogleIdTokenVerifier {
 
     private static final Logger log = LoggerFactory.getLogger(GoogleIdTokenVerifier.class);
 

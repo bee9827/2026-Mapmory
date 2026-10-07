@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.infrastructure.kakao.client;
+package com.mapmory.backend.auth.infrastructure.kakao;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * id            : 카카오 회원번호 (provider_id로 사용)
  * kakao_account : 닉네임 등 계정 정보. 사용자가 동의하지 않으면 하위 값이 없을 수 있다.
  */
-public record KakaoUserResponse(
+record KakaoUserResponse(
         Long id,
         @JsonProperty("kakao_account") KakaoAccount kakaoAccount
 ) {

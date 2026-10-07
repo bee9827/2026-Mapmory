@@ -1,6 +1,6 @@
 package com.mapmory.backend.auth.token.refresh;
 
-import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.auth.token.jwt.JwtProperties;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;

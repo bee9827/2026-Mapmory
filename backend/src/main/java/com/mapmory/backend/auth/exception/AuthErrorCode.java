@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.application;
+package com.mapmory.backend.auth.exception;
 
 import com.mapmory.backend.common.exception.ErrorCode;
 import com.mapmory.backend.common.exception.ErrorKind;
@@ -39,6 +39,11 @@ public enum AuthErrorCode implements ErrorCode {
             ErrorKind.SERVICE_UNAVAILABLE,
             "구글 로그인을 일시적으로 사용할 수 없습니다.",
             "구글 인증 서버 오류로 로그인에 실패했습니다. 잠시 후 다시 시도하세요."
+    ),
+    UNSUPPORTED_SOCIAL_PROVIDER(
+            ErrorKind.INVALID_INPUT,
+            "지원하지 않는 로그인 방식입니다.",
+            "이 제공자로는 소셜 로그인을 할 수 없습니다."
     ),
     INVALID_REFRESH_TOKEN(
             ErrorKind.AUTHENTICATION_REQUIRED,

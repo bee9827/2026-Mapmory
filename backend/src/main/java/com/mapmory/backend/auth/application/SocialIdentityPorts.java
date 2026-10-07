@@ -1,6 +1,9 @@
-package com.mapmory.backend.auth.application.port;
+package com.mapmory.backend.auth.application;
 
 import com.mapmory.backend.auth.application.model.SocialIdentity;
+import com.mapmory.backend.auth.application.port.SocialIdentityPort;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
+import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
 import java.util.EnumMap;
 import java.util.List;
@@ -23,9 +26,14 @@ public class SocialIdentityPorts {
     }
 
     private void register(SocialIdentityPort port) {
-        SocialIdentityPort duplicate = ports.putIfAbsent(port.provider(), port);
+        AuthProvider provider = port.provider();
+        if (provider == null) {
+            // 테스트에서 Adapter를 @MockitoBean으로 바꾸면 provider()가 null이 된다. 원인을 바로 알 수 있게 한다.
+            throw new IllegalStateException(port.getClass().getName() + "의 provider()가 null입니다.");
+        }
+        SocialIdentityPort duplicate = ports.putIfAbsent(provider, port);
         if (duplicate != null) {
-            throw new IllegalStateException("같은 제공자의 소셜 로그인 포트가 둘 이상입니다: " + port.provider());
+            throw new IllegalStateException("같은 제공자의 소셜 로그인 포트가 둘 이상입니다: " + provider);
         }
     }
 
@@ -36,7 +44,7 @@ public class SocialIdentityPorts {
     private SocialIdentityPort find(AuthProvider provider) {
         SocialIdentityPort port = ports.get(provider);
         if (port == null) {
-            throw new IllegalArgumentException("소셜 로그인을 지원하지 않는 제공자입니다: " + provider);
+            throw new BusinessException(AuthErrorCode.UNSUPPORTED_SOCIAL_PROVIDER);
         }
         return port;
     }

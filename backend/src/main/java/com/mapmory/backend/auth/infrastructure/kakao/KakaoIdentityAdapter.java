@@ -2,8 +2,6 @@ package com.mapmory.backend.auth.infrastructure.kakao;
 
 import com.mapmory.backend.auth.application.model.SocialIdentity;
 import com.mapmory.backend.auth.application.port.SocialIdentityPort;
-import com.mapmory.backend.auth.infrastructure.kakao.client.KakaoApiClient;
-import com.mapmory.backend.auth.infrastructure.kakao.client.KakaoUserResponse;
 import com.mapmory.backend.member.AuthProvider;
 import org.springframework.stereotype.Component;
 

@@ -1,4 +1,4 @@
-package com.mapmory.backend.auth.infrastructure.kakao.client;
+package com.mapmory.backend.auth.infrastructure.kakao;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -6,7 +6,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
-import com.mapmory.backend.auth.application.AuthErrorCode;
+import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.auth.infrastructure.kakao.config.KakaoProperties;
 import com.mapmory.backend.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,5 +64,15 @@ class KakaoApiClientTest {
                     assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.KAKAO_UNAVAILABLE);
                     assertThat(exception.getCause()).isInstanceOf(RestClientResponseException.class);
                 });
+    }
+
+    @Test
+    void 회원번호가_없는_응답은_KAKAO_UNAVAILABLE로_변환한다() {
+        server.expect(requestTo(USER_INFO_URI))
+                .andRespond(withSuccess("{\"kakao_account\":{}}", MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> kakaoApiClient.fetchUser("token"))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.KAKAO_UNAVAILABLE));
     }
 }
