@@ -34,6 +34,14 @@ class MapViewModel(
     var uiState by mutableStateOf(mapSummaryRepository.cachedUiState())
         private set
 
+    private var loadedRevision: Long? = null
+
+    suspend fun refreshIfNeeded(dataRevision: Long) {
+        if (loadedRevision == dataRevision && uiState.errorMessage == null) return
+        refresh()
+        if (uiState.errorMessage == null) loadedRevision = dataRevision
+    }
+
     suspend fun refresh() {
         val openProvinceCode = when (val mapState = uiState.koreaMap) {
             is KoreaMapUiState.DistrictLoading -> mapState.provinceCode
@@ -89,7 +97,10 @@ class MapViewModel(
     }
 
     suspend fun openProvince(provinceCode: String) {
-        uiState = uiState.copy(koreaMap = KoreaMapUiState.DistrictLoading(provinceCode))
+        val visibleDetail = uiState.koreaMap as? KoreaMapUiState.DistrictDetail
+        if (visibleDetail?.provinceCode != provinceCode) {
+            uiState = uiState.copy(koreaMap = KoreaMapUiState.DistrictLoading(provinceCode))
+        }
         val serverProvinceCode = provinceCode.removePrefix(KoreanProvincePrefix)
         val province = uiState.koreaProvinces.firstOrNull { it.code == serverProvinceCode }
         val summaries = province?.let { summary ->

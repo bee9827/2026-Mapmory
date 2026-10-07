@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -96,8 +98,8 @@ fun KoreaMapArtwork(
             }
         }
     }
-    var zoom by remember(regions) { mutableStateOf(1f) }
-    var pan by remember(regions) { mutableStateOf(Offset.Zero) }
+    var zoom by rememberSaveable(regions) { mutableStateOf(1f) }
+    var pan by rememberSaveable(regions, stateSaver = MapPanSaver) { mutableStateOf(Offset.Zero) }
     val currentTransform = rememberUpdatedState(MapTransform(zoom, pan))
     val backgroundColor = if (isDark) Color(0xFF121518) else Color(0xFFFAFCFB)
     val visitedFillColor = if (isDark) Color(0xFF35C987) else Color(0xFF4D9272)
@@ -542,3 +544,8 @@ private fun GeoEdge.normalized(): GeoEdge = if (
 } else {
     GeoEdge(end, start)
 }
+
+private val MapPanSaver = listSaver<Offset, Float>(
+    save = { listOf(it.x, it.y) },
+    restore = { Offset(it[0], it[1]) },
+)

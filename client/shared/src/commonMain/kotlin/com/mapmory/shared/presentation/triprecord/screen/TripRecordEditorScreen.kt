@@ -1,5 +1,6 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -1197,7 +1198,7 @@ private fun RecommendedPhoto(
 
 @Composable
 private fun PhotoPreview(photo: SelectedPhoto, modifier: Modifier = Modifier) {
-    TripPhotoImage(
+    MapmoryAsyncImage(
         imageBytes = photo.previewBytes,
         contentDescription = photo.displayName,
         modifier = modifier,
@@ -1207,7 +1208,7 @@ private fun PhotoPreview(photo: SelectedPhoto, modifier: Modifier = Modifier) {
 
 @Composable
 private fun PhotoPreview(photo: TripRecordPhotoUiState, modifier: Modifier = Modifier) {
-    TripPhotoImage(
+    MapmoryAsyncImage(
         imageBytes = photo.previewBytes?.bytesForDecoding(),
         imageUri = photo.previewUri,
         contentDescription = photo.displayName,

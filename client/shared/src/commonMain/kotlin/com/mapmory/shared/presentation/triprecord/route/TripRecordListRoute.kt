@@ -37,7 +37,7 @@ internal fun TripRecordListRoute(
     }
 
     LaunchedEffect(viewModel, initialLocationId, tripRecordRevision) {
-        viewModel.refresh(initialLocationId)
+        viewModel.refreshIfNeeded(initialLocationId, tripRecordRevision)
     }
 
     TripRecordListScreen(
