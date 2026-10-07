@@ -158,6 +158,21 @@ fun TripProfileScreen(
                             modifier = Modifier.weight(1f),
                         )
                     }
+                    Text(
+                        text = "불편한 점이나 의견이 있으면 알려주세요.",
+                        color = TripRecordPalette.current.secondaryText,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 18.dp),
+                    )
+                    TextButton(
+                        onClick = {
+                            uriHandler.openUri(
+                                "mailto:sjhan0711@gmail.com?subject=Mapmory%20%EC%82%AC%EC%9A%A9%20%EC%9D%98%EA%B2%AC",
+                            )
+                        },
+                    ) {
+                        Text("이메일로 의견 보내기", color = TripRecordPalette.current.primary)
+                    }
                     if (PrivacyPolicy.URL.isNotBlank()) {
                         Text(
                             text = "서비스 정책은 아래 버튼에서 확인할 수 있어요.",

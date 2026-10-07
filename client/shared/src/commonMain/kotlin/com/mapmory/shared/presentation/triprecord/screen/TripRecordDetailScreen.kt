@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +59,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewUiRecords
+import kotlinx.datetime.LocalDate
 
 @Composable
 fun TripRecordDetailScreen(
@@ -267,7 +269,7 @@ private fun EmptyPhotoAlbum() {
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = "아직 사진이 없어요.",
+            text = "이 기록에 추가된 사진이 없어요.",
             color = TripRecordPalette.current.secondaryText,
             fontSize = 14.sp,
         )
@@ -283,7 +285,7 @@ private fun PhotoDateGroup(
     Column(modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -291,6 +293,16 @@ private fun PhotoDateGroup(
                 color = TripRecordPalette.current.headingText,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = "${group.photos.size}장",
+                color = TripRecordPalette.current.secondaryText,
+                fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false,
             )
         }
         Column(
@@ -550,7 +562,10 @@ private fun String?.toAlbumDate(): String? {
 
 private fun String.toAlbumDisplayDate(): String {
     val (year, month, day) = split('-')
-    return "$year. $month. $day"
+    val weekday = runCatching { LocalDate.parse(this).dayOfWeek.ordinal }
+        .getOrNull()
+        ?.let(KoreanWeekdays::getOrNull)
+    return "$year. $month. $day${weekday?.let { " ($it)" }.orEmpty()}"
 }
 
 @Preview(
@@ -610,3 +625,4 @@ fun ErrorTripRecordDetailScreenPreview() {
 private const val PhotoColumns = 2
 private const val UnknownPhotoDate = "날짜 미상"
 private val AlbumDatePattern = Regex("(\\d{4})[.\\-/](\\d{1,2})[.\\-/](\\d{1,2})")
+private val KoreanWeekdays = listOf("월", "화", "수", "목", "금", "토", "일")
