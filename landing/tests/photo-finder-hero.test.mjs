@@ -30,7 +30,10 @@ test("the demo moves scan -> type -> match -> fly -> done once", () => {
 });
 
 test("demo places only use units the shipping app can search: Korean provinces or whole countries", () => {
-  assert.deepEqual(PHOTO_FINDER_PLACES.map(({ label }) => label), ["제주", "일본", "미국"]);
+  assert.deepEqual(PHOTO_FINDER_PLACES.map(({ label }) => label), ["일본", "제주", "미국"]);
+  // Autoplay and the default chip use the first place; it matches the promo copy.
+  assert.equal(PHOTO_FINDER_PLACES[0].key, "japan");
+  assert.equal(PHOTO_FINDER_PLACES[0].foundCount, 86);
   for (const place of PHOTO_FINDER_PLACES) {
     if (place.scope === "korea") assert.match(place.regionCode, /^KR-\d{2}$/);
     else assert.match(place.regionCode, /^\d{3}$/);

@@ -11,16 +11,6 @@ export const PHOTO_FINDER_TIMELINE = Object.freeze({
 // Only places the shipping app can search today: Korean provinces and whole countries.
 export const PHOTO_FINDER_PLACES = Object.freeze([
   {
-    key: "jeju",
-    query: "제주",
-    label: "제주",
-    scope: "korea",
-    regionCode: "KR-49",
-    target: [126.55, 33.38],
-    foundCount: 31,
-    photos: ["/assets/team-jeju-coast.jpg", "/assets/team-jeju-coast-hero.jpg"],
-  },
-  {
     key: "japan",
     query: "일본",
     label: "일본",
@@ -30,6 +20,16 @@ export const PHOTO_FINDER_PLACES = Object.freeze([
     view: { minLng: 120, maxLng: 150, minLat: 26, maxLat: 46 },
     foundCount: 86,
     photos: ["/assets/team-tokyo-street.jpeg"],
+  },
+  {
+    key: "jeju",
+    query: "제주",
+    label: "제주",
+    scope: "korea",
+    regionCode: "KR-49",
+    target: [126.55, 33.38],
+    foundCount: 31,
+    photos: ["/assets/team-jeju-coast.jpg", "/assets/team-jeju-coast-hero.jpg"],
   },
   {
     key: "usa",
