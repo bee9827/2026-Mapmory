@@ -42,7 +42,7 @@
 | `hero_demo_select` | 히어로 사진 찾기 데모의 장소 칩(제주·일본·미국) 탭 | `experience_type=hero_demo`, `demo_place`; 탭마다. 자동 재생은 기록하지 않음 |
 
 체험 유형: `globe`, `korea_detail`.
-체험 진입 위치: `header_nav`, `hero`. (`hero_mobile`, `hero_handoff`, `hero_reduced_handoff`는 2026-10 사진 찾기 히어로 교체 전 데이터에만 있음)
+체험 진입 위치: `header_nav`, `how_section`(3단계 사용법 아래 지구본 미리 보기 링크). (`hero`, `hero_mobile`, `hero_handoff`, `hero_reduced_handoff`는 2026-10 사진 찾기 히어로 교체 전 데이터에만 있음)
 스토어 위치: `header`, `hero`, `final` (Recap은 `demand_primary`).
 `waitlist_*`는 비노출 폴백으로 보존하지만 현재 퍼널에서 제외한다.
 

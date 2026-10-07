@@ -1574,7 +1574,7 @@ function App() {
             </li>
           ))}
         </ol>
-        <a className="how-experience-link" href="#experience" onClick={() => globeAnalytics.trackEntryClick("hero")}><GlobeHemisphereEast size={18} weight="duotone" />기록이 쌓인 지도 미리 보기</a>
+        <a className="how-experience-link" href="#experience" onClick={() => globeAnalytics.trackEntryClick("how_section")}><GlobeHemisphereEast size={18} weight="duotone" />기록이 쌓인 지도 미리 보기</a>
       </section>
 
       <section className={`experience-section ${isGlobeFocused ? "is-focused" : ""}`} id="experience" ref={setExperienceSectionRef}>
