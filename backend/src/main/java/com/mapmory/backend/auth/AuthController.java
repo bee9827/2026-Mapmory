@@ -1,5 +1,6 @@
 package com.mapmory.backend.auth;
 
+import com.mapmory.backend.auth.dto.GoogleLoginRequest;
 import com.mapmory.backend.auth.dto.KakaoLoginRequest;
 import com.mapmory.backend.auth.dto.LoginResponse;
 import com.mapmory.backend.auth.dto.LogoutRequest;
@@ -35,6 +36,18 @@ public class AuthController {
     ) {
         return ApiResponse.from(LoginResponse.from(
                 authService.loginWithKakao(request.kakaoAccessToken(), authenticatedMemberId)));
+    }
+
+    /**
+     * 카카오 로그인과 같다. 앱이 구글 SDK로 받은 ID token을 보내며, 게스트 토큰이 있으면 승격한다.
+     */
+    @PostMapping("/login/google")
+    public ApiResponse<LoginResponse> loginWithGoogle(
+            @Valid @RequestBody GoogleLoginRequest request,
+            @AuthenticationPrincipal Long authenticatedMemberId
+    ) {
+        return ApiResponse.from(LoginResponse.from(
+                authService.loginWithGoogle(request.idToken(), authenticatedMemberId)));
     }
 
     @PostMapping("/login/guest")

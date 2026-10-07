@@ -42,6 +42,13 @@ guest-login:
 kakao:
   user-info-uri: https://kapi.kakao.com/v2/user/me
 
+google:
+  # ID token의 aud로 허용할 OAuth 클라이언트 ID 목록(쉼표 구분). Android Credential Manager는
+  # serverClientId로 지정한 웹 클라이언트 ID를, iOS SDK는 iOS 클라이언트 ID를 aud로 넣는다.
+  # 비어 있으면 모든 구글 로그인을 거부한다. (ADR 0019)
+  client-ids: ${GOOGLE_CLIENT_IDS:}
+  jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+
 geoapify:
   api-key: ${GEOAPIFY_API_KEY:}
   rate-limit:
