@@ -112,6 +112,38 @@ class GoogleLoginIntegrationTest extends IntegrationTest {
     }
 
     @Test
+    void 이름이_50자를_넘으면_50자로_잘라_저장한다() throws Exception {
+        given(googleIdTokenVerifier.verify(anyString()))
+                .willReturn(new GoogleUser("google-sub-4", "가".repeat(60)));
+
+        mockMvc.perform(post("/api/v1/auth/login/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(REQUEST_BODY))
+                .andExpect(status().isOk());
+
+        Member member = memberRepository
+                .findByProviderAndProviderId(AuthProvider.GOOGLE, "google-sub-4")
+                .orElseThrow();
+        assertThat(member.getName()).isEqualTo("가".repeat(50));
+    }
+
+    @Test
+    void 이름이_없으면_기본_이름을_부여한다() throws Exception {
+        given(googleIdTokenVerifier.verify(anyString()))
+                .willReturn(new GoogleUser("google-sub-5", null));
+
+        mockMvc.perform(post("/api/v1/auth/login/google")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(REQUEST_BODY))
+                .andExpect(status().isOk());
+
+        Member member = memberRepository
+                .findByProviderAndProviderId(AuthProvider.GOOGLE, "google-sub-5")
+                .orElseThrow();
+        assertThat(member.getName()).matches("회원\\d{5}");
+    }
+
+    @Test
     void 유효하지_않은_구글_토큰은_401_ProblemDetails로_응답한다() throws Exception {
         given(googleIdTokenVerifier.verify(anyString()))
                 .willThrow(new BusinessException(AuthErrorCode.INVALID_GOOGLE_TOKEN));

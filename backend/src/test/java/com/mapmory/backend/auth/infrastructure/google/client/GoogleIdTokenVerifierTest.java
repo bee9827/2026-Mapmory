@@ -92,6 +92,38 @@ class GoogleIdTokenVerifierTest {
     }
 
     @Test
+    void exp가_없는_토큰은_INVALID_GOOGLE_TOKEN이다() throws Exception {
+        String idToken = sign(googleKey, claims().expirationTime(null).build());
+
+        assertInvalid(idToken);
+    }
+
+    @Test
+    void aud가_여러_개면_azp가_우리_클라이언트일_때만_허용한다() throws Exception {
+        List<String> audiences = List.of(CLIENT_ID, "other-app.apps.googleusercontent.com");
+
+        assertInvalid(sign(googleKey, claims().audience(audiences).build()));
+        assertInvalid(sign(googleKey, claims().audience(audiences)
+                .claim("azp", "other-app.apps.googleusercontent.com").build()));
+        assertThat(verifier.verify(sign(googleKey, claims().audience(audiences).claim("azp", CLIENT_ID).build()))
+                .subject()).isEqualTo("109876543210");
+    }
+
+    @Test
+    void 허용된_클라이언트_ID가_없으면_모든_토큰을_거부한다() throws Exception {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder
+                .withPublicKey((RSAPublicKey) googleKey.getPublic())
+                .build();
+        decoder.setJwtValidator(GoogleIdTokenValidators.create(List.of()));
+        GoogleIdTokenVerifier unconfigured = new GoogleIdTokenVerifier(decoder);
+        String idToken = sign(googleKey, claims().build());
+
+        assertThatThrownBy(() -> unconfigured.verify(idToken))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getErrorCode()).isEqualTo(AuthErrorCode.INVALID_GOOGLE_TOKEN));
+    }
+
+    @Test
     void 형식이_잘못된_토큰은_INVALID_GOOGLE_TOKEN이다() {
         assertInvalid("not-a-jwt");
     }

@@ -249,7 +249,7 @@ Access Token이 아니라 ID Token을 보낸다.
 | `401` | `INVALID_ACCESS_TOKEN` | Access Token이 유효하지 않음 |
 | `401` | `EXPIRED_ACCESS_TOKEN` | Access Token이 만료됨 |
 | `401` | `INVALID_KAKAO_TOKEN` | 카카오 Access Token이 유효하지 않음 |
-| `401` | `INVALID_GOOGLE_TOKEN` | 구글 ID Token이 유효하지 않음 (서명·발급자·대상 앱·만료) |
+| `401` | `INVALID_GOOGLE_TOKEN` | 구글 ID Token이 유효하지 않음 (서명·발급자·대상 앱·만료). Android가 웹 클라이언트 ID가 아닌 Android 클라이언트 ID로 토큰을 받은 경우도 대상 앱 불일치로 여기에 해당 |
 | `401` | `INVALID_REFRESH_TOKEN` | Refresh Token이 유효하지 않거나 폐기됨 |
 | `401` | `EXPIRED_REFRESH_TOKEN` | Refresh Token이 만료됨 |
 | `403` | `ACCESS_DENIED` | 리소스 접근 권한 없음 |

@@ -2,6 +2,8 @@ package com.mapmory.backend.auth.infrastructure.google.client;
 
 import com.mapmory.backend.auth.application.AuthErrorCode;
 import com.mapmory.backend.common.exception.BusinessException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -21,6 +23,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class GoogleIdTokenVerifier {
 
+    private static final Logger log = LoggerFactory.getLogger(GoogleIdTokenVerifier.class);
+
     private final JwtDecoder googleIdTokenDecoder;
 
     public GoogleIdTokenVerifier(JwtDecoder googleIdTokenDecoder) {
@@ -36,6 +40,8 @@ public class GoogleIdTokenVerifier {
         try {
             return googleIdTokenDecoder.decode(idToken);
         } catch (BadJwtException exception) {
+            // 클라이언트 ID 설정 불일치(aud) 등을 운영 로그에서 구분할 수 있도록 거부 사유를 남긴다.
+            log.info("구글 ID token 검증 실패: {}", exception.getMessage());
             throw new BusinessException(AuthErrorCode.INVALID_GOOGLE_TOKEN);
         } catch (JwtException exception) {
             throw new BusinessException(
