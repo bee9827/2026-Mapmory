@@ -92,6 +92,12 @@ class GoogleIdTokenVerifierTest {
     }
 
     @Test
+    void sub가_없거나_비어_있으면_INVALID_GOOGLE_TOKEN이다() throws Exception {
+        assertInvalid(sign(googleKey, claims().subject(null).build()));
+        assertInvalid(sign(googleKey, claims().subject(" ").build()));
+    }
+
+    @Test
     void exp가_없는_토큰은_INVALID_GOOGLE_TOKEN이다() throws Exception {
         String idToken = sign(googleKey, claims().expirationTime(null).build());
 
