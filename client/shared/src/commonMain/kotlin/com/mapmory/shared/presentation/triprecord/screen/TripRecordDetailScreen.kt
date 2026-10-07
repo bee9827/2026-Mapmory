@@ -302,13 +302,6 @@ private fun PhotoDateGroup(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                text = "${group.photos.size}장",
-                color = TripRecordPalette.current.secondaryText,
-                fontSize = 12.sp,
-                maxLines = 1,
-                softWrap = false,
-            )
         }
         Column(
             modifier = Modifier.padding(top = 14.dp),
