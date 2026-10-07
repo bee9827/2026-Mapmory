@@ -1,6 +1,7 @@
 package com.mapmory.shared.navigation
 
 import androidx.navigation.NavHostController
+import androidx.navigation.NavDestination.Companion.hasRoute
 
 internal class MapmoryNavigator(
     private val navController: NavHostController,
@@ -21,6 +22,8 @@ internal class MapmoryNavigator(
 
     fun navigateToRecords(locationId: Long? = null) {
         navigateToTab(RecordsRoute(locationId))
+        // Restoring an entry also restores its old route arguments. Honor this navigation request.
+        navController.currentBackStackEntry?.savedStateHandle?.set(RecordsLocationKey, locationId)
     }
 
     fun navigateToProfile() {
@@ -45,11 +48,22 @@ internal class MapmoryNavigator(
     }
 
     private fun navigateToTab(route: Any) {
+        // Detail/editor entries are temporary flows, not a tab's saved destination.
+        while (navController.currentDestination?.let {
+                it.hasRoute<DetailRoute>() || it.hasRoute<EditorRoute>()
+            } == true
+        ) {
+            if (!navController.popBackStack()) break
+        }
         navController.navigate(route) {
             popUpTo<MapRoute> {
                 inclusive = false
+                saveState = true
             }
             launchSingleTop = true
+            restoreState = true
         }
     }
 }
+
+internal const val RecordsLocationKey = "recordsLocationId"

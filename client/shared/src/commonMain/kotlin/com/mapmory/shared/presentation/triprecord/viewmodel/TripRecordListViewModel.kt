@@ -30,6 +30,7 @@ class TripRecordListViewModel(
     private var isRouteInitialized = false
     private var loadGeneration = 0L
     private var loadedQuery: TripRecordQuery? = null
+    private var loadedRevision: Long? = null
 
     var uiState by mutableStateOf<TripRecordListUiState>(TripRecordListUiState.Idle)
         private set
@@ -54,6 +55,14 @@ class TripRecordListViewModel(
         filterByLocation(locationId)
         refreshTags()
         load()
+    }
+
+    suspend fun refreshIfNeeded(locationId: Long?, dataRevision: Long) {
+        if (loadedRevision == dataRevision && query.locationId == locationId &&
+            uiState is TripRecordListUiState.Success
+        ) return
+        refresh(locationId)
+        if (uiState is TripRecordListUiState.Success) loadedRevision = dataRevision
     }
 
     suspend fun refresh(locationId: Long?) {

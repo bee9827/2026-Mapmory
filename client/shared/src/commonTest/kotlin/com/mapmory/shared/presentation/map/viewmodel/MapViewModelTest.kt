@@ -15,6 +15,28 @@ import kotlin.test.assertTrue
 
 class MapViewModelTest {
     @Test
+    fun `지도_재진입은_열린_지역을_유지하고_같은_데이터를_재조회하지_않는다`() = runSuspend {
+        var requests = 0
+        val repository = object : MapSummaryRepository {
+            override suspend fun getRootRegions(tagId: Long?): Result<List<MapRegionSummary>> {
+                requests++
+                return Result.success(emptyList())
+            }
+            override suspend fun getChildRegions(regionId: Long, tagId: Long?) =
+                Result.success(emptyList<MapRegionSummary>())
+        }
+        val viewModel = MapViewModel(repository, StaticRegionCatalog())
+        viewModel.refreshIfNeeded(0)
+        viewModel.openProvince("KR-11")
+        val visible = viewModel.uiState
+        viewModel.refreshIfNeeded(0)
+        assertEquals(visible, viewModel.uiState)
+        assertEquals(1, requests)
+        viewModel.refreshIfNeeded(1)
+        assertEquals(2, requests)
+    }
+
+    @Test
     fun `캐시된_지도_요약으로_첫_화면을_즉시_구성한다`() {
         val korea = MapRegionSummary(1, "KR", MapRegionType.COUNTRY, "대한민국", 2, MapRegionLevel.LOW)
         val seoul = MapRegionSummary(11, "11", MapRegionType.PROVINCE, "서울특별시", 2, MapRegionLevel.LOW)

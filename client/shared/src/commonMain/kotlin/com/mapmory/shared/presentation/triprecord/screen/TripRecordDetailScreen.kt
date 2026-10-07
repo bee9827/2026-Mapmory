@@ -1,5 +1,9 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import com.mapmory.shared.presentation.components.MapmoryPhotoExpansion
+import com.mapmory.shared.presentation.components.MapmoryPhotoViewer
+import com.mapmory.shared.presentation.components.MapmoryAsyncImage
+import com.mapmory.shared.presentation.components.LocalMapmoryImageTransitionScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -115,33 +119,34 @@ fun TripRecordDetailScreen(
 
             is TripRecordDetailUiState.Success -> {
                 val record = uiState.record
-                LaunchedEffect(record.id) { albumScrollState.scrollTo(0) }
                 val groups = remember(record.id, record.photos, record.startDate) {
                     groupTripRecordPhotosByDate(record.photos, record.startDate)
                 }
                 val orderedPhotos = remember(groups) { groups.flatMap(TripRecordPhotoGroup::photos) }
                 val selectedIndex = expandedPhotoIndex
 
-                if (selectedIndex != null && orderedPhotos.isNotEmpty()) {
-                    ExpandedTripPhotoViewer(
-                        locationName = record.locationName,
-                        photos = orderedPhotos,
-                        initialPage = selectedIndex.coerceIn(orderedPhotos.indices),
-                        onBackClick = { expandedPhotoIndex = null },
-                    )
-                } else {
-                    TripRecordPhotoAlbum(
-                        record = record,
-                        groups = groups,
-                        onBackClick = onBackClick,
-                        onEditClick = onEditClick,
-                        onDeleteClick = { showDeleteDialog = true },
-                        scrollState = albumScrollState,
-                        onPhotoClick = { photo ->
-                            expandedPhotoIndex = orderedPhotos.indexOfFirst { it.id == photo.id }
-                                .takeIf { it >= 0 }
-                        },
-                    )
+                MapmoryPhotoExpansion(selectedIndex) { targetIndex ->
+                    if (targetIndex != null && orderedPhotos.isNotEmpty()) {
+                        ExpandedTripPhotoViewer(
+                            locationName = record.locationName,
+                            photos = orderedPhotos,
+                            initialPage = targetIndex.coerceIn(orderedPhotos.indices),
+                            onBackClick = { expandedPhotoIndex = null },
+                        )
+                    } else {
+                        TripRecordPhotoAlbum(
+                            record = record,
+                            groups = groups,
+                            scrollState = albumScrollState,
+                            onBackClick = onBackClick,
+                            onEditClick = onEditClick,
+                            onDeleteClick = { showDeleteDialog = true },
+                            onPhotoClick = { photo ->
+                                expandedPhotoIndex = orderedPhotos.indexOfFirst { it.id == photo.id }
+                                    .takeIf { it >= 0 }
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -315,7 +320,7 @@ private fun PhotoDateGroup(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     rowPhotos.forEach { photo ->
-                        TripPhotoImage(
+                        MapmoryAsyncImage(
                             imageBytes = photo.previewBytes?.bytesForDecoding()
                                 ?: photo.originalBytes?.bytesForDecoding(),
                             imageUri = photo.previewUri ?: photo.localOriginalUri ?: photo.fullResolutionUri,
@@ -323,6 +328,7 @@ private fun PhotoDateGroup(
                             fallbackUri = photo.fullResolutionUri,
                             fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                             contentDescription = "${group.displayDate} 여행 사진 확대",
+                            sharedImageKey = photo.id,
                             modifier = Modifier
                                 .weight(1f)
                                 .aspectRatio(1f)
@@ -391,6 +397,8 @@ private fun ExpandedTripPhotoViewer(
     onBackClick: () -> Unit,
 ) {
     val pagerState = rememberPagerState(initialPage = initialPage) { photos.size }
+    val imageTransitionActive =
+        LocalMapmoryImageTransitionScope.current?.isTransitionActive == true
     val currentPhoto = photos[pagerState.currentPage]
     var localPreview by remember(currentPhoto.id) { mutableStateOf<ByteArray?>(null) }
     var localLookupFinished by remember(currentPhoto.id) { mutableStateOf(false) }
@@ -409,13 +417,22 @@ private fun ExpandedTripPhotoViewer(
         localLookupFinished = true
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
+    MapmoryPhotoViewer(
+        title = locationName,
+        onClose = onBackClick,
+        closeContentDescription = "사진첩으로 돌아가기",
+        trailingContent = {
+            Text(
+                "${pagerState.currentPage + 1} / ${photos.size}",
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        },
     ) {
         HorizontalPager(
             state = pagerState,
+            key = { photos[it].id },
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val photo = photos[page]
@@ -423,21 +440,31 @@ private fun ExpandedTripPhotoViewer(
             val localBytes = localPreview.takeIf { isCurrent }
             val awaitingLocalPhoto = isCurrent && !localLookupFinished &&
                 photo.localPhotoId != null && photo.localOriginalUri == null
-            if (awaitingLocalPhoto) return@HorizontalPager
+            val usePreview = imageTransitionActive || awaitingLocalPhoto
             Box(Modifier.fillMaxSize()) {
-                TripPhotoImage(
-                    imageBytes = localBytes ?: photo.previewBytes?.bytesForDecoding()
-                        ?: photo.originalBytes?.bytesForDecoding(),
+                MapmoryAsyncImage(
+                    imageBytes = if (usePreview) {
+                        photo.previewBytes?.bytesForDecoding() ?: photo.originalBytes?.bytesForDecoding()
+                    } else {
+                        localBytes ?: photo.previewBytes?.bytesForDecoding()
+                            ?: photo.originalBytes?.bytesForDecoding()
+                    },
                     imageUri = when {
+                        usePreview -> photo.previewUri ?: photo.localOriginalUri
                         localBytes != null -> null
                         !isCurrent -> photo.previewUri
                         else -> photo.localOriginalUri ?: photo.fullResolutionUri ?: photo.previewUri
                     },
-                    cacheKey = "trip-full:${photo.id}",
+                    cacheKey = if (usePreview) "trip-preview:${photo.id}" else "trip-full:${photo.id}",
                     blackLoadingBackground = true,
-                    fallbackUri = if (photo.localOriginalUri != null) photo.fullResolutionUri ?: photo.previewUri else photo.previewUri,
+                    fallbackUri = when {
+                        usePreview -> null
+                        photo.localOriginalUri != null -> photo.fullResolutionUri ?: photo.previewUri
+                        else -> photo.previewUri
+                    },
                     fallbackBytes = photo.originalBytes?.bytesForDecoding(),
                     contentDescription = "$locationName 확대 사진 ${page + 1}",
+                    sharedImageKey = photo.id.takeIf { isCurrent },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(vertical = 104.dp),
@@ -447,43 +474,7 @@ private fun ExpandedTripPhotoViewer(
                 )
             }
         }
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TripIconButton(
-                    label = "←",
-                    contentDescription = "사진첩으로 돌아가기",
-                    onClick = onBackClick,
-                    containerColor = Color.Black.copy(alpha = 0.48f),
-                    contentColor = TripRecordPalette.current.contentOnMedia,
-                )
-                Text(
-                    text = locationName,
-                    color = TripRecordPalette.current.contentOnMedia,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-            Text(
-                text = "${pagerState.currentPage + 1} / ${photos.size}",
-                color = TripRecordPalette.current.contentOnMedia,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.48f), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 13.dp, vertical = 9.dp),
-            )
-        }
+
     }
 }
 

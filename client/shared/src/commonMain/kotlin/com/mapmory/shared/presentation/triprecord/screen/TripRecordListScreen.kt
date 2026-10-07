@@ -1,5 +1,6 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -468,7 +469,7 @@ private fun TripRecordCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            TripPhotoImage(
+            MapmoryAsyncImage(
                 imageBytes = record.photos.minByOrNull { it.sortOrder }?.previewBytes?.bytesForDecoding(),
                 imageUri = record.photos.minByOrNull { it.sortOrder }?.previewUri,
                 contentDescription = record.locationName,
