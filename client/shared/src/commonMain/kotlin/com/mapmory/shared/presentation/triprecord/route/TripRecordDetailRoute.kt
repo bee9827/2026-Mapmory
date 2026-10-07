@@ -60,7 +60,7 @@ internal fun TripRecordDetailRoute(
     }
 
     LaunchedEffect(viewModel, recordId, tripRecordRevision) {
-        viewModel.load(recordId)
+        viewModel.loadIfNeeded(recordId, tripRecordRevision)
     }
 
     TripRecordDetailScreen(

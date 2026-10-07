@@ -24,6 +24,31 @@ import kotlin.test.assertIs
 
 class TripRecordListViewModelTest {
     @Test
+    fun `재진입은_동일_리비전의_본문과_썸네일을_재조회하지_않는다`() = runBlocking {
+        val repository = ThumbnailListRepository()
+        var thumbnailRequests = 0
+        val viewModel = TripRecordListViewModel(
+            GetTripRecordsUseCase(repository),
+            thumbnailLoader = TripRecordThumbnailLoader {
+                thumbnailRequests++
+                TripRecordThumbnailLoadResult.Success(byteArrayOf(1))
+            },
+        )
+        viewModel.refreshIfNeeded(null, 0)
+        val visible = viewModel.uiState
+        viewModel.refreshIfNeeded(null, 0)
+        assertEquals(visible, viewModel.uiState)
+        assertEquals(1, repository.listRequestCount)
+        assertEquals(1, thumbnailRequests)
+
+        viewModel.refreshIfNeeded(null, 1)
+        assertEquals(2, repository.listRequestCount)
+        viewModel.refreshIfNeeded(101, 1)
+        assertEquals(3, repository.listRequestCount)
+        assertEquals(101, viewModel.query.locationId)
+    }
+
+    @Test
     fun `선택한_태그_ID로_기록을_필터링한다`() = runSuspend {
         val repository = FakeTripRecordRepository { "2026-08-31T00:00:00Z" }
         val family = repository.createTag("가족").getOrThrow()

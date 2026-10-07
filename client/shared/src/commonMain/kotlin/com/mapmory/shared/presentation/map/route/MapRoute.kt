@@ -57,7 +57,7 @@ internal fun MapRoute(
     }
 
     LaunchedEffect(viewModel, tripRecordRevision) {
-        viewModel.refresh()
+        viewModel.refreshIfNeeded(tripRecordRevision)
     }
 
     DisposableEffect(viewModel, backHandlerRegistry) {

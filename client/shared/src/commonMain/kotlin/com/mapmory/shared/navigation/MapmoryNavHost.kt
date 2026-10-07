@@ -71,6 +71,9 @@ internal fun MapmoryNavHost(
 
         composable<RecordsRoute> { backStackEntry ->
             val route = backStackEntry.toRoute<RecordsRoute>()
+            val requestedLocationId by backStackEntry.savedStateHandle
+                .getStateFlow<Long?>(RecordsLocationKey, route.locationId)
+                .collectAsState()
             LaunchedEffect(backStackEntry) {
                 mapmoryDebugLog(
                     NavigationLogTag,
@@ -83,7 +86,7 @@ internal fun MapmoryNavHost(
             TripRecordListRoute(
                 modifier = Modifier.windowInsetsPadding(contentWindowInsets),
                 viewModel = viewModel,
-                initialLocationId = route.locationId,
+                initialLocationId = requestedLocationId,
                 tripRecordRevision = tripRecordRevision,
                 pendingSaves = backgroundSaves,
                 onRetryPendingSave = container.backgroundTripRecordSaver::retry,
