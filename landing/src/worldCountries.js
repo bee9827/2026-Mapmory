@@ -23,3 +23,5 @@ export function useWorldCountries(enabled = true) {
 
   return countries;
 }
+
+export { loadWorldCountries };

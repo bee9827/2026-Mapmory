@@ -23,6 +23,7 @@ import {
   NavigationArrow,
   Play,
   Plus,
+  ShieldCheck,
   Sun,
 } from "@phosphor-icons/react";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics.js";
@@ -209,6 +210,12 @@ const TRUST_POINTS = [
   { Icon: CloudArrowUp, title: "고른 사진만 올라가요", body: "기록을 저장할 때 내가 직접 고른 사진만 업로드돼요." },
   { Icon: Trash, title: "기록은 언제든 지울 수 있어요", body: "남긴 여행 기록은 앱에서 언제든 삭제할 수 있어요." },
 ];
+
+// On-device matching and on-save upload form one boundary; deleting a record stays a separate line.
+const [TRUST_ON_DEVICE, TRUST_ON_SAVE, TRUST_DELETE] = TRUST_POINTS;
+const { Icon: TrustOnDeviceIcon } = TRUST_ON_DEVICE;
+const { Icon: TrustOnSaveIcon } = TRUST_ON_SAVE;
+const { Icon: TrustDeleteIcon } = TRUST_DELETE;
 
 const FAQ_ITEMS = [
   { question: "사진첩 사진을 전부 가져가나요?", answer: "아니요. 사진을 찾는 일은 폰 안에서만 이뤄지고, 서버에는 기록을 저장할 때 직접 고른 사진만 올라가요." },
@@ -1230,7 +1237,7 @@ function KoreaDetailExperience({ theme }) {
   return (
     <section className="detail-section" id="korea-detail" ref={analytics.sectionRef}>
       <div className="detail-heading">
-        <div><p className="eyebrow">02 · 대한민국</p><h2>사진을 기록하면<br /><em>지도가 채워져요.</em></h2></div>
+        <div><h2>사진을 기록하면<br /><em>지도가 채워져요.</em></h2></div>
       </div>
 
       <div className={`detail-demo detail-level-${detailLevel}`} id="korea-map-demo" ref={detailDemoRef}>
@@ -1554,16 +1561,16 @@ function App() {
 
       <section className="how-section" id="how" aria-labelledby="how-title">
         <div className="section-heading">
-          <p className="eyebrow">사용 방법</p>
           <h2 id="how-title">3단계면 끝나요.</h2>
         </div>
         <ol className="how-steps">
-          {HOW_STEPS.map(({ Icon, title, body }, index) => (
+          {HOW_STEPS.map(({ title, body }, index) => (
             <li key={title}>
-              <span className="how-step-icon"><Icon size={26} weight="duotone" /></span>
-              <span className="how-step-number">{index + 1}</span>
-              <h3>{title}</h3>
-              <p>{body}</p>
+              <span className="how-step-number" aria-hidden="true">{index + 1}</span>
+              <div>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </div>
             </li>
           ))}
         </ol>
@@ -1573,7 +1580,7 @@ function App() {
       <section className={`experience-section ${isGlobeFocused ? "is-focused" : ""}`} id="experience" ref={setExperienceSectionRef}>
         <div className="experience-pin">
           <div className="section-heading section-heading-flow">
-            <div><p className="eyebrow">01 · 세계</p><h2>지구본에서 기억을 꺼내봐요.</h2></div>
+            <div><h2>지구본에서 기억을 꺼내봐요.</h2></div>
             <p>지구본을 움직이고 민트색 나라를 눌러보세요. 지도는 그대로, 그곳의 사진만 열려요.</p>
           </div>
           <div className={`experience-stage ${isWorldMemoryOpen ? "is-memory-open" : ""}`} ref={experienceStageRef}>
@@ -1617,18 +1624,28 @@ function App() {
 
       <section className="trust-section" id="privacy" aria-labelledby="privacy-title">
         <div className="section-heading">
-          <p className="eyebrow">안심하고 쓰기</p>
           <h2 id="privacy-title">사진첩은 폰 안에서만 살펴봐요.</h2>
         </div>
-        <ul className="trust-points">
-          {TRUST_POINTS.map(({ Icon, title, body }) => (
-            <li key={title}>
-              <Icon size={26} weight="duotone" />
-              <h3>{title}</h3>
-              <p>{body}</p>
-            </li>
-          ))}
-        </ul>
+        <div className="trust-flow">
+          <div className="trust-zone is-device">
+            <span className="trust-zone-label"><TrustOnDeviceIcon size={18} weight="duotone" />내 폰 안</span>
+            <h3>{TRUST_ON_DEVICE.title}</h3>
+            <p>{TRUST_ON_DEVICE.body}</p>
+          </div>
+          <span className="trust-arrow" aria-hidden="true"><ArrowRight size={20} weight="bold" /></span>
+          <div className="trust-zone is-saved">
+            <span className="trust-zone-label"><TrustOnSaveIcon size={18} weight="duotone" />저장할 때</span>
+            <h3>{TRUST_ON_SAVE.title}</h3>
+            <p>{TRUST_ON_SAVE.body}</p>
+          </div>
+        </div>
+        <div className="trust-delete">
+          <TrustDeleteIcon size={22} weight="duotone" />
+          <div>
+            <h3>{TRUST_DELETE.title}</h3>
+            <p>{TRUST_DELETE.body}</p>
+          </div>
+        </div>
         <div className="faq-list">
           <h3 className="faq-title">자주 묻는 질문</h3>
           {FAQ_ITEMS.map(({ question, answer }) => (
@@ -1647,6 +1664,7 @@ function App() {
           <StoreButton placement="final" platform="ios" label="App Store" />
           <StoreButton placement="final" platform="android" label="Google Play" />
         </div>
+        <p className="finder-trust-note download-trust"><ShieldCheck size={18} weight="fill" />사진은 폰 안에서 찾고, 고른 사진만 올라가요.</p>
       </section>
 
       <footer><div><Brand /><p>기억은 흩어져도, 지도는 남아요.</p></div><p>© 2026 Mapmory. All rights reserved.</p></footer>

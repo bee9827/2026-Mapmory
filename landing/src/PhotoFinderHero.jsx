@@ -1,28 +1,33 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { MagnifyingGlass, MapPin, ShieldCheck } from "@phosphor-icons/react";
+import { CheckCircle, MagnifyingGlass, MapPin, ShieldCheck } from "@phosphor-icons/react";
 import koreaProvinces from "./data/korea-provinces.json";
 import { ANALYTICS_EVENTS, trackEvent } from "./analytics.js";
 import {
   PHOTO_FINDER_LIBRARY_COUNT,
+  PHOTO_FINDER_LIBRARY_PHOTOS,
+  PHOTO_FINDER_MATCH_COUNT,
   PHOTO_FINDER_PLACES,
+  PHOTO_FINDER_REPLAY_TIMELINE,
+  PHOTO_FINDER_TIMELINE,
   getPhotoFinderDuration,
   getPhotoFinderState,
 } from "./photoFinderDemo.js";
-import { useWorldCountries } from "./worldCountries.js";
+import { loadWorldCountries, useWorldCountries } from "./worldCountries.js";
 
 const GRID_COLUMNS = 7;
 const GRID_ROWS = 16;
 const VISIBLE_ROWS = 4;
 const FINAL_WINDOW_START = (GRID_ROWS - VISIBLE_ROWS) * GRID_COLUMNS;
-// Positions inside the final window (first three fully visible rows) where the searched place's photos sit.
-const MATCH_SLOTS = [2, 8, 12, 15, 20];
-const DECOY_SLOTS = [5, 10, 17, 23];
-const MATCH_COUNT = MATCH_SLOTS.length;
-const AUTOPLAY_DELAY_MS = 700;
-const TILE_TONES = [
-  ["#c9d8e4", "#9fb6c9"], ["#e6d6bf", "#c9ae8a"], ["#c8dcc4", "#8fb289"], ["#ead0c8", "#c99a8c"],
-  ["#d8d2e6", "#a99cc4"], ["#dfe3d2", "#b4bd98"], ["#cfe2de", "#8fbab2"], ["#ecdcc6", "#d1a978"],
-];
+// Positions inside the final window where the searched place's photos sit: rows 2-3,
+// so the first row stays free for the result pill.
+const MATCH_SLOTS = [8, 11, 13, 16, 19];
+// [x%, y%, zoom] crops so the rest of the library never repeats a shot next to itself.
+const FILLER_CROPS = [[50, 50, 1], [30, 35, 1.35], [70, 65, 1.5], [50, 20, 1.25], [20, 80, 1.6], [80, 40, 1.4]];
+const AUTOPLAY_MIN_WAIT_MS = 400;
+const AUTOPLAY_MAX_WAIT_MS = 1800;
+const REDUCED_MOTION_SETTLE_MS = 200;
+const SOFT_RESET_KEYFRAMES = [{ opacity: 0.5, filter: "blur(4px)" }, { opacity: 1, filter: "blur(0px)" }];
+const SOFT_RESET_OPTIONS = { duration: 200, easing: "cubic-bezier(0.23, 1, 0.32, 1)" };
 const KOREA_BOUNDS = { minLng: 124.5, maxLng: 130.05, minLat: 33, maxLat: 38.75 };
 const KOREA_LONGITUDE_SCALE = 0.81;
 const numberFormat = new Intl.NumberFormat("ko-KR");
@@ -31,9 +36,12 @@ function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function tileTone(index) {
-  const [from, to] = TILE_TONES[(index * 7 + Math.floor(index / 5)) % TILE_TONES.length];
-  return { background: `linear-gradient(${(index * 47) % 180}deg, ${from}, ${to})` };
+function cropStyle([x, y, zoom]) {
+  return {
+    objectPosition: `${x}% ${y}%`,
+    transformOrigin: `${x}% ${y}%`,
+    transform: zoom === 1 ? undefined : `scale(${zoom})`,
+  };
 }
 
 function ringsOf(geometry) {
@@ -53,12 +61,14 @@ function ringPath(ring, project) {
 function useMapScene(place, worldCountries) {
   return useMemo(() => {
     if (place.scope === "korea") {
+      // A place may crop the Korea view so a small province such as 제주 reads when filled.
+      const bounds = place.view ?? KOREA_BOUNDS;
       const project = (lng, lat) => [
-        (lng - KOREA_BOUNDS.minLng) * KOREA_LONGITUDE_SCALE * 100,
-        (KOREA_BOUNDS.maxLat - lat) * 100,
+        (lng - bounds.minLng) * KOREA_LONGITUDE_SCALE * 100,
+        (bounds.maxLat - lat) * 100,
       ];
-      const width = (KOREA_BOUNDS.maxLng - KOREA_BOUNDS.minLng) * KOREA_LONGITUDE_SCALE * 100;
-      const height = (KOREA_BOUNDS.maxLat - KOREA_BOUNDS.minLat) * 100;
+      const width = (bounds.maxLng - bounds.minLng) * KOREA_LONGITUDE_SCALE * 100;
+      const height = (bounds.maxLat - bounds.minLat) * 100;
       return {
         scopeLabel: "대한민국",
         viewBox: `-10 -10 ${width + 20} ${height + 20}`,
@@ -94,49 +104,70 @@ function useMapScene(place, worldCountries) {
   }, [place, worldCountries]);
 }
 
+function wait(ms, cleanups) {
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(resolve, ms);
+    cleanups.push(() => window.clearTimeout(timer));
+  });
+}
+
 function PhotoFinderHero({ storeActions, onPlaySelect }) {
   const [placeKey, setPlaceKey] = useState(PHOTO_FINDER_PLACES[0].key);
-  const [run, setRun] = useState({ id: 0, startedAt: null });
+  const [run, setRun] = useState({ id: 0, startedAt: null, timeline: PHOTO_FINDER_TIMELINE });
   const [isReducedMotion] = useState(prefersReducedMotion);
   const [demo, setDemo] = useState(() => (
     isReducedMotion
       ? getPhotoFinderState(Number.POSITIVE_INFINITY, PHOTO_FINDER_PLACES[0].query)
       : { phase: "idle", typedQuery: "", scannedCount: 0, isMapFilled: false }
   ));
+  const [resultPlaceKey, setResultPlaceKey] = useState(PHOTO_FINDER_PLACES[0].key);
   const [flights, setFlights] = useState([]);
   const [pinPosition, setPinPosition] = useState(null);
   const mapRef = useRef(null);
   const cardRef = useRef(null);
+  const gridWindowRef = useRef(null);
   const counterRef = useRef(null);
   const targetRef = useRef(null);
   const matchRefs = useRef([]);
+  const hasPlayedRef = useRef(false);
+  const flightsRunRef = useRef(-1);
+  const settleTimerRef = useRef(null);
   const place = PHOTO_FINDER_PLACES.find(({ key }) => key === placeKey);
   const needsWorld = place.scope === "world" || demo.phase !== "idle";
   const worldCountries = useWorldCountries(needsWorld);
   const scene = useMapScene(place, worldCountries);
 
   const tiles = useMemo(() => {
-    const otherPhotos = PHOTO_FINDER_PLACES
-      .filter(({ key }) => key !== place.key)
-      .flatMap(({ photos }) => photos);
+    const pool = PHOTO_FINDER_LIBRARY_PHOTOS.filter((src) => !place.photos.includes(src));
     return Array.from({ length: GRID_COLUMNS * GRID_ROWS }, (_, index) => {
-      const slot = index - FINAL_WINDOW_START;
-      const matchIndex = MATCH_SLOTS.indexOf(slot);
-      if (matchIndex >= 0) return { index, matchIndex, photo: place.photos[matchIndex] ?? null };
-      const decoyIndex = DECOY_SLOTS.indexOf(slot);
-      if (decoyIndex >= 0) return { index, matchIndex: -1, photo: otherPhotos[decoyIndex % otherPhotos.length] };
-      return { index, matchIndex: -1, photo: null };
+      const col = index % GRID_COLUMNS;
+      const row = Math.floor(index / GRID_COLUMNS);
+      const matchIndex = MATCH_SLOTS.indexOf(index - FINAL_WINDOW_START);
+      if (matchIndex >= 0) {
+        return { index, matchIndex, photo: place.photos[matchIndex % place.photos.length], crop: place.crops[matchIndex] };
+      }
+      // Steps of 1 across and 3 down keep neighbouring tiles on different photos for pools of 5 and 9.
+      return { index, matchIndex: -1, photo: pool[(col + row * 3) % pool.length], crop: FILLER_CROPS[(col * 2 + row) % FILLER_CROPS.length] };
     });
   }, [place]);
 
   const play = useCallback((nextKey, source) => {
+    const nextPlace = PHOTO_FINDER_PLACES.find(({ key }) => key === nextKey);
+    hasPlayedRef.current = true;
+    window.clearTimeout(settleTimerRef.current);
     setPlaceKey(nextKey);
     setFlights([]);
     if (isReducedMotion) {
-      const nextPlace = PHOTO_FINDER_PLACES.find(({ key }) => key === nextKey);
-      setDemo(getPhotoFinderState(Number.POSITIVE_INFINITY, nextPlace.query));
+      // No movement: hold the found photos briefly, then crossfade the fill and result in.
+      setDemo({ ...getPhotoFinderState(Number.POSITIVE_INFINITY, nextPlace.query), phase: "match", isMapFilled: false });
+      settleTimerRef.current = window.setTimeout(() => {
+        setDemo(getPhotoFinderState(Number.POSITIVE_INFINITY, nextPlace.query));
+      }, REDUCED_MOTION_SETTLE_MS);
     } else {
-      setRun((current) => ({ id: current.id + 1, startedAt: performance.now() }));
+      const timeline = source === "chip" ? PHOTO_FINDER_REPLAY_TIMELINE : PHOTO_FINDER_TIMELINE;
+      // The first frame of a new run is already its unfilled scan, never a spoiler of the next place.
+      setDemo(getPhotoFinderState(0, nextPlace.query, timeline));
+      setRun((current) => ({ id: current.id + 1, startedAt: performance.now(), timeline }));
     }
     if (source !== "autoplay") {
       trackEvent(ANALYTICS_EVENTS.HERO_DEMO_SELECT, { experience_type: "hero_demo", demo_place: nextKey });
@@ -144,19 +175,68 @@ function PhotoFinderHero({ storeActions, onPlaySelect }) {
     }
   }, [isReducedMotion, onPlaySelect]);
 
+  useEffect(() => () => window.clearTimeout(settleTimerRef.current), []);
+
+  // Autoplay once the stage is ready (map shape and thumbnails), in view, and the tab is visible.
   useEffect(() => {
     if (isReducedMotion) return undefined;
-    const timer = window.setTimeout(() => play(PHOTO_FINDER_PLACES[0].key, "autoplay"), AUTOPLAY_DELAY_MS);
-    return () => window.clearTimeout(timer);
+    let cancelled = false;
+    const cleanups = [];
+    const assetsReady = Promise.race([
+      Promise.all([
+        loadWorldCountries().catch(() => {}),
+        ...PHOTO_FINDER_LIBRARY_PHOTOS.map((src) => {
+          const image = new Image();
+          image.src = src;
+          return image.decode().catch(() => {});
+        }),
+        wait(AUTOPLAY_MIN_WAIT_MS, cleanups),
+      ]),
+      wait(AUTOPLAY_MAX_WAIT_MS, cleanups),
+    ]);
+    const inView = new Promise((resolve) => {
+      if (typeof IntersectionObserver === "undefined" || !cardRef.current) {
+        resolve();
+        return;
+      }
+      const observer = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        observer.disconnect();
+        resolve();
+      }, { threshold: 0.5 });
+      observer.observe(cardRef.current);
+      cleanups.push(() => observer.disconnect());
+    });
+    const tabVisible = () => new Promise((resolve) => {
+      if (document.visibilityState === "visible") {
+        resolve();
+        return;
+      }
+      const handleVisibility = () => {
+        if (document.visibilityState !== "visible") return;
+        document.removeEventListener("visibilitychange", handleVisibility);
+        resolve();
+      };
+      document.addEventListener("visibilitychange", handleVisibility);
+      cleanups.push(() => document.removeEventListener("visibilitychange", handleVisibility));
+    });
+    Promise.all([assetsReady, inView]).then(() => (cancelled ? undefined : tabVisible())).then(() => {
+      if (cancelled || hasPlayedRef.current) return;
+      play(PHOTO_FINDER_PLACES[0].key, "autoplay");
+    });
+    return () => {
+      cancelled = true;
+      cleanups.forEach((cleanup) => cleanup());
+    };
   }, [isReducedMotion, play]);
 
   useEffect(() => {
     if (run.startedAt === null) return undefined;
-    const duration = getPhotoFinderDuration(place.query);
+    const duration = getPhotoFinderDuration(place.query, run.timeline);
     let frame;
     let previous = null;
     const tick = (now) => {
-      const next = getPhotoFinderState(now - run.startedAt, place.query);
+      const next = getPhotoFinderState(now - run.startedAt, place.query, run.timeline);
       if (counterRef.current) counterRef.current.textContent = numberFormat.format(next.scannedCount);
       if (!previous || previous.phase !== next.phase || previous.typedQuery !== next.typedQuery || previous.isMapFilled !== next.isMapFilled) {
         previous = next;
@@ -168,18 +248,27 @@ function PhotoFinderHero({ storeActions, onPlaySelect }) {
     return () => cancelAnimationFrame(frame);
   }, [run, place.query]);
 
+  // Replays soften the grid and map back in instead of hard-cutting to the new library.
   useLayoutEffect(() => {
-    if (demo.phase !== "fly" || !cardRef.current || !targetRef.current) return;
+    if (run.id < 2 || isReducedMotion) return;
+    gridWindowRef.current?.animate?.(SOFT_RESET_KEYFRAMES, SOFT_RESET_OPTIONS);
+    mapRef.current?.querySelector("svg")?.animate?.(SOFT_RESET_KEYFRAMES, SOFT_RESET_OPTIONS);
+  }, [run.id, isReducedMotion]);
+
+  useLayoutEffect(() => {
+    if (demo.phase !== "fly" || flightsRunRef.current === run.id || !cardRef.current || !targetRef.current) return;
+    flightsRunRef.current = run.id;
     const card = cardRef.current.getBoundingClientRect();
     const target = targetRef.current.getBoundingClientRect();
     const targetX = target.left + target.width / 2 - card.left;
     const targetY = target.top + target.height / 2 - card.top;
-    setFlights(matchRefs.current.slice(0, MATCH_COUNT).map((node, index) => {
+    setFlights(matchRefs.current.slice(0, PHOTO_FINDER_MATCH_COUNT).map((node, index) => {
       if (!node) return null;
       const rect = node.getBoundingClientRect();
       return {
         index,
-        photo: place.photos[index] ?? null,
+        photo: place.photos[index % place.photos.length],
+        crop: place.crops[index],
         size: rect.width,
         fromX: rect.left - card.left,
         fromY: rect.top - card.top,
@@ -187,24 +276,32 @@ function PhotoFinderHero({ storeActions, onPlaySelect }) {
         toY: targetY - rect.width / 2,
       };
     }).filter(Boolean));
-  }, [demo.phase, place]);
+  }, [demo.phase, run.id, place]);
 
+  // The pin settles last, after every photo has landed.
   useLayoutEffect(() => {
-    if (!demo.isMapFilled || !mapRef.current || !targetRef.current) {
+    if (demo.phase !== "done" || !mapRef.current || !targetRef.current) {
       setPinPosition(null);
       return;
     }
     const map = mapRef.current.getBoundingClientRect();
     const target = targetRef.current.getBoundingClientRect();
     setPinPosition({ x: target.left + target.width / 2 - map.left, y: target.top + target.height / 2 - map.top });
-  }, [demo.isMapFilled, scene]);
+  }, [demo.phase, scene]);
+
+  // The result sentence belongs to the run that finished, so it never swaps text while fading out.
+  useLayoutEffect(() => {
+    if (demo.phase === "done") setResultPlaceKey(place.key);
+  }, [demo.phase, place.key]);
 
   const isFound = demo.phase === "match" || demo.phase === "fly" || demo.phase === "done";
+  const isTyping = demo.phase === "type" || demo.phase === "scan";
   const counterText = numberFormat.format(demo.phase === "idle" ? 0 : demo.phase === "scan" ? demo.scannedCount : PHOTO_FINDER_LIBRARY_COUNT);
   useLayoutEffect(() => {
     if (counterRef.current) counterRef.current.textContent = counterText;
   }, [counterText]);
-  const resultText = `${numberFormat.format(PHOTO_FINDER_LIBRARY_COUNT)}장 중 ${place.label} 사진 ${place.foundCount}장을 찾았어요`;
+  const resultPlace = PHOTO_FINDER_PLACES.find(({ key }) => key === resultPlaceKey);
+  const resultText = `${numberFormat.format(PHOTO_FINDER_LIBRARY_COUNT)}장 중 ${resultPlace.label} 사진 ${resultPlace.foundCount}장을 찾았어요`;
 
   return (
     <section className="finder-hero" aria-labelledby="finder-hero-title">
@@ -227,14 +324,21 @@ function PhotoFinderHero({ storeActions, onPlaySelect }) {
           <div className="finder-demo-bar" aria-hidden="true">
             <span className="finder-search">
               <MagnifyingGlass size={16} weight="bold" />
-              <span className="finder-search-text">{demo.typedQuery || <span className="finder-search-placeholder">장소 검색</span>}</span>
-              {(demo.phase === "type" || demo.phase === "scan") && <span className="finder-caret" />}
+              <span className="finder-search-text">
+                {demo.typedQuery || (
+                  <>
+                    {isTyping && <span className="finder-caret is-leading" />}
+                    <span className="finder-search-placeholder">장소 검색</span>
+                  </>
+                )}
+              </span>
+              {demo.typedQuery && isTyping && <span className="finder-caret" />}
             </span>
             <span className="finder-counter">사진 <strong ref={counterRef} />장</span>
           </div>
 
-          <div className="finder-grid-window" aria-hidden="true">
-            <div className="finder-grid-strip" key={`${run.id}-${place.key}`}>
+          <div className="finder-grid-window" ref={gridWindowRef} aria-hidden="true">
+            <div className="finder-grid-strip" key={`${run.id}-${place.key}`} style={{ "--scan-ms": `${run.timeline.scanEndMs}ms` }}>
               {tiles.map((tile) => (
                 <span
                   key={tile.index}
@@ -242,12 +346,15 @@ function PhotoFinderHero({ storeActions, onPlaySelect }) {
                   ref={tile.matchIndex >= 0 ? (node) => { matchRefs.current[tile.matchIndex] = node; } : undefined}
                   style={{ "--match-order": Math.max(tile.matchIndex, 0) }}
                 >
-                  <span style={tile.photo ? undefined : tileTone(tile.index)}>
-                    {tile.photo && <img src={tile.photo} alt="" loading="lazy" decoding="async" />}
+                  <span>
+                    <img src={tile.photo} alt="" decoding="async" style={cropStyle(tile.crop)} />
                   </span>
                 </span>
               ))}
             </div>
+            <p className={`finder-result ${demo.phase === "done" ? "is-visible" : ""}`} aria-hidden={demo.phase !== "done"}>
+              <strong><CheckCircle size={16} weight="fill" />{resultText}</strong>
+            </p>
             <span className="finder-sample-badge">예시</span>
           </div>
 
@@ -277,23 +384,23 @@ function PhotoFinderHero({ storeActions, onPlaySelect }) {
                 "--from-y": `${flight.fromY}px`,
                 "--to-x": `${flight.toX}px`,
                 "--to-y": `${flight.toY}px`,
-                "--delay": `${flight.index * 90}ms`,
+                "--flight-ms": `${run.timeline.flightMs}ms`,
+                "--delay": `${flight.index * run.timeline.flightStaggerMs}ms`,
               }}
             >
               <span>
-                {flight.photo && <img src={flight.photo} alt="" />}
+                <img src={flight.photo} alt="" style={cropStyle(flight.crop)} />
               </span>
             </span>
           ))}
-
-          <p className={`finder-result ${demo.phase === "done" ? "is-visible" : ""}`} aria-hidden={demo.phase !== "done"}>
-            <strong>{resultText}</strong>
-          </p>
         </div>
         <p className="sr-only" aria-live="polite">{demo.phase === "done" ? resultText : ""}</p>
 
         <div className="finder-chips" role="group" aria-label="다른 장소로 찾아보기">
-          <span>{isFound ? "다른 곳도 찾아보기" : "직접 해보기"}</span>
+          <span className="finder-chips-label" aria-hidden="true">
+            <span data-visible={!isFound}>직접 해보기</span>
+            <span data-visible={isFound}>다른 곳도 찾아보기</span>
+          </span>
           {PHOTO_FINDER_PLACES.map((option) => (
             <button
               key={option.key}
