@@ -31,7 +31,7 @@ internal fun TripProfileRoute(
     }
 
     LaunchedEffect(viewModel, tripRecordRevision) {
-        viewModel.refresh(dataRevision = tripRecordRevision)
+        viewModel.refreshIfNeeded(dataRevision = tripRecordRevision)
     }
 
     TripProfileScreen(

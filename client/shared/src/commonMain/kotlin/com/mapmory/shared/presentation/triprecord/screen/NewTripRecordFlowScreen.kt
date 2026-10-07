@@ -1,5 +1,8 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import com.mapmory.shared.presentation.components.MapmoryPhotoExpansion
+import com.mapmory.shared.presentation.components.MapmoryPhotoViewer
+import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,16 +46,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -62,6 +70,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -70,13 +79,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.mapmory.shared.presentation.components.LocalMapmoryImageTransitionScope
+import androidx.compose.ui.unit.sp
 import com.mapmory.shared.analytics.LocalMapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.domain.model.PlaceCandidate
+import com.mapmory.shared.domain.model.PlaceReference
 import com.mapmory.shared.domain.model.TripRecordPhotoRules
 import com.mapmory.shared.presentation.photo.PhotoLibraryActionsFactory
 import com.mapmory.shared.presentation.photo.PhotoLibraryPermissionIssue
@@ -96,6 +107,7 @@ import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 internal enum class NewRecordFlowStep {
@@ -128,6 +140,9 @@ internal fun newRecordBackAction(
 }
 
 private const val KoreaCountryId = 1L
+private const val MinPlaceQueryLength = 2
+private const val MaxPlaceQueryLength = 100
+private const val PlaceSearchDebounceMillis = 350L
 private const val PhotoListPrefetchItems = 4
 private const val PhotoLimitMessageDurationMillis = 3_000L
 private const val DragAutoScrollFrameMillis = 16L
@@ -276,6 +291,10 @@ internal fun NewTripRecordFlowScreen(
     onLocationSelected: (Location) -> Unit,
     onLocationCleared: () -> Unit,
     onLocationTouched: () -> Unit,
+    onPlaceSearchQueryChanged: () -> Unit,
+    onSearchPlaces: suspend (String) -> Unit,
+    onPlaceCandidateSelected: suspend (PlaceCandidate) -> Location?,
+    onSelectedPlaceCleared: () -> Unit,
     onPhotosAdded: (List<SelectedPhoto>) -> Unit,
     onPhotoRemoved: (String) -> Unit,
     onPhotoLoadingChanged: (Boolean) -> Unit,
@@ -311,6 +330,7 @@ internal fun NewTripRecordFlowScreen(
 ) {
     val analytics = LocalMapmoryAnalytics.current
     val keyboard = LocalSoftwareKeyboardController.current
+    val placeSelectionScope = rememberCoroutineScope()
     val selectableLocations = remember(locations) {
         locations.selectableTripRecordDestinations()
     }
@@ -550,10 +570,35 @@ internal fun NewTripRecordFlowScreen(
         }
     }
 
-    LaunchedEffect(uiState.selectedLocation?.id) {
-        uiState.selectedLocation?.let { selected ->
-            locationSearchQuery = selected.flowDisplayName(locations)
+    LaunchedEffect(uiState.selectedLocation?.id, uiState.selectedPlace?.placeId) {
+        val selectedValue = uiState.selectedPlace?.name
+            ?: uiState.selectedLocation?.flowDisplayName(locations)
+        if (locationSearchQuery.isBlank() && selectedValue != null) {
+            locationSearchQuery = selectedValue
         }
+    }
+
+    LaunchedEffect(
+        locationSearchQuery,
+        uiState.selectedLocation?.id,
+        uiState.selectedPlace?.placeId,
+        uiState.isSelectingPlace,
+        uiState.manualRegionRequired,
+    ) {
+        val query = locationSearchQuery.trim()
+        val selectedRegionName = uiState.selectedLocation?.flowDisplayName(locations)
+        if (
+            !uiState.isPlaceSearchAvailable ||
+            query.length < MinPlaceQueryLength ||
+            query.equals(uiState.selectedPlace?.name, ignoreCase = true) ||
+            query.equals(selectedRegionName, ignoreCase = true) ||
+            uiState.isSelectingPlace ||
+            uiState.manualRegionRequired
+        ) {
+            return@LaunchedEffect
+        }
+        delay(PlaceSearchDebounceMillis)
+        onSearchPlaces(query.take(MaxPlaceQueryLength))
     }
 
     LaunchedEffect(
@@ -780,145 +825,194 @@ internal fun NewTripRecordFlowScreen(
         modifier = modifier,
         backgroundColor = TripRecordPalette.current.pageBackground,
     ) {
-        Box(Modifier.fillMaxSize()) {
-            when (step) {
-            NewRecordFlowStep.LOCATION -> LocationStep(
-                uiState = uiState,
-                locations = locations,
-                searchQuery = locationSearchQuery,
-                searchResults = filteredLocations,
-                errorMessage = detailsErrorMessage,
-                onSearchQueryChanged = {
-                    onLocationTouched()
-                    if (it.isNotBlank()) logFieldInteraction("location")
-                    locationSearchQuery = it
-                    val selectedName = uiState.selectedLocation?.flowDisplayName(locations)
-                    if (selectedName != null && it != selectedName) onLocationCleared()
-                    detailsErrorMessage = null
-                },
-                onLocationSelected = { location ->
-                    logFieldInteraction("location")
-                    analytics.logEvent(
-                        MapmoryAnalyticsEvent.RECORD_LOCATION_SELECTED,
-                        mapOf(
-                            "source" to "location_search",
-                            "location_type" to location.type.name.lowercase(),
-                        ),
-                    )
-                    keyboard?.hide()
-                    onLocationSelected(location)
-                    pendingLocation = location
-                    locationSearchQuery = location.flowDisplayName(locations)
-                    detailsErrorMessage = null
-                },
-                onBackClick = ::returnToPreviousStep,
-                onCompleteClick = ::beginPhotoSearch,
-            )
+        MapmoryPhotoExpansion(
+            previewPhotoId?.let { id -> recommendationPagingState.photos.firstOrNull { it.id == id } },
+        ) { previewPhoto ->
+            if (previewPhoto != null) {
+                PhotoPreviewViewer(
+                    photo = previewPhoto,
+                    fullResolutionBytes = fullResolutionPreviewBytes,
+                    selected = previewPhoto.id in recommendationPagingState.selectedIds,
+                    onToggle = {
+                        val next = recommendationPagingState.toggleSelection(previewPhoto.id)
+                        if (next == recommendationPagingState && previewPhoto.id !in next.selectedIds) {
+                            previewPhotoId = null
+                            showPhotoLimitMessage()
+                        }
+                        recommendationPagingState = next
+                    },
+                    onDismiss = { previewPhotoId = null },
+                )
+            } else {
+                Box(Modifier.fillMaxSize()) {
+                    when (step) {
+                        NewRecordFlowStep.LOCATION -> LocationStep(
+                            uiState = uiState,
+                            locations = locations,
+                            searchQuery = locationSearchQuery,
+                            searchResults = filteredLocations,
+                            errorMessage = detailsErrorMessage,
+                            onSearchQueryChanged = {
+                                onLocationTouched()
+                                if (it.isNotBlank()) logFieldInteraction("location")
+                                locationSearchQuery = it.take(MaxPlaceQueryLength)
+                                onPlaceSearchQueryChanged()
+                                val selectedName = uiState.selectedLocation?.flowDisplayName(locations)
+                                if (selectedName != null && it != selectedName) onLocationCleared()
+                                detailsErrorMessage = null
+                            },
+                            onLocationSelected = { location ->
+                                logFieldInteraction("location")
+                                analytics.logEvent(
+                                    MapmoryAnalyticsEvent.RECORD_LOCATION_SELECTED,
+                                    mapOf(
+                                        "source" to "location_search",
+                                        "location_type" to location.type.name.lowercase(),
+                                    ),
+                                )
+                                keyboard?.hide()
+                                onLocationSelected(location)
+                                onPlaceSearchQueryChanged()
+                                pendingLocation = location
+                                locationSearchQuery = location.flowDisplayName(locations)
+                                detailsErrorMessage = null
+                            },
+                            onPlaceCandidateSelected = { candidate ->
+                                if (!uiState.isSelectingPlace) {
+                                    logFieldInteraction("location")
+                                    keyboard?.hide()
+                                    onPlaceSearchQueryChanged()
+                                    locationSearchQuery = candidate.name
+                                    placeSelectionScope.launch {
+                                        onPlaceCandidateSelected(candidate)?.let { location ->
+                                            analytics.logEvent(
+                                                MapmoryAnalyticsEvent.RECORD_LOCATION_SELECTED,
+                                                mapOf(
+                                                    "source" to "place_search",
+                                                    "location_type" to location.type.name.lowercase(),
+                                                ),
+                                            )
+                                            pendingLocation = location
+                                        }
+                                    }
+                                }
+                            },
+                            onSelectedPlaceCleared = {
+                                onSelectedPlaceCleared()
+                                locationSearchQuery = uiState.selectedLocation
+                                    ?.flowDisplayName(locations)
+                                    .orEmpty()
+                            },
+                            onBackClick = ::returnToPreviousStep,
+                            onCompleteClick = ::beginPhotoSearch,
+                        )
 
-            NewRecordFlowStep.PHOTO_LOADING -> PhotoLoadingStep(
-                locationName = uiState.selectedLocation?.name.orEmpty(),
-                progress = photoLoadingProgress,
-                isPreparingPreviews = isPreparingPhotoPreviews,
-                message = photoMessage,
-                onBackClick = ::returnToPreviousStep,
-                onPickFromGallery = {
-                    logFieldInteraction("photos")
-                    analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_PICKER_OPENED)
-                    photoLibrary.pickFromGallery()
-                },
-                onRetry = ::beginPhotoSearch,
-            )
+                        NewRecordFlowStep.PHOTO_LOADING -> PhotoLoadingStep(
+                            locationName = uiState.selectedLocation?.name.orEmpty(),
+                            progress = photoLoadingProgress,
+                            isPreparingPreviews = isPreparingPhotoPreviews,
+                            message = photoMessage,
+                            onBackClick = ::returnToPreviousStep,
+                            onPickFromGallery = {
+                                logFieldInteraction("photos")
+                                analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_PICKER_OPENED)
+                                photoLibrary.pickFromGallery()
+                            },
+                            onRetry = ::beginPhotoSearch,
+                        )
 
-            NewRecordFlowStep.PHOTO_PICKER -> PhotoPickerStep(
-                locationName = uiState.selectedLocation?.name ?: "여행지",
-                pagingState = recommendationPagingState,
-                listState = photoListState,
-                message = uiState.errorMessage ?: photoMessage,
-                isLoadingMore = isRecommendationLoading,
-                isPreparing = uiState.isSaving || pendingSave,
-                isSelectingAll = isSelectingAllPhotos,
-                isRefreshingFilter = isRefreshingRecordedPhotoFilter,
-                actionLabel = saveActionLabel,
-                recordedPhotoIds = recordedPhotoIds,
-                excludeRecordedPhotos = excludeRecordedPhotos,
-                showRecordedFilter = !startWithPhotoSearch,
-                onRecordedFilterChanged = {
-                    excludeRecordedPhotos = it
-                    beginPhotoSearch(
-                        keepPhotoPickerVisible = true,
-                        shouldExcludeRecordedPhotos = it,
-                    )
-                },
-                onBackClick = ::returnToPreviousStep,
-                onCompleteClick = ::completePhotoSelection,
-                onPickFromGallery = {
-                    logFieldInteraction("photos")
-                    analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_PICKER_OPENED)
-                    photoLibrary.pickFromGallery()
-                },
-                onPhotoPreview = { previewPhotoId = it.id },
-                onPhotoToggle = { photo ->
-                    if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
-                    cancelSelectAllContinuation()
-                    val next = recommendationPagingState.toggleSelection(photo.id)
-                    if (next == recommendationPagingState && photo.id !in next.selectedIds) {
-                        previewPhotoId = null
-                        showPhotoLimitMessage()
+                        NewRecordFlowStep.PHOTO_PICKER -> PhotoPickerStep(
+                            locationName = uiState.selectedLocation?.name ?: "여행지",
+                            pagingState = recommendationPagingState,
+                            listState = photoListState,
+                            message = uiState.errorMessage ?: photoMessage,
+                            isLoadingMore = isRecommendationLoading,
+                            isPreparing = uiState.isSaving || pendingSave,
+                            isSelectingAll = isSelectingAllPhotos,
+                            isRefreshingFilter = isRefreshingRecordedPhotoFilter,
+                            actionLabel = saveActionLabel,
+                            recordedPhotoIds = recordedPhotoIds,
+                            excludeRecordedPhotos = excludeRecordedPhotos,
+                            showRecordedFilter = !startWithPhotoSearch,
+                            onRecordedFilterChanged = {
+                                excludeRecordedPhotos = it
+                                beginPhotoSearch(
+                                    keepPhotoPickerVisible = true,
+                                    shouldExcludeRecordedPhotos = it,
+                                )
+                            },
+                            onBackClick = ::returnToPreviousStep,
+                            onCompleteClick = ::completePhotoSelection,
+                            onPickFromGallery = {
+                                logFieldInteraction("photos")
+                                analytics.logEvent(MapmoryAnalyticsEvent.PHOTO_PICKER_OPENED)
+                                photoLibrary.pickFromGallery()
+                            },
+                            onPhotoPreview = { previewPhotoId = it.id },
+                            onPhotoToggle = { photo ->
+                                if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
+                                cancelSelectAllContinuation()
+                                val next = recommendationPagingState.toggleSelection(photo.id)
+                                if (next == recommendationPagingState && photo.id !in next.selectedIds) {
+                                    previewPhotoId = null
+                                    showPhotoLimitMessage()
+                                }
+                                recommendationPagingState = next
+                            },
+                            onPhotoSelectionChange = { photoId, selected ->
+                                if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
+                                cancelSelectAllContinuation()
+                                val next = recommendationPagingState.setSelection(photoId, selected)
+                                if (
+                                    selected &&
+                                    next == recommendationPagingState &&
+                                    photoId !in recommendationPagingState.selectedIds
+                                ) {
+                                    showPhotoLimitMessage()
+                                }
+                                recommendationPagingState = next
+                            },
+                            onGroupToggle = { ids ->
+                                if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
+                                cancelSelectAllContinuation()
+                                val nextState = recommendationPagingState.toggleGroup(ids)
+                                recommendationPagingState = nextState
+                                if (
+                                    ids.any { it !in nextState.selectedIds } &&
+                                    nextState.selectedIds.size == nextState.maxSelectionCount
+                                ) {
+                                    showPhotoLimitMessage()
+                                }
+                            },
+                            onAllToggle = {
+                                if (isRefreshingRecordedPhotoFilter || isSelectingAllPhotos) {
+                                    return@PhotoPickerStep
+                                }
+                                if (recommendationPagingState.isAllSelectionActive()) {
+                                    cancelSelectAllContinuation()
+                                    recommendationPagingState = recommendationPagingState.copy(selectedIds = emptySet())
+                                } else {
+                                    isSelectingAllPhotos = true
+                                    recommendationPagingState = recommendationPagingState.selectAllLoadedPhotos()
+                                    photoLibrary.loadRecommendationPagesForSelection(
+                                        recommendationPagingState.maxSelectionCount,
+                                    )
+                                }
+                            },
+                        )
+
                     }
-                    recommendationPagingState = next
-                },
-                onPhotoSelectionChange = { photoId, selected ->
-                    if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
-                    cancelSelectAllContinuation()
-                    val next = recommendationPagingState.setSelection(photoId, selected)
-                    if (
-                        selected &&
-                        next == recommendationPagingState &&
-                        photoId !in recommendationPagingState.selectedIds
-                    ) {
-                        showPhotoLimitMessage()
-                    }
-                    recommendationPagingState = next
-                },
-                onGroupToggle = { ids ->
-                    if (isRefreshingRecordedPhotoFilter) return@PhotoPickerStep
-                    cancelSelectAllContinuation()
-                    val nextState = recommendationPagingState.toggleGroup(ids)
-                    recommendationPagingState = nextState
-                    if (
-                        ids.any { it !in nextState.selectedIds } &&
-                        nextState.selectedIds.size == nextState.maxSelectionCount
-                    ) {
-                        showPhotoLimitMessage()
-                    }
-                },
-                onAllToggle = {
-                    if (isRefreshingRecordedPhotoFilter || isSelectingAllPhotos) {
-                        return@PhotoPickerStep
-                    }
-                    if (recommendationPagingState.isAllSelectionActive()) {
-                        cancelSelectAllContinuation()
-                        recommendationPagingState = recommendationPagingState.copy(selectedIds = emptySet())
-                    } else {
-                        isSelectingAllPhotos = true
-                        recommendationPagingState = recommendationPagingState.selectAllLoadedPhotos()
-                        photoLibrary.loadRecommendationPagesForSelection(
-                            recommendationPagingState.maxSelectionCount,
+
+                    transientPhotoMessage?.let { message ->
+                        FlowToast(
+                            message = message,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(horizontal = 24.dp, vertical = 24.dp),
                         )
                     }
-                },
-            )
-
-            }
-
-            transientPhotoMessage?.let { message ->
-                FlowToast(
-                    message = message,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .padding(horizontal = 24.dp, vertical = 24.dp),
-                )
+                }
             }
         }
     }
@@ -937,24 +1031,6 @@ internal fun NewTripRecordFlowScreen(
         )
     }
 
-    previewPhotoId
-        ?.let { id -> recommendationPagingState.photos.firstOrNull { it.id == id } }
-        ?.let { photo ->
-            PhotoPreviewDialog(
-                photo = photo,
-                fullResolutionBytes = fullResolutionPreviewBytes,
-                selected = photo.id in recommendationPagingState.selectedIds,
-                onToggle = {
-                    val next = recommendationPagingState.toggleSelection(photo.id)
-                    if (next == recommendationPagingState && photo.id !in next.selectedIds) {
-                        previewPhotoId = null
-                        showPhotoLimitMessage()
-                    }
-                    recommendationPagingState = next
-                },
-                onDismiss = { previewPhotoId = null },
-            )
-        }
 
     if (showPhotoLoadingBackConfirmation) {
         AlertDialog(
@@ -1050,9 +1126,36 @@ private fun LocationStep(
     errorMessage: String?,
     onSearchQueryChanged: (String) -> Unit,
     onLocationSelected: (Location) -> Unit,
+    onPlaceCandidateSelected: (PlaceCandidate) -> Unit,
+    onSelectedPlaceCleared: () -> Unit,
     onBackClick: () -> Unit,
     onCompleteClick: () -> Unit,
 ) {
+    val locationScrollState = rememberScrollState()
+    val queryMatchesSelectedRegion = searchQuery.trim().equals(
+        uiState.selectedLocation?.flowDisplayName(locations),
+        ignoreCase = true,
+    )
+    LaunchedEffect(
+        searchQuery,
+        uiState.isSearchingPlaces,
+        uiState.hasSearchedPlaces,
+        uiState.placeSearchErrorMessage,
+        uiState.placeSearchResults.size,
+    ) {
+        if (
+            uiState.isPlaceSearchAvailable &&
+            uiState.hasSearchedPlaces &&
+            !uiState.isSearchingPlaces &&
+            searchQuery.trim().length >= MinPlaceQueryLength &&
+            !uiState.manualRegionRequired &&
+            !queryMatchesSelectedRegion &&
+            !searchQuery.trim().equals(uiState.selectedPlace?.name, ignoreCase = true)
+        ) {
+            withFrameNanos { }
+            locationScrollState.animateScrollTo(locationScrollState.maxValue)
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         FlowTopBar(
             title = "사진 불러오기",
@@ -1064,7 +1167,7 @@ private fun LocationStep(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(locationScrollState)
                 .imePadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp, vertical = 28.dp),
@@ -1094,7 +1197,7 @@ private fun LocationStep(
             FlowSectionTitle(
                 title = "장소",
                 badge = "필수",
-                helper = "한 글자부터 검색할 수 있어요.",
+                helper = "지역은 한 글자부터, 장소는 두 글자부터 검색해요.",
                 modifier = Modifier.padding(top = 30.dp),
             )
             LocationSearchField(
@@ -1102,12 +1205,82 @@ private fun LocationStep(
                 onValueChange = onSearchQueryChanged,
                 modifier = Modifier.padding(top = 12.dp),
             )
+            uiState.selectedPlace?.let { place ->
+                SelectedPlaceCard(
+                    place = place,
+                    regionName = uiState.selectedLocation?.flowDisplayName(locations),
+                    manualRegionRequired = uiState.manualRegionRequired,
+                    onClear = onSelectedPlaceCleared,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
             if (searchQuery.isNotBlank()) {
-                LocationSearchResults(
-                    results = searchResults,
-                    locations = locations,
-                    selectedLocationId = uiState.selectedLocation?.id,
-                    onLocationSelected = onLocationSelected,
+                if (
+                    uiState.isPlaceSearchAvailable &&
+                    searchQuery.trim().length >= MinPlaceQueryLength &&
+                    !uiState.manualRegionRequired &&
+                    !queryMatchesSelectedRegion &&
+                    !searchQuery.trim().equals(uiState.selectedPlace?.name, ignoreCase = true)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = "장소 검색 결과",
+                            color = TripRecordPalette.current.headingText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 18.dp),
+                        )
+                        PlaceSearchResults(
+                            results = uiState.placeSearchResults,
+                            isLoading = uiState.isSearchingPlaces,
+                            isSelecting = uiState.isSelectingPlace,
+                            hasSearched = uiState.hasSearchedPlaces,
+                            errorMessage = uiState.placeSearchErrorMessage,
+                            onPlaceSelected = onPlaceCandidateSelected,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                        uiState.placeSearchResults.firstOrNull()?.let { candidate ->
+                            PlaceAttributionLinks(
+                                attribution = candidate.attribution,
+                                attributionUrl = candidate.attributionUrl,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
+                        }
+                    }
+                }
+                if (uiState.manualRegionRequired) {
+                    Text(
+                        text = "장소의 행정구역을 찾지 못했어요. 사진을 찾을 지역을 직접 선택해 주세요.",
+                        color = TripRecordPalette.current.secondaryText,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+                if (searchResults.isNotEmpty()) {
+                    Text(
+                        text = "행정구역 검색 결과",
+                        color = TripRecordPalette.current.headingText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 18.dp),
+                    )
+                    LocationSearchResults(
+                        results = searchResults,
+                        locations = locations,
+                        selectedLocationId = uiState.selectedLocation?.id,
+                        onLocationSelected = onLocationSelected,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+            }
+            uiState.placeSelectionErrorMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = TripRecordPalette.current.danger,
+                    fontSize = 12.sp,
                     modifier = Modifier.padding(top = 10.dp),
                 )
             }
@@ -1134,6 +1307,191 @@ private fun LocationStep(
         }
     }
 }
+
+@Composable
+private fun SelectedPlaceCard(
+    place: PlaceReference,
+    regionName: String?,
+    manualRegionRequired: Boolean,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(TripRecordPalette.current.surfaceElevated)
+            .border(1.dp, TripRecordPalette.current.border, RoundedCornerShape(18.dp))
+            .padding(16.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "선택한 장소",
+                    color = TripRecordPalette.current.accent,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    text = place.name,
+                    color = TripRecordPalette.current.headingText,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            TextButton(onClick = onClear) {
+                Text("해제", color = TripRecordPalette.current.accent)
+            }
+        }
+        place.address?.let { address ->
+            Text(
+                text = address,
+                color = TripRecordPalette.current.secondaryText,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        Text(
+            text = when {
+                manualRegionRequired -> "사진을 찾을 행정구역을 아래에서 직접 선택해 주세요."
+                regionName != null -> "사진 검색 지역: $regionName"
+                else -> "장소의 행정구역을 확인하고 있어요."
+            },
+            color = TripRecordPalette.current.bodyText,
+            fontSize = 12.sp,
+            lineHeight = 18.sp,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        PlaceAttributionLinks(
+            attribution = place.attribution,
+            attributionUrl = place.attributionUrl,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun PlaceSearchResults(
+    results: List<PlaceCandidate>,
+    isLoading: Boolean,
+    isSelecting: Boolean,
+    hasSearched: Boolean,
+    errorMessage: String?,
+    onPlaceSelected: (PlaceCandidate) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when {
+        isLoading || isSelecting -> Row(
+            modifier = modifier.padding(horizontal = 4.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = TripRecordPalette.current.accent,
+                strokeWidth = 2.dp,
+            )
+            Text(
+                text = if (isSelecting) "장소 정보를 확인하고 있어요." else "장소를 찾고 있어요.",
+                color = TripRecordPalette.current.secondaryText,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(start = 10.dp),
+            )
+        }
+        errorMessage != null -> Text(
+            text = errorMessage,
+            color = TripRecordPalette.current.danger,
+            fontSize = 13.sp,
+            modifier = modifier.padding(horizontal = 4.dp, vertical = 14.dp),
+        )
+        results.isEmpty() && hasSearched -> Text(
+            text = "장소 검색 결과가 없습니다.",
+            color = TripRecordPalette.current.secondaryText,
+            fontSize = 13.sp,
+            modifier = modifier.padding(horizontal = 4.dp, vertical = 14.dp),
+        )
+        results.isNotEmpty() -> LazyColumn(
+            modifier = modifier
+                .fillMaxWidth()
+                .heightIn(max = 64.dp * 3)
+                .clip(RoundedCornerShape(18.dp))
+                .border(1.dp, TripRecordPalette.current.border, RoundedCornerShape(18.dp)),
+        ) {
+            items(results, key = PlaceCandidate::placeId) { candidate ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(
+                            enabled = !isSelecting,
+                            role = Role.Button,
+                            onClick = { onPlaceSelected(candidate) },
+                        )
+                        .background(TripRecordPalette.current.surface)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    Text(
+                        text = candidate.name,
+                        color = TripRecordPalette.current.text,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    candidate.address?.let { address ->
+                        Text(
+                            text = address,
+                            color = TripRecordPalette.current.secondaryText,
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 3.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlaceAttributionLinks(
+    attribution: String?,
+    attributionUrl: String?,
+    modifier: Modifier = Modifier,
+) {
+    val uriHandler = LocalUriHandler.current
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = attribution ?: "© OpenStreetMap contributors",
+            color = TripRecordPalette.current.secondaryText,
+            fontSize = 10.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f)
+                .then(
+                    if (attributionUrl.isNullOrBlank()) Modifier else Modifier.clickable(
+                        onClick = { runCatching { uriHandler.openUri(attributionUrl) } },
+                    ),
+                ),
+        )
+        Text(
+            text = "Powered by Geoapify",
+            color = TripRecordPalette.current.accent,
+            fontSize = 10.sp,
+            maxLines = 1,
+            modifier = Modifier.clickable(
+                onClick = { runCatching { uriHandler.openUri(GeoapifyUrl) } },
+            ),
+        )
+    }
+}
+
+private const val GeoapifyUrl = "https://www.geoapify.com/"
 
 @Composable
 private fun FlowTopBar(
@@ -1245,7 +1603,7 @@ private fun LocationSearchField(
                 Box(contentAlignment = Alignment.CenterStart) {
                     if (value.isBlank()) {
                         Text(
-                            text = "도시 또는 국가 검색",
+                            text = "장소 또는 행정구역 검색",
                             color = TripRecordPalette.current.muted,
                             fontSize = 15.sp,
                         )
@@ -2061,9 +2419,11 @@ private fun PhotoSelectionCard(
             }
             .testTag("new-record-photo-${photo.id}"),
     ) {
-        TripPhotoImage(
+        MapmoryAsyncImage(
             imageBytes = photo.previewBytes,
             imageUri = photo.previewUri ?: photo.fullResolutionUri.takeIf { photo.previewBytes == null },
+            sharedImageKey = "picker:${photo.id}",
+            cacheKey = "picker-preview:${photo.id}",
             contentDescription = photo.displayName,
             modifier = Modifier.fillMaxSize(),
             placeholderVariant = photo.id.hashCode(),
@@ -2104,97 +2464,48 @@ private fun PhotoSelectionCard(
 }
 
 @Composable
-private fun PhotoPreviewDialog(
+private fun PhotoPreviewViewer(
     photo: SelectedPhoto,
     fullResolutionBytes: ByteArray?,
     selected: Boolean,
     onToggle: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(TripRecordPalette.current.mediaScrim)
-                .clickable(onClick = onDismiss),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(TripRecordPalette.current.surface.copy(alpha = 0.8f))
-                    .clickable(onClick = {}),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
-                ) {
-                    TripPhotoImage(
-                        imageBytes = fullResolutionBytes ?: photo.previewBytes,
-                        imageUri = photo.fullResolutionUri,
-                        fallbackUri = photo.previewUri,
-                        contentDescription = "${photo.displayName} 확대 사진",
-                        blackLoadingBackground = true,
-                        modifier = Modifier.fillMaxSize(),
-                        placeholderVariant = photo.id.hashCode(),
-                    )
-                    Text(
-                        text = "×",
-                        color = TripRecordPalette.current.contentOnMedia,
-                        fontSize = 26.sp,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(12.dp)
-                            .size(42.dp)
-                            .background(TripRecordPalette.current.mediaScrim, CircleShape)
-                            .clickable(onClick = onDismiss)
-                            .padding(top = 2.dp),
-                    )
-                }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = photo.capturedAt?.toFlowDateDisplay() ?: "촬영일 미상",
-                        color = TripRecordPalette.current.text,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(
-                        text = if (selected) "선택 해제" else "앨범에 추가",
-                        color = if (selected) {
-                            TripRecordPalette.current.accent
-                        } else {
-                            TripRecordPalette.current.onPrimary
-                        },
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .background(
-                                if (selected) {
-                                    TripRecordPalette.current.primarySoft
-                                } else {
-                                    TripRecordPalette.current.primary
-                                },
-                                RoundedCornerShape(12.dp),
-                            )
-                            .clickable(onClick = onToggle)
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                    )
-                }
+    val usePreview = LocalMapmoryImageTransitionScope.current?.isTransitionActive == true
+    MapmoryPhotoViewer(
+        title = photo.displayName,
+        onClose = onDismiss,
+        closeContentDescription = "사진 고르기로 돌아가기",
+        bottomContent = {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    photo.capturedAt?.toFlowDateDisplay() ?: "촬영일 미상",
+                    color = Color.White, modifier = Modifier.weight(1f),
+                )
+                Text(
+                    if (selected) "선택 해제" else "앨범에 추가",
+                    color = Color.White, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(12.dp))
+                        .clickable(onClick = onToggle).padding(horizontal = 16.dp, vertical = 12.dp),
+                )
             }
-        }
+        },
+    ) {
+        MapmoryAsyncImage(
+            imageBytes = if (usePreview) photo.previewBytes else fullResolutionBytes ?: photo.previewBytes,
+            imageUri = if (usePreview) {
+                photo.previewUri ?: photo.fullResolutionUri.takeIf { photo.previewBytes == null }
+            } else photo.fullResolutionUri.takeIf { fullResolutionBytes == null },
+            fallbackUri = photo.previewUri,
+            fallbackBytes = photo.previewBytes,
+            cacheKey = if (usePreview) "picker-preview:${photo.id}" else "picker-full:${photo.id}",
+            sharedImageKey = "picker:${photo.id}",
+            contentDescription = "${photo.displayName} 확대 사진",
+            blackLoadingBackground = true,
+            modifier = Modifier.fillMaxSize().padding(vertical = 104.dp),
+            shape = RectangleShape,
+            contentScale = ContentScale.Fit,
+        )
     }
 }
 
