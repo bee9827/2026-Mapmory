@@ -2029,16 +2029,15 @@ private fun PhotoSelectionCard(
     DisposableEffect(photo.id, dragSelectionController) {
         onDispose { dragSelectionController.remove(photo.id) }
     }
+    val cardShape = RoundedCornerShape(16.dp)
     Box(
         modifier = modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
-            .then(
-                if (selected) {
-                    Modifier.border(3.dp, TripRecordPalette.current.accent, RoundedCornerShape(16.dp))
-                } else {
-                    Modifier
-                },
+            .clip(cardShape)
+            .border(
+                width = if (selected) 3.dp else 1.dp,
+                color = if (selected) TripRecordPalette.current.accent else TripRecordPalette.current.photoGalleryBorder,
+                shape = cardShape,
             )
             .onGloballyPositioned { layoutCoordinates ->
                 dragSelectionController.updateBounds(
