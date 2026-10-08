@@ -8,11 +8,13 @@ npm install
 npm run dev
 ```
 
-The current screens use local demo data. Dashboard metrics, member data, feedback storage, and status updates are not connected to the Java backend yet. The admin UI and `/api/v1/admin/**` endpoints currently have no login or access control.
+The dashboard summary is connected to the Java backend. Member management and service feedback still use local demo data. The admin UI and `/api/v1/admin/**` endpoints currently have no login or access control.
+
+Set `VITE_API_BASE_URL` to the backend API base URL if it differs from `http://localhost:8080/api/v1`. The dashboard requests `GET /admin/dashboard` with `from` and `to` date parameters.
 
 ## Screens
 
-- Dashboard: member, travel-record, and feedback overview
+- Dashboard: member and travel-record totals and selected-period counts (Java API)
 - Members: search, provider filter, and member detail drawer
 - Service feedback: status filter and internal status updates
 

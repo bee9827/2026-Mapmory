@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Page = "dashboard" | "members" | "feedback";
 type FeedbackStatus = "미확인" | "반영 중" | "반영 완료" | "보류" | "미반영";
@@ -18,6 +18,11 @@ type Member = {
   records: number;
   refresh: "정상" | "갱신 실패";
   lastActive: string;
+};
+type DashboardSummary = {
+  period: { from: string; to: string };
+  members: { total: number; guest: number; kakao: number; newInPeriod: number };
+  travelRecords: { total: number; createdInPeriod: number };
 };
 
 const feedbackStatuses: FeedbackStatus[] = ["미확인", "반영 중", "반영 완료", "보류", "미반영"];
@@ -40,6 +45,30 @@ const members: Member[] = [
   { id: "M-10837", name: "최유진", provider: "KAKAO", joinedAt: "2026.10.06", records: 7, refresh: "정상", lastActive: "10.06" },
   { id: "M-10836", name: "정민준", provider: "KAKAO", joinedAt: "2026.10.05", records: 19, refresh: "정상", lastActive: "10.05" },
 ];
+
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1").replace(/\/+$/, "");
+
+function getDashboardRange(period: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "0";
+  const year = Number(value("year"));
+  const month = Number(value("month"));
+  const day = Number(value("day"));
+  const to = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const fromDate = new Date(Date.UTC(year, month - 1, day));
+  fromDate.setUTCDate(fromDate.getUTCDate() - (period === "최근 30일" ? 29 : 6));
+  return { from: fromDate.toISOString().slice(0, 10), to };
+}
+
+function formatPeriodDate(date: string) {
+  const [, month, day] = date.split("-");
+  return `${month}.${day}`;
+}
 
 function Icon({ name, size = 18 }: { name: string; size?: number }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true as const };
@@ -118,47 +147,139 @@ function App() {
           </div>
         </header>
         <div className="content-area">
-          {page === "dashboard" && <Dashboard period={period} setPeriod={setPeriod} feedback={feedback} onNavigate={setPage} onNotice={showNotice} />}
+          {page === "dashboard" && <Dashboard period={period} setPeriod={setPeriod} onNavigate={setPage} onNotice={showNotice} />}
           {page === "members" && <MembersPage query={memberQuery} setQuery={setMemberQuery} list={filteredMembers} onSelect={setSelectedMember} onNotice={showNotice} />}
           {page === "feedback" && <FeedbackPage feedback={filteredFeedback} allFeedback={feedback} filter={feedbackFilter} setFilter={setFeedbackFilter} query={feedbackQuery} setQuery={setFeedbackQuery} onStatusChange={(id, status) => setFeedback((current) => current.map((item) => item.id === id ? { ...item, status } : item))} />}
         </div>
       </main>
       {selectedMember && <MemberDrawer member={selectedMember} onClose={() => setSelectedMember(null)} />}
       {notice && <div className="toast"><span className="toast-check">✓</span>{notice}</div>}
-      <div className="demo-ribbon">시연용 데이터</div>
+      <div className="demo-ribbon">회원·의견은 시연 데이터</div>
     </div>
   );
 }
 
-function Dashboard({ period, setPeriod, feedback, onNavigate, onNotice }: { period: string; setPeriod: (period: string) => void; feedback: Feedback[]; onNavigate: (page: Page) => void; onNotice: (message: string) => void }) {
-  const newFeedback = feedback.filter((item) => item.status === "미확인").length;
-  const periods = ["최근 7일", "최근 30일", "전체"];
+function Dashboard({ period, setPeriod, onNavigate, onNotice }: { period: string; setPeriod: (period: string) => void; onNavigate: (page: Page) => void; onNotice: (message: string) => void }) {
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
+  const range = getDashboardRange(period);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    setSummary(null);
+    const query = new URLSearchParams(range);
+
+    fetch(`${apiBaseUrl}/admin/dashboard?${query.toString()}`, { signal: controller.signal })
+      .then(async (response) => {
+        const body = await response.json() as {
+          data?: DashboardSummary;
+          detail?: string;
+          title?: string;
+        };
+        if (!response.ok) {
+          throw new Error(body.detail || body.title || "대시보드 데이터를 불러오지 못했습니다.");
+        }
+        if (!body.data) {
+          throw new Error("서버 응답 형식이 올바르지 않습니다.");
+        }
+        setSummary(body.data);
+        setLastUpdated(new Date());
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return;
+        setError(cause instanceof Error ? cause.message : "대시보드 데이터를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [range.from, range.to, retryKey]);
+
+  const number = (value: number | undefined) => value === undefined ? "—" : new Intl.NumberFormat("ko-KR").format(value);
+  const total = summary?.members.total ?? 0;
+  const guest = summary?.members.guest ?? 0;
+  const kakao = summary?.members.kakao ?? 0;
+  const classifiedMembers = guest + kakao;
+  const guestPercent = classifiedMembers === 0 ? 0 : (guest / classifiedMembers) * 100;
+  const kakaoPercent = classifiedMembers === 0 ? 0 : (kakao / classifiedMembers) * 100;
+  const unknown = Math.max(0, total - classifiedMembers);
+  const donutBackground = total === 0
+    ? "#e7ece8"
+    : `conic-gradient(#64c1a0 0% ${guest / total * 100}%, #f0ba9c ${guest / total * 100}% ${(guest + kakao) / total * 100}%, #d9dfdb ${(guest + kakao) / total * 100}% 100%)`;
+  const dateLabel = summary
+    ? `${formatPeriodDate(summary.period.from)} – ${formatPeriodDate(summary.period.to)}`
+    : `${formatPeriodDate(range.from)} – ${formatPeriodDate(range.to)}`;
+  const todayLabel = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(new Date());
+
   return (
     <div className="page-content dashboard-page">
-      <div className="page-heading-row"><div><div className="date-eyebrow"><span className="live-dot"/> 2026년 10월 8일 목요일</div><h1>좋은 오후예요, 운영자님 <span className="wave">✳</span></h1><p>Mapmory의 최근 현황을 확인해 보세요.</p></div><button className="secondary-button" onClick={() => onNotice("리포트 다운로드는 API 연결 후 제공됩니다.")}><Icon name="download" size={16}/> 리포트 내보내기</button></div>
-      <div className="period-row"><div className="period-tabs">{periods.map((item) => <button key={item} className={period === item ? "period-tab active" : "period-tab"} onClick={() => setPeriod(item)}>{item}</button>)}</div><button className="date-range"><Icon name="calendar" size={15}/>{period === "최근 7일" ? "10.02 – 10.08" : period === "최근 30일" ? "09.09 – 10.08" : "전체 기간"}<Icon name="chevron" size={13}/></button></div>
+      <div className="page-heading-row">
+        <div>
+          <div className="date-eyebrow"><span className="live-dot"/> {todayLabel}</div>
+          <h1>좋은 오후예요, 운영자님 <span className="wave">✳</span></h1>
+          <p>Mapmory의 최근 현황을 확인해 보세요.</p>
+        </div>
+        <button className="secondary-button" onClick={() => onNotice("리포트 다운로드는 준비 중입니다.")}><Icon name="download" size={16}/> 리포트 내보내기</button>
+      </div>
+
+      <div className="period-row">
+        <div className="period-tabs">
+          {["최근 7일", "최근 30일"].map((item) => (
+            <button key={item} className={period === item ? "period-tab active" : "period-tab"} onClick={() => setPeriod(item)}>{item}</button>
+          ))}
+        </div>
+        <div className="date-range"><Icon name="calendar" size={15}/>{dateLabel}<span>한국 시간</span></div>
+      </div>
+
+      {error && (
+        <div className="dashboard-error" role="alert">
+          <span>{error} 백엔드 실행 상태와 주소 설정을 확인해 주세요.</span>
+          <button type="button" onClick={() => setRetryKey((value) => value + 1)}>다시 시도</button>
+        </div>
+      )}
+      {loading && <div className="dashboard-loading" role="status">대시보드 데이터를 불러오는 중입니다.</div>}
+
       <section className="metric-grid" aria-label="주요 지표">
-        <MetricCard label="가입 회원" value="1,284" change="12.8%" detail="지난 기간 대비" icon="users" tint="mint" trend="up" foot="게스트 812 · OAuth 472" />
-        <MetricCard label="여행 기록" value="5,492" change="18.6%" detail="지난 기간 대비" icon="grid" tint="peach" trend="up" foot="최근 7일 286개 생성" />
-        <MetricCard label="서비스 의견" value="248" change="12건" detail="최근 7일 접수" icon="chat" tint="lavender" trend="neutral" foot={`${newFeedback}건 확인이 필요해요`} />
+        <MetricCard label="가입 회원" value={number(summary?.members.total)} change={summary ? `+${number(summary.members.newInPeriod)}` : "—"} detail="선택 기간 신규 가입" icon="users" tint="mint" trend="neutral" foot={`게스트 ${number(summary?.members.guest)} · 카카오 ${number(summary?.members.kakao)}`} />
+        <MetricCard label="여행 기록" value={number(summary?.travelRecords.total)} change={summary ? `+${number(summary.travelRecords.createdInPeriod)}` : "—"} detail="선택 기간 생성" icon="grid" tint="peach" trend="neutral" foot="전체 누적 기록" />
+        <MetricCard label="기간 신규 회원" value={number(summary?.members.newInPeriod)} change={loading ? "—" : period} detail="가입 수" icon="users" tint="lavender" trend="neutral" foot={dateLabel} />
       </section>
+
       <section className="dashboard-main-grid">
-        <div className="panel chart-panel">
-          <div className="panel-heading"><div><h2>서비스 성장</h2><p>가입 회원과 여행 기록 생성 추이</p></div><button className="more-button" aria-label="차트 옵션" onClick={() => onNotice("차트 옵션은 준비 중입니다.")}><Icon name="more"/></button></div>
-          <div className="chart-legend"><span><i className="legend-dot mint-dot"/> 가입 회원</span><span><i className="legend-dot blue-dot"/> 여행 기록</span><div className="chart-total"><strong>+24.8%</strong><span>지난 기간 대비</span></div></div>
-          <div className="chart-wrap"><div className="chart-y-labels"><span>300</span><span>225</span><span>150</span><span>75</span><span>0</span></div><div className="chart-area"><div className="chart-grid-lines"><i/><i/><i/><i/><i/></div><svg className="chart-svg" viewBox="0 0 700 230" preserveAspectRatio="none" role="img" aria-label="날짜별 회원 가입 및 여행 기록 추이 그래프"><defs><linearGradient id="mintArea" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#79cbb0" stopOpacity=".2"/><stop offset="100%" stopColor="#79cbb0" stopOpacity="0"/></linearGradient></defs><path d="M0 175 C34 174 42 153 78 160 S120 158 156 138 S198 148 234 126 S277 133 312 115 S356 126 390 96 S434 110 468 89 S512 101 546 70 S589 82 624 55 S665 60 700 35 L700 230 L0 230Z" fill="url(#mintArea)"/><path d="M0 175 C34 174 42 153 78 160 S120 158 156 138 S198 148 234 126 S277 133 312 115 S356 126 390 96 S434 110 468 89 S512 101 546 70 S589 82 624 55 S665 60 700 35" fill="none" stroke="#55b99b" strokeWidth="3" vectorEffect="non-scaling-stroke"/><path d="M0 200 C34 195 44 188 78 191 S121 176 156 184 S200 167 234 175 S276 156 312 166 S357 151 390 155 S434 143 468 151 S511 130 546 141 S590 119 624 132 S666 108 700 115" fill="none" stroke="#94a9dd" strokeWidth="2.5" strokeDasharray="5 6" vectorEffect="non-scaling-stroke"/><circle cx="546" cy="70" r="5" fill="#fff" stroke="#55b99b" strokeWidth="3" vectorEffect="non-scaling-stroke"/></svg><div className="chart-x-labels"><span>10.02</span><span>10.03</span><span>10.04</span><span>10.05</span><span>10.06</span><span>10.07</span><span>10.08</span></div></div></div>
+        <div className="panel chart-panel period-summary-panel">
+          <div className="panel-heading"><div><h2>선택 기간 집계</h2><p>한국 시간 기준 기간별 생성 수</p></div></div>
+          <div className="period-summary-grid">
+            <div className="period-summary-item"><span>신규 회원</span><strong>{number(summary?.members.newInPeriod)}<small>명</small></strong></div>
+            <div className="period-summary-item"><span>여행 기록 생성</span><strong>{number(summary?.travelRecords.createdInPeriod)}<small>개</small></strong></div>
+          </div>
+          {!loading && !error && <p className="period-summary-caption">집계 기간 · {dateLabel}</p>}
         </div>
         <div className="panel distribution-panel">
-          <div className="panel-heading"><div><h2>회원 구성</h2><p>로그인 방식별 회원 현황</p></div><button className="more-button" aria-label="회원 페이지로 이동" onClick={() => onNavigate("members")}><Icon name="arrow" size={16}/></button></div>
-          <div className="donut-area"><div className="donut"><div className="donut-center"><strong>1,284</strong><span>전체 회원</span></div></div><div className="donut-caption"><span><i className="legend-dot mint-dot"/>게스트<strong>812</strong><small>63.2%</small></span><span><i className="legend-dot peach-dot"/>OAuth<strong>472</strong><small>36.8%</small></span></div></div>
-          <div className="distribution-footer"><span><i className="sparkle-icon">✦</i> 게스트 회원의 <strong>18%</strong>가 계정을 연결했어요</span><Icon name="chevron" size={14}/></div>
+          <div className="panel-heading"><div><h2>회원 구성</h2><p>가입 방식별 누적 회원</p></div><button className="more-button" aria-label="회원 페이지로 이동" onClick={() => onNavigate("members")}><Icon name="arrow" size={16}/></button></div>
+          <div className="donut-area">
+            <div className="donut" style={{ background: donutBackground }}><div className="donut-center"><strong>{number(summary?.members.total)}</strong><span>전체 회원</span></div></div>
+            <div className="donut-caption">
+              <span><i className="legend-dot mint-dot"/>게스트<strong>{number(summary?.members.guest)}</strong><small>{guestPercent.toFixed(1)}%</small></span>
+              <span><i className="legend-dot peach-dot"/>카카오<strong>{number(summary?.members.kakao)}</strong><small>{kakaoPercent.toFixed(1)}%</small></span>
+              {unknown > 0 && <span><i className="legend-dot unknown-dot"/>유형 미지정<strong>{number(unknown)}</strong><small>기존 회원</small></span>}
+            </div>
+          </div>
+          <div className="distribution-footer"><span>유형별 비율은 확인 가능한 회원 기준입니다.</span></div>
         </div>
       </section>
-      <section className="panel feedback-preview">
-        <div className="panel-heading"><div><div className="title-with-count"><h2>최근 서비스 의견</h2><span className="count-chip">{newFeedback} 신규</span></div><p>사용자가 남긴 소중한 의견이에요.</p></div><button className="text-link" onClick={() => onNavigate("feedback")}>전체 보기 <Icon name="chevron" size={14}/></button></div>
-        <div className="feedback-preview-list">{feedback.slice(0, 3).map((item) => <div className="feedback-preview-item" key={item.id}><div className="category-dot"/><div className="feedback-preview-copy"><div className="feedback-preview-meta"><span className="category-label">{item.category}</span><span>{item.platform}</span><span>{item.createdAt}</span></div><p>{item.content}</p></div><StatusBadge status={item.status}/><button className="row-arrow" onClick={() => onNavigate("feedback")} aria-label="의견 관리로 이동"><Icon name="chevron" size={15}/></button></div>)}</div>
-      </section>
-      <footer className="page-footer"><span>Mapmory Admin <b>·</b> 내부 운영 도구</span><span>마지막 데이터 업데이트 <strong>방금 전</strong></span></footer>
+      <footer className="page-footer"><span>Mapmory Admin <b>·</b> 내부 운영 도구</span><span>마지막 데이터 업데이트 <strong>{lastUpdated ? lastUpdated.toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit" }) : "—"}</strong></span></footer>
     </div>
   );
 }
@@ -194,6 +315,5 @@ function MemberDrawer({ member, onClose }: { member: Member; onClose: () => void
 
 function DetailRow({ label, value }: { label: string; value: string }) { return <div className="detail-row"><span>{label}</span><strong>{value}</strong></div>; }
 function ProviderBadge({ provider }: { provider: Member["provider"] }) { return <span className={`provider-badge ${provider === "GUEST" ? "provider-guest" : "provider-kakao"}`}><i/>{provider === "GUEST" ? "게스트" : "Kakao"}</span>; }
-function StatusBadge({ status }: { status: FeedbackStatus }) { return <span className={`status-badge badge-${status.replaceAll(" ", "")}`}><i/>{status}</span>; }
 
 export default App;
