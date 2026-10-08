@@ -281,7 +281,7 @@ public class TravelRecordService {
 
     private void setPlace(TravelRecord travelRecord, PlaceDetails place) {
         travelRecord.setPlace(place == null ? null : new RecordedPlace(
-                placeLookupPort.providerCode(), place.placeId(), place.name(),
+                placeLookupPort.providerCode(place.placeId()), place.placeId(), place.name(),
                 place.attribution(), place.attributionUrl()));
     }
 

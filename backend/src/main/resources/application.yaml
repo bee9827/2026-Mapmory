@@ -41,6 +41,9 @@ guest-login:
 
 kakao:
   user-info-uri: https://kapi.kakao.com/v2/user/me
+  local:
+    # 국내 장소 키워드 검색용 Kakao REST API 키. 비어 있으면 Geoapify만 사용한다.
+    rest-api-key: ${KAKAO_REST_API_KEY:}
 
 google:
   # ID token의 aud로 허용할 OAuth 클라이언트 ID 목록(쉼표 구분). Android Credential Manager는

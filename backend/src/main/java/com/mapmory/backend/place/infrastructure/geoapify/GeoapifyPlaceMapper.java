@@ -14,8 +14,17 @@ import tools.jackson.databind.JsonNode;
 final class GeoapifyPlaceMapper {
 
     List<PlaceCandidate> candidates(JsonNode response) {
+        return candidates(response, null);
+    }
+
+    List<PlaceCandidate> candidates(JsonNode response, String excludedCountryCode) {
         List<PlaceCandidate> candidates = new ArrayList<>();
         for (JsonNode result : response.path("results")) {
+            String countryCode = text(result, "country_code");
+            if (excludedCountryCode != null
+                    && (countryCode == null || excludedCountryCode.equalsIgnoreCase(countryCode))) {
+                continue;
+            }
             String placeId = text(result, "place_id");
             String name = name(result);
             if (placeId != null && name != null) {

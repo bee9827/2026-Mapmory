@@ -39,23 +39,30 @@ public class GeoapifyClient implements PlaceLookupPort {
     }
 
     @Override
-    public String providerCode() {
+    public String providerCode(String placeId) {
         return PROVIDER_CODE;
     }
 
     @Override
     public List<PlaceCandidate> search(String query) {
+        return mapper.candidates(autocomplete(query));
+    }
+
+    /** 국내 장소를 다른 제공자가 맡을 때, 해외 후보만 남긴다. */
+    public List<PlaceCandidate> searchExcludingCountry(String query, String countryCode) {
+        return mapper.candidates(autocomplete(query), countryCode);
+    }
+
+    private JsonNode autocomplete(String query) {
         requireConfigured();
         requestLimiter.reserveSearch();
-        JsonNode response = get(uri -> uri.path("/v1/geocode/autocomplete")
+        return get(uri -> uri.path("/v1/geocode/autocomplete")
                 .queryParam("text", query)
                 .queryParam("format", "json")
                 .queryParam("lang", "ko")
                 .queryParam("limit", 10)
                 .queryParam("apiKey", apiKey)
                 .build());
-
-        return mapper.candidates(response);
     }
 
     @Override

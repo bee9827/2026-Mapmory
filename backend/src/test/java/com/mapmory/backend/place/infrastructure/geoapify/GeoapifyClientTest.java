@@ -27,7 +27,7 @@ class GeoapifyClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         GeoapifyClient client = new GeoapifyClient(
                 builder, "https://api.geoapify.test", "test-key", mock(GeoapifyRequestLimiter.class));
-        assertThat(client.providerCode()).isEqualTo("GEOAPIFY");
+        assertThat(client.providerCode("park-1")).isEqualTo("GEOAPIFY");
         server.expect(queryParam("text", URLEncoder.encode("한강공원", StandardCharsets.UTF_8)))
                 .andRespond(withSuccess("""
                         {"results":[
@@ -111,5 +111,26 @@ class GeoapifyClientTest {
                 .isInstanceOf(BusinessException.class)
                 .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code())
                         .isEqualTo("PLACE_RATE_LIMITED"));
+    }
+
+    @Test
+    void 국가를_제외한_검색은_그_국가와_국가_불명_후보를_뺀다() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GeoapifyClient client = new GeoapifyClient(
+                builder, "https://api.geoapify.test", "test-key", mock(GeoapifyRequestLimiter.class));
+        server.expect(queryParam("text", URLEncoder.encode("마카오", StandardCharsets.UTF_8)))
+                .andRespond(withSuccess("""
+                        {"results":[
+                          {"place_id":"mo-1","name":"마카오","formatted":"마카오, 중국","country_code":"cn"},
+                          {"place_id":"kr-1","name":"마카오","formatted":"면목로, 서울","country_code":"kr"},
+                          {"place_id":"none","name":"마카오","formatted":"마카오"}
+                        ]}
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThat(client.searchExcludingCountry("마카오", "KR"))
+                .extracting(PlaceCandidate::placeId)
+                .containsExactly("mo-1");
+        server.verify();
     }
 }
