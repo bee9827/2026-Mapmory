@@ -38,7 +38,6 @@
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --type-h2: clamp(28px, 3vw, 42px);
   --dark-surface: #10181f;
-  --dark-raised: #182228;
   --dark-text: #f0fff8;
   --header: rgba(246, 248, 245, 0.94);
   --shadow: 0 24px 70px rgba(25, 54, 39, 0.12);
@@ -250,7 +249,6 @@ h1 em, h2 em { color: inherit; font-style: normal; }
 .memory-photo-dots button.is-active { width: 18px; border-radius: 999px; background: var(--accent); }
 @keyframes image-in { from { opacity: 0.25; transform: scale(1.025); } to { opacity: 1; transform: scale(1); } }
 @keyframes map-fill-in { 0% { opacity: 0.48; transform: scale(0.985); } 62% { opacity: 1; transform: scale(1.008); } 100% { opacity: 1; transform: scale(1); } }
-@keyframes memory-panel-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes memory-sheet-in { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes memory-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 .memory-card-body { min-height: 188px; padding: 16px 18px 18px; display: flex; flex-direction: column; align-items: flex-start; }
@@ -355,7 +353,6 @@ footer p { margin: 10px 0 0; }
   .experience-section .globe-panel,
   .experience-section .memory-card { height: 480px; }
   .experience-section .memory-card-body { min-height: 166px; padding: 13px 16px 15px; }
-  
   .map-guide { border-radius: 14px; }
   .map-guide { padding: 18px 20px; }
   .map-guide h3 { margin: 10px 0 6px; font-size: 22px; }

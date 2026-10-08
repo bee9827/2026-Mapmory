@@ -46,6 +46,8 @@ test("how-play places are real provinces and never reuse the hero's photos", () 
   }
   assert.equal(withSubjectParticle("부산"), "부산이");
   assert.equal(withSubjectParticle("경주"), "경주가");
+  // The result line names the painted province, not the picked city.
+  assert.equal(HOW_PLAY_PLACES.find(({ key }) => key === "gyeongbuk").province, "경북");
   assert.equal(withObjectParticle("제주"), "제주를");
   assert.equal(withObjectParticle("일본"), "일본을");
 });

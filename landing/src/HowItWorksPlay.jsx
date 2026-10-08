@@ -52,7 +52,7 @@ function HowItWorksPlay() {
     ? "어디 다녀왔어요?"
     : state.step === 1
       ? `${place.label} 사진 ${place.photos.length}장을 찾았어요`
-      : `${withSubjectParticle(place.label)} 칠해졌어요. ${filledCodes.length} / ${HOW_PLAY_PROVINCE_TOTAL}`;
+      : `${withSubjectParticle(place.province)} 칠해졌어요. ${filledCodes.length} / ${HOW_PLAY_PROVINCE_TOTAL}`;
 
   // Each step replaces the screen, so hand focus to its prompt instead of dropping it on <body>.
   useEffect(() => {
@@ -155,7 +155,7 @@ function HowItWorksPlay() {
                 </div>
               </div>
               <p className="how-play-prompt" ref={promptRef} tabIndex={-1}>
-                <strong>{withSubjectParticle(place.label)}</strong> 칠해졌어요
+                <strong>{withSubjectParticle(place.province)}</strong> 칠해졌어요
                 <span className="how-play-count">{filledCodes.length} / {HOW_PLAY_PROVINCE_TOTAL}</span>
               </p>
               {remaining.length > 0 ? (

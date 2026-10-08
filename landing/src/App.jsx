@@ -975,8 +975,6 @@ function App() {
         document.body,
       )}
 
-
-
       <section className="trust-section" id="privacy" aria-labelledby="privacy-title">
         <div className="section-heading">
           <h2 id="privacy-title">사진첩은 폰 안에서만 살펴봐요.</h2>

@@ -6,6 +6,7 @@ export const HOW_PLAY_PLACES = Object.freeze([
   {
     key: "busan",
     label: "부산",
+    province: "부산",
     regionCode: "KR-26",
     photos: [
       { src: photo("busan-01"), alt: "해변 열차가 숲길 레일 위를 달리는 부산 해안" },
@@ -17,6 +18,7 @@ export const HOW_PLAY_PLACES = Object.freeze([
   {
     key: "gangwon",
     label: "강원",
+    province: "강원",
     regionCode: "KR-42",
     photos: [
       { src: photo("gangwon-01"), alt: "단풍 든 설악산 골짜기와 그 안의 절" },
@@ -28,6 +30,8 @@ export const HOW_PLAY_PLACES = Object.freeze([
   {
     key: "gyeongbuk",
     label: "경주",
+    // The map paints provinces, so 경주 fills 경북 and the result line names the province.
+    province: "경북",
     regionCode: "KR-47",
     photos: [
       { src: photo("gyeongbuk-01"), alt: "연등이 걸린 불국사 돌계단" },
