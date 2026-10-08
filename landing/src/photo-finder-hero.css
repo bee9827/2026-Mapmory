@@ -245,26 +245,6 @@
 .how-section,
 .trust-section { width: min(1080px, calc(100% - 48px)); margin: 0 auto; padding: 64px 0 96px; scroll-margin-top: 100px; }
 
-/* How it works reads as one numbered timeline, not three cards. */
-.how-section .section-heading { max-width: none; margin: 0 0 36px; text-align: left; }
-.how-steps { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
-.how-steps li { position: relative; display: grid; gap: 16px; align-content: start; }
-.how-steps li:not(:last-child)::before { content: ""; position: absolute; top: 17px; left: 44px; right: -24px; height: 2px; background: var(--line); }
-.how-step-number {
-  position: relative;
-  z-index: 1;
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  border: 1.5px solid var(--accent-strong);
-  border-radius: 50%;
-  color: var(--accent-ink);
-  background: var(--canvas);
-  font: 700 15px/1 "LINE Seed Sans KR", system-ui, sans-serif;
-}
-.how-steps h3 { margin: 0 0 8px; font-size: 18px; line-height: 1.4; word-break: keep-all; }
-.how-steps p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; word-break: keep-all; }
 .how-experience-link { width: fit-content; min-height: 44px; margin: 32px 0 0; padding: 0; display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; font-weight: 700; }
 .how-experience-link:hover { color: var(--accent-ink); }
 
@@ -310,10 +290,6 @@
   .finder-hero-actions { display: flex; justify-content: center; }
   .finder-trust-note { justify-content: center; }
   .finder-demo-wrap { width: min(100%, 540px); margin: 0 auto; }
-  .how-steps { grid-template-columns: 1fr; gap: 26px; }
-  .how-steps li { grid-template-columns: 36px minmax(0, 1fr); column-gap: 14px; }
-  .how-steps li > div { padding-top: 6px; }
-  .how-steps li:not(:last-child)::before { top: 44px; bottom: -18px; left: 17px; right: auto; width: 2px; height: auto; }
   .trust-flow { grid-template-columns: 1fr; }
   .trust-arrow { height: 36px; }
   .trust-arrow svg { transform: rotate(90deg); }

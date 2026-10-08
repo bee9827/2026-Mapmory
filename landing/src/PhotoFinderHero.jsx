@@ -21,7 +21,8 @@ const FINAL_WINDOW_START = (GRID_ROWS - VISIBLE_ROWS) * GRID_COLUMNS;
 // Positions inside the final window where the searched place's photos sit: rows 2-3,
 // so the first row stays free for the result pill.
 const MATCH_SLOTS = [8, 11, 13, 16, 19];
-// [x%, y%, zoom] crops so the rest of the library never repeats a shot next to itself.
+// Found photos show the full frame; filler tiles get [x%, y%, zoom] crops so repeats further down the grid read as new shots.
+const FULL_FRAME = [50, 50, 1];
 const FILLER_CROPS = [[50, 50, 1], [30, 35, 1.35], [70, 65, 1.5], [50, 20, 1.25], [20, 80, 1.6], [80, 40, 1.4]];
 const AUTOPLAY_MIN_WAIT_MS = 400;
 const AUTOPLAY_MAX_WAIT_MS = 1800;
@@ -144,9 +145,9 @@ function PhotoFinderHero({ storeActions, onPlaySelect }) {
       const row = Math.floor(index / GRID_COLUMNS);
       const matchIndex = MATCH_SLOTS.indexOf(index - FINAL_WINDOW_START);
       if (matchIndex >= 0) {
-        return { index, matchIndex, photo: place.photos[matchIndex % place.photos.length], crop: place.crops[matchIndex] };
+        return { index, matchIndex, photo: place.photos[matchIndex % place.photos.length], crop: FULL_FRAME };
       }
-      // Steps of 1 across and 3 down keep neighbouring tiles on different photos for pools of 5 and 9.
+      // Steps of 1 across and 3 down keep neighbouring tiles on different photos.
       return { index, matchIndex: -1, photo: pool[(col + row * 3) % pool.length], crop: FILLER_CROPS[(col * 2 + row) % FILLER_CROPS.length] };
     });
   }, [place]);
@@ -268,7 +269,7 @@ function PhotoFinderHero({ storeActions, onPlaySelect }) {
       return {
         index,
         photo: place.photos[index % place.photos.length],
-        crop: place.crops[index],
+        crop: FULL_FRAME,
         size: rect.width,
         fromX: rect.left - card.left,
         fromY: rect.top - card.top,

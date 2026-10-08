@@ -9,8 +9,6 @@ import {
   CaretDown,
   CloudArrowUp,
   DeviceMobile,
-  Images,
-  MagnifyingGlass,
   Trash,
   CheckCircle,
   DownloadSimple,
@@ -30,6 +28,8 @@ import { ANALYTICS_EVENTS, trackEvent } from "./analytics.js";
 import { classifyGlobeGesture } from "./globe-gesture.js";
 import { useWorldCountries } from "./worldCountries.js";
 import { PhotoFinderHero } from "./PhotoFinderHero.jsx";
+import { HowItWorksPlay } from "./HowItWorksPlay.jsx";
+import { PhotoCredits } from "./PhotoCredits.jsx";
 import {
   createWorldMemoryHistoryState,
   isWorldMemoryHistoryEntry,
@@ -198,12 +198,6 @@ const koreaMemories = [
   },
 ];
 const koreaAddMemories = [koreaMemories[2], koreaMemories[1], koreaMemories[0]];
-
-const HOW_STEPS = [
-  { Icon: MagnifyingGlass, title: "다녀온 곳 검색", body: "제주, 일본처럼 다녀온 지역이나 나라를 검색해요." },
-  { Icon: Images, title: "사진은 폰이 찾아 줘요", body: "그곳에서 찍은 사진만 모아 보여 줘요. 위치 정보가 없는 사진은 사진첩에서 직접 고르면 돼요." },
-  { Icon: MapTrifold, title: "골라서 저장하면 끝", body: "마음에 드는 사진만 골라 저장하면 지도에 그 지역이 칠해져요." },
-];
 
 const TRUST_POINTS = [
   { Icon: DeviceMobile, title: "사진 찾기는 폰 안에서", body: "그 장소에서 찍은 사진인지 폰 안에서 위치·날짜 정보로만 확인해요. 사진첩을 서버로 보내지 않아요." },
@@ -1563,17 +1557,7 @@ function App() {
         <div className="section-heading">
           <h2 id="how-title">3단계면 끝나요.</h2>
         </div>
-        <ol className="how-steps">
-          {HOW_STEPS.map(({ title, body }, index) => (
-            <li key={title}>
-              <span className="how-step-number" aria-hidden="true">{index + 1}</span>
-              <div>
-                <h3>{title}</h3>
-                <p>{body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <HowItWorksPlay />
         <a className="how-experience-link" href="#experience" onClick={() => globeAnalytics.trackEntryClick("how_section")}><GlobeHemisphereEast size={18} weight="duotone" />기록이 쌓인 지도 미리 보기</a>
       </section>
 
@@ -1667,7 +1651,7 @@ function App() {
         <p className="finder-trust-note download-trust"><ShieldCheck size={18} weight="fill" />사진은 폰 안에서 찾고, 고른 사진만 올라가요.</p>
       </section>
 
-      <footer><div><Brand /><p>기억은 흩어져도, 지도는 남아요.</p></div><p>© 2026 Mapmory. All rights reserved.</p></footer>
+      <footer><div><Brand /><p>기억은 흩어져도, 지도는 남아요.</p></div><div className="footer-meta"><PhotoCredits /><p>© 2026 Mapmory. All rights reserved.</p></div></footer>
     </main>
   );
 }
