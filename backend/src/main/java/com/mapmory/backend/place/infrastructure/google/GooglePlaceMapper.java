@@ -5,19 +5,10 @@ import com.mapmory.backend.place.application.model.PlaceDetails;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import tools.jackson.databind.JsonNode;
 
 class GooglePlaceMapper {
-
-    /*
-     * Google은 괌·홍콩 등을 별도 국가 코드로 준다. 앱 지역 목록에는 아직 없어서, 영토 분류를
-     * 한 번에 정리하기 전까지 기존 Geoapify와 같은 소속 국가로 맞춘다.
-     */
-    private static final Map<String, String> TERRITORY_TO_COUNTRY = Map.of(
-            "GU", "US", "MP", "US", "AS", "US", "PR", "US", "VI", "US",
-            "HK", "CN", "MO", "CN");
 
     List<PlaceCandidate> candidates(JsonNode response) {
         List<PlaceCandidate> candidates = new ArrayList<>();
@@ -61,8 +52,7 @@ class GooglePlaceMapper {
                     if (code == null) {
                         return null;
                     }
-                    String upper = code.toUpperCase(Locale.ROOT);
-                    return TERRITORY_TO_COUNTRY.getOrDefault(upper, upper);
+                    return code.toUpperCase(Locale.ROOT);
                 }
             }
         }

@@ -34,7 +34,7 @@
 - 후보 목록에는 Google 로고(또는 `Google Maps` 표기)를 보여야 한다. 응답 `attribution`은 `Google Maps`다.
 - 선택 조회(`GET /places/{placeId}`)는 `id,location,addressComponents,displayName`을 요청한다. `displayName` 때문에 Place Details Pro로 과금된다(월 5,000건 무료). 클라이언트가 후보의 `name`을 표시하도록 바뀌면 `displayName`을 빼서 Essentials(월 10,000건 무료)로 낮출 수 있다. 기록 저장 시 재조회는 이름 없이 Essentials 필드만 요청한다.
 - 검색과 선택에 같은 `sessionToken`(UUID 권장, 영문·숫자·`-`·`_` 64자 이하)을 query parameter로 보내면 Autocomplete 요청이 세션으로 묶여 무료가 된다. 없어도 동작하며, 이때 Autocomplete는 요청당 과금된다(월 10,000건 무료).
-- Google은 괌·사이판·홍콩·마카오 등을 별도 국가 코드로 준다. 영토 분류를 정리하기 전까지 기존 Geoapify 결과와 같게 미국(US)·중국(CN)으로 바꿔 돌려준다.
+- Google은 괌·사이판·홍콩·마카오를 별도 국가 코드(GU·MP·HK·MO)로 주며, 그대로 사용한다. DB 국가 목록(V6)에는 있지만 앱 지역 목록(`GeneratedWorldMapData`)에는 아직 없다.
 - Geoapify 장소 ID(소문자 16진수)는 Google 키가 있어도 Geoapify로 조회한다. 기존 기록 수정을 위해 `GEOAPIFY_API_KEY`도 유지한다. 두 제공자는 아래 호출 제한을 함께 쓴다.
 
 ## 설정과 데이터

@@ -94,14 +94,14 @@ class GooglePlacesClientTest {
     }
 
     @Test
-    void 괌은_영토_분류_전까지_미국으로_돌려준다() {
+    void 괌은_Google이_준_국가_코드_GU로_돌려준다() {
         server.expect(queryParam("languageCode", "ko"))
                 .andRespond(withSuccess("""
                         {"id":"ChIJ-tumon","location":{"latitude":13.51,"longitude":144.80},
                          "addressComponents":[{"shortText":"GU","types":["country","political"]}]}
                         """, MediaType.APPLICATION_JSON));
 
-        assertThat(client.findById("ChIJ-tumon").countryCode()).isEqualTo("US");
+        assertThat(client.findById("ChIJ-tumon").countryCode()).isEqualTo("GU");
     }
 
     @Test
