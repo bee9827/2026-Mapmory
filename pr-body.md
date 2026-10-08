@@ -7,10 +7,7 @@ Before: dev에서 Google 장소 후보를 고르면(`GET /api/v1/places/{placeId
 
 After: 추천 지역(국가·시·도·시·군·구)이 담긴 선택 응답이 정상으로 옵니다.
 
-두 가지를 바꿨습니다.
-
-- 주소로 시·군·구를 찾을 때 쓰는 목록 조회 `RegionRepository.findByParentIdAndRegionType`에 `@EntityGraph(attributePaths = {"parent", "root"})`를 붙였습니다.
-- 장소 선택 결과(`SelectedPlace`)에 `Region` 엔티티 대신 국가·시·도·시·군·구의 코드와 이름을 담은 값(`SuggestedRegion`)을 넣습니다. 서비스가 값으로 바꿔 넘기고, 응답 DTO(`PlaceSelectionResponse`)는 엔티티를 import하지 않습니다.
+주소로 시·군·구를 찾을 때 쓰는 목록 조회 `RegionRepository.findByParentIdAndRegionType`에 `@EntityGraph(attributePaths = {"parent", "root"})`를 붙였습니다.
 
 ## 배경
 
@@ -23,12 +20,11 @@ After: 추천 지역(국가·시·도·시·군·구)이 담긴 선택 응답이
 
 - 서비스에 `@Transactional`을 붙이는 대신 조회에서 함께 가져왔습니다. 선택 API는 외부 Google 호출을 포함하므로, 트랜잭션을 열면 그동안 DB 연결을 잡고 있게 됩니다.
 - 이 목록 조회는 주소 매칭에서만 씁니다. 시·도 17개, 시·군·구 수십 개라 조인 비용은 작습니다.
-- 서비스가 돌려주는 읽기 모델에는 엔티티를 담지 않았습니다. 엔티티가 컨트롤러까지 가면 응답을 만들 때 지연 로딩이 일어나고, 이번처럼 조회 방식이 바뀌면 다시 깨질 수 있습니다. 이제 지연 연관을 읽는 곳은 지역을 조회한 서비스 안뿐입니다.
-- `PlaceSelectionService.suggestedRegion(PlaceDetails)`는 엔티티를 그대로 돌려줍니다. `TravelRecordService`가 자기 트랜잭션 안에서 기록에 지역을 연결할 때 씁니다.
+- 이 PR은 버그 수정만 담습니다. 장소 선택 결과(`SelectedPlace`)가 `Region` 엔티티를 트랜잭션 밖으로 내보내는 구조는 그대로입니다. 값 모델로 바꾸는 커밋(a1c06cf)을 넣었다가 되돌렸습니다(796c65c). 변환이 여전히 트랜잭션 밖에서 일어나 지연 로딩을 막지 못하고, `RegionDetailResponse`와 같은 모양의 타입만 늘었기 때문입니다. 구조 정리는 Geoapify 제거와 함께 따로 합니다.
 
 ## 확인
 
-- [x] 로컬에서 실행 확인: 통합 테스트 `KoreanAddressRegionMatcherIntegrationTest`를 추가했습니다. "서울특별시 종로구"로 찾은 지역을 트랜잭션 밖에서 `SuggestedRegion`으로 바꿉니다. `@EntityGraph`를 빼면 dev와 같은 `Region#122` 오류로 실패하고, 넣으면 통과합니다. DB가 필요 없어진 `PlaceSelectionResponseIntegrationTest`는 단위 테스트 `PlaceSelectionResponseTest`로 바꿨습니다. 전체 테스트 393개 통과.
+- [x] 로컬에서 실행 확인: 통합 테스트 `KoreanAddressRegionMatcherIntegrationTest`를 추가했습니다. "서울특별시 종로구"로 찾은 지역을 트랜잭션 밖에서 응답으로 바꿉니다. 수정 전에는 dev와 같은 `Region#122` 오류로 실패했고, 수정 후 통과합니다. 전체 테스트 392개 통과.
 - [x] 비밀 정보(비밀번호·키·토큰)를 커밋하지 않았음
 - [ ] 새 환경변수를 추가했다면 `.env.example` 갱신 (해당 없음)
 - [ ] DB 스키마를 변경했다면 **새 마이그레이션 파일**로 추가 (해당 없음)
