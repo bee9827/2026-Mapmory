@@ -167,11 +167,11 @@ fun TripProfileScreen(
                     TextButton(
                         onClick = {
                             uriHandler.openUri(
-                                "mailto:sjhan0711@gmail.com?subject=Mapmory%20%EC%82%AC%EC%9A%A9%20%EC%9D%98%EA%B2%AC",
+                                "https://docs.google.com/forms/d/e/1FAIpQLScToKllNctPYx5zSCp3kllrIUYcdwnasw1tczC3S-ZzULRxRw/viewform?usp=header",
                             )
                         },
                     ) {
-                        Text("이메일로 의견 보내기", color = TripRecordPalette.current.primary)
+                        Text("의견 보내기", color = TripRecordPalette.current.primary)
                     }
                     if (PrivacyPolicy.URL.isNotBlank()) {
                         Text(
