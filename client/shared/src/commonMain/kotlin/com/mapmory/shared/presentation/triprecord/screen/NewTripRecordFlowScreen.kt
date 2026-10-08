@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -75,6 +76,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -140,7 +142,7 @@ internal fun newRecordBackAction(
 }
 
 private const val KoreaCountryId = 1L
-private const val MinPlaceQueryLength = 2
+private const val MinPlaceQueryLength = 1
 private const val MaxPlaceQueryLength = 100
 private const val PlaceSearchDebounceMillis = 350L
 private const val PhotoListPrefetchGroups = 2
@@ -571,7 +573,7 @@ internal fun NewTripRecordFlowScreen(
     }
 
     LaunchedEffect(uiState.selectedLocation?.id, uiState.selectedPlace?.placeId) {
-        val selectedValue = uiState.selectedPlace?.name
+        val selectedValue = uiState.selectedPlace?.name?.takeIf(String::isNotBlank)
             ?: uiState.selectedLocation?.flowDisplayName(locations)
         if (locationSearchQuery.isBlank() && selectedValue != null) {
             locationSearchQuery = selectedValue
@@ -1197,7 +1199,7 @@ private fun LocationStep(
             FlowSectionTitle(
                 title = "장소",
                 badge = "필수",
-                helper = "지역은 한 글자부터, 장소는 두 글자부터 검색해요.",
+                helper = "지역과 장소를 한 글자부터 검색해요.",
                 modifier = Modifier.padding(top = 30.dp),
             )
             LocationSearchField(
@@ -1459,6 +1461,10 @@ private fun PlaceAttributionLinks(
     attributionUrl: String?,
     modifier: Modifier = Modifier,
 ) {
+    if (attribution == GoogleMapsAttribution) {
+        GoogleMapsAttributionText(modifier)
+        return
+    }
     val uriHandler = LocalUriHandler.current
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -1491,7 +1497,27 @@ private fun PlaceAttributionLinks(
     }
 }
 
+// Google 지도 없이 Places 결과를 보여 줄 때의 출처 표기: 번역하지 않은 "Google Maps", 12~16sp, 줄바꿈 없음.
+// 색은 밝은 배경에서 #5E5E5E, 어두운 배경에서 흰색이다. Geoapify 표기와 함께 두지 않는다.
+// https://developers.google.com/maps/documentation/places/web-service/policies
+@Composable
+private fun GoogleMapsAttributionText(modifier: Modifier = Modifier) {
+    val isDarkSurface = TripRecordPalette.current.surface.luminance() < 0.5f
+    Text(
+        text = GoogleMapsAttribution,
+        color = if (isDarkSurface) Color.White else GoogleMapsAttributionColor,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Normal,
+        fontFamily = FontFamily.SansSerif,
+        maxLines = 1,
+        softWrap = false,
+        modifier = modifier,
+    )
+}
+
 private const val GeoapifyUrl = "https://www.geoapify.com/"
+private const val GoogleMapsAttribution = "Google Maps"
+private val GoogleMapsAttributionColor = Color(0xFF5E5E5E)
 
 @Composable
 private fun FlowTopBar(

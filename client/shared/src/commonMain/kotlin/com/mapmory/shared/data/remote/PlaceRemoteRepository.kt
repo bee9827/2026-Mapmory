@@ -20,14 +20,15 @@ class PlaceRemoteRepository(
 ) : PlaceRepository {
     private val placesUrl = "${apiBaseUrl.trimEnd('/')}/places"
 
-    override suspend fun searchPlaces(query: String): Result<List<PlaceCandidate>> = apiCall {
+    override suspend fun searchPlaces(query: String, sessionToken: String): Result<List<PlaceCandidate>> = apiCall {
         val normalizedQuery = query.trim()
         require(normalizedQuery.length in MinQueryLength..MaxQueryLength) {
-            "장소 검색어는 2자 이상 100자 이하로 입력해 주세요."
+            "장소 검색어는 1자 이상 100자 이하로 입력해 주세요."
         }
         client.get("$placesUrl/search") {
             authorizeWith(accessTokenProvider)
             parameter("query", normalizedQuery)
+            parameter("sessionToken", sessionToken)
         }.requireSuccess()
             .body<ApiResponseDto<List<PlaceCandidateDto>>>()
             .data
@@ -35,13 +36,14 @@ class PlaceRemoteRepository(
             .map(PlaceCandidateDto::toDomain)
     }
 
-    override suspend fun selectPlace(placeId: String): Result<PlaceSelection> = apiCall {
+    override suspend fun selectPlace(placeId: String, sessionToken: String): Result<PlaceSelection> = apiCall {
         val normalizedPlaceId = placeId.trim()
         require(normalizedPlaceId.isNotEmpty() && normalizedPlaceId.length <= MaxPlaceIdLength) {
             "장소 정보를 확인하지 못했습니다. 다시 검색해 주세요."
         }
         client.get("$placesUrl/${normalizedPlaceId.encodeURLPathPart()}") {
             authorizeWith(accessTokenProvider)
+            parameter("sessionToken", sessionToken)
         }.requireSuccess()
             .body<ApiResponseDto<PlaceSelectionDto>>()
             .data
@@ -49,7 +51,7 @@ class PlaceRemoteRepository(
     }
 }
 
-private const val MinQueryLength = 2
+private const val MinQueryLength = 1
 private const val MaxQueryLength = 100
 private const val MaxPlaceIdLength = 255
 private const val MaxCandidates = 10

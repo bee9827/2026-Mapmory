@@ -29,6 +29,8 @@ import com.mapmory.shared.presentation.triprecord.isSelectableTripRecordDestinat
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.toTripRecordPhotoUiState
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class TripRecordEditorViewModel(
     private val createTripRecord: CreateTripRecordUseCase,
@@ -41,12 +43,14 @@ class TripRecordEditorViewModel(
     private val backgroundTripRecordSaver: BackgroundTripRecordSaver? = null,
     private val recordedPhotoIndex: com.mapmory.shared.data.media.RecordedPhotoIndex? = null,
     private val placeRepository: PlaceRepository? = null,
+    private val newPlaceSessionToken: () -> String = ::randomPlaceSessionToken,
 ) : ViewModel() {
     val recordedPhotoIds = recordedPhotoIndex?.ids ?: kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>())
     val pendingPhotoIds = backgroundTripRecordSaver?.pendingPhotoIds ?: kotlinx.coroutines.flow.MutableStateFlow(emptySet<String>())
     private var isRouteInitialized = false
     private var placeSearchGeneration = 0
     private var placeSelectionGeneration = 0
+    private var placeSessionToken: String? = null
 
     var uiState by mutableStateOf(TripRecordEditorUiState())
         private set
@@ -57,6 +61,7 @@ class TripRecordEditorViewModel(
     fun reset() {
         placeSearchGeneration += 1
         placeSelectionGeneration += 1
+        placeSessionToken = null
         uiState = TripRecordEditorUiState()
         savedRecordId = null
         isRouteInitialized = false
@@ -80,6 +85,7 @@ class TripRecordEditorViewModel(
     fun startCreating(location: Location?) {
         placeSearchGeneration += 1
         placeSelectionGeneration += 1
+        placeSessionToken = null
         uiState = TripRecordEditorUiState(
             selectedLocation = location?.takeIf(Location::isSelectableTripRecordDestination),
             isPlaceSearchAvailable = placeRepository != null,
@@ -109,6 +115,7 @@ class TripRecordEditorViewModel(
     fun startEditing(record: TripRecordData, location: Location) {
         placeSearchGeneration += 1
         placeSelectionGeneration += 1
+        placeSessionToken = null
         val allTags = (uiState.availableTags + record.tags).distinctBy { it.id }
         uiState = TripRecordEditorUiState(
             recordId = record.id,
@@ -309,7 +316,7 @@ class TripRecordEditorViewModel(
         if (normalizedQuery.length !in PlaceMinQueryLength..PlaceMaxQueryLength) return
         val generation = placeSearchGeneration
         uiState = uiState.copy(isSearchingPlaces = true, placeSearchErrorMessage = null)
-        repository.searchPlaces(normalizedQuery).fold(
+        repository.searchPlaces(normalizedQuery, currentPlaceSessionToken()).fold(
             onSuccess = { candidates ->
                 if (generation == placeSearchGeneration) {
                     uiState = uiState.copy(
@@ -346,10 +353,24 @@ class TripRecordEditorViewModel(
             isSearchingPlaces = false,
             hasSearchedPlaces = false,
         )
-        return repository.selectPlace(candidate.placeId).fold(
+        // 선택 조회로 검색 세션이 끝나므로 다음 검색은 새 토큰을 쓴다.
+        val sessionToken = currentPlaceSessionToken()
+        placeSessionToken = null
+        return repository.selectPlace(candidate.placeId, sessionToken).fold(
             onSuccess = { selection ->
                 if (generation != placeSelectionGeneration) return@fold null
-                val place = selection.place.copy(address = candidate.address)
+                if (selection.isOutsideRegionCatalog(regionCatalog)) {
+                    uiState = uiState.copy(
+                        isSelectingPlace = false,
+                        placeSelectionErrorMessage = PlaceOutsideRegionCatalogMessage,
+                    )
+                    return@fold null
+                }
+                // Google 장소는 선택 응답에 이름이 없으므로 고른 후보의 이름을 보여 준다.
+                val place = selection.place.copy(
+                    name = selection.place.name.ifBlank { candidate.name },
+                    address = candidate.address,
+                )
                 val location = selection.toSelectableLocation(regionCatalog)
                 uiState = uiState.copy(
                     selectedPlace = place,
@@ -371,6 +392,9 @@ class TripRecordEditorViewModel(
             },
         )
     }
+
+    private fun currentPlaceSessionToken(): String =
+        placeSessionToken ?: newPlaceSessionToken().also { placeSessionToken = it }
 
     fun clearSelectedPlace() {
         placeSelectionGeneration += 1
@@ -642,6 +666,7 @@ class TripRecordEditorViewModel(
 
 private fun PlaceSelection.toSelectableLocation(regionCatalog: RegionCatalog?): Location? {
     val catalog = regionCatalog ?: return null
+    val countryCode = countryCode ?: return null
     val suggestion = suggestedRegion
     val location = when {
         countryCode == KoreaCountryCode && suggestion?.provinceCode != null &&
@@ -687,7 +712,20 @@ private fun TripRecordEditorUiState.revalidatedAfterChange(
 
 }
 
-private const val PlaceMinQueryLength = 2
+// 앱 지역 목록에 없는 국가(괌 GU, 사이판 MP, 홍콩 HK, 마카오 MO 등)의 장소는 어떤 지역을 골라도
+// 서버가 PLACE_COUNTRY_MISMATCH로 거절하므로 장소를 연결하지 않고 지역을 직접 고르게 한다.
+private fun PlaceSelection.isOutsideRegionCatalog(regionCatalog: RegionCatalog?): Boolean {
+    val catalog = regionCatalog ?: return false
+    val countryCode = countryCode ?: return false
+    return countryCode != KoreaCountryCode && catalog.findByCode(countryCode) == null
+}
+
+@OptIn(ExperimentalUuidApi::class)
+private fun randomPlaceSessionToken(): String = Uuid.random().toString()
+
+private const val PlaceOutsideRegionCatalogMessage =
+    "이 장소가 있는 지역은 아직 앱에서 고를 수 없어요. 지역을 직접 검색해 선택해 주세요."
+private const val PlaceMinQueryLength = 1
 private const val PlaceMaxQueryLength = 100
 private const val MaxPlaceCandidates = 10
 private const val KoreaCountryCode = "KR"
@@ -762,7 +800,8 @@ internal fun Throwable.toEditorFieldErrors(): Map<TripRecordEditorErrorTarget, S
 
         "INVALID_REGION_CODE",
         "INVALID_REGION_TYPE",
-        "REGION_REQUIRED" -> TripRecordEditorErrorTarget.LOCATION
+        "REGION_REQUIRED",
+        "PLACE_COUNTRY_MISMATCH" -> TripRecordEditorErrorTarget.LOCATION
 
         "INVALID_TRAVEL_DATE_RANGE" -> TripRecordEditorErrorTarget.END_DATE
         "TOO_MANY_TAGS", "INVALID_TAG_IDS" -> TripRecordEditorErrorTarget.TAGS

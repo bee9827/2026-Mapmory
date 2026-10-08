@@ -24,7 +24,7 @@ data class PlaceRegionSuggestion(
 
 data class PlaceSelection(
     val place: PlaceReference,
-    val countryCode: String,
+    val countryCode: String?,
     val suggestedRegion: PlaceRegionSuggestion?,
     val manualRegionRequired: Boolean,
 )

@@ -101,7 +101,7 @@ fun PlaceCandidateDto.toDomain(): PlaceCandidate = PlaceCandidate(
 fun PlaceSelectionDto.toDomain(): PlaceSelection = PlaceSelection(
     place = PlaceReference(
         placeId = placeId,
-        name = name,
+        name = name.orEmpty(),
         attribution = attribution,
         attributionUrl = attributionUrl,
     ),
