@@ -255,7 +255,7 @@ Access Token이 아니라 ID Token을 보낸다.
 | `401` | `EXPIRED_REFRESH_TOKEN` | Refresh Token이 만료됨 |
 | `403` | `ACCESS_DENIED` | 리소스 접근 권한 없음 |
 | `429` | `GUEST_LOGIN_RATE_LIMITED` | 게스트 로그인 요청이 한도를 초과함 |
-| `503` | `KAKAO_UNAVAILABLE` | 카카오 인증 서버를 일시적으로 사용할 수 없음 |
+| `503` | `KAKAO_UNAVAILABLE` | 카카오 인증 서버를 일시적으로 사용할 수 없음. 카카오가 회원번호 없이 응답하거나 빈 본문을 준 경우도 해당 |
 | `503` | `GOOGLE_UNAVAILABLE` | 구글 공개키를 받아오지 못해 검증할 수 없음 |
 
 ## 3. Upload API
