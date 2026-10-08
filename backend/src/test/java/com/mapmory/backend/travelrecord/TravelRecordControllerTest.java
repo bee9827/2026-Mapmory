@@ -126,21 +126,27 @@ class TravelRecordControllerTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"", "   "})
-    void 제목이_비어_있으면_여행_일지를_생성하지_않는다(String title) throws Exception {
+    void 제목이_비어_있어도_여행_일지를_생성한다(String title) throws Exception {
         String requestBody = validCreateRequestBody(title, "본문");
+        TravelRecord travelRecord = travelRecord("", "본문");
+        when(travelRecordService.create(eq(MEMBER), any(TravelRecordCommand.class)))
+                .thenReturn(travelRecord);
 
         mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.errors[0].field").value("title"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value(101L));
 
-        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordCommand.class));
+        verify(travelRecordService).create(eq(MEMBER), any(TravelRecordCommand.class));
     }
 
     @Test
-    void 제목이_누락되면_여행_일지를_생성하지_않는다() throws Exception {
+    void 제목이_누락되어도_여행_일지를_생성한다() throws Exception {
+        TravelRecord travelRecord = travelRecord("", "본문");
+        when(travelRecordService.create(eq(MEMBER), any(TravelRecordCommand.class)))
+                .thenReturn(travelRecord);
+
         mockMvcWithLoginMember().perform(post("/api/v1/travel-records")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -151,11 +157,10 @@ class TravelRecordControllerTest {
                                   "objectKeys": []
                                 }
                                 """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.errors[0].field").value("title"));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.id").value(101L));
 
-        verify(travelRecordService, never()).create(eq(MEMBER), any(TravelRecordCommand.class));
+        verify(travelRecordService).create(eq(MEMBER), any(TravelRecordCommand.class));
     }
 
     @Test
