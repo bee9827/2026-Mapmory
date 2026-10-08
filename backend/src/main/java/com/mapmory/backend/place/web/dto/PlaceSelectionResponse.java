@@ -2,8 +2,9 @@ package com.mapmory.backend.place.web.dto;
 
 import com.mapmory.backend.place.application.model.PlaceDetails;
 import com.mapmory.backend.place.application.model.SelectedPlace;
-import com.mapmory.backend.region.Region;
+import com.mapmory.backend.place.application.model.SuggestedRegion;
 import com.mapmory.backend.travelrecord.dto.RegionDetailResponse;
+import com.mapmory.backend.travelrecord.dto.RegionItemResponse;
 
 public record PlaceSelectionResponse(
         String placeId,
@@ -16,10 +17,18 @@ public record PlaceSelectionResponse(
 ) {
     public static PlaceSelectionResponse from(SelectedPlace selected) {
         PlaceDetails place = selected.place();
-        Region region = selected.suggestedRegion();
+        SuggestedRegion region = selected.suggestedRegion();
         return new PlaceSelectionResponse(
                 place.placeId(), place.name(), place.countryCode(),
-                region == null ? null : RegionDetailResponse.from(region),
+                region == null ? null : toResponse(region),
                 region == null, place.attribution(), place.attributionUrl());
+    }
+
+    private static RegionDetailResponse toResponse(SuggestedRegion region) {
+        return new RegionDetailResponse(item(region.country()), item(region.province()), item(region.district()));
+    }
+
+    private static RegionItemResponse item(SuggestedRegion.Area area) {
+        return area == null ? null : new RegionItemResponse(area.code(), area.name());
     }
 }

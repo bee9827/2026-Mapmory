@@ -10,6 +10,8 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.place.application.PlaceErrorCode;
 import com.mapmory.backend.place.application.model.PlaceDetails;
 import com.mapmory.backend.place.application.model.SelectedPlace;
+import com.mapmory.backend.place.application.model.SuggestedRegion;
+import com.mapmory.backend.place.application.model.SuggestedRegion.Area;
 import com.mapmory.backend.place.application.port.DistrictLocator;
 import com.mapmory.backend.place.application.port.PlaceLookupPort;
 import com.mapmory.backend.place.application.port.PlaceRateLimitPort;
@@ -47,7 +49,8 @@ class PlaceSelectionServiceTest {
 
         SelectedPlace result = service.select(1L, "park-1", null);
 
-        assertThat(result.suggestedRegion()).isEqualTo(district);
+        assertThat(result.suggestedRegion()).isEqualTo(new SuggestedRegion(
+                new Area("KR", "대한민국"), new Area("11", "서울특별시"), new Area("11560", "영등포구")));
     }
 
     @Test
@@ -83,7 +86,8 @@ class PlaceSelectionServiceTest {
 
         SelectedPlace result = service.select(1L, "ChIJ-gyeong", null);
 
-        assertThat(result.suggestedRegion()).isEqualTo(district);
+        assertThat(result.suggestedRegion()).isEqualTo(new SuggestedRegion(
+                new Area("KR", "대한민국"), new Area("11", "서울특별시"), new Area("11110", "종로구")));
         verifyNoInteractions(districtLocator);
     }
 
