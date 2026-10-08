@@ -48,6 +48,9 @@ google:
   # 비어 있으면 모든 구글 로그인을 거부한다. (ADR 0019)
   client-ids: ${GOOGLE_CLIENT_IDS:}
   jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+  places:
+    # Places API (New) 키. 비어 있으면 장소 검색은 Geoapify를 쓴다. (docs/place-search.md)
+    api-key: ${GOOGLE_PLACES_API_KEY:}
 
 geoapify:
   api-key: ${GEOAPIFY_API_KEY:}

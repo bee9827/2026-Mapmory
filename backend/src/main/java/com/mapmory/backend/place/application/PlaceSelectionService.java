@@ -30,9 +30,9 @@ public class PlaceSelectionService {
         this.regionResolver = regionResolver;
     }
 
-    public SelectedPlace select(Long memberId, String placeId) {
+    public SelectedPlace select(Long memberId, String placeId, String sessionToken) {
         rateLimitPort.checkSelection(memberId);
-        PlaceDetails place = placeLookupPort.findById(placeId);
+        PlaceDetails place = placeLookupPort.findForSelection(placeId, sessionToken);
         return new SelectedPlace(place, suggestedRegion(place));
     }
 

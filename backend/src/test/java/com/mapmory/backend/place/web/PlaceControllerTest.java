@@ -24,7 +24,7 @@ class PlaceControllerTest {
         PlaceSearchService searchService = mock(PlaceSearchService.class);
         PlaceSelectionService selectionService = mock(PlaceSelectionService.class);
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(searchService, selectionService)).build();
-        when(searchService.search(null, "한강공원"))
+        when(searchService.search(null, "한강공원", null))
                 .thenReturn(List.of(new PlaceCandidate("park-1", "여의도한강공원", "서울 영등포구", null, null)));
 
         mockMvc.perform(get("/api/v1/places/search").param("query", "한강공원"))
@@ -38,7 +38,7 @@ class PlaceControllerTest {
         PlaceSearchService searchService = mock(PlaceSearchService.class);
         PlaceSelectionService selectionService = mock(PlaceSelectionService.class);
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(searchService, selectionService)).build();
-        when(selectionService.select(null, "park-1"))
+        when(selectionService.select(null, "park-1", null))
                 .thenReturn(new SelectedPlace(
                         new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932, null, null), null));
 
