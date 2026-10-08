@@ -45,14 +45,15 @@ public class GoogleRequestLimiter {
                 .build();
     }
 
+    // 속도 제한을 먼저 확인한다. 거절된 요청이 하루 한도를 쓰지 않게 하기 위해서다.
     public void reserveAutocomplete() {
-        consume(AUTOCOMPLETE_BUDGET + today(), autocompleteBudget, PlaceErrorCode.PLACE_SEARCH_BUDGET_EXHAUSTED);
         consume(REQUEST_PACE, requestPace, PlaceErrorCode.PLACE_RATE_LIMITED);
+        consume(AUTOCOMPLETE_BUDGET + today(), autocompleteBudget, PlaceErrorCode.PLACE_SEARCH_BUDGET_EXHAUSTED);
     }
 
     public void reserveDetails() {
-        consume(DETAILS_BUDGET + today(), detailsBudget, PlaceErrorCode.PLACE_PROVIDER_BUDGET_EXHAUSTED);
         consume(REQUEST_PACE, requestPace, PlaceErrorCode.PLACE_RATE_LIMITED);
+        consume(DETAILS_BUDGET + today(), detailsBudget, PlaceErrorCode.PLACE_PROVIDER_BUDGET_EXHAUSTED);
     }
 
     private void consume(String key, BucketConfiguration configuration, PlaceErrorCode exhaustedError) {
