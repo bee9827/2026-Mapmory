@@ -23,8 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/places")
 public class PlaceController {
 
-    // 클라이언트가 검색 화면을 열 때 만든 UUID. 같은 토큰의 검색과 선택이 Google에서 한 세션으로 과금된다.
-    private static final String SESSION_TOKEN = "[A-Za-z0-9_-]{1,64}";
+    // 클라이언트가 검색을 시작할 때 만든 UUID. Google은 URL-safe base64 36자 이하만 받는다.
+    private static final String SESSION_TOKEN = "[A-Za-z0-9_-]{1,36}";
 
     private final PlaceSearchService placeSearchService;
     private final PlaceSelectionService placeSelectionService;

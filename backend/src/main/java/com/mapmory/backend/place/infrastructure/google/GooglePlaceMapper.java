@@ -10,6 +10,10 @@ import tools.jackson.databind.JsonNode;
 
 class GooglePlaceMapper {
 
+    // 시·도 아래 단위를 큰 것부터. 예: 경기도 > 성남시 > 분당구, 서울특별시 > 종로구
+    private static final List<String> AREA_TYPES = List.of(
+            "administrative_area_level_2", "locality", "sublocality_level_1");
+
     List<PlaceCandidate> candidates(JsonNode response) {
         List<PlaceCandidate> candidates = new ArrayList<>();
         for (JsonNode suggestion : response.path("suggestions")) {
@@ -30,18 +34,49 @@ class GooglePlaceMapper {
     }
 
     Optional<PlaceDetails> details(JsonNode response, String placeId) {
-        JsonNode location = response.path("location");
-        if (!location.path("latitude").isNumber() || !location.path("longitude").isNumber()) {
+        JsonNode components = response.path("addressComponents");
+        if (!components.isArray()) {
             return Optional.empty();
         }
+        // 이름과 좌표는 요청하지 않는다. 이름은 클라이언트가 후보의 name을 쓰고,
+        // Places 좌표를 경계 판정에 쓰는 것은 약관(3.2.3(c)(iv))이 금지한다.
         return Optional.of(new PlaceDetails(
                 placeId,
-                text(response.path("displayName").path("text")),
-                countryCode(response.path("addressComponents")),
-                location.path("latitude").asDouble(),
-                location.path("longitude").asDouble(),
+                null,
+                countryCode(components),
+                null,
+                null,
                 GooglePlacesClient.ATTRIBUTION,
-                GooglePlacesClient.ATTRIBUTION_URL));
+                GooglePlacesClient.ATTRIBUTION_URL,
+                addressAreas(components)));
+    }
+
+    /** 시·도부터 작은 단위 순서의 주소 이름. 시·도가 없으면 빈 목록이다. */
+    private static List<String> addressAreas(JsonNode components) {
+        String province = componentText(components, "administrative_area_level_1");
+        if (province == null) {
+            return List.of();
+        }
+        List<String> areas = new ArrayList<>();
+        areas.add(province);
+        for (String type : AREA_TYPES) {
+            String name = componentText(components, type);
+            if (name != null && !areas.contains(name)) {
+                areas.add(name);
+            }
+        }
+        return List.copyOf(areas);
+    }
+
+    private static String componentText(JsonNode components, String wantedType) {
+        for (JsonNode component : components) {
+            for (JsonNode type : component.path("types")) {
+                if (wantedType.equals(type.asString())) {
+                    return text(component.path("longText"));
+                }
+            }
+        }
+        return null;
     }
 
     private static String countryCode(JsonNode components) {

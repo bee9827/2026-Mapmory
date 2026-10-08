@@ -51,6 +51,11 @@ google:
   places:
     # Places API (New) 키. 비어 있으면 장소 검색은 Geoapify를 쓴다. (docs/place-search.md)
     api-key: ${GOOGLE_PLACES_API_KEY:}
+    rate-limit:
+      # 월 무료 사용량(Autocomplete 10,000건, Place Details Essentials 10,000건)을 넘지 않도록 하루 한도를 둔다.
+      autocomplete-per-day: 300
+      details-per-day: 300
+      requests-per-second: 4
 
 geoapify:
   api-key: ${GEOAPIFY_API_KEY:}

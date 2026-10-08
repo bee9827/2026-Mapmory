@@ -16,6 +16,7 @@ import com.mapmory.backend.place.application.port.PlaceRateLimitPort;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
 import com.mapmory.backend.region.RegionType;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +31,7 @@ class PlaceSelectionServiceTest {
     @Mock PlaceRateLimitPort rateLimitPort;
     @Mock DistrictLocator districtLocator;
     @Mock RegionResolver regionResolver;
+    @Mock KoreanAddressRegionMatcher addressRegionMatcher;
     @InjectMocks PlaceSelectionService service;
 
     @Test
@@ -67,6 +69,22 @@ class PlaceSelectionServiceTest {
         SelectedPlace result = service.select(1L, "place-1", null);
 
         assertThat(result.suggestedRegion()).isNull();
+    }
+
+    @Test
+    void 주소를_주는_제공자는_좌표_대신_주소_이름으로_지역을_추천한다() {
+        Region country = Region.of(null, null, "KR", "대한민국", RegionType.COUNTRY);
+        Region province = Region.of(country, country, "11", "서울특별시", RegionType.PROVINCE);
+        Region district = Region.of(province, country, "11110", "종로구", RegionType.DISTRICT);
+        when(placeLookupPort.findForSelection("ChIJ-gyeong", null))
+                .thenReturn(new PlaceDetails("ChIJ-gyeong", "경복궁", "KR", null, null, null, null,
+                        List.of("서울특별시", "종로구")));
+        when(addressRegionMatcher.match(List.of("서울특별시", "종로구"))).thenReturn(Optional.of(district));
+
+        SelectedPlace result = service.select(1L, "ChIJ-gyeong", null);
+
+        assertThat(result.suggestedRegion()).isEqualTo(district);
+        verifyNoInteractions(districtLocator);
     }
 
     @Test

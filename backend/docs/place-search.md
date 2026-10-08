@@ -27,15 +27,19 @@
 
 ## Google Places Autocomplete
 
-`GOOGLE_PLACES_API_KEY`가 있으면 검색은 [Places API (New) Autocomplete](https://developers.google.com/maps/documentation/places/web-service/place-autocomplete)를 쓴다. Geoapify와 달리 한글 앞부분("경복" → 경복궁)으로도 장소를 찾는다.
+`GOOGLE_PLACES_API_KEY`가 있고 클라이언트가 `sessionToken`을 보내면 검색은 [Places API (New) Autocomplete](https://developers.google.com/maps/documentation/places/web-service/place-autocomplete)를 쓴다. Geoapify와 달리 한글 앞부분("경복" → 경복궁)으로도 장소를 찾는다.
 
-- 검색은 사진을 찾기 위한 도구다. 저장하는 것은 사진 GPS(사용자 데이터)와 우리 경계 데이터로 계산한 지역 코드, 장소 ID뿐이다. Google이 준 장소명과 좌표는 선택 응답과 지역 추천에만 쓰고 저장하지 않는다. 장소 ID는 저장이 허용되고, 좌표는 30일까지만 캐시할 수 있다([Service Specific Terms §14](https://cloud.google.com/maps-platform/terms/maps-service-terms), [Places 정책](https://developers.google.com/maps/documentation/places/web-service/policies)).
-- Google 지도 없이 Places를 쓸 수 있지만, Google 콘텐츠를 다른 지도 위에 표시하면 안 된다. 따라서 Google 장소명·좌표를 앱 지도에 찍지 않는다. 지도에는 사진 GPS를 쓴다.
-- 후보 목록에는 Google 로고(또는 `Google Maps` 표기)를 보여야 한다. 응답 `attribution`은 `Google Maps`다.
-- 선택 조회(`GET /places/{placeId}`)는 `id,location,addressComponents,displayName`을 요청한다. `displayName` 때문에 Place Details Pro로 과금된다(월 5,000건 무료). 클라이언트가 후보의 `name`을 표시하도록 바뀌면 `displayName`을 빼서 Essentials(월 10,000건 무료)로 낮출 수 있다. 기록 저장 시 재조회는 이름 없이 Essentials 필드만 요청한다.
-- 검색과 선택에 같은 `sessionToken`(UUID 권장, 영문·숫자·`-`·`_` 64자 이하)을 query parameter로 보내면 Autocomplete 요청이 세션으로 묶여 무료가 된다. 없어도 동작하며, 이때 Autocomplete는 요청당 과금된다(월 10,000건 무료).
-- Google은 괌·사이판·홍콩·마카오를 별도 국가 코드(GU·MP·HK·MO)로 주며, 그대로 사용한다. DB 국가 목록(V6)에는 있지만 앱 지역 목록(`GeneratedWorldMapData`)에는 아직 없다.
-- Geoapify 장소 ID(소문자 16진수)는 Google 키가 있어도 Geoapify로 조회한다. 기존 기록 수정을 위해 `GEOAPIFY_API_KEY`도 유지한다. 두 제공자는 아래 호출 제한을 함께 쓴다.
+- **누가 Google을 쓰나**: `sessionToken`을 보내는 앱 버전만 쓴다. 이전 앱은 출처를 "Powered by Geoapify"로 고정해 그리므로, Google 결과를 받으면 표기 정책을 지킬 수 없다. 그래서 토큰이 없는 요청은 키가 있어도 Geoapify로 검색한다. 선택(`GET /places/{placeId}`)과 기록 저장은 장소 ID 형식으로 제공자를 고른다. 소문자 16진수는 Geoapify, 그 밖은 Google이다. Google 키를 빼면 Google 장소 조회는 `PLACE_PROVIDER_UNAVAILABLE`(503)이 된다.
+- **저장하지 않는 것**: 검색은 사진을 찾기 위한 도구다. Google 장소는 장소 ID, 출처(`Google Maps`), 우리 지역 코드만 저장하고 이름은 저장하지 않는다(`placeName`이 `null`). place_id는 저장이 허용된다. 이름·주소 저장은 금지다([Maps Platform ToS 3.2.3(a)(iii), (b)](https://cloud.google.com/maps-platform/terms), [Service Specific Terms §14, A.3](https://cloud.google.com/maps-platform/terms/maps-service-terms)).
+- **좌표를 받지 않는 이유**: Places 좌표를 경계 판정(point-in-polygon)의 입력으로 쓰는 것은 금지다([ToS 3.2.3(c)(iv)](https://cloud.google.com/maps-platform/terms)). 그래서 Place Details는 `id,addressComponents`만 요청한다. 국가는 `country` 구성요소에서 받는다. 국내 시·군·구는 `administrative_area_level_1`(시·도)과 `administrative_area_level_2`·`locality`·`sublocality_level_1` 이름을 DB 지역 이름과 맞춰 추천한다(`KoreanAddressRegionMatcher`). 시·도는 줄임 이름("강원도" = "강원특별자치도")으로 비교한다. 일반구가 있는 시는 시 단위(V18)로 맞춘다. 맞추지 못하면 `manualRegionRequired`가 `true`다.
+- **지도**: Google 콘텐츠를 Google이 아닌 지도와 함께 쓰면 안 된다(§14.2). Google 장소명이나 좌표를 앱 지도에 표시하지 않는다. 지도에는 사진 GPS와 우리 지역 데이터만 쓴다.
+- **출처 표기**: 후보 목록의 위나 아래, 같은 영역 안에 Google Maps 로고(높이 16~19dp)를 둔다. 공간이 부족하면 `Google Maps` 글자(12~16sp, 번역 금지)로 대신할 수 있다([Places 정책](https://developers.google.com/maps/documentation/places/web-service/policies)). Google 결과 옆에 "Powered by Geoapify"를 함께 두면 안 된다.
+- **이름 표시**: 선택 응답의 `name`은 Google 장소에서 `null`이다. 클라이언트는 고른 후보의 `name`을 표시한다. `displayName`(Pro 필드)을 요청하지 않아 세션이 Essentials로 끝난다.
+- **sessionToken**: 검색을 시작할 때 UUID(36자)를 만들어 검색마다 보내고, 후보를 고를 때 같은 토큰을 선택 API에 보낸다. 선택 후나 검색을 지울 때는 새 토큰을 만든다. 서버는 영문·숫자·`-`·`_` 36자 이하만 받는다. Google 제한이 36자다.
+- **과금**: Essentials 상세 조회로 끝난 세션은 Autocomplete 12번째 요청까지 요청당(Autocomplete Requests, 월 10,000건 무료), 13번째부터 무료다. 상세 조회는 Place Details Essentials(월 10,000건 무료)다. 기록 저장 때 재조회도 Essentials다([세션 과금](https://developers.google.com/maps/documentation/places/web-service/session-pricing)). Google 호출은 Geoapify와 별도 한도(`google.places.rate-limit`, 자동완성·상세 각각 UTC 하루 300회, 초당 4회)로 막는다. 회원별 검색·선택 한도는 공통이다. 실제 비용 상한은 Google Cloud 콘솔의 할당량으로도 걸어 둔다.
+- **국가 코드**: Google은 괌·사이판·홍콩·마카오를 별도 국가 코드(GU·MP·HK·MO)로 주며, 그대로 쓴다. DB 국가 목록(V6)에는 있지만 앱 지역 목록(`GeneratedWorldMapData`)에는 아직 없다.
+- **오류**: 상세 조회의 404와, API 키 오류가 아닌 400은 `PLACE_NOT_FOUND`다. 잘못된 키(400 `API_KEY_*`)를 포함한 나머지와 검색 실패는 `PLACE_PROVIDER_UNAVAILABLE`이다.
+- **약관 고지**: 앱 이용약관과 개인정보 처리방침에 Google 서비스 약관과 개인정보처리방침을 포함해야 한다(Places 정책).
 
 ## 설정과 데이터
 
@@ -49,4 +53,4 @@
 
 ## 확인 범위
 
-Google·Geoapify 실호출에는 유효한 API 키가 필요하다. 단위 테스트는 Google 자동완성·필드 마스크·국가 변환, 제공자 라우팅, 검색 응답, 장소 ID 재조회, 경계 판정, 기록 저장 및 오류 흐름을 모의 응답으로 검증한다.
+Google·Geoapify 실호출에는 유효한 API 키가 필요하다. 단위 테스트는 Google 자동완성·필드 마스크·주소 기반 지역 추천·오류 변환, 토큰 기반 제공자 선택, Google 하루 한도(통합 테스트), 검색 응답, 장소 ID 재조회, 경계 판정, 기록 저장 및 오류 흐름을 모의 응답으로 검증한다.

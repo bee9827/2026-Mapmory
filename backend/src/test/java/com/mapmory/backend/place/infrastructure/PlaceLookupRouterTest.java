@@ -2,6 +2,7 @@ package com.mapmory.backend.place.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -34,6 +35,24 @@ class PlaceLookupRouterTest {
         router.search("경복궁", "session-1");
 
         verify(geoapify).search("경복궁");
+    }
+
+    @Test
+    void 세션_토큰을_보내지_않는_앱은_Google_키가_있어도_Geoapify로_검색한다() {
+        when(google.isConfigured()).thenReturn(true);
+
+        router.search("경복궁", null);
+
+        verify(geoapify).search("경복궁");
+        verify(google, never()).search(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void Google_키를_뺀_뒤에도_Google_장소는_Google로_보내_제공자_장애로_알린다() {
+        router.findById(GOOGLE_ID);
+
+        verify(google).findById(GOOGLE_ID);
+        verifyNoInteractions(geoapify);
     }
 
     @Test
