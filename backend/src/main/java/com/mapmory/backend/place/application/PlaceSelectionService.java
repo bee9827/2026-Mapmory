@@ -3,7 +3,6 @@ package com.mapmory.backend.place.application;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.place.application.model.PlaceDetails;
 import com.mapmory.backend.place.application.model.SelectedPlace;
-import com.mapmory.backend.place.application.model.SuggestedRegion;
 import com.mapmory.backend.place.application.port.DistrictLocator;
 import com.mapmory.backend.place.application.port.PlaceLookupPort;
 import com.mapmory.backend.place.application.port.PlaceRateLimitPort;
@@ -37,8 +36,7 @@ public class PlaceSelectionService {
     public SelectedPlace select(Long memberId, String placeId, String sessionToken) {
         rateLimitPort.checkSelection(memberId);
         PlaceDetails place = placeLookupPort.findForSelection(placeId, sessionToken);
-        Region region = suggestedRegion(place);
-        return new SelectedPlace(place, region == null ? null : SuggestedRegion.from(region));
+        return new SelectedPlace(place, suggestedRegion(place));
     }
 
     public Region suggestedRegion(PlaceDetails place) {
