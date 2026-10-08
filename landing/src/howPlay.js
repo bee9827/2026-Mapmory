@@ -19,7 +19,7 @@ export const HOW_PLAY_PLACES = Object.freeze([
     label: "강원",
     regionCode: "KR-42",
     photos: [
-      { src: photo("gangwon-01"), alt: "파란 하늘 아래 설악산의 바위 봉우리" },
+      { src: photo("gangwon-01"), alt: "단풍 든 설악산 골짜기와 그 안의 절" },
       { src: photo("gangwon-02"), alt: "단풍 사이 설악산의 큰 불상" },
       { src: photo("gangwon-03"), alt: "단풍 든 산 아래 돌다리" },
       { src: photo("gangwon-04"), alt: "강릉 바닷가의 파란 사진 프레임 조형물" },
