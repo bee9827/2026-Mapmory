@@ -8,7 +8,6 @@ import {
   CaretDown,
   CloudArrowUp,
   DeviceMobile,
-  Trash,
   DownloadSimple,
   EnvelopeSimple,
   GlobeHemisphereEast,
@@ -133,18 +132,17 @@ const memories = [
 const TRUST_POINTS = [
   { Icon: DeviceMobile, title: "사진 찾기는 폰 안에서", body: "그 장소에서 찍은 사진인지 폰 안에서 위치·날짜 정보로만 확인해요. 사진첩을 서버로 보내지 않아요." },
   { Icon: CloudArrowUp, title: "고른 사진만 올라가요", body: "기록을 저장할 때 내가 직접 고른 사진만 업로드돼요." },
-  { Icon: Trash, title: "기록은 언제든 지울 수 있어요", body: "남긴 여행 기록은 앱에서 언제든 삭제할 수 있어요." },
 ];
 
-// On-device matching and on-save upload form one boundary; deleting a record stays a separate line.
-const [TRUST_ON_DEVICE, TRUST_ON_SAVE, TRUST_DELETE] = TRUST_POINTS;
+// The panel is only the on-device -> on-save boundary; deleting a record is answered in the FAQ.
+const [TRUST_ON_DEVICE, TRUST_ON_SAVE] = TRUST_POINTS;
 const { Icon: TrustOnDeviceIcon } = TRUST_ON_DEVICE;
 const { Icon: TrustOnSaveIcon } = TRUST_ON_SAVE;
-const { Icon: TrustDeleteIcon } = TRUST_DELETE;
 
 const FAQ_ITEMS = [
   { question: "사진첩 사진을 전부 가져가나요?", answer: "아니요. 사진을 찾는 일은 폰 안에서만 이뤄지고, 서버에는 기록을 저장할 때 직접 고른 사진만 올라가요." },
   { question: "위치 정보가 없는 사진은요?", answer: "자동으로 찾지는 못하지만, 사진첩에서 직접 골라 기록에 넣을 수 있어요." },
+  { question: "남긴 기록은 지울 수 있나요?", answer: "네. 여행 기록은 앱에서 언제든 삭제할 수 있어요." },
   { question: "무료인가요?", answer: "네. App Store와 Google Play에서 무료로 받아 바로 쓸 수 있어요." },
 ];
 
@@ -994,13 +992,6 @@ function App() {
             <span className="trust-zone-label"><TrustOnSaveIcon size={18} weight="duotone" />저장할 때</span>
             <h3>{TRUST_ON_SAVE.title}</h3>
             <p>{TRUST_ON_SAVE.body}</p>
-          </div>
-        </div>
-        <div className="trust-delete">
-          <TrustDeleteIcon size={22} weight="duotone" />
-          <div>
-            <h3>{TRUST_DELETE.title}</h3>
-            <p>{TRUST_DELETE.body}</p>
           </div>
         </div>
         <div className="faq-list">
