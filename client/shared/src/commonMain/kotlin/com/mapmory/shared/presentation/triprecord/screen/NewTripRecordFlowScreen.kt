@@ -1498,6 +1498,8 @@ private fun FlowTopBar(
     title: String,
     onBackClick: () -> Unit,
     actionLabel: String? = null,
+    actionStatusLabel: String? = null,
+    reserveActionStatusSlot: Boolean = false,
     actionEnabled: Boolean = true,
     onActionClick: () -> Unit = {},
 ) {
@@ -1512,16 +1514,45 @@ private fun FlowTopBar(
                         enabled = actionEnabled,
                         contentPadding = PaddingValues(horizontal = 10.dp),
                     ) {
-                        Text(
-                            text = label,
-                            color = if (actionEnabled) {
-                                TripRecordPalette.current.accent
-                            } else {
-                                TripRecordPalette.current.muted
-                            },
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (actionEnabled || actionStatusLabel != null) {
+                                    TripRecordPalette.current.accent
+                                } else {
+                                    TripRecordPalette.current.muted
+                                },
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                            if (reserveActionStatusSlot || actionStatusLabel != null) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .then(
+                                            if (actionStatusLabel != null) {
+                                                Modifier.semantics {
+                                                    contentDescription = actionStatusLabel
+                                                }
+                                            } else {
+                                                Modifier
+                                            },
+                                        ),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (actionStatusLabel != null) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.fillMaxSize(),
+                                            color = TripRecordPalette.current.accent,
+                                            strokeWidth = 2.dp,
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -1954,12 +1985,14 @@ private fun PhotoPickerStep(
         FlowTopBar(
             title = "사진 고르기",
             onBackClick = onBackClick,
-            actionLabel = when {
+            actionLabel = actionLabel,
+            actionStatusLabel = when {
                 isPreparing -> "저장 요청 중"
                 isSelectingAll -> "사진 불러오는 중"
                 isRefreshingFilter -> "필터 적용 중"
-                else -> actionLabel
+                else -> null
             },
+            reserveActionStatusSlot = true,
             actionEnabled = pagingState.selectedIds.isNotEmpty() &&
                 !isPreparing &&
                 !isSelectingAll &&
@@ -2030,7 +2063,13 @@ private fun PhotoPickerStep(
                                 enabled = !isRefreshingFilter,
                                 onCheckedChange = onRecordedFilterChanged,
                             )
-                            Text("기록한 사진 제외", color = TripRecordPalette.current.text)
+                            Text(
+                                text = "이미 기록에 포함된 사진 숨기기",
+                                color = TripRecordPalette.current.bodyText,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(start = 4.dp),
+                            )
                         }
                     }
                 }
@@ -2265,9 +2304,10 @@ private fun PhotoPickerHeader(
             )
         }
         Text(
-            text = "날짜별 선택은 현재 불러온 사진에 적용돼요. 추천 사진은 최대 ${TripRecordPhotoRules.MaxPhotosPerRecord}장까지 선택할 수 있어요.",
+            text = "날짜별 선택은 현재 불러온 사진에 적용돼요.\n추천 사진은 최대 ${TripRecordPhotoRules.MaxPhotosPerRecord}장까지 선택할 수 있어요.",
             color = TripRecordPalette.current.secondaryText,
             fontSize = 11.sp,
+            lineHeight = 16.sp,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
