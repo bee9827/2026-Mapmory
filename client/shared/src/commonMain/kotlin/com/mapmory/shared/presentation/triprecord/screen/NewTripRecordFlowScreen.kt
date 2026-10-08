@@ -63,7 +63,6 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -84,12 +83,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.mapmory.shared.presentation.components.LocalMapmoryImageTransitionScope
 import androidx.compose.ui.unit.sp
+import com.mapmory.shared.LocalMapmoryTheme
 import com.mapmory.shared.analytics.LocalMapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.LocationType
+import com.mapmory.shared.domain.model.PlaceAttribution
 import com.mapmory.shared.domain.model.PlaceCandidate
 import com.mapmory.shared.domain.model.PlaceReference
+import com.mapmory.shared.domain.model.PlaceRules
 import com.mapmory.shared.domain.model.TripRecordPhotoRules
 import com.mapmory.shared.presentation.photo.PhotoLibraryActionsFactory
 import com.mapmory.shared.presentation.photo.PhotoLibraryPermissionIssue
@@ -142,8 +144,6 @@ internal fun newRecordBackAction(
 }
 
 private const val KoreaCountryId = 1L
-private const val MinPlaceQueryLength = 1
-private const val MaxPlaceQueryLength = 100
 private const val PlaceSearchDebounceMillis = 350L
 private const val PhotoListPrefetchGroups = 2
 private const val PhotoLimitMessageDurationMillis = 3_000L
@@ -591,7 +591,7 @@ internal fun NewTripRecordFlowScreen(
         val selectedRegionName = uiState.selectedLocation?.flowDisplayName(locations)
         if (
             !uiState.isPlaceSearchAvailable ||
-            query.length < MinPlaceQueryLength ||
+            !PlaceRules.isSearchableQuery(query) ||
             query.equals(uiState.selectedPlace?.name, ignoreCase = true) ||
             query.equals(selectedRegionName, ignoreCase = true) ||
             uiState.isSelectingPlace ||
@@ -600,7 +600,7 @@ internal fun NewTripRecordFlowScreen(
             return@LaunchedEffect
         }
         delay(PlaceSearchDebounceMillis)
-        onSearchPlaces(query.take(MaxPlaceQueryLength))
+        onSearchPlaces(query.take(PlaceRules.MaxQueryLength))
     }
 
     LaunchedEffect(
@@ -857,7 +857,7 @@ internal fun NewTripRecordFlowScreen(
                             onSearchQueryChanged = {
                                 onLocationTouched()
                                 if (it.isNotBlank()) logFieldInteraction("location")
-                                locationSearchQuery = it.take(MaxPlaceQueryLength)
+                                locationSearchQuery = it.take(PlaceRules.MaxQueryLength)
                                 onPlaceSearchQueryChanged()
                                 val selectedName = uiState.selectedLocation?.flowDisplayName(locations)
                                 if (selectedName != null && it != selectedName) onLocationCleared()
@@ -1149,7 +1149,7 @@ private fun LocationStep(
             uiState.isPlaceSearchAvailable &&
             uiState.hasSearchedPlaces &&
             !uiState.isSearchingPlaces &&
-            searchQuery.trim().length >= MinPlaceQueryLength &&
+            PlaceRules.isSearchableQuery(searchQuery) &&
             !uiState.manualRegionRequired &&
             !queryMatchesSelectedRegion &&
             !searchQuery.trim().equals(uiState.selectedPlace?.name, ignoreCase = true)
@@ -1219,7 +1219,7 @@ private fun LocationStep(
             if (searchQuery.isNotBlank()) {
                 if (
                     uiState.isPlaceSearchAvailable &&
-                    searchQuery.trim().length >= MinPlaceQueryLength &&
+                    PlaceRules.isSearchableQuery(searchQuery) &&
                     !uiState.manualRegionRequired &&
                     !queryMatchesSelectedRegion &&
                     !searchQuery.trim().equals(uiState.selectedPlace?.name, ignoreCase = true)
@@ -1335,7 +1335,7 @@ private fun SelectedPlaceCard(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = place.name,
+                    text = place.name ?: place.address.orEmpty(),
                     color = TripRecordPalette.current.headingText,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -1461,7 +1461,7 @@ private fun PlaceAttributionLinks(
     attributionUrl: String?,
     modifier: Modifier = Modifier,
 ) {
-    if (attribution == GoogleMapsAttribution) {
+    if (PlaceAttribution.isGoogleMaps(attribution, attributionUrl)) {
         GoogleMapsAttributionText(modifier)
         return
     }
@@ -1502,10 +1502,9 @@ private fun PlaceAttributionLinks(
 // https://developers.google.com/maps/documentation/places/web-service/policies
 @Composable
 private fun GoogleMapsAttributionText(modifier: Modifier = Modifier) {
-    val isDarkSurface = TripRecordPalette.current.surface.luminance() < 0.5f
     Text(
-        text = GoogleMapsAttribution,
-        color = if (isDarkSurface) Color.White else GoogleMapsAttributionColor,
+        text = PlaceAttribution.GoogleMaps,
+        color = if (LocalMapmoryTheme.current.isDark) Color.White else GoogleMapsAttributionColor,
         fontSize = 12.sp,
         fontWeight = FontWeight.Normal,
         fontFamily = FontFamily.SansSerif,
@@ -1516,7 +1515,6 @@ private fun GoogleMapsAttributionText(modifier: Modifier = Modifier) {
 }
 
 private const val GeoapifyUrl = "https://www.geoapify.com/"
-private const val GoogleMapsAttribution = "Google Maps"
 private val GoogleMapsAttributionColor = Color(0xFF5E5E5E)
 
 @Composable

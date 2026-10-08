@@ -9,6 +9,7 @@ import com.mapmory.shared.data.remote.MapmoryApiException
 import com.mapmory.shared.domain.model.Location
 import com.mapmory.shared.domain.model.PlaceCandidate
 import com.mapmory.shared.domain.model.PlaceReference
+import com.mapmory.shared.domain.model.PlaceRules
 import com.mapmory.shared.domain.model.PlaceSelection
 import com.mapmory.shared.domain.model.Tag
 import com.mapmory.shared.domain.model.TagRules
@@ -26,6 +27,7 @@ import com.mapmory.shared.domain.usecase.GetTagsUseCase
 import com.mapmory.shared.domain.usecase.UpdateTripRecordUseCase
 import com.mapmory.shared.presentation.photo.SelectedPhoto
 import com.mapmory.shared.presentation.triprecord.isSelectableTripRecordDestination
+import com.mapmory.shared.presentation.triprecord.tripRecordCountryCode
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorErrorTarget
 import com.mapmory.shared.presentation.triprecord.state.TripRecordEditorUiState
 import com.mapmory.shared.presentation.triprecord.state.toTripRecordPhotoUiState
@@ -51,6 +53,7 @@ class TripRecordEditorViewModel(
     private var placeSearchGeneration = 0
     private var placeSelectionGeneration = 0
     private var placeSessionToken: String? = null
+    private var rejectedPlaceName: String? = null
 
     var uiState by mutableStateOf(TripRecordEditorUiState())
         private set
@@ -62,6 +65,7 @@ class TripRecordEditorViewModel(
         placeSearchGeneration += 1
         placeSelectionGeneration += 1
         placeSessionToken = null
+        rejectedPlaceName = null
         uiState = TripRecordEditorUiState()
         savedRecordId = null
         isRouteInitialized = false
@@ -86,6 +90,7 @@ class TripRecordEditorViewModel(
         placeSearchGeneration += 1
         placeSelectionGeneration += 1
         placeSessionToken = null
+        rejectedPlaceName = null
         uiState = TripRecordEditorUiState(
             selectedLocation = location?.takeIf(Location::isSelectableTripRecordDestination),
             isPlaceSearchAvailable = placeRepository != null,
@@ -116,6 +121,7 @@ class TripRecordEditorViewModel(
         placeSearchGeneration += 1
         placeSelectionGeneration += 1
         placeSessionToken = null
+        rejectedPlaceName = null
         val allTags = (uiState.availableTags + record.tags).distinctBy { it.id }
         uiState = TripRecordEditorUiState(
             recordId = record.id,
@@ -292,8 +298,16 @@ class TripRecordEditorViewModel(
 
     fun selectLocation(location: Location) {
         if (!location.isSelectableTripRecordDestination()) return
+        // 지역을 직접 고르면 장소 검색 세션은 끝난다.
+        placeSessionToken = null
+        val place = uiState.selectedPlace
+        // 다른 나라를 고르면 서버가 PLACE_COUNTRY_MISMATCH로 거절하므로 장소 연결을 뺀다.
+        val placeCountryCode = place?.countryCode
+        val keepsPlace = placeCountryCode == null || placeCountryCode == location.tripRecordCountryCode()
         uiState = uiState.copy(
             selectedLocation = location,
+            selectedPlace = place.takeIf { keepsPlace },
+            placeSelectionErrorMessage = null,
             manualRegionRequired = false,
         ).revalidatedAfterChange(TripRecordEditorErrorTarget.LOCATION)
     }
@@ -306,6 +320,7 @@ class TripRecordEditorViewModel(
             isSearchingPlaces = false,
             hasSearchedPlaces = false,
             placeSearchErrorMessage = null,
+            placeSelectionErrorMessage = null,
             isSelectingPlace = false,
         )
     }
@@ -313,14 +328,16 @@ class TripRecordEditorViewModel(
     suspend fun searchPlaces(query: String) {
         val normalizedQuery = query.trim()
         val repository = placeRepository ?: return
-        if (normalizedQuery.length !in PlaceMinQueryLength..PlaceMaxQueryLength) return
+        if (!PlaceRules.isSearchableQuery(normalizedQuery)) return
+        // 앱에서 고를 수 없는 장소로 거절한 후보를 같은 이름으로 다시 검색하지 않는다.
+        if (normalizedQuery == rejectedPlaceName) return
         val generation = placeSearchGeneration
         uiState = uiState.copy(isSearchingPlaces = true, placeSearchErrorMessage = null)
         repository.searchPlaces(normalizedQuery, currentPlaceSessionToken()).fold(
             onSuccess = { candidates ->
                 if (generation == placeSearchGeneration) {
                     uiState = uiState.copy(
-                        placeSearchResults = candidates.take(MaxPlaceCandidates),
+                        placeSearchResults = candidates.take(PlaceRules.MaxCandidates),
                         isSearchingPlaces = false,
                         hasSearchedPlaces = true,
                     )
@@ -360,15 +377,20 @@ class TripRecordEditorViewModel(
             onSuccess = { selection ->
                 if (generation != placeSelectionGeneration) return@fold null
                 if (selection.isOutsideRegionCatalog(regionCatalog)) {
+                    rejectedPlaceName = candidate.name.trim()
                     uiState = uiState.copy(
+                        selectedPlace = null,
                         isSelectingPlace = false,
                         placeSelectionErrorMessage = PlaceOutsideRegionCatalogMessage,
-                    )
+                        manualRegionRequired = false,
+                    ).revalidatedAfterChange()
                     return@fold null
                 }
-                // Google 장소는 선택 응답에 이름이 없으므로 고른 후보의 이름을 보여 준다.
+                rejectedPlaceName = null
+                // 검색창에 고른 후보의 이름이 들어가므로 같은 이름을 보여 준다.
+                // Google 장소는 선택 응답에 이름이 없다.
                 val place = selection.place.copy(
-                    name = selection.place.name.ifBlank { candidate.name },
+                    name = candidate.name,
                     address = candidate.address,
                 )
                 val location = selection.toSelectableLocation(regionCatalog)
@@ -725,9 +747,6 @@ private fun randomPlaceSessionToken(): String = Uuid.random().toString()
 
 private const val PlaceOutsideRegionCatalogMessage =
     "이 장소가 있는 지역은 아직 앱에서 고를 수 없어요. 지역을 직접 검색해 선택해 주세요."
-private const val PlaceMinQueryLength = 1
-private const val PlaceMaxQueryLength = 100
-private const val MaxPlaceCandidates = 10
 private const val KoreaCountryCode = "KR"
 private const val KoreanProvincePrefix = "KR-"
 

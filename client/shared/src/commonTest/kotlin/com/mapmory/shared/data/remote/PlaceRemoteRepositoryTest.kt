@@ -70,6 +70,7 @@ class PlaceRemoteRepositoryTest {
                     name = "판교역",
                     attribution = "© OpenStreetMap contributors",
                     attributionUrl = "https://www.openstreetmap.org/copyright",
+                    countryCode = "KR",
                 ),
                 countryCode = "KR",
                 suggestedRegion = PlaceRegionSuggestion("KR", "41", "41135"),
@@ -92,6 +93,7 @@ class PlaceRemoteRepositoryTest {
                     when (requestCount) {
                         1 -> {
                             assertEquals("괌", request.url.parameters["query"])
+                            assertEquals("google-session", request.url.parameters["sessionToken"])
                             respondJson(
                                 """{"data":[{"placeId":"ChIJ-guam","name":"괌","address":"미국","attribution":"Google Maps","attributionUrl":"https://www.google.com/maps"}]}""",
                             )
@@ -99,6 +101,7 @@ class PlaceRemoteRepositoryTest {
 
                         else -> {
                             assertEquals("/api/v1/places/ChIJ-guam", request.url.encodedPath)
+                            assertEquals("google-session", request.url.parameters["sessionToken"])
                             respondJson(
                                 """{"data":{"placeId":"ChIJ-guam","name":null,"countryCode":null,"suggestedRegion":null,"manualRegionRequired":true,"attribution":"Google Maps","attributionUrl":"https://www.google.com/maps"}}""",
                             )
@@ -113,12 +116,12 @@ class PlaceRemoteRepositoryTest {
             accessTokenProvider = AccessTokenProvider { "guest-token" },
         )
 
-        assertEquals("ChIJ-guam", repository.searchPlaces("괌", "session-1").getOrThrow().single().placeId)
+        assertEquals("ChIJ-guam", repository.searchPlaces("괌", "google-session").getOrThrow().single().placeId)
         assertEquals(
             PlaceSelection(
                 place = PlaceReference(
                     placeId = "ChIJ-guam",
-                    name = "",
+                    name = null,
                     attribution = "Google Maps",
                     attributionUrl = "https://www.google.com/maps",
                 ),
@@ -126,7 +129,7 @@ class PlaceRemoteRepositoryTest {
                 suggestedRegion = null,
                 manualRegionRequired = true,
             ),
-            repository.selectPlace("ChIJ-guam", "session-1").getOrThrow(),
+            repository.selectPlace("ChIJ-guam", "google-session").getOrThrow(),
         )
         assertEquals(2, requestCount)
         client.close()
