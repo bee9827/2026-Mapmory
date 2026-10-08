@@ -11,6 +11,10 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
 
+admin:
+  cors:
+    allowed-origins: ${ADMIN_ALLOWED_ORIGINS}
+
 logging:
   file:
     name: /var/log/mapmory/application.log
