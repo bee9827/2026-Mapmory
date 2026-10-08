@@ -3,13 +3,16 @@ package com.mapmory.shared.presentation.triprecord.screen
 import com.mapmory.shared.presentation.components.MapmoryPhotoExpansion
 import com.mapmory.shared.presentation.components.MapmoryPhotoViewer
 import com.mapmory.shared.presentation.components.MapmoryAsyncImage
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,6 +65,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
@@ -78,6 +82,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.mapmory.shared.presentation.components.LocalMapmoryImageTransitionScope
@@ -146,6 +151,33 @@ private const val PlaceSearchDebounceMillis = 350L
 private const val PhotoListPrefetchGroups = 2
 private const val PhotoLimitMessageDurationMillis = 3_000L
 private const val DragAutoScrollFrameMillis = 16L
+private const val DefaultPhotoGridColumns = 3
+private const val MinPhotoGridColumns = 1
+private const val MaxPhotoGridColumns = 4
+private const val PhotoGridZoomThreshold = 1.25f
+
+internal data class PhotoGridPinchResult(
+    val columnCount: Int,
+    val accumulatedZoom: Float,
+)
+
+internal fun photoGridPinchResultAfterZoom(current: Int, accumulatedZoom: Float): PhotoGridPinchResult? {
+    val nextColumns = when {
+        accumulatedZoom >= PhotoGridZoomThreshold -> (current - 1).coerceAtLeast(MinPhotoGridColumns)
+        accumulatedZoom <= 1f / PhotoGridZoomThreshold -> (current + 1).coerceAtMost(MaxPhotoGridColumns)
+        else -> return null
+    }
+    val columnsChanged = nextColumns != current
+
+    return PhotoGridPinchResult(
+        columnCount = nextColumns,
+        accumulatedZoom = when {
+            !columnsChanged -> 1f
+            accumulatedZoom >= PhotoGridZoomThreshold -> accumulatedZoom / PhotoGridZoomThreshold
+            else -> accumulatedZoom * PhotoGridZoomThreshold
+        },
+    )
+}
 
 internal data class PhotoPickerScrollBarMetrics(
     val thumbFraction: Float,
@@ -1187,18 +1219,11 @@ private fun LocationStep(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 14.dp),
             )
-            Text(
-                text = "해당 장소에서 찍은 사진을 불러와줘요.",
-                color = TripRecordPalette.current.bodyText,
-                fontSize = 14.sp,
-                lineHeight = 21.sp,
-                modifier = Modifier.padding(top = 10.dp),
-            )
             FlowSectionTitle(
                 title = "장소",
                 badge = "필수",
                 helper = "지역은 한 글자부터, 장소는 두 글자부터 검색해요.",
-                modifier = Modifier.padding(top = 30.dp),
+                modifier = Modifier.padding(top = 24.dp),
             )
             LocationSearchField(
                 value = searchQuery,
@@ -1542,30 +1567,27 @@ private fun FlowSectionTitle(
     helper: String,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Bottom,
-    ) {
-        Text(
-            text = title,
-            color = TripRecordPalette.current.headingText,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-        )
-        Text(
-            text = badge,
-            color = TripRecordPalette.current.accent,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 8.dp, bottom = 2.dp),
-        )
-        Spacer(Modifier.weight(1f))
+    Column(modifier = modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                text = title,
+                color = TripRecordPalette.current.headingText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = badge,
+                color = TripRecordPalette.current.accent,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 8.dp, bottom = 2.dp),
+            )
+        }
         Text(
             text = helper,
             color = TripRecordPalette.current.secondaryText,
             fontSize = 11.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp),
         )
     }
 }
@@ -1896,6 +1918,36 @@ private fun PhotoPickerStep(
     onAllToggle: () -> Unit,
 ) {
     val groups = remember(pagingState.photos) { pagingState.photos.toPhotoDateGroups() }
+    var photoGridColumns by rememberSaveable { mutableStateOf(DefaultPhotoGridColumns) }
+    var accumulatedGridZoom by remember { mutableStateOf(1f) }
+    val previewButtonSize by animateDpAsState(
+        targetValue = when (photoGridColumns) {
+            1 -> 48.dp
+            2 -> 38.dp
+            3 -> 32.dp
+            else -> 27.dp
+        },
+        label = "photoPreviewButtonSize",
+    )
+    val previewIconSize by animateDpAsState(
+        targetValue = when (photoGridColumns) {
+            1 -> 24.dp
+            2 -> 19.dp
+            3 -> 16.dp
+            else -> 14.dp
+        },
+        label = "photoPreviewIconSize",
+    )
+    val gridTransformableState = rememberTransformableState { _, zoomChange, _, _ ->
+        accumulatedGridZoom *= zoomChange
+        photoGridPinchResultAfterZoom(photoGridColumns, accumulatedGridZoom)?.let { result ->
+            photoGridColumns = result.columnCount
+            accumulatedGridZoom = result.accumulatedZoom
+        }
+    }
+    LaunchedEffect(gridTransformableState.isTransformInProgress) {
+        if (!gridTransformableState.isTransformInProgress) accumulatedGridZoom = 1f
+    }
     val density = LocalDensity.current
     val autoScrollEdgeSize = with(density) { 104.dp.toPx() }
     val maximumAutoScrollStep = with(density) { 30.dp.toPx() }
@@ -1959,6 +2011,12 @@ private fun PhotoPickerStep(
                 modifier = Modifier
                     .fillMaxSize()
                     .navigationBarsPadding()
+                    .transformable(
+                        state = gridTransformableState,
+                        canPan = { false },
+                        lockRotationOnZoomPan = true,
+                        enabled = pagingState.photos.isNotEmpty(),
+                    )
                     .clipToBounds()
                     .onGloballyPositioned { coordinates -> listBounds = coordinates.boundsInRoot() }
                     .pointerInput(dragSelectionController) {
@@ -2039,12 +2097,16 @@ private fun PhotoPickerStep(
                         PhotoDateGroup(
                             date = date,
                             photos = photos,
+                            columnCount = photoGridColumns,
+                            previewButtonSize = previewButtonSize,
+                            previewIconSize = previewIconSize,
                             selectedIds = pagingState.selectedIds,
                             onGroupToggle = { onGroupToggle(photos.map(SelectedPhoto::id)) },
                             onPhotoPreview = onPhotoPreview,
                             onPhotoToggle = onPhotoToggle,
                             dragSelectionController = dragSelectionController,
                             recordedPhotoIds = recordedPhotoIds,
+                            modifier = Modifier.animateItem(),
                         )
                     }
                 }
@@ -2282,15 +2344,19 @@ private fun EmptyPhotoPicker(onPickFromGallery: () -> Unit) {
 private fun PhotoDateGroup(
     date: String,
     photos: List<SelectedPhoto>,
+    columnCount: Int,
+    previewButtonSize: Dp,
+    previewIconSize: Dp,
     selectedIds: Set<String>,
     onGroupToggle: () -> Unit,
     onPhotoPreview: (SelectedPhoto) -> Unit,
     onPhotoToggle: (SelectedPhoto) -> Unit,
     dragSelectionController: PhotoDragSelectionController,
     recordedPhotoIds: Set<String>,
+    modifier: Modifier = Modifier,
 ) {
     val allSelected = photos.all { it.id in selectedIds }
-    Column {
+    Column(modifier = modifier) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -2323,7 +2389,7 @@ private fun PhotoDateGroup(
             modifier = Modifier.padding(top = 12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            photos.chunked(2).forEach { rowPhotos ->
+            photos.chunked(columnCount).forEach { rowPhotos ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -2336,10 +2402,14 @@ private fun PhotoDateGroup(
                             onToggle = { onPhotoToggle(photo) },
                             dragSelectionController = dragSelectionController,
                             recorded = photo.id in recordedPhotoIds,
+                            previewButtonSize = previewButtonSize,
+                            previewIconSize = previewIconSize,
                             modifier = Modifier.weight(1f),
                         )
                     }
-                    if (rowPhotos.size == 1) Spacer(Modifier.weight(1f))
+                    repeat(columnCount - rowPhotos.size) {
+                        Spacer(Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -2349,6 +2419,8 @@ private fun PhotoDateGroup(
 @Composable
 private fun PhotoSelectionCard(
     photo: SelectedPhoto,
+    previewButtonSize: Dp,
+    previewIconSize: Dp,
     selected: Boolean,
     onPreview: () -> Unit,
     onToggle: () -> Unit,
@@ -2415,7 +2487,7 @@ private fun PhotoSelectionCard(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(8.dp)
-                .size(38.dp)
+                .size(previewButtonSize)
                 .background(
                     if (selected) {
                         TripRecordPalette.current.accent
@@ -2430,7 +2502,7 @@ private fun PhotoSelectionCard(
         ) {
             SearchIcon(
                 color = TripRecordPalette.current.contentOnMedia,
-                modifier = Modifier.size(19.dp),
+                modifier = Modifier.size(previewIconSize),
             )
         }
     }

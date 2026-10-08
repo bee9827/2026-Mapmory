@@ -20,6 +20,7 @@ import com.mapmory.shared.data.remote.TripStatisticsRemoteRepository
 import com.mapmory.shared.data.remote.createHttpClient
 import com.mapmory.shared.data.remote.installMapmoryAuthRetry
 import com.mapmory.shared.data.repository.AuthenticatedMapSummaryRepository
+import com.mapmory.shared.data.repository.AuthenticatedPlaceRepository
 import com.mapmory.shared.data.repository.AuthenticatedTagRepository
 import com.mapmory.shared.data.repository.AuthenticatedTripRecordRepository
 import com.mapmory.shared.data.repository.AuthenticatedTripStatisticsRepository
@@ -407,7 +408,7 @@ internal fun createGuestRemoteAppContainer(
         tripStatisticsRepository = AuthenticatedTripStatisticsRepository(session, remoteTripStatistics),
         tripStatisticsCache = tripStatisticsCache,
         tagRepository = AuthenticatedTagRepository(session, remoteTags),
-        placeRepository = remotePlaces,
+        placeRepository = AuthenticatedPlaceRepository(session, remotePlaces),
         regionCatalog = regionCatalog,
         themePreference = themePreference,
         onboardingPreference = onboardingPreference,
