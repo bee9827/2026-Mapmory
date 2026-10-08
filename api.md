@@ -25,7 +25,7 @@
 | 구현됨 | `POST` | `/auth/login/guest` | 게스트 로그인 |
 | 구현됨 | `POST` | `/auth/token/refresh` | Access·Refresh Token 회전 재발급 |
 | 구현됨 | `POST` | `/auth/logout` | Refresh Token 폐기 |
-| 구현 전 설계 | `GET` | `/admin/dashboard` | 운영 현황 집계 조회 |
+| 구현됨 | `GET` | `/admin/dashboard` | 운영 현황 집계 조회 |
 | 구현 전 설계 | `GET` | `/admin/members` | 회원 목록 조회 |
 | 구현 전 설계 | `GET` | `/admin/members/{memberId}` | 회원 상세·세션 상태 조회 |
 | 구현 전 설계 | `POST` | `/service-feedback` | 앱 서비스 의견 제출 |
@@ -810,7 +810,7 @@ Authorization: Bearer {accessToken}
 해외 행정구역 저장을 지원할 때 필드와 집계 단계, API 버전을 함께 재검토해야 한다. 자세한 결정과
 변경 조건은 [ADR 0016](backend/docs/adr/0016-travel-statistics-read-model.md)을 참고한다.
 
-## 8. 관리자 및 서비스 의견 API — 구현 전 설계
+## 8. 관리자 및 서비스 의견 API
 
 관리자 대시보드와 관리자 API는 현재 로그인 없이 접근할 수 있다. 따라서 배포 환경에 올리면 API 주소를
 아는 누구나 회원 정보와 서비스 의견을 조회할 수 있다. CORS Origin 설정은 브라우저의 교차 출처 호출만
@@ -824,22 +824,23 @@ Authorization: Bearer {accessToken}
 
 `GET /api/v1/admin/dashboard?from=2026-10-02&to=2026-10-08`
 
-기간 파라미터는 선택 사항이다. 생략하면 한국 시간 기준 오늘을 포함한 최근 7일을 사용한다. `total`은
-조회 시점 누적 수, `InPeriod`는 해당 기간에 생성·접수된 수다.
+기간 파라미터는 선택 사항이다. 둘 다 생략하면 한국 시간 기준 오늘을 포함한 최근 7일을 사용한다.
+`from`만 지정하면 `to`는 오늘, `to`만 지정하면 `from`은 해당 날짜를 포함한 최근 7일로 보완한다.
+`from`과 `to`는 양 끝을 포함한다. `total`은 조회 시점 누적 수, `InPeriod`는 해당 기간에 생성된 수다.
 
 ```json
 {
   "data": {
     "period": { "from": "2026-10-02", "to": "2026-10-08" },
     "members": { "total": 1284, "guest": 812, "kakao": 472, "newInPeriod": 35 },
-    "travelRecords": { "total": 5492, "createdInPeriod": 286 },
-    "serviceFeedback": { "receivedInPeriod": 12, "unconfirmed": 8 }
+    "travelRecords": { "total": 5492, "createdInPeriod": 286 }
   }
 }
 ```
 
-회원은 `member.provider`의 `GUEST`, `KAKAO` 값으로 집계한다. 기록은 `travel_record.created_at`, 의견은
-`service_feedback.created_at` 기준으로 집계한다.
+회원은 `member.provider`의 `GUEST`, `KAKAO` 값으로 집계한다. provider가 비어 있는 기존 회원은 `total`에만
+포함한다. 기간별 회원·기록 수는 각각 `member.created_at`, `travel_record.created_at` 기준으로 한국 시간
+날짜의 시작부터 종료일 다음 날 시작 전까지 집계한다. `from`이 `to`보다 늦으면 `400 INVALID_DASHBOARD_DATE_RANGE`.
 
 ### 회원 목록 및 상세
 
@@ -894,7 +895,7 @@ Authorization: Bearer {accessToken}
 알 수 없는 토큰 요청은 특정 회원의 실패 상태로 표시하지 않는다. 실패 이력이 없으면 `lastRefresh`는
 `null`이다. 관리자 응답에는 여행 기록 제목·내용·사진을 포함하지 않는다.
 
-### 앱 서비스 의견 제출
+### 앱 서비스 의견 제출 — 구현 전 설계
 
 `POST /api/v1/service-feedback` — 앱 회원 인증 필요
 
@@ -967,8 +968,8 @@ Authorization: Bearer {accessToken}
 
 ## 9. 구현 전 확인 사항
 
-- 관리자 의견 변경 감사 로그 추가
-- 서비스 의견 테이블, 앱 제출 API, 관리자 조회·상태 변경 API 추가
+- 서비스 의견 테이블과 앱 제출 API 추가
+- 관리자 서비스 의견 조회·상태 변경 API 및 감사 로그 추가
 - 회원 인증 Refresh 성공·실패 이벤트 기록 및 관리자 집계 조회 추가
 - `tag`, `travel_record_tag` Flyway 마이그레이션과 JPA 모델 추가
 - 태그 이름 정규화 규칙을 서버와 클라이언트에서 동일하게 적용
