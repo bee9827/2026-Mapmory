@@ -1,4 +1,4 @@
-// "3단계면 끝나요" as three taps: pick a place -> keep the photos you like -> save and the province fills.
+// "3단계면 끝나요" as three taps: pick a place -> tap the photos to keep -> save and the province fills.
 const photo = (name) => `/assets/photos/${name}.webp`;
 
 // Korean provinces only, and none of the hero's places, so the two demos never show the same photos.
@@ -48,8 +48,8 @@ export function howPlayReducer(state, action) {
     case "pick-place": {
       const place = HOW_PLAY_PLACES.find(({ key }) => key === action.placeKey);
       if (!place) return state;
-      // Every found photo starts selected; tapping one leaves it out. Saved provinces stay filled.
-      return { ...state, step: 1, placeKey: place.key, picked: place.photos.map((_, index) => index) };
+      // Like the app's new-record screen, nothing starts selected; tap the keepers or pick them all. Saved provinces stay filled.
+      return { ...state, step: 1, placeKey: place.key, picked: [] };
     }
     case "toggle-photo": {
       if (state.step !== 1) return state;
@@ -57,6 +57,11 @@ export function howPlayReducer(state, action) {
         ? state.picked.filter((index) => index !== action.index)
         : [...state.picked, action.index].sort((a, b) => a - b);
       return { ...state, picked };
+    }
+    case "pick-all": {
+      if (state.step !== 1) return state;
+      const place = HOW_PLAY_PLACES.find(({ key }) => key === state.placeKey);
+      return { ...state, picked: place.photos.map((_, index) => index) };
     }
     case "save": {
       if (state.step !== 1 || state.picked.length === 0) return state;
@@ -68,11 +73,4 @@ export function howPlayReducer(state, action) {
     default:
       return state;
   }
-}
-
-// "부산이" / "경주가": pick the subject particle from the last syllable's final consonant.
-export function withSubjectParticle(word) {
-  const code = word.charCodeAt(word.length - 1) - 0xac00;
-  const hasFinal = code >= 0 && code <= 11171 && code % 28 !== 0;
-  return `${word}${hasFinal ? "이" : "가"}`;
 }

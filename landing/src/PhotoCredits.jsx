@@ -11,7 +11,7 @@ function PhotoCredits() {
   return (
     <details className="photo-credits">
       <summary>사진 출처</summary>
-      <p>데모 사진은 공개 라이선스 사진을 크기 조정·WebP 변환해 사용했어요.</p>
+      <p>데모 사진은 공개 라이선스 사진을 크기 조정·자르기·WebP 변환해 사용했어요.</p>
       <ul>
         {photoCredits.map((credit) => (
           <li key={credit.file}>

@@ -13,6 +13,7 @@ import {
   getPhotoFinderState,
 } from "./photoFinderDemo.js";
 import { loadWorldCountries, useWorldCountries } from "./worldCountries.js";
+import { withObjectParticle } from "./koreanParticle.js";
 
 const GRID_COLUMNS = 7;
 const GRID_ROWS = 16;
@@ -319,7 +320,7 @@ function PhotoFinderHero({ storeActions, onPlaySelect }) {
           ref={cardRef}
           data-phase={demo.phase}
           data-place={place.key}
-          aria-label={`예시: 사진첩에서 ${place.label}을 검색하면 그곳에서 찍은 사진만 찾아 지도에 칠하는 모습`}
+          aria-label={`예시: 사진첩에서 ${withObjectParticle(place.label)} 검색하면 그곳에서 찍은 사진만 찾아 지도에 칠하는 모습`}
           role="img"
         >
           <div className="finder-demo-bar" aria-hidden="true">

@@ -7,8 +7,8 @@ import {
   HOW_PLAY_STEPS,
   howPlayReducer,
   initialHowPlayState,
-  withSubjectParticle,
 } from "./howPlay.js";
+import { withSubjectParticle } from "./koreanParticle.js";
 
 const KOREA_BOUNDS = { minLng: 124.5, maxLng: 130.05, minLat: 33, maxLat: 38.75 };
 const KOREA_LONGITUDE_SCALE = 0.81;
@@ -102,7 +102,12 @@ function HowItWorksPlay() {
           {state.step === 1 && place && (
             <>
               <p className="how-play-prompt" ref={promptRef} tabIndex={-1}>{place.label} 사진 {place.photos.length}장을 찾았어요</p>
-              <p className="how-play-hint">빼고 싶은 사진은 탭해요</p>
+              <div className="how-play-hint">
+                <span>남길 사진을 탭해요</span>
+                {state.picked.length < place.photos.length && (
+                  <button type="button" onClick={() => act({ type: "pick-all" })}>모두 선택</button>
+                )}
+              </div>
               <div className="how-play-photos">
                 {place.photos.map((item, index) => {
                   const isPicked = state.picked.includes(index);

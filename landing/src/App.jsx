@@ -30,6 +30,7 @@ import { useWorldCountries } from "./worldCountries.js";
 import { PhotoFinderHero } from "./PhotoFinderHero.jsx";
 import { HowItWorksPlay } from "./HowItWorksPlay.jsx";
 import { PhotoCredits } from "./PhotoCredits.jsx";
+import { withSubjectParticle } from "./koreanParticle.js";
 import {
   createWorldMemoryHistoryState,
   isWorldMemoryHistoryEntry,
@@ -1127,7 +1128,7 @@ function DistrictMap({ memory, theme }) {
       <div className="district-map-caption"><span><b>3단계</b>{memory.provinceShort} 상세지역</span><small>민트색 = 기억이 있는 지역</small></div>
       {mapState.status === "loading" && <div className="district-map-status"><MapTrifold size={26} weight="duotone" />상세지도를 불러오고 있어요</div>}
       {mapState.status === "error" && <div className="district-map-status">상세지도를 불러오지 못했어요.</div>}
-      <canvas ref={canvasRef} role="img" aria-label={`${memory.province} 시·군·구 상세 지도. ${memory.location}이 민트색으로 표시되어 있습니다.`} />
+      <canvas ref={canvasRef} role="img" aria-label={`${memory.province} 시·군·구 상세 지도. ${withSubjectParticle(memory.location)} 민트색으로 표시되어 있습니다.`} />
     </div>
   );
 }
