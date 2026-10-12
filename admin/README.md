@@ -14,7 +14,7 @@ The admin UI connects only to the production API at `https://api.map-mory.com/ap
 
 ## Screens
 
-- Dashboard: member and travel-record totals and selected-period counts (Java API)
+- Dashboard: member, travel-record, and attached-photo totals; guest/Kakao/Google login distribution; selected-period counts (Java API)
 - Members: search, provider filter, and member detail drawer
 - Service feedback: status filter and internal status updates
 

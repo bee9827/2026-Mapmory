@@ -3,6 +3,7 @@ package com.mapmory.backend.admin.dashboard;
 import com.mapmory.backend.admin.dashboard.dto.AdminDashboardResponse;
 import com.mapmory.backend.admin.dashboard.dto.AdminDashboardResponse.MemberStatistics;
 import com.mapmory.backend.admin.dashboard.dto.AdminDashboardResponse.Period;
+import com.mapmory.backend.admin.dashboard.dto.AdminDashboardResponse.PhotoStatistics;
 import com.mapmory.backend.admin.dashboard.dto.AdminDashboardResponse.TravelRecordStatistics;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
@@ -52,12 +53,14 @@ public class AdminDashboardService {
                         memberRepository.count(),
                         memberRepository.countByProvider(AuthProvider.GUEST),
                         memberRepository.countByProvider(AuthProvider.KAKAO),
+                        memberRepository.countByProvider(AuthProvider.GOOGLE),
                         memberRepository.countCreatedBetween(fromInclusive, toExclusive)
                 ),
                 new TravelRecordStatistics(
                         travelRecordRepository.count(),
                         travelRecordRepository.countCreatedBetween(fromInclusive, toExclusive)
-                )
+                ),
+                new PhotoStatistics(travelRecordRepository.countAllMedia())
         );
     }
 

@@ -40,7 +40,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addMapping("/api/v1/admin/**")
                 .allowedOrigins(adminAllowedOrigins)
                 .allowedMethods("GET", "POST", "PATCH", "OPTIONS")
-                .allowedHeaders("Content-Type", "Authorization")
+                .allowedHeaders("Content-Type", "Authorization", "X-CSRF-TOKEN")
+                .allowCredentials(true)
                 .maxAge(3600);
     }
 }

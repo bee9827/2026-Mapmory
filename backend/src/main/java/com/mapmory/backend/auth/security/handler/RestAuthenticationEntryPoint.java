@@ -1,6 +1,7 @@
 package com.mapmory.backend.auth.security.handler;
 
 import com.mapmory.backend.auth.exception.AuthErrorCode;
+import com.mapmory.backend.admin.auth.AdminAuthErrorCode;
 import com.mapmory.backend.auth.security.filter.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,10 +32,14 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletResponse response,
             AuthenticationException authException
     ) throws IOException {
+        if (request.getRequestURI().startsWith("/api/v1/admin/")) {
+            problemResponseWriter.write(
+                    request, response, HttpStatus.UNAUTHORIZED, AdminAuthErrorCode.ADMIN_SESSION_REQUIRED);
+            return;
+        }
+
         Object attribute = request.getAttribute(JwtAuthenticationFilter.AUTH_ERROR_ATTRIBUTE);
-        AuthErrorCode errorCode = attribute instanceof AuthErrorCode code
-                ? code
-                : AuthErrorCode.INVALID_ACCESS_TOKEN;
+        AuthErrorCode errorCode = attribute instanceof AuthErrorCode code ? code : AuthErrorCode.INVALID_ACCESS_TOKEN;
         problemResponseWriter.write(request, response, HttpStatus.UNAUTHORIZED, errorCode);
     }
 }
