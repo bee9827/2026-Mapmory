@@ -10,18 +10,6 @@ internal object GeneratedKoreaMapData {
         GeneratedKoreaMapDataPart02.provinces,
         GeneratedKoreaMapDataPart03.provinces,
         GeneratedKoreaMapDataPart04.provinces,
-        GeneratedKoreaMapDataPart05.provinces,
-        GeneratedKoreaMapDataPart06.provinces,
-        GeneratedKoreaMapDataPart07.provinces,
-        GeneratedKoreaMapDataPart08.provinces,
-        GeneratedKoreaMapDataPart09.provinces,
-        GeneratedKoreaMapDataPart10.provinces,
-        GeneratedKoreaMapDataPart11.provinces,
-        GeneratedKoreaMapDataPart12.provinces,
-        GeneratedKoreaMapDataPart13.provinces,
-        GeneratedKoreaMapDataPart14.provinces,
-        GeneratedKoreaMapDataPart15.provinces,
-        GeneratedKoreaMapDataPart16.provinces,
     ).flatten()
 
     val provinces: List<ProvincePolygon> = fragments

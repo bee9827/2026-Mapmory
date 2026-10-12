@@ -96,16 +96,16 @@ class GenerateKoreaMapTest(unittest.TestCase):
             source = Path(directory) / "province.json"
             source.write_text(json.dumps({"features": [feature]}))
 
-            provinces = MODULE.read_province_features(source, simplify_tolerance=0.001)
+            provinces = MODULE.read_province_features(source, simplify_tolerance=0.002)
 
         self.assertEqual(1, len(provinces))
-        self.assertGreater(len(provinces[0][2][0]), len(MODULE.simplify_ring(ring, 0.001)))
+        self.assertGreater(len(provinces[0][2][0]), len(MODULE.simplify_ring(ring, 0.002)))
 
     def test_광주는_다른_시도와_같은_단순화_정밀도를_사용한다(self):
         ring = [[126.65, 35.05], [126.75, 35.051], [126.85, 35.05], [126.85, 35.15], [126.65, 35.15]]
 
-        self.assertEqual(0.001, MODULE.province_ring_tolerance("KR-29", ring, 0.001))
-        self.assertEqual(0.001, MODULE.province_ring_tolerance("KR-46", ring, 0.001))
+        self.assertEqual(0.002, MODULE.province_ring_tolerance("KR-29", ring, 0.002))
+        self.assertEqual(0.002, MODULE.province_ring_tolerance("KR-46", ring, 0.002))
         self.assertEqual(0.0, MODULE.province_ring_tolerance("KR-29", ring, 0.0))
 
     def test_주요_시도_재정의는_대상_코드만_교체한다(self):

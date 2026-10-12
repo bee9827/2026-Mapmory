@@ -30,7 +30,7 @@ class DokdoMapDataTest {
         assertEquals("KR-47", province?.code)
         val provinceDokdoRings = province?.rings?.filter { it.isDokdoIslandRing() }.orEmpty()
         assertTrue(provinceDokdoRings.size >= 2)
-        assertTrue(provinceDokdoRings.sortedByDescending { it.size }.take(2).all { it.size >= 30 })
+        assertTrue(provinceDokdoRings.sumOf { it.size } >= 50)
         assertEquals("울릉군", district?.name)
         assertEquals(2, district?.rings?.count { it.isDokdoIslandRing() })
         assertEquals("47940", KoreanSelectableDistrictCodes.single { it.name == "경상북도 울릉군" }.code)

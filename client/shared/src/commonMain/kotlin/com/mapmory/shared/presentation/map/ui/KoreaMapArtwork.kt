@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
@@ -37,11 +39,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import com.mapmory.shared.LocalMapmoryTheme
+import com.mapmory.shared.presentation.map.data.GeneratedKoreaDistrictMapData
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
+import com.mapmory.shared.presentation.map.data.OverviewDistrictData
 import com.mapmory.shared.presentation.map.domain.GeoPoint
 import com.mapmory.shared.presentation.map.domain.ProvincePolygon
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewVisitedRegions
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -59,68 +65,63 @@ fun KoreaMapArtwork(
 ) {
     val bounds = remember(regions) { KoreaBounds.from(regions) }
     var viewportSize by remember { mutableStateOf(IntSize.Zero) }
+    val coroutineScope = rememberCoroutineScope()
     val currentOnRegionClick by rememberUpdatedState(onRegionClick)
     val textMeasurer = rememberTextMeasurer()
     val isDark = LocalMapmoryTheme.current.isDark
     val labelStyle = TextStyle(
-        color = if (isDark) Color(0xFF7085A8) else Color(0xFF6B786F),
+        color = if (isProvinceOverview) {
+            if (isDark) Color(0xFFE0E9E2) else Color(0xFF34443A)
+        } else if (isDark) {
+            Color(0xFF7085A8)
+        } else {
+            Color(0xFF6B786F)
+        },
         fontSize = when {
-            isProvinceOverview -> 8.sp
+            isProvinceOverview -> 5.sp
             regions.size >= 35 -> 7.sp
             regions.size >= 25 -> 8.sp
             else -> 10.sp
         },
         fontWeight = FontWeight.Bold,
     )
-    val labelHitPadding = with(LocalDensity.current) { 12.dp.toPx() }
-    val showDokdoMarker = remember(regions) {
+    val overviewDistrictLabelStyle = labelStyle.copy(
+        color = if (isDark) Color(0xFFAAB6AD) else Color(0xFF87938A),
+    )
+    val labelHitPadding = with(LocalDensity.current) {
+        (if (isProvinceOverview) 2.dp else 12.dp).toPx()
+    }
+    val hasDokdoRegion = remember(regions) {
         regions.any { it.code == DokdoProvinceCode || it.code == DokdoDistrictCode }
+    }
+    var overviewData by remember { mutableStateOf<OverviewDistrictData?>(null) }
+    LaunchedEffect(isProvinceOverview) {
+        if (isProvinceOverview && overviewData == null) {
+            overviewData = runCatching {
+                GeneratedKoreaDistrictMapData.overviewData()
+            }.getOrDefault(OverviewDistrictData(emptyList(), emptyList()))
+        }
     }
     val projection = remember(bounds, viewportSize) {
         KoreaProjection.from(bounds, viewportSize)
     }
-    val dokdoOverviewRings = remember(regions) { createDokdoOverviewRings(regions) }
-    val dokdoIslandPaths = remember(dokdoOverviewRings) { createDokdoInsetPaths(dokdoOverviewRings) }
-    val dokdoLabelStyle = TextStyle(
-        color = if (isDark) Color(0xFFE9F4F2) else Color(0xFF2F7659),
-        fontSize = 9.sp,
-        fontWeight = FontWeight.Bold,
-    )
-    val dokdoLabel = remember(showDokdoMarker, dokdoLabelStyle, textMeasurer) {
-        if (showDokdoMarker) textMeasurer.measure("독도", dokdoLabelStyle) else null
+    val overviewDistrictOutlinePath = remember(overviewData, projection, isProvinceOverview) {
+        if (!isProvinceOverview || !projection.isValid || overviewData == null) {
+            null
+        } else {
+            Path().apply {
+                overviewData?.lines.orEmpty().forEach { line -> addProjectedLine(line, projection) }
+            }
+        }
     }
-    val dokdoCardHorizontalPadding = with(LocalDensity.current) { 7.dp.toPx() }
-    val dokdoCardVerticalPadding = with(LocalDensity.current) { 5.dp.toPx() }
-    val dokdoIslandWidth = with(LocalDensity.current) { 14.dp.toPx() }
-    val dokdoIslandHeight = with(LocalDensity.current) { 14.dp.toPx() }
-    val dokdoCalloutEdgePadding = with(LocalDensity.current) { 8.dp.toPx() }
-    val dokdoCalloutVerticalGap = with(LocalDensity.current) { 4.dp.toPx() }
-    val dokdoHitRadius = with(LocalDensity.current) { 18.dp.toPx() }
+    val dokdoTapRadius = with(LocalDensity.current) { 18.dp.toPx() }
     val labelHorizontalPadding = with(LocalDensity.current) { 4.dp.toPx() }
     val labelVerticalPadding = with(LocalDensity.current) { 2.dp.toPx() }
     val labelCornerRadius = with(LocalDensity.current) { 6.dp.toPx() }
     val labelBorderWidth = with(LocalDensity.current) { 0.8.dp.toPx() }
-    val overviewLabelOffsets = with(LocalDensity.current) {
-        mapOf(
-            "KR-11" to Offset(0f, -28.dp.toPx()),
-            "KR-28" to Offset(-30.dp.toPx(), 0f),
-            "KR-41" to Offset(24.dp.toPx(), 8.dp.toPx()),
-            "KR-44" to Offset(-16.dp.toPx(), 0f),
-            "KR-50" to Offset(-18.dp.toPx(), -15.dp.toPx()),
-            "KR-30" to Offset(25.dp.toPx(), 15.dp.toPx()),
-            "KR-46" to Offset(5.dp.toPx(), 12.dp.toPx()),
-            "KR-49" to Offset(0f, 12.dp.toPx()),
-            "KR-29" to Offset(18.dp.toPx(), 20.dp.toPx()),
-        )
-    }
-    val dokdoCalloutSize = dokdoLabel?.let { label ->
-        androidx.compose.ui.geometry.Size(
-            dokdoCardHorizontalPadding * 2f + label.size.width,
-            dokdoCardVerticalPadding * 2f + label.size.height,
-        )
-    }
-    val dokdoBaseCenter = remember(showDokdoMarker, projection) {
-        if (!showDokdoMarker) {
+    // Small island shapes reappear on zoom, so keep Dokdo selectable at overview scale.
+    val dokdoTapCenter = remember(hasDokdoRegion, projection) {
+        if (!hasDokdoRegion) {
             null
         } else {
             projection.project(DokdoMapPoint)
@@ -131,10 +132,15 @@ fun KoreaMapArtwork(
             emptyList()
         } else {
             regions.sortedForMapRendering().map { region ->
-                val (visibleRings, smallIslandRings) = if (isProvinceOverview) {
-                    region.rings.partition { projectedRingArea(it, projection) >= OverviewIslandAreaThreshold }
+                val (dokdoRings, provinceRings) = if (isProvinceOverview && region.code == DokdoProvinceCode) {
+                    region.rings.partition(List<GeoPoint>::isDokdoIslandRing)
                 } else {
-                    region.rings to emptyList()
+                    emptyList<List<GeoPoint>>() to region.rings
+                }
+                val (visibleRings, smallIslandRings) = if (isProvinceOverview) {
+                    provinceRings.partition { projectedRingArea(it, projection) >= OverviewIslandAreaThreshold }
+                } else {
+                    provinceRings to emptyList()
                 }
                 PreparedKoreaRegion(
                     region = region,
@@ -156,11 +162,16 @@ fun KoreaMapArtwork(
                     } else {
                         Path().apply { smallIslandRings.forEach { addProjectedRing(it, projection) } }
                     },
+                    dokdoPath = dokdoRings.takeIf { it.isNotEmpty() }?.let { rings ->
+                        Path().apply { rings.forEach { addProjectedRing(it, projection) } }
+                    },
                 )
             }
         }
     }
-    var zoom by rememberSaveable(regions) { mutableStateOf(1f) }
+    var zoom by rememberSaveable(regions, isProvinceOverview) {
+        mutableStateOf(if (isProvinceOverview) 1.5f else 1f)
+    }
     var pan by rememberSaveable(regions, stateSaver = MapPanSaver) { mutableStateOf(Offset.Zero) }
     val currentTransform = rememberUpdatedState(MapTransform(zoom, pan))
     val backgroundColor = if (isDark) Color(0xFF121518) else Color(0xFFFAFCFB)
@@ -172,21 +183,45 @@ fun KoreaMapArtwork(
         Color(0xFF2F7659).copy(alpha = 0.72f)
     }
     val unvisitedOutlineColor = if (isDark) Color(0xFF65738A) else Color(0xFFA7B9AC)
-    val preparedLabels = remember(regions, projection, labelStyle, showRegionLabels) {
+    val overviewDistrictOutlineColor = if (isDark) Color(0xFF36453D) else Color(0xFFBECAC1)
+    val overviewProvinceOutlineColor = if (isDark) Color(0xFF9AAFA0) else Color(0xFF526157)
+    val preparedLabels = remember(
+        regions,
+        projection,
+        labelStyle,
+        showRegionLabels,
+        isProvinceOverview,
+        overviewData,
+    ) {
         if (!showRegionLabels || !projection.isValid) {
             emptyList()
+        } else if (isProvinceOverview) {
+            val districtLabels = overviewData?.labels.orEmpty()
+                .filterNot { it.provinceCode in MetropolitanCityLabels }
+                .map { label ->
+                    PreparedKoreaLabel(
+                        code = label.code,
+                        center = projection.project(label.point),
+                        layout = textMeasurer.measure(label.name, overviewDistrictLabelStyle),
+                    )
+                }
+            val cityLabels = regions.mapNotNull { region ->
+                val name = MetropolitanCityLabels[region.code] ?: return@mapNotNull null
+                val labelPoint = region.labelPoint() ?: return@mapNotNull null
+                PreparedKoreaLabel(
+                    code = region.code,
+                    center = projection.project(labelPoint),
+                    layout = textMeasurer.measure(name, labelStyle),
+                )
+            }
+            districtLabels + cityLabels
         } else {
             regions.mapNotNull { region ->
                 val labelPoint = region.labelPoint() ?: return@mapNotNull null
                 PreparedKoreaLabel(
-                    region = region,
-                    anchorCenter = projection.project(labelPoint),
-                    baseCenter = projection.project(labelPoint) +
-                        if (isProvinceOverview) overviewLabelOffsets[region.code].orZero() else Offset.Zero,
-                    layout = textMeasurer.measure(
-                        if (isProvinceOverview) region.overviewLabel() else region.name,
-                        labelStyle,
-                    ),
+                    code = region.code,
+                    center = projection.project(labelPoint),
+                    layout = textMeasurer.measure(region.name, labelStyle),
                 )
             }
         }
@@ -215,47 +250,31 @@ fun KoreaMapArtwork(
                     viewportSize,
                     projection,
                     regions,
+                    isProvinceOverview,
                     showRegionLabels,
                     preparedLabels,
-                    dokdoBaseCenter,
-                    dokdoCalloutSize,
-                    dokdoCalloutEdgePadding,
-                    dokdoCalloutVerticalGap,
-                    dokdoIslandWidth,
-                    dokdoHitRadius,
+                    dokdoTapCenter,
+                    dokdoTapRadius,
                 ) {
                 detectTapGestures { position ->
                     val transform = currentTransform.value
                     val mapPoint = projection.unproject(position, transform, viewportSize)
-                    val dokdoScreenCenter = dokdoBaseCenter?.let { baseCenter ->
-                        transformMapPoint(baseCenter, transform, viewportSize)
+                    val dokdoScreenCenter = dokdoTapCenter?.let { tapCenter ->
+                        transformMapPoint(tapCenter, transform, viewportSize)
                     }
-                    val calloutHitBounds = dokdoScreenCenter?.let { center ->
-                        dokdoCalloutSize?.let { calloutSize ->
-                            dokdoCalloutBounds(
-                                center,
-                                viewportSize,
-                                calloutSize,
-                                dokdoCalloutEdgePadding,
-                                dokdoCalloutVerticalGap,
-                                dokdoIslandWidth,
-                            )
-                        }
-                    }
-                    val tappedDokdo = calloutHitBounds?.contains(position) == true
-                        || dokdoScreenCenter?.let { markerCenter ->
-                            val delta = position - markerCenter
-                            delta.x * delta.x + delta.y * delta.y <= dokdoHitRadius * dokdoHitRadius
-                        } == true
+                    val tappedDokdo = dokdoScreenCenter?.let { markerCenter ->
+                        val delta = position - markerCenter
+                        delta.x * delta.x + delta.y * delta.y <= dokdoTapRadius * dokdoTapRadius
+                    } == true
                     val labelRegion = if (showRegionLabels) {
                         preparedLabels.mapNotNull { label ->
-                            val labelCenter = transformMapPoint(label.baseCenter, transform, viewportSize)
+                            val labelCenter = transformMapPoint(label.center, transform, viewportSize)
                             val horizontalDistance = abs(position.x - labelCenter.x)
                             val verticalDistance = abs(position.y - labelCenter.y)
                             if (horizontalDistance <= label.layout.size.width / 2f + labelHitPadding &&
                                 verticalDistance <= label.layout.size.height / 2f + labelHitPadding
                             ) {
-                                label.region to (horizontalDistance * horizontalDistance + verticalDistance * verticalDistance)
+                                label.code to (horizontalDistance * horizontalDistance + verticalDistance * verticalDistance)
                             } else {
                                 null
                             }
@@ -265,8 +284,29 @@ fun KoreaMapArtwork(
                     }
                     if (tappedDokdo) {
                         currentOnRegionClick(DokdoDistrictCode)
+                    } else if (labelRegion != null) {
+                        currentOnRegionClick(labelRegion)
                     } else {
-                        (labelRegion ?: regions.regionAt(mapPoint))?.let { currentOnRegionClick(it.code) }
+                        val region = regions.regionAt(mapPoint)
+                        if (
+                            isProvinceOverview &&
+                            region != null &&
+                            region.code !in MetropolitanCityLabels
+                        ) {
+                            coroutineScope.launch {
+                                val district = try {
+                                    GeneratedKoreaDistrictMapData.forProvince(region.code)
+                                        .regionAt(mapPoint)
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: Exception) {
+                                    null
+                                }
+                                currentOnRegionClick(district?.code ?: region.code)
+                            }
+                        } else {
+                            region?.let { currentOnRegionClick(it.code) }
+                        }
                     }
                 }
             },
@@ -283,11 +323,37 @@ fun KoreaMapArtwork(
             preparedRegions.forEach { prepared ->
                 val isVisited = prepared.region.code in visitedRegionCodes
                 val fillColor = if (isVisited) visitedFillColor else unvisitedFillColor
+                drawPath(path = prepared.fillPath, color = fillColor)
+                if (transform.zoom >= OverviewIslandRevealZoom) {
+                    prepared.smallIslandPath?.let { islandPath ->
+                        drawPath(path = islandPath, color = fillColor)
+                    }
+                }
+                prepared.dokdoPath?.let { dokdoPath ->
+                    val dokdoFillColor = if (DokdoDistrictCode in visitedRegionCodes) {
+                        visitedFillColor
+                    } else {
+                        unvisitedFillColor
+                    }
+                    drawPath(path = dokdoPath, color = dokdoFillColor)
+                }
+            }
+
+            overviewDistrictOutlinePath?.let { path ->
+                drawPath(
+                    path = path,
+                    color = overviewDistrictOutlineColor,
+                    style = Stroke(width = max(0.45f, outlineWidth * 0.48f) / transform.zoom),
+                )
+            }
+
+            preparedRegions.forEach { prepared ->
+                val isVisited = prepared.region.code in visitedRegionCodes
                 val outlineColor = when {
+                    isProvinceOverview -> overviewProvinceOutlineColor
                     isVisited -> visitedOutlineColor
                     else -> unvisitedOutlineColor
                 }
-                drawPath(path = prepared.fillPath, color = fillColor)
                 drawPath(
                     path = prepared.outlinePath,
                     color = outlineColor,
@@ -295,7 +361,6 @@ fun KoreaMapArtwork(
                 )
                 if (transform.zoom >= OverviewIslandRevealZoom) {
                     prepared.smallIslandPath?.let { islandPath ->
-                        drawPath(path = islandPath, color = fillColor)
                         drawPath(
                             path = islandPath,
                             color = outlineColor,
@@ -303,116 +368,56 @@ fun KoreaMapArtwork(
                         )
                     }
                 }
+                prepared.dokdoPath?.let { dokdoPath ->
+                    val dokdoOutlineColor = if (DokdoDistrictCode in visitedRegionCodes) {
+                        visitedOutlineColor
+                    } else {
+                        unvisitedOutlineColor
+                    }
+                    val displayedDokdoOutlineColor = if (isProvinceOverview) {
+                        overviewProvinceOutlineColor
+                    } else {
+                        dokdoOutlineColor
+                    }
+                    drawPath(
+                        path = dokdoPath,
+                        color = displayedDokdoOutlineColor,
+                        style = Stroke(width = outlineWidth / transform.zoom),
+                    )
+                }
             }
         }
 
-        // Prototype detail screens keep the map readable by showing the
-        // selected province's district names directly on the boundaries.
+        // Keep overview labels plain and detailed-map labels readable with their background.
         preparedLabels.forEach { label ->
-            val labelCenter = transformMapPoint(label.baseCenter, transform, viewportSize)
-            if (label.anchorCenter != label.baseCenter) {
-                val leaderStart = if (isProvinceOverview && label.region.code == "KR-29") {
-                    label.region.rings.flatten().minByOrNull { point ->
-                        val delta = projection.project(point) - label.baseCenter
-                        delta.x * delta.x + delta.y * delta.y
-                    }?.let(projection::project) ?: label.anchorCenter
-                } else {
-                    label.anchorCenter
-                }
-                drawLine(
-                    color = unvisitedOutlineColor.copy(alpha = 0.9f),
-                    start = transformMapPoint(leaderStart, transform, viewportSize),
-                    end = labelCenter,
-                    strokeWidth = 1.dp.toPx(),
+            val labelCenter = transformMapPoint(label.center, transform, viewportSize)
+            if (!isProvinceOverview) {
+                val labelBounds = androidx.compose.ui.geometry.Rect(
+                    left = labelCenter.x - label.layout.size.width / 2f - labelHorizontalPadding,
+                    top = labelCenter.y - label.layout.size.height / 2f - labelVerticalPadding,
+                    right = labelCenter.x + label.layout.size.width / 2f + labelHorizontalPadding,
+                    bottom = labelCenter.y + label.layout.size.height / 2f + labelVerticalPadding,
+                )
+                drawRoundRect(
+                    color = if (isDark) Color(0xFF121B18).copy(alpha = 0.94f) else Color(0xFFF9FCFA).copy(alpha = 0.96f),
+                    topLeft = labelBounds.topLeft,
+                    size = androidx.compose.ui.geometry.Size(labelBounds.width, labelBounds.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(labelCornerRadius),
+                )
+                drawRoundRect(
+                    color = if (isDark) Color(0xFF3D6653) else Color(0xFFD5E2D9),
+                    topLeft = labelBounds.topLeft,
+                    size = androidx.compose.ui.geometry.Size(labelBounds.width, labelBounds.height),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(labelCornerRadius),
+                    style = Stroke(width = labelBorderWidth),
                 )
             }
-            val labelBounds = androidx.compose.ui.geometry.Rect(
-                left = labelCenter.x - label.layout.size.width / 2f - labelHorizontalPadding,
-                top = labelCenter.y - label.layout.size.height / 2f - labelVerticalPadding,
-                right = labelCenter.x + label.layout.size.width / 2f + labelHorizontalPadding,
-                bottom = labelCenter.y + label.layout.size.height / 2f + labelVerticalPadding,
-            )
-            drawRoundRect(
-                color = if (isDark) Color(0xFF121B18).copy(alpha = 0.94f) else Color(0xFFF9FCFA).copy(alpha = 0.96f),
-                topLeft = labelBounds.topLeft,
-                size = androidx.compose.ui.geometry.Size(labelBounds.width, labelBounds.height),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(labelCornerRadius),
-            )
-            drawRoundRect(
-                color = if (isDark) Color(0xFF3D6653) else Color(0xFFD5E2D9),
-                topLeft = labelBounds.topLeft,
-                size = androidx.compose.ui.geometry.Size(labelBounds.width, labelBounds.height),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(labelCornerRadius),
-                style = Stroke(width = labelBorderWidth),
-            )
             drawText(
                 textLayoutResult = label.layout,
                 topLeft = labelCenter - Offset(label.layout.size.width / 2f, label.layout.size.height / 2f),
             )
         }
 
-        dokdoBaseCenter?.let { baseCenter ->
-            val markerCenter = transformMapPoint(baseCenter, transform, viewportSize)
-            val calloutSize = dokdoCalloutSize ?: return@let
-            val calloutBounds = dokdoCalloutBounds(
-                markerCenter,
-                viewportSize,
-                calloutSize,
-                dokdoCalloutEdgePadding,
-                dokdoCalloutVerticalGap,
-                dokdoIslandWidth,
-            )
-            val accentColor = if (isDark) Color(0xFF35C987) else Color(0xFF4D9272)
-
-            // Keep the island at its projected coordinate, with its label directly above it.
-            val islandIconLeft = markerCenter.x - dokdoIslandWidth / 2f
-            val islandIconTop = markerCenter.y - dokdoIslandHeight / 2f
-            drawLine(
-                color = accentColor.copy(alpha = 0.85f),
-                start = Offset(calloutBounds.center.x, calloutBounds.bottom),
-                end = Offset(markerCenter.x, markerCenter.y - dokdoIslandWidth * 0.72f),
-                strokeWidth = 1.dp.toPx(),
-            )
-            drawRoundRect(
-                color = if (isDark) Color(0xFF173B2D) else Color.White,
-                topLeft = calloutBounds.topLeft,
-                size = calloutSize,
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()),
-            )
-            drawRoundRect(
-                color = if (isDark) Color(0xFF385B4C) else Color(0xFFDCE8E0),
-                topLeft = calloutBounds.topLeft,
-                size = calloutSize,
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()),
-                style = Stroke(width = 1.dp.toPx()),
-            )
-            drawCircle(
-                color = if (isDark) Color(0xFF173B2D) else Color.White,
-                radius = dokdoIslandWidth * 0.72f,
-                center = markerCenter,
-            )
-            drawCircle(
-                color = if (isDark) Color(0xFF385B4C) else Color(0xFFDCE8E0),
-                radius = dokdoIslandWidth * 0.72f,
-                center = markerCenter,
-                style = Stroke(width = 1.dp.toPx()),
-            )
-            withTransform({
-                translate(islandIconLeft, islandIconTop)
-                scale(dokdoIslandWidth, dokdoIslandHeight, pivot = Offset.Zero)
-            }) {
-                dokdoIslandPaths.forEach { path -> drawPath(path, accentColor) }
-            }
-            dokdoLabel.let { label ->
-                drawText(
-                    textLayoutResult = label,
-                    topLeft = Offset(
-                        calloutBounds.left + dokdoCardHorizontalPadding,
-                        calloutBounds.top + dokdoCardVerticalPadding,
-                    ),
-                )
-            }
-        }
     }
 }
 
@@ -426,15 +431,15 @@ private data class PreparedKoreaRegion(
     val fillPath: Path,
     val outlinePath: Path,
     val smallIslandPath: Path?,
+    val dokdoPath: Path?,
 )
 
 internal fun List<ProvincePolygon>.sortedForMapRendering(): List<ProvincePolygon> =
     sortedByDescending(ProvincePolygon::area)
 
 private data class PreparedKoreaLabel(
-    val region: ProvincePolygon,
-    val anchorCenter: Offset,
-    val baseCenter: Offset,
+    val code: String,
+    val center: Offset,
     val layout: androidx.compose.ui.text.TextLayoutResult,
 )
 
@@ -446,67 +451,18 @@ private const val OverviewIslandAreaThreshold = 20f
 private const val OverviewIslandRevealZoom = 1.8f
 private const val DokdoProvinceCode = "KR-47"
 private const val DokdoDistrictCode = "47940"
-private const val DokdoOverviewIslandCount = 2
 private const val DokdoRingRadius = 0.05f
+private val MetropolitanCityLabels = mapOf(
+    "KR-11" to "서울특별시",
+    "KR-26" to "부산광역시",
+    "KR-27" to "대구광역시",
+    "KR-28" to "인천광역시",
+    "KR-29" to "광주광역시",
+    "KR-30" to "대전광역시",
+    "KR-31" to "울산광역시",
+    "KR-50" to "세종특별자치시",
+)
 private val DokdoMapPoint = GeoPoint(longitude = 131.86941f, latitude = 37.24006f)
-
-// Simplified from the detailed KR-47 boundary rings for an overview-scale callout.
-private fun ProvincePolygon.overviewLabel(): String = when (code) {
-    "KR-11" -> "서울"
-    "KR-26" -> "부산"
-    "KR-27" -> "대구"
-    "KR-28" -> "인천"
-    "KR-29" -> "광주"
-    "KR-30" -> "대전"
-    "KR-31" -> "울산"
-    "KR-41" -> "경기"
-    "KR-42" -> "강원"
-    "KR-43" -> "충북"
-    "KR-44" -> "충남"
-    "KR-45" -> "전북"
-    "KR-46" -> "전남"
-    "KR-47" -> "경북"
-    "KR-48" -> "경남"
-    "KR-49" -> "제주"
-    "KR-50" -> "세종"
-    else -> name
-}
-
-private fun Offset?.orZero(): Offset = this ?: Offset.Zero
-
-private fun createDokdoOverviewRings(regions: List<ProvincePolygon>): List<List<GeoPoint>> =
-    regions.flatMap { region ->
-        region.rings.filter(List<GeoPoint>::isDokdoIslandRing)
-    }.sortedByDescending { ring -> abs(ring.signedAreaTwice()) }
-        .take(DokdoOverviewIslandCount)
-
-private fun createDokdoInsetPaths(dokdoRings: List<List<GeoPoint>>): List<Path> {
-    if (dokdoRings.isEmpty()) return emptyList()
-
-    val allPoints = dokdoRings.flatten()
-    val minLongitude = allPoints.minOf(GeoPoint::longitude)
-    val maxLongitude = allPoints.maxOf(GeoPoint::longitude)
-    val minLatitude = allPoints.minOf(GeoPoint::latitude)
-    val maxLatitude = allPoints.maxOf(GeoPoint::latitude)
-    val longitudeFactor = cos((minLatitude + maxLatitude) / 2f * PI.toFloat() / 180f)
-    val projectedWidth = (maxLongitude - minLongitude) * longitudeFactor
-    val projectedHeight = maxLatitude - minLatitude
-    if (projectedWidth <= 0f || projectedHeight <= 0f) return emptyList()
-
-    val scale = min(1f / projectedWidth, 1f / projectedHeight)
-    val horizontalOffset = (1f - projectedWidth * scale) / 2f
-    val verticalOffset = (1f - projectedHeight * scale) / 2f
-    return dokdoRings.map { ring ->
-        Path().apply {
-            ring.forEachIndexed { index, point ->
-                val x = horizontalOffset + (point.longitude - minLongitude) * longitudeFactor * scale
-                val y = verticalOffset + (maxLatitude - point.latitude) * scale
-                if (index == 0) moveTo(x, y) else lineTo(x, y)
-            }
-            close()
-        }
-    }
-}
 
 private fun List<GeoPoint>.isDokdoIslandRing(): Boolean = isNotEmpty() && all { point ->
     abs(point.longitude - DokdoMapPoint.longitude) <= DokdoRingRadius &&
@@ -522,26 +478,6 @@ private fun projectedRingArea(ring: List<GeoPoint>, projection: KoreaProjection)
         twiceArea += current.x.toDouble() * next.y - next.x.toDouble() * current.y
     }
     return (abs(twiceArea) / 2.0).toFloat()
-}
-
-private fun dokdoCalloutBounds(
-    anchor: Offset,
-    viewportSize: IntSize,
-    calloutSize: androidx.compose.ui.geometry.Size,
-    edgePadding: Float,
-    verticalGap: Float,
-    islandWidth: Float,
-): androidx.compose.ui.geometry.Rect {
-    val left = (anchor.x - calloutSize.width / 2f)
-        .coerceIn(edgePadding, viewportSize.width - calloutSize.width - edgePadding)
-    val top = (anchor.y - islandWidth * 0.72f - verticalGap - calloutSize.height)
-        .coerceIn(edgePadding, viewportSize.height - calloutSize.height - edgePadding)
-    return androidx.compose.ui.geometry.Rect(
-        left,
-        top,
-        left + calloutSize.width,
-        top + calloutSize.height,
-    )
 }
 
 @Composable
@@ -677,6 +613,14 @@ private fun Path.addProjectedRing(ring: List<GeoPoint>, projection: KoreaProject
         if (index == 0) moveTo(screen.x, screen.y) else lineTo(screen.x, screen.y)
     }
     close()
+}
+
+private fun Path.addProjectedLine(line: List<GeoPoint>, projection: KoreaProjection) {
+    if (line.size < 2) return
+    line.forEachIndexed { index, point ->
+        val screen = projection.project(point)
+        if (index == 0) moveTo(screen.x, screen.y) else lineTo(screen.x, screen.y)
+    }
 }
 
 private fun transformMapPoint(
