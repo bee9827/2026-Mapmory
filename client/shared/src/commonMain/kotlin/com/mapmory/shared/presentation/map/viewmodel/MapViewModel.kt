@@ -70,11 +70,25 @@ class MapViewModel(
                 return
             }
         }.orEmpty()
+        val dokdoProvince = provinces.firstOrNull { it.code == DokdoProvinceCode.removePrefix(KoreanProvincePrefix) }
+        val dokdoDistricts = if (openProvinceCode == DokdoProvinceCode) {
+            emptyList()
+        } else {
+            dokdoProvince?.let { province ->
+                mapSummaryRepository.getChildRegions(province.regionId, selectedTagId).getOrElse {
+                    mapSummaryRepository.getCachedChildRegions(province.regionId, selectedTagId).orEmpty()
+                }
+            }.orEmpty()
+        }
 
         uiState = uiState.copy(
             rootRegions = roots,
             koreaProvinces = provinces,
-            districtsByProvince = emptyMap(),
+            districtsByProvince = if (dokdoProvince == null || openProvinceCode == DokdoProvinceCode) {
+                emptyMap()
+            } else {
+                mapOf(DokdoProvinceCode to dokdoDistricts)
+            },
             tags = tags,
             selectedTagId = selectedTagId,
             errorMessage = null,
@@ -194,4 +208,5 @@ private fun MapSummaryRepository.cachedUiState(): MapUiState {
 
 private const val KoreaCountryCode = "KR"
 private const val KoreanProvincePrefix = "KR-"
+private const val DokdoProvinceCode = "KR-47"
 private const val CountryCodeLength = 2
