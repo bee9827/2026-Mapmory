@@ -635,12 +635,37 @@ class TravelRecordServiceTest {
 
         assertThat(result.thumbnailUrlOf(travelRecord).url())
                 .isEqualTo("https://download.example/mapmory/first.jpg");
+        assertThat(result.photoCountOf(travelRecord)).isEqualTo(2);
         verify(recordMediaUrlService).createViewUrl("mapmory/first.jpg");
         verify(recordMediaUrlService, never()).createViewUrl("mapmory/later.jpg");
     }
 
     @Test
-    void 미디어가_없는_일지_목록은_썸네일_정보가_null이다() {
+    void 일지마다_사진_개수를_따로_센다() {
+        TravelRecord jeju = mock(TravelRecord.class);
+        when(jeju.getId()).thenReturn(101L);
+        TravelRecord busan = mock(TravelRecord.class);
+        when(busan.getId()).thenReturn(102L);
+        Page<TravelRecord> expected = new PageImpl<>(List.of(jeju, busan), PageRequest.of(0, 20), 2);
+        when(travelRecordRepository.findByMemberIdAndOptionalTagId(eq(10L), eq(null), any(Pageable.class)))
+                .thenReturn(expected);
+        List<RecordMedia> media = List.of(
+                recordMedia(101L, "mapmory/jeju-1.jpg"),
+                recordMedia(101L, "mapmory/jeju-2.jpg"),
+                recordMedia(101L, "mapmory/jeju-3.jpg"),
+                recordMedia(102L, "mapmory/busan-1.jpg")
+        );
+        when(travelRecordRepository.findMediaByTravelRecordIdIn(List.of(101L, 102L))).thenReturn(media);
+
+        TravelRecordSummaries result = travelRecordService.findAll(member, null, null, null, null, 0, 20);
+
+        assertThat(result.photoCountOf(jeju)).isEqualTo(3);
+        assertThat(result.photoCountOf(busan)).isEqualTo(1);
+        verify(travelRecordRepository).findMediaByTravelRecordIdIn(List.of(101L, 102L));
+    }
+
+    @Test
+    void 미디어가_없는_일지_목록은_썸네일_정보가_null이고_사진_개수가_0이다() {
         TravelRecord travelRecord = mock(TravelRecord.class);
         when(travelRecord.getId()).thenReturn(101L);
         Page<TravelRecord> expected = new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1);
@@ -651,6 +676,7 @@ class TravelRecordServiceTest {
         TravelRecordSummaries result = travelRecordService.findAll(member, null, null, null, null, 0, 20);
 
         assertThat(result.thumbnailUrlOf(travelRecord)).isNull();
+        assertThat(result.photoCountOf(travelRecord)).isZero();
         verify(recordMediaUrlService, never()).createViewUrl(anyString());
     }
 

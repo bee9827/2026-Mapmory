@@ -306,7 +306,7 @@ class TravelRecordControllerTest {
     }
 
     @Test
-    void 여행_일지_목록에_썸네일_URL을_반환한다() throws Exception {
+    void 여행_일지_목록에_썸네일_URL과_사진_개수를_반환한다() throws Exception {
         TravelRecord travelRecord = travelRecord("제주 여행", "");
         TravelRecordSummaries summaries = new TravelRecordSummaries(
                 new PageImpl<>(List.of(travelRecord), PageRequest.of(0, 20), 1),
@@ -314,7 +314,8 @@ class TravelRecordControllerTest {
                 Map.of(101L, new ExpiringUrl(
                         "https://download.example/mapmory/travel-records/a.jpg",
                         300L
-                ))
+                )),
+                Map.of(101L, 3)
         );
         when(travelRecordService.findAll(MEMBER, null, null, null, null, 0, 20))
                 .thenReturn(summaries);
@@ -323,7 +324,8 @@ class TravelRecordControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items[0].thumbnailUrl")
                         .value("https://download.example/mapmory/travel-records/a.jpg"))
-                .andExpect(jsonPath("$.data.items[0].thumbnailUrlExpiresIn").value(300L));
+                .andExpect(jsonPath("$.data.items[0].thumbnailUrlExpiresIn").value(300L))
+                .andExpect(jsonPath("$.data.items[0].photoCount").value(3));
     }
 
     @Test
