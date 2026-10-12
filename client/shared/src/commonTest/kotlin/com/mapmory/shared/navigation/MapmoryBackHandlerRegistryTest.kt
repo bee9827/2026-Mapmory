@@ -31,4 +31,50 @@ class MapmoryBackHandlerRegistryTest {
 
         assertFalse(registry.handleBack("records"))
     }
+
+    @Test
+    fun `gesture back can preserve a draft without invoking destructive button back`() {
+        val registry = MapmoryBackHandlerRegistry()
+        var buttonBackCalled = false
+        registry.register(
+            "editor",
+            gestureBack = { false }, // Delegate to save-state navigation.
+        ) {
+            buttonBackCalled = true
+            true
+        }
+
+        assertFalse(registry.handleGestureBack("editor"))
+        assertFalse(buttonBackCalled)
+        assertTrue(registry.handleBack("editor"))
+        assertTrue(buttonBackCalled)
+    }
+
+    @Test
+    fun `forward uses only the active screen and unregister removes its callbacks`() {
+        val registry = MapmoryBackHandlerRegistry()
+        var hiddenForwardCalled = false
+        registry.register("hidden", gestureForward = { hiddenForwardCalled = true; true }) { true }
+        val active = registry.register("editor", gestureForward = { true }) { true }
+
+        assertTrue(registry.handleGestureForward("editor"))
+        assertFalse(hiddenForwardCalled)
+        registry.unregister(active)
+        assertFalse(registry.handleGestureForward("editor"))
+    }
+
+    @Test
+    fun `gesture does not invoke an ordinary non reversible back handler`() {
+        val registry = MapmoryBackHandlerRegistry()
+        var ordinaryBackCalled = false
+        registry.register("detail") {
+            ordinaryBackCalled = true
+            true
+        }
+
+        assertFalse(registry.handleGestureBack("detail"))
+        assertFalse(ordinaryBackCalled)
+        assertFalse(registry.handleGestureForward("detail"))
+        assertFalse(registry.handleGestureBack("missing"))
+    }
 }

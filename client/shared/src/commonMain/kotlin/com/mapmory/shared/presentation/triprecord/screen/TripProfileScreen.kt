@@ -1,5 +1,8 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import com.mapmory.shared.presentation.components.ScrollToTopEffect
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -269,7 +272,10 @@ private fun StatisticsContent(
     statistics: TripStatisticsUiModel,
     modifier: Modifier = Modifier,
 ) {
+    val listState = rememberLazyListState()
+    ScrollToTopEffect(listState)
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxWidth(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 4.dp, bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(15.dp),

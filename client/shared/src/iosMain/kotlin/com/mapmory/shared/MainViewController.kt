@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.window.ComposeUIViewController
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.uikit.EndEdgePanGestureBehavior
 import com.mapmory.shared.analytics.MapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.app.createGuestRemoteAppContainer
@@ -18,7 +20,7 @@ import com.mapmory.shared.data.settings.IosThemePreference
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.Platform
 
-@OptIn(ExperimentalNativeApi::class)
+@OptIn(ExperimentalNativeApi::class, ExperimentalComposeUiApi::class)
 fun MainViewController(
     apiBaseUrl: String,
     onThemeChanged: (Boolean) -> Unit,
@@ -48,7 +50,9 @@ fun MainViewController(
         }
     },
 ).let { container ->
-    ComposeUIViewController {
+    ComposeUIViewController(configure = {
+        endEdgePanGestureBehavior = EndEdgePanGestureBehavior.Forward
+    }) {
         DisposableEffect(container) {
             onDispose(container::close)
         }

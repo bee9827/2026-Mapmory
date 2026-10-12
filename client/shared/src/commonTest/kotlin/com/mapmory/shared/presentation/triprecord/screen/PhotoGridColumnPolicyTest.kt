@@ -35,14 +35,21 @@ class PhotoGridColumnPolicyTest {
     }
 
     @Test
-    fun `열_수는_한_열부터_네_열_사이로_제한한다`() {
+    fun `열_수는_한_열부터_여섯_열_사이로_제한한다`() {
         assertEquals(
             PhotoGridPinchResult(columnCount = 1, accumulatedZoom = 1f),
             photoGridPinchResultAfterZoom(current = 1, accumulatedZoom = 1.5f),
         )
         assertEquals(
-            PhotoGridPinchResult(columnCount = 4, accumulatedZoom = 1f),
-            photoGridPinchResultAfterZoom(current = 4, accumulatedZoom = 0.7f),
+            PhotoGridPinchResult(columnCount = 6, accumulatedZoom = 1f),
+            photoGridPinchResultAfterZoom(current = 6, accumulatedZoom = 0.7f),
         )
+    }
+
+    @Test
+    fun `다섯_열부터는_확대_버튼을_숨긴다`() {
+        assertEquals(true, shouldShowPhotoPreviewButton(columnCount = 4))
+        assertEquals(false, shouldShowPhotoPreviewButton(columnCount = 5))
+        assertEquals(false, shouldShowPhotoPreviewButton(columnCount = 6))
     }
 }

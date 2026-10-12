@@ -1,6 +1,7 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
 import com.mapmory.shared.presentation.components.MapmoryPhotoExpansion
+import com.mapmory.shared.presentation.components.ScrollToTopEffect
 import com.mapmory.shared.presentation.components.MapmoryPhotoViewer
 import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import com.mapmory.shared.presentation.components.LocalMapmoryImageTransitionScope
@@ -21,11 +22,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -39,6 +43,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,14 +81,19 @@ fun TripRecordDetailScreen(
     onCreateClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
     onInternalBackHandlerChanged: ((() -> Boolean)?) -> Unit = {},
+    onForwardHandlerChanged: ((() -> Boolean)?) -> Unit = {},
     modifier: Modifier = Modifier,
     initialLocationName: String? = null,
     initialLatestDate: String? = null,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var expandedPhotoIndex by remember { mutableStateOf<Int?>(null) }
-    val albumScrollState = rememberScrollState()
+    var expandedPhotoIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var forwardPhotoIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    val albumScrollState = rememberLazyListState()
+    ScrollToTopEffect(albumScrollState, enabled = expandedPhotoIndex == null && uiState is TripRecordDetailUiState.Success)
+    var photoColumns by rememberSaveable { mutableStateOf(2) }
     val latestPhotoViewerBackHandler by rememberUpdatedState {
+        forwardPhotoIndex = expandedPhotoIndex
         expandedPhotoIndex = null
         true
     }
@@ -93,6 +103,20 @@ fun TripRecordDetailScreen(
             if (expandedPhotoIndex == null) null else latestPhotoViewerBackHandler,
         )
         onDispose { onInternalBackHandlerChanged(null) }
+    }
+
+    val latestForwardHandler by rememberUpdatedState {
+        val index = forwardPhotoIndex
+        val photoCount = (uiState as? TripRecordDetailUiState.Success)?.record?.photos?.size ?: 0
+        if (expandedPhotoIndex == null && index != null && index in 0 until photoCount) {
+            expandedPhotoIndex = index
+            forwardPhotoIndex = null
+            true
+        } else false
+    }
+    DisposableEffect(Unit) {
+        onForwardHandlerChanged { latestForwardHandler() }
+        onDispose { onForwardHandlerChanged(null) }
     }
 
     TripRecordBackground(modifier = modifier) {
@@ -145,10 +169,13 @@ fun TripRecordDetailScreen(
                             record = record,
                             groups = groups,
                             scrollState = albumScrollState,
+                            columnCount = photoColumns,
+                            onColumnCountChange = { photoColumns = it },
                             onBackClick = onBackClick,
                             onEditClick = onEditClick,
                             onDeleteClick = { showDeleteDialog = true },
                             onPhotoClick = { photo ->
+                                forwardPhotoIndex = null
                                 expandedPhotoIndex = orderedPhotos.indexOfFirst { it.id == photo.id }
                                     .takeIf { it >= 0 }
                             },
@@ -188,9 +215,12 @@ private fun TripRecordPhotoAlbum(
     onBackClick: () -> Unit,
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
-    scrollState: androidx.compose.foundation.ScrollState,
+    scrollState: LazyListState,
+    columnCount: Int,
+    onColumnCountChange: (Int) -> Unit,
     onPhotoClick: (TripRecordPhotoUiState) -> Unit,
 ) {
+    var isPinching by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         TripRecordTopBar(
             title = record.locationName,
@@ -213,31 +243,46 @@ private fun TripRecordPhotoAlbum(
                 .fillMaxWidth()
                 .weight(1f),
         ) {
-            Column(
+            LazyColumn(
+                state = scrollState,
+                userScrollEnabled = !isPinching,
+                contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 32.dp, bottom = 36.dp),
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    .navigationBarsPadding()
-                    .padding(start = 24.dp, top = 32.dp, end = 32.dp, bottom = 36.dp),
+                    .photoGridPinch(columnCount, onColumnCountChange, { isPinching = it })
+                    .navigationBarsPadding(),
             ) {
-                AlbumHeading(
-                    locationName = record.locationName,
-                )
+                item(key = "heading", contentType = "heading") { AlbumHeading(record.locationName) }
                 if (groups.isEmpty()) {
-                    EmptyPhotoAlbum()
+                    item(key = "empty") { EmptyPhotoAlbum() }
                 } else {
                     groups.forEachIndexed { index, group ->
-                        PhotoDateGroup(
-                            group = group,
-                            onPhotoClick = onPhotoClick,
-                            modifier = Modifier.padding(top = if (index == 0) 32.dp else 34.dp),
-                        )
+                        item(key = "date:${group.displayDate}", contentType = "date") {
+                            Text(
+                                text = group.displayDate,
+                                color = TripRecordPalette.current.headingText,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = if (index == 0) 32.dp else 34.dp, bottom = 14.dp),
+                            )
+                        }
+                        itemsIndexed(
+                            group.photos.chunked(columnCount),
+                            key = { _, photos -> "row:${photos.first().id}" },
+                            contentType = { _, _ -> "photos" },
+                        ) { rowIndex, photos ->
+                            AlbumPhotoRow(
+                                photos, group.displayDate, columnCount, onPhotoClick,
+                                Modifier.padding(top = if (rowIndex == 0) 0.dp else 8.dp),
+                            )
+                        }
                     }
                 }
             }
             AlbumScrollBar(
-                scrollValue = scrollState.value,
-                maxScrollValue = scrollState.maxValue,
+                scrollState = scrollState,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 5.dp, top = 8.dp, bottom = 8.dp),
@@ -289,76 +334,53 @@ private fun EmptyPhotoAlbum() {
 }
 
 @Composable
-private fun PhotoDateGroup(
-    group: TripRecordPhotoGroup,
+private fun AlbumPhotoRow(
+    photos: List<TripRecordPhotoUiState>,
+    displayDate: String,
+    columnCount: Int,
     onPhotoClick: (TripRecordPhotoUiState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = group.displayDate,
-                color = TripRecordPalette.current.headingText,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        photos.forEach { photo ->
+            MapmoryAsyncImage(
+                imageBytes = photo.previewBytes?.bytesForDecoding()
+                    ?: photo.originalBytes?.bytesForDecoding(),
+                imageUri = photo.previewUri ?: photo.localOriginalUri ?: photo.fullResolutionUri,
+                cacheKey = "trip-preview:${photo.id}",
+                fallbackUri = photo.fullResolutionUri,
+                fallbackBytes = photo.originalBytes?.bytesForDecoding(),
+                contentDescription = "$displayDate 여행 사진 확대",
+                sharedImageKey = photo.id,
+                sharedCornerRadius = 14.dp,
+                modifier = Modifier
+                    .weight(1f)
+                    .aspectRatio(1f)
+                    .semantics {
+                        contentDescription = "$displayDate 여행 사진 확대"
+                    }
+                    .clickable(role = Role.Button) { onPhotoClick(photo) },
+                shape = RoundedCornerShape(14.dp),
             )
         }
-        Column(
-            modifier = Modifier.padding(top = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            group.photos.chunked(PhotoColumns).forEach { rowPhotos ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    rowPhotos.forEach { photo ->
-                        MapmoryAsyncImage(
-                            imageBytes = photo.previewBytes?.bytesForDecoding()
-                                ?: photo.originalBytes?.bytesForDecoding(),
-                            imageUri = photo.previewUri ?: photo.localOriginalUri ?: photo.fullResolutionUri,
-                            cacheKey = "trip-preview:${photo.id}",
-                            fallbackUri = photo.fullResolutionUri,
-                            fallbackBytes = photo.originalBytes?.bytesForDecoding(),
-                            contentDescription = "${group.displayDate} 여행 사진 확대",
-                            sharedImageKey = photo.id,
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f)
-                                .semantics {
-                                    contentDescription = "${group.displayDate} 여행 사진 확대"
-                                }
-                                .clickable(role = Role.Button) { onPhotoClick(photo) },
-                            shape = RoundedCornerShape(14.dp),
-                        )
-                    }
-                    repeat(PhotoColumns - rowPhotos.size) {
-                        Spacer(
-                            modifier = Modifier
-                                .weight(1f)
-                                .aspectRatio(1f),
-                        )
-                    }
-                }
-            }
+        repeat(columnCount - photos.size) {
+            Spacer(
+                modifier = Modifier
+                    .weight(1f)
+                    .aspectRatio(1f),
+            )
         }
     }
 }
 
 @Composable
 private fun AlbumScrollBar(
-    scrollValue: Int,
-    maxScrollValue: Int,
+    scrollState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
-    if (maxScrollValue <= 0) return
     val trackColor = TripRecordPalette.current.line.copy(alpha = 0.65f)
     val thumbColor = TripRecordPalette.current.accent.copy(alpha = 0.9f)
 
@@ -367,12 +389,18 @@ private fun AlbumScrollBar(
             .width(4.dp)
             .fillMaxHeight(),
     ) {
+        if (!scrollState.canScrollForward && !scrollState.canScrollBackward) return@Canvas
+        val layout = scrollState.layoutInfo
+        val averageHeight = layout.visibleItemsInfo.map { it.size }.average().toFloat()
+        if (!averageHeight.isFinite() || averageHeight <= 0f) return@Canvas
         val viewportHeight = size.height
-        val contentHeight = viewportHeight + maxScrollValue
+        val contentHeight = averageHeight * layout.totalItemsCount + layout.beforeContentPadding + layout.afterContentPadding
+        val maxScrollValue = (contentHeight - viewportHeight).coerceAtLeast(1f)
+        val scrollValue = scrollState.firstVisibleItemIndex * averageHeight + scrollState.firstVisibleItemScrollOffset
         val thumbHeight = (viewportHeight * viewportHeight / contentHeight)
             .coerceAtLeast(44.dp.toPx())
             .coerceAtMost(viewportHeight)
-        val progress = scrollValue.toFloat() / maxScrollValue.toFloat()
+        val progress = if (!scrollState.canScrollForward) 1f else (scrollValue / maxScrollValue).coerceIn(0f, 1f)
         val thumbOffset = (viewportHeight - thumbHeight) * progress
 
         drawRoundRect(
@@ -468,6 +496,7 @@ private fun ExpandedTripPhotoViewer(
                         .fillMaxSize()
                         .padding(vertical = 104.dp),
                     shape = RectangleShape,
+                    sharedCornerRadius = 14.dp,
                     contentScale = ContentScale.Fit,
                 )
             }
@@ -609,7 +638,6 @@ fun ErrorTripRecordDetailScreenPreview() {
     }
 }
 
-private const val PhotoColumns = 2
 private const val UnknownPhotoDate = "날짜 미상"
 private val AlbumDatePattern = Regex("(\\d{4})[.\\-/](\\d{1,2})[.\\-/](\\d{1,2})")
 private val KoreanWeekdays = listOf("월", "화", "수", "목", "금", "토", "일")
