@@ -54,16 +54,15 @@ public class AuthController {
     }
 
     /**
-     * 구글 로그인과 같다. 앱이 Sign in with Apple로 받은 identity token을 보낸다.
-     * 애플은 이름을 최초 인증 때만 앱에 주므로, 그때 받은 이름을 name으로 함께 보낸다. (ADR 0020)
+     * 구글 로그인과 같다. 앱이 Sign in with Apple로 받은 identity token을 보낸다. (ADR 0020)
      */
     @PostMapping("/login/apple")
     public ApiResponse<LoginResponse> loginWithApple(
             @Valid @RequestBody AppleLoginRequest request,
             @AuthenticationPrincipal Long authenticatedMemberId
     ) {
-        return ApiResponse.from(LoginResponse.from(authService.loginWithSocial(
-                AuthProvider.APPLE, request.identityToken(), request.name(), authenticatedMemberId)));
+        return ApiResponse.from(LoginResponse.from(
+                authService.loginWithSocial(AuthProvider.APPLE, request.identityToken(), authenticatedMemberId)));
     }
 
     @PostMapping("/login/guest")

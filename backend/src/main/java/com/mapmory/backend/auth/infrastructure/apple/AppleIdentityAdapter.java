@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 /**
  * 애플 identity token을 검증해 sub를 꺼낸다.
  *
- * 토큰에 이름이 없으므로 신원의 이름은 비워 둔다. 이름은 앱이 최초 로그인 때만 받아 요청에 함께 보낸다. (ADR 0020)
+ * 토큰에 이름이 없으므로 신원의 이름은 비워 두고, 회원은 기본 이름으로 시작한다. (ADR 0020)
  */
 @Component
 public class AppleIdentityAdapter implements SocialIdentityPort {

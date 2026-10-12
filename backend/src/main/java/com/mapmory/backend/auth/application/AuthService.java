@@ -52,24 +52,7 @@ public class AuthService {
      */
     @Transactional
     public LoginResult loginWithSocial(AuthProvider provider, String token, Long authenticatedMemberId) {
-        return loginWithSocial(provider, token, null, authenticatedMemberId);
-    }
-
-    /**
-     * 토큰에 이름이 없는 제공자(애플)용. 앱이 받은 이름(clientName)은 제공자가 확인해 준 이름이 없을 때만 쓴다.
-     * 이미 가입한 회원의 이름은 바꾸지 않는다. (ADR 0020)
-     */
-    @Transactional
-    public LoginResult loginWithSocial(
-            AuthProvider provider,
-            String token,
-            String clientName,
-            Long authenticatedMemberId
-    ) {
-        SocialIdentity verified = socialIdentityPorts.verify(provider, token);
-        SocialIdentity identity = verified.name() == null || verified.name().isBlank()
-                ? new SocialIdentity(verified.providerId(), clientName)
-                : verified;
+        SocialIdentity identity = socialIdentityPorts.verify(provider, token);
         String providerId = identity.providerId();
         Optional<Member> guest = findGuest(authenticatedMemberId);
 

@@ -196,18 +196,12 @@ Access Token이 아니라 ID Token을 보낸다.
 
 ```json
 {
-  "identityToken": "apple-identity-token",
-  "name": "티온"
+  "identityToken": "apple-identity-token"
 }
 ```
 
-| 필드 | 필수 | 설명 |
-| --- | --- | --- |
-| `identityToken` | O | `credential.identityToken`을 UTF-8 문자열로 바꾼 값 |
-| `name` | X | 애플은 이름을 **처음 인증할 때만** 앱에 준다(`credential.fullName`). 그때 받은 이름을 보내고, 이후 로그인에서는 생략한다. 최대 100자, 저장할 때 50자로 자른다 |
-
-`name`은 새 회원을 만들거나 게스트를 승격할 때만 쓴다. 이미 가입한 회원의 이름은 바꾸지 않는다.
-`name`이 없으면 기본 이름(예: `회원58213`)을 부여한다.
+`identityToken`은 `credential.identityToken`을 UTF-8 문자열로 바꾼 값이다.
+애플은 토큰에 이름을 넣지 않으므로 애플 회원은 기본 이름(예: `회원58213`)으로 시작한다.
 
 게스트 승격 규칙, 결과 표, 응답 형식은 카카오 로그인과 같다. 같은 사람이라도 카카오·구글 회원과
 애플 회원은 별개 회원이다.

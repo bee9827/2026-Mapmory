@@ -30,8 +30,6 @@ import org.springframework.test.web.servlet.MockMvc;
 class AppleLoginIntegrationTest extends IntegrationTest {
 
     private static final String REQUEST_BODY = "{\"identityToken\":\"apple-identity-token\"}";
-    private static final String REQUEST_BODY_WITH_NAME =
-            "{\"identityToken\":\"apple-identity-token\",\"name\":\"티온\"}";
 
     @Autowired
     private MockMvc mockMvc;
@@ -43,12 +41,12 @@ class AppleLoginIntegrationTest extends IntegrationTest {
     private AppleIdentityAdapter appleIdentityAdapter;
 
     @Test
-    void 신규_애플_사용자는_앱이_보낸_이름으로_회원이_생성된다() throws Exception {
+    void 신규_애플_사용자는_기본_이름으로_회원이_생성되고_토큰을_받는다() throws Exception {
         willReturn(new SocialIdentity("apple-sub-1", null)).given(appleIdentityAdapter).verify(anyString());
 
         mockMvc.perform(post("/api/v1/auth/login/apple")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(REQUEST_BODY_WITH_NAME))
+                        .content(REQUEST_BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.data.refreshToken").isNotEmpty())
@@ -56,40 +54,23 @@ class AppleLoginIntegrationTest extends IntegrationTest {
 
         Member member = memberRepository.findByProviderAndProviderId(AuthProvider.APPLE, "apple-sub-1")
                 .orElseThrow();
-        assertThat(member.getName()).isEqualTo("티온");
-    }
-
-    @Test
-    void 이름_없이_오면_기본_이름을_부여한다() throws Exception {
-        willReturn(new SocialIdentity("apple-sub-2", null)).given(appleIdentityAdapter).verify(anyString());
-
-        mockMvc.perform(post("/api/v1/auth/login/apple")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(REQUEST_BODY))
-                .andExpect(status().isOk());
-
-        Member member = memberRepository.findByProviderAndProviderId(AuthProvider.APPLE, "apple-sub-2")
-                .orElseThrow();
         assertThat(member.getName()).matches("회원\\d{5}");
     }
 
     @Test
-    void 기존_회원은_재로그인시_동일_회원이고_이름이_바뀌지_않는다() throws Exception {
+    void 기존_회원은_재로그인시_동일_회원으로_매핑되고_isNewMember는_false다() throws Exception {
         willReturn(new SocialIdentity("apple-sub-3", null)).given(appleIdentityAdapter).verify(anyString());
 
         mockMvc.perform(post("/api/v1/auth/login/apple")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(REQUEST_BODY_WITH_NAME))
+                        .content(REQUEST_BODY))
                 .andExpect(jsonPath("$.data.isNewMember").value(true));
 
         mockMvc.perform(post("/api/v1/auth/login/apple")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"identityToken\":\"apple-identity-token\",\"name\":\"다른이름\"}"))
+                        .content(REQUEST_BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.isNewMember").value(false));
-
-        assertThat(memberRepository.findByProviderAndProviderId(AuthProvider.APPLE, "apple-sub-3")
-                .orElseThrow().getName()).isEqualTo("티온");
     }
 
     @Test
@@ -104,13 +85,13 @@ class AppleLoginIntegrationTest extends IntegrationTest {
         mockMvc.perform(post("/api/v1/auth/login/apple")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + guestAccessToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(REQUEST_BODY_WITH_NAME))
+                        .content(REQUEST_BODY))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.isNewMember").value(false));
 
         assertThat(memberRepository.count()).isEqualTo(memberCountBeforePromotion);
-        assertThat(memberRepository.findByProviderAndProviderId(AuthProvider.APPLE, "apple-sub-4")
-                .orElseThrow().getName()).isEqualTo("티온");
+        assertThat(memberRepository.findByProviderAndProviderId(AuthProvider.APPLE, "apple-sub-4"))
+                .isPresent();
     }
 
     @Test

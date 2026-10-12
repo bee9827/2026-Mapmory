@@ -1,17 +1,14 @@
 package com.mapmory.backend.auth.web.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
 /**
  * identityToken : 앱이 Sign in with Apple로 받은 identity token(JWT)
- * name          : 애플은 이름을 최초 인증 때 앱에만 한 번 준다. 그때 받은 이름을 보내고, 이후 로그인에서는 비운다.
+ *
+ * 애플은 토큰에 이름을 넣지 않으므로 애플 회원은 기본 이름으로 시작한다. (ADR 0020)
  */
 public record AppleLoginRequest(
         @NotBlank
-        String identityToken,
-
-        @Size(max = 100)
-        String name
+        String identityToken
 ) {
 }
