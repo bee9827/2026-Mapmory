@@ -7,11 +7,12 @@ import kotlinx.serialization.json.Json
 import mapmoryclient.shared.generated.resources.Res
 
 /**
- * Reads one generated province resource at a time. Boundary geometry is bundled with the app;
- * it is not a business-data cache and is never fetched from the network at runtime.
+ * Reads bundled overview and province geometry. Boundary data is not a business-data cache and is
+ * never fetched from the network at runtime.
  */
 internal object GeneratedKoreaDistrictMapData {
     private val json = Json
+    private var cachedOverviewData: OverviewDistrictData? = null
     private val supportedProvinceCodes = setOf(
         "11", "26", "27", "28", "29", "30", "31", "41", "42",
         "43", "44", "45", "46", "47", "48", "49", "50",
@@ -23,22 +24,69 @@ internal object GeneratedKoreaDistrictMapData {
 
         val file = Res.readBytes("files/korea-districts-$suffix.json")
             .decodeToString()
-        return json.decodeFromString<DistrictResource>(file).districts.map { district ->
-            ProvincePolygon(
-                code = district.code,
-                name = district.name,
-                rings = district.rings.map { ring ->
-                    ring.map { point -> GeoPoint(point[0].toFloat(), point[1].toFloat()) }
-                },
-            )
-        }
+        return json.decodeFromString<DistrictResource>(file).districts.toPolygons()
     }
+
+    suspend fun overviewData(): OverviewDistrictData {
+        cachedOverviewData?.let { return it }
+        val file = Res.readBytes("files/korea-district-overview.json").decodeToString()
+        val resource = json.decodeFromString<OverviewBoundaryResource>(file)
+        return OverviewDistrictData(
+            lines = resource.lines.map { line ->
+                line.map { point -> GeoPoint(point[0].toFloat(), point[1].toFloat()) }
+            },
+            labels = resource.labels.map { label ->
+                OverviewDistrictLabel(
+                    code = label.code,
+                    provinceCode = label.provinceCode,
+                    name = label.name,
+                    point = GeoPoint(label.point[0].toFloat(), label.point[1].toFloat()),
+                )
+            },
+        ).also { cachedOverviewData = it }
+    }
+}
+
+internal data class OverviewDistrictData(
+    val lines: List<List<GeoPoint>>,
+    val labels: List<OverviewDistrictLabel>,
+)
+
+internal data class OverviewDistrictLabel(
+    val code: String,
+    val provinceCode: String,
+    val name: String,
+    val point: GeoPoint,
+)
+
+private fun List<DistrictBoundary>.toPolygons(): List<ProvincePolygon> = map { district ->
+    ProvincePolygon(
+        code = district.code,
+        name = district.name,
+        rings = district.rings.map { ring ->
+            ring.map { point -> GeoPoint(point[0].toFloat(), point[1].toFloat()) }
+        },
+    )
 }
 
 @Serializable
 private data class DistrictResource(
     val provinceCode: String,
     val districts: List<DistrictBoundary>,
+)
+
+@Serializable
+private data class OverviewBoundaryResource(
+    val lines: List<List<List<Double>>>,
+    val labels: List<OverviewDistrictLabelResource> = emptyList(),
+)
+
+@Serializable
+private data class OverviewDistrictLabelResource(
+    val code: String,
+    val provinceCode: String,
+    val name: String,
+    val point: List<Double>,
 )
 
 @Serializable
