@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { adminApiRequest, getCurrentAdmin, loginAdmin, logoutAdmin } from "./api/adminApi";
 
 type Page = "dashboard" | "members" | "feedback";
 type FeedbackStatus = "미확인" | "반영 중" | "반영 완료" | "보류" | "미반영";
@@ -21,8 +22,9 @@ type Member = {
 };
 type DashboardSummary = {
   period: { from: string; to: string };
-  members: { total: number; guest: number; kakao: number; newInPeriod: number };
+  members: { total: number; guest: number; kakao: number; google: number; newInPeriod: number };
   travelRecords: { total: number; createdInPeriod: number };
+  photos: { total: number };
 };
 
 const feedbackStatuses: FeedbackStatus[] = ["미확인", "반영 중", "반영 완료", "보류", "미반영"];
@@ -45,8 +47,6 @@ const members: Member[] = [
   { id: "M-10837", name: "최유진", provider: "KAKAO", joinedAt: "2026.10.06", records: 7, refresh: "정상", lastActive: "10.06" },
   { id: "M-10836", name: "정민준", provider: "KAKAO", joinedAt: "2026.10.05", records: 19, refresh: "정상", lastActive: "10.05" },
 ];
-
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1").replace(/\/+$/, "");
 
 function getDashboardRange(period: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -82,6 +82,7 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     download: <><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v3h16v-3"/></>,
     arrow: <><path d="M7 17 17 7M7 7h10v10"/></>,
     calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></>,
+    image: <><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></>,
     more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
     logout: <><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"/></>,
     close: <path d="m6 6 12 12M18 6 6 18"/>,
@@ -91,6 +92,9 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
 }
 
 function App() {
+  const [authStatus, setAuthStatus] = useState<"checking" | "authenticated" | "anonymous">("checking");
+  const [adminUsername, setAdminUsername] = useState("");
+  const [authError, setAuthError] = useState("");
   const [page, setPage] = useState<Page>("dashboard");
   const [period, setPeriod] = useState("최근 7일");
   const [feedback, setFeedback] = useState(initialFeedback);
@@ -99,6 +103,23 @@ function App() {
   const [memberQuery, setMemberQuery] = useState("");
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    getCurrentAdmin()
+      .then((admin) => {
+        if (!active) return;
+        setAdminUsername(admin.username);
+        setAuthStatus("authenticated");
+      })
+      .catch(() => {
+        if (active) setAuthStatus("anonymous");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const filteredMembers = useMemo(() => members.filter((member) =>
     `${member.id} ${member.name} ${member.provider}`.toLowerCase().includes(memberQuery.toLowerCase()),
@@ -113,6 +134,35 @@ function App() {
     setNotice(message);
     window.setTimeout(() => setNotice(""), 2600);
   };
+
+  const handleLogin = async (username: string, password: string) => {
+    setAuthError("");
+    try {
+      const admin = await loginAdmin(username, password);
+      setAdminUsername(admin.username);
+      setAuthStatus("authenticated");
+    } catch (cause) {
+      setAuthError(cause instanceof Error ? cause.message : "로그인에 실패했습니다.");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutAdmin();
+      setAdminUsername("");
+      setAuthStatus("anonymous");
+    } catch (cause) {
+      showNotice(cause instanceof Error ? cause.message : "로그아웃에 실패했습니다.");
+    }
+  };
+
+  if (authStatus === "checking") {
+    return <div className="auth-loading">관리자 로그인 상태를 확인하고 있어요.</div>;
+  }
+
+  if (authStatus === "anonymous") {
+    return <AdminLoginPage error={authError} onLogin={handleLogin} />;
+  }
 
   const pageTitle = page === "dashboard" ? "대시보드" : page === "members" ? "회원 관리" : "서비스 의견";
 
@@ -131,9 +181,11 @@ function App() {
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-help"><div className="help-icon">?</div><div><strong>운영 가이드</strong><span>어드민 사용 방법</span></div><Icon name="arrow" size={15}/></div>
-          <div className="profile-button">
-          <div className="avatar admin-avatar">M</div><div className="profile-copy"><strong>Mapmory 운영자</strong><span>운영자</span></div>
-          </div>
+          <button className="profile-button" onClick={handleLogout} title="로그아웃">
+            <div className="avatar admin-avatar">{adminUsername.slice(0, 1).toUpperCase() || "M"}</div>
+            <div className="profile-copy"><strong>{adminUsername}</strong><span>로그아웃</span></div>
+            <Icon name="logout" size={16}/>
+          </button>
         </div>
       </aside>
 
@@ -159,6 +211,73 @@ function App() {
   );
 }
 
+function AdminLoginPage({ error, onLogin }: { error: string; onLogin: (username: string, password: string) => Promise<void> }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitting(true);
+    await onLogin(username, password);
+    setSubmitting(false);
+  };
+
+  return (
+    <main className="login-page">
+      <section className="login-panel">
+        <div className="login-brand">
+          <div className="brand-mark"><span /><span /><span /></div>
+          <strong>mapmory</strong>
+        </div>
+        <div className="login-heading">
+          <span className="eyebrow">ADMIN CONSOLE</span>
+          <h1>운영자 로그인</h1>
+          <p>관리자 계정으로 로그인해 주세요.</p>
+        </div>
+        <form className="login-form" onSubmit={submit}>
+          <label htmlFor="admin-username">아이디</label>
+          <input
+            id="admin-username"
+            autoComplete="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            required
+          />
+          <div className="password-label"><label htmlFor="admin-password">비밀번호</label></div>
+          <input
+            id="admin-password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+          {error && <p className="login-error" role="alert">{error}</p>}
+          <button className="primary-button login-submit" type="submit" disabled={submitting}>
+            {submitting ? "로그인 중..." : "로그인"}
+          </button>
+        </form>
+        <div className="login-footnote"><span className="lock-mark">⌑</span> 관리자 전용 페이지입니다.</div>
+      </section>
+      <aside className="login-side">
+        <div className="login-side-copy">
+          <span>MAPMORY ADMIN</span>
+          <h2>여행의 기억을<br/><em>더 나은 경험으로</em></h2>
+          <p>서비스 현황을 확인하고 회원들의 여행 기록을 살펴보세요.</p>
+        </div>
+        <div className="login-graphic" aria-hidden="true">
+          <div className="orbit orbit-outer"/><div className="orbit orbit-inner"/>
+          <div className="orbit-center"><div className="brand-mark large-mark"><span/><span/><span/></div></div>
+          <i className="orbit-dot dot-a"/><i className="orbit-dot dot-b"/><i className="orbit-dot dot-c"/>
+          <div className="graphic-card"><span className="graphic-card-label">기록된 여행</span><strong>Mapmory</strong><span className="graphic-spark">✳</span></div>
+        </div>
+      </aside>
+      <div className="login-decoration decoration-one"/><div className="login-decoration decoration-two"/>
+    </main>
+  );
+}
+
 function Dashboard({ period, setPeriod, onNavigate, onNotice }: { period: string; setPeriod: (period: string) => void; onNavigate: (page: Page) => void; onNotice: (message: string) => void }) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -174,20 +293,9 @@ function Dashboard({ period, setPeriod, onNavigate, onNotice }: { period: string
     setSummary(null);
     const query = new URLSearchParams(range);
 
-    fetch(`${apiBaseUrl}/admin/dashboard?${query.toString()}`, { signal: controller.signal })
-      .then(async (response) => {
-        const body = await response.json() as {
-          data?: DashboardSummary;
-          detail?: string;
-          title?: string;
-        };
-        if (!response.ok) {
-          throw new Error(body.detail || body.title || "대시보드 데이터를 불러오지 못했습니다.");
-        }
-        if (!body.data) {
-          throw new Error("서버 응답 형식이 올바르지 않습니다.");
-        }
-        setSummary(body.data);
+    adminApiRequest<DashboardSummary>(`/admin/dashboard?${query.toString()}`, { signal: controller.signal })
+      .then((data) => {
+        setSummary(data);
         setLastUpdated(new Date());
       })
       .catch((cause: unknown) => {
@@ -205,13 +313,15 @@ function Dashboard({ period, setPeriod, onNavigate, onNotice }: { period: string
   const total = summary?.members.total ?? 0;
   const guest = summary?.members.guest ?? 0;
   const kakao = summary?.members.kakao ?? 0;
-  const classifiedMembers = guest + kakao;
+  const google = summary?.members.google ?? 0;
+  const classifiedMembers = guest + kakao + google;
   const guestPercent = classifiedMembers === 0 ? 0 : (guest / classifiedMembers) * 100;
   const kakaoPercent = classifiedMembers === 0 ? 0 : (kakao / classifiedMembers) * 100;
+  const googlePercent = classifiedMembers === 0 ? 0 : (google / classifiedMembers) * 100;
   const unknown = Math.max(0, total - classifiedMembers);
   const donutBackground = total === 0
     ? "#e7ece8"
-    : `conic-gradient(#64c1a0 0% ${guest / total * 100}%, #f0ba9c ${guest / total * 100}% ${(guest + kakao) / total * 100}%, #d9dfdb ${(guest + kakao) / total * 100}% 100%)`;
+    : `conic-gradient(#64c1a0 0% ${guest / total * 100}%, #f0ba9c ${guest / total * 100}% ${(guest + kakao) / total * 100}%, #98aadd ${(guest + kakao) / total * 100}% ${classifiedMembers / total * 100}%, #d9dfdb ${classifiedMembers / total * 100}% 100%)`;
   const dateLabel = summary
     ? `${formatPeriodDate(summary.period.from)} – ${formatPeriodDate(summary.period.to)}`
     : `${formatPeriodDate(range.from)} – ${formatPeriodDate(range.to)}`;
@@ -252,8 +362,9 @@ function Dashboard({ period, setPeriod, onNavigate, onNotice }: { period: string
       {loading && <div className="dashboard-loading" role="status">대시보드 데이터를 불러오는 중입니다.</div>}
 
       <section className="metric-grid" aria-label="주요 지표">
-        <MetricCard label="가입 회원" value={number(summary?.members.total)} change={summary ? `+${number(summary.members.newInPeriod)}` : "—"} detail="선택 기간 신규 가입" icon="users" tint="mint" trend="neutral" foot={`게스트 ${number(summary?.members.guest)} · 카카오 ${number(summary?.members.kakao)}`} />
+        <MetricCard label="가입 회원" value={number(summary?.members.total)} change={summary ? `+${number(summary.members.newInPeriod)}` : "—"} detail="선택 기간 신규 가입" icon="users" tint="mint" trend="neutral" foot={`게스트 ${number(summary?.members.guest)} · 카카오 ${number(summary?.members.kakao)} · Google ${number(summary?.members.google)}`} />
         <MetricCard label="여행 기록" value={number(summary?.travelRecords.total)} change={summary ? `+${number(summary.travelRecords.createdInPeriod)}` : "—"} detail="선택 기간 생성" icon="grid" tint="peach" trend="neutral" foot="전체 누적 기록" />
+        <MetricCard label="등록 사진" value={number(summary?.photos.total)} change="누적" detail="여행 기록에 연결된 사진" icon="image" tint="lavender" trend="neutral" foot="삭제된 사진 제외" />
         <MetricCard label="기간 신규 회원" value={number(summary?.members.newInPeriod)} change={loading ? "—" : period} detail="가입 수" icon="users" tint="lavender" trend="neutral" foot={dateLabel} />
       </section>
 
@@ -273,6 +384,7 @@ function Dashboard({ period, setPeriod, onNavigate, onNotice }: { period: string
             <div className="donut-caption">
               <span><i className="legend-dot mint-dot"/>게스트<strong>{number(summary?.members.guest)}</strong><small>{guestPercent.toFixed(1)}%</small></span>
               <span><i className="legend-dot peach-dot"/>카카오<strong>{number(summary?.members.kakao)}</strong><small>{kakaoPercent.toFixed(1)}%</small></span>
+              <span><i className="legend-dot blue-dot"/>Google<strong>{number(summary?.members.google)}</strong><small>{googlePercent.toFixed(1)}%</small></span>
               {unknown > 0 && <span><i className="legend-dot unknown-dot"/>유형 미지정<strong>{number(unknown)}</strong><small>기존 회원</small></span>}
             </div>
           </div>

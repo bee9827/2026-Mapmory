@@ -24,6 +24,9 @@ public interface TravelRecordRepository extends JpaRepository<TravelRecord, Long
     @Query("SELECT COUNT(tr) FROM TravelRecord tr WHERE tr.createdAt >= :from AND tr.createdAt < :to")
     long countCreatedBetween(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
+    @Query("SELECT COUNT(rm) FROM RecordMedia rm")
+    long countAllMedia();
+
     /**
      * RecordMedia는 TravelRecord 애그리거트 내부 엔티티이므로 루트 리포지토리에서 조회한다.
      * 다른 일지가 이미 쓰고 있는 Object Key인지 판별하는 데 쓴다.
