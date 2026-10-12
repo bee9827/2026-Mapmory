@@ -26,6 +26,8 @@
 | 구현됨 | `POST` | `/auth/login/guest` | 게스트 로그인 |
 | 구현됨 | `POST` | `/auth/token/refresh` | Access·Refresh Token 회전 재발급 |
 | 구현됨 | `POST` | `/auth/logout` | Refresh Token 폐기 |
+| 구현됨 | `GET` | `/members/me` | 내 정보(이름) 조회 |
+| 구현됨 | `PATCH` | `/members/me` | 내 이름 변경 |
 | 구현됨 | `GET` | `/admin/dashboard` | 운영 현황 집계 조회 |
 | 구현 전 설계 | `GET` | `/admin/members` | 회원 목록 조회 |
 | 구현 전 설계 | `GET` | `/admin/members/{memberId}` | 회원 상세·세션 상태 조회 |
@@ -264,6 +266,43 @@ Access Token이 아니라 ID Token을 보낸다.
 | `429` | `GUEST_LOGIN_RATE_LIMITED` | 게스트 로그인 요청이 한도를 초과함 |
 | `503` | `KAKAO_UNAVAILABLE` | 카카오 인증 서버를 일시적으로 사용할 수 없음. 카카오가 회원번호 없이 응답하거나 빈 본문을 준 경우도 해당 |
 | `503` | `GOOGLE_UNAVAILABLE` | 구글 공개키를 받아오지 못해 검증할 수 없음 |
+
+## 2-1. Member API
+
+### 내 정보 조회
+
+`GET /api/v1/members/me`
+
+#### Response `200 OK`
+
+```json
+{
+  "data": {
+    "name": "회원58213"
+  }
+}
+```
+
+### 내 이름 변경
+
+`PATCH /api/v1/members/me`
+
+게스트도 바꿀 수 있다. 게스트 때 바꾼 이름은 이름을 주지 않는 제공자로 계정을 연결해도 유지되고,
+이름을 주는 제공자(카카오 닉네임, 구글 이름)로 연결하면 그 이름으로 바뀐다.
+
+```json
+{
+  "name": "티온"
+}
+```
+
+앞뒤 공백을 지운 뒤 1자 이상 20자 이하(이모지 등은 한 글자)여야 하고 제어 문자는 쓸 수 없다.
+응답은 내 정보 조회와 같다.
+
+| 상태 | `code` | 조건 |
+| --- | --- | --- |
+| `400` | `VALIDATION_ERROR` | `name`이 없음, 비었거나 20자를 넘음, 제어 문자가 있음 |
+| `401` | `INVALID_ACCESS_TOKEN` | Access Token이 없거나 유효하지 않음 |
 
 ## 3. Upload API
 

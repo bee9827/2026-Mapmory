@@ -75,6 +75,13 @@ public class Member extends BaseEntity {
         this.name = name;
     }
 
+    /**
+     * 사용자가 직접 정한 이름으로 바꾼다. 앞뒤 공백은 지우고, 1자 이상 20자 이하(코드 포인트 기준)만 허용한다.
+     */
+    public void rename(String rawName) {
+        this.name = MemberName.from(rawName);
+    }
+
     public Long getId() {
         return id;
     }

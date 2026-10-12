@@ -64,7 +64,9 @@ public class AuthService {
 
         if (guest.isPresent()) {
             Member promoted = guest.get();
-            promoted.promote(provider, providerId, resolveName(identity.name()));
+            // 제공자가 이름을 주지 않으면(애플) 게스트 때 쓰던 이름(직접 바꾼 이름일 수 있다)을 유지한다.
+            String name = hasText(identity.name()) ? truncate(identity.name()) : promoted.getName();
+            promoted.promote(provider, providerId, name);
             // 게스트로 이미 앱을 사용했으므로 온보딩을 반복하지 않도록 신규로 보지 않는다.
             return issueTokens(promoted, false);
         }
@@ -125,6 +127,10 @@ public class AuthService {
                 UUID.randomUUID()
         );
         return memberRepository.save(member);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private String resolveName(String nickname) {
