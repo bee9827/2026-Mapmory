@@ -113,12 +113,7 @@ internal fun MapRoute(
                         visitedCountryCodes = viewModel.visitedCountryCodes,
                         onCountryClick = { countryCode ->
                             if (countryCode == KoreaCountryCode) {
-                                val korea = regionCatalog.findByCode(KoreaCountryCode)
-                                if (korea != null && viewModel.hasRecords(korea)) {
-                                    openLocation(korea)
-                                } else {
-                                    viewModel.changeScope(MapScope.KOREA)
-                                }
+                                viewModel.changeScope(MapScope.KOREA)
                             } else {
                                 regionCatalog.findByCode(countryCode)?.let(::openLocation)
                             }
