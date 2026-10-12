@@ -8,9 +8,9 @@ npm install
 npm run dev
 ```
 
-The dashboard summary is connected to the Java backend. Member management and service feedback still use local demo data. The admin UI and `/api/v1/admin/**` endpoints currently have no login or access control.
+The dashboard summary is connected to the Java backend. Member management and service feedback still use local demo data. The admin UI uses the backend session login endpoints and sends the session cookie with API requests. Write requests first load a CSRF token and send it in the response-provided header.
 
-Set `VITE_API_BASE_URL` to the backend API base URL if it differs from `http://localhost:8080/api/v1`. The dashboard requests `GET /admin/dashboard` with `from` and `to` date parameters.
+The admin UI connects only to the production API at `https://api.map-mory.com/api/v1`. It checks `GET /admin/auth/me` on startup, logs in through `POST /admin/auth/login`, and logs out through `POST /admin/auth/logout`. The dashboard requests `GET /admin/dashboard` with `from` and `to` date parameters.
 
 ## Screens
 
