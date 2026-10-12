@@ -557,7 +557,9 @@ GET /api/v1/travel-records?tagId=12
         "regionName": "제주시",
         "startDate": "2026-08-11",
         "endDate": null,
-        "thumbnailUrl": null,
+        "thumbnailUrl": "https://...presigned-get-url",
+        "thumbnailUrlExpiresIn": 300,
+        "photoCount": 3,
         "tags": [
           { "id": 9, "name": "연인" },
           { "id": 12, "name": "라멘맛집" }
@@ -573,7 +575,9 @@ GET /api/v1/travel-records?tagId=12
 }
 ```
 
-목록에는 본문과 전체 미디어 목록을 포함하지 않는다. `thumbnailUrl` 필드는 후속 구현을 위해 포함했으며 현재는 `null`을 반환한다.
+목록에는 본문과 전체 미디어 목록을 포함하지 않는다. `thumbnailUrl`은 정렬 순서가 가장 앞선 사진의 Presigned GET URL이고 `thumbnailUrlExpiresIn`은 그 만료까지 남은 초다. 사진이 없으면 둘 다 `null`이다.
+
+`photoCount`는 기록에 연결된 사진 수다. 사진이 없으면 `0`이다.
 
 `tags`는 `tag.created_at ASC, tag.id ASC` 순서로 반환한다.
 
