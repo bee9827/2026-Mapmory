@@ -114,7 +114,7 @@ internal fun TripTagChip(
                     Modifier.border(1.dp, TripRecordPalette.current.border, shape)
                 },
             )
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
             .padding(horizontal = 11.dp, vertical = 4.dp),
     )
 }

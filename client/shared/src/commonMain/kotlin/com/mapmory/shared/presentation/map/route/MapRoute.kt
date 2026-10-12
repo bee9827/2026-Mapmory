@@ -16,6 +16,7 @@ import com.mapmory.shared.analytics.LocalMapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.data.settings.OnboardingPreference
 import com.mapmory.shared.domain.model.Location
+import com.mapmory.shared.domain.model.LocationType
 import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.navigation.MapmoryBackHandlerRegistry
 import com.mapmory.shared.presentation.map.data.GeneratedKoreaMapData
@@ -48,6 +49,7 @@ internal fun MapRoute(
     var showRecordIntroduction by remember(onboardingPreference) {
         mutableStateOf(!onboardingPreference.hasSeenRecordIntroduction())
     }
+    var showRegionLabels by remember { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
         analytics.logEvent(
@@ -69,7 +71,7 @@ internal fun MapRoute(
         }
     }
 
-    fun openLocation(location: Location) {
+    fun openLocation(location: Location, forceEditor: Boolean = false) {
         val hasRecords = viewModel.hasRecords(location)
         analytics.logEvent(
             MapmoryAnalyticsEvent.MAP_LOCATION_SELECTED,
@@ -78,7 +80,7 @@ internal fun MapRoute(
                 "has_records" to hasRecords.toString(),
             ),
         )
-        if (hasRecords) {
+        if (hasRecords && !forceEditor) {
             onOpenRecords(location.id)
         } else {
             analytics.logEvent(
@@ -106,6 +108,8 @@ internal fun MapRoute(
                 )
                 viewModel.changeScope(selectedScope)
             },
+            showRegionLabels = showRegionLabels,
+            onRegionLabelsToggle = { showRegionLabels = !showRegionLabels },
             mapContent = {
                 when (uiState.scope) {
                     MapScope.WORLD -> MapArtwork(
@@ -128,14 +132,22 @@ internal fun MapRoute(
                     MapScope.KOREA -> when (val mapState = uiState.koreaMap) {
                         KoreaMapUiState.ProvinceOverview -> MapArtwork(
                             scope = MapScope.KOREA,
-                            visitedRegionCodes = viewModel.visitedProvinceCodes,
+                            visitedRegionCodes = viewModel.visitedProvinceCodes +
+                                viewModel.visitedDistrictCodes("KR-47"),
                             koreaRegions = GeneratedKoreaMapData.provinces,
+                            showRegionLabels = showRegionLabels,
+                            isProvinceOverview = true,
                             onRegionClick = { provinceCode ->
-                                analytics.logEvent(
-                                    MapmoryAnalyticsEvent.MAP_PROVINCE_SELECTED,
-                                    mapOf("province_code" to provinceCode),
-                                )
-                                scope.launch { viewModel.openProvince(provinceCode) }
+                                val selectedLocation = regionCatalog.findByCode(provinceCode)
+                                if (selectedLocation?.type == LocationType.DISTRICT) {
+                                    openLocation(selectedLocation, forceEditor = true)
+                                } else {
+                                    analytics.logEvent(
+                                        MapmoryAnalyticsEvent.MAP_PROVINCE_SELECTED,
+                                        mapOf("province_code" to provinceCode),
+                                    )
+                                    scope.launch { viewModel.openProvince(provinceCode) }
+                                }
                             },
                         )
 
@@ -155,7 +167,7 @@ internal fun MapRoute(
                             scope = MapScope.KOREA,
                             visitedRegionCodes = viewModel.visitedDistrictCodes(mapState.provinceCode),
                             koreaRegions = mapState.regions,
-                            showRegionLabels = true,
+                            showRegionLabels = showRegionLabels,
                             onRegionClick = { districtCode ->
                                 regionCatalog.findDistrict(
                                     provinceCode = mapState.provinceCode,
