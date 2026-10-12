@@ -39,6 +39,8 @@ fun TripMapScreen(
     mapScope: MapScope = MapScope.WORLD,
     visitedCount: Int = 0,
     onMapScopeChange: (MapScope) -> Unit = {},
+    showRegionLabels: Boolean = true,
+    onRegionLabelsToggle: () -> Unit = {},
     onBackClick: () -> Unit,
     mapDetailTitle: String? = null,
     mapDetailTotal: Int? = null,
@@ -84,6 +86,17 @@ fun TripMapScreen(
                     onClick = onCreateClick,
                     modifier = Modifier.align(Alignment.BottomEnd),
                 )
+
+                if (mapScope == MapScope.KOREA) {
+                    TripTagChip(
+                        text = if (showRegionLabels) "지역명 숨기기" else "지역명 표시",
+                        selected = showRegionLabels,
+                        onClick = onRegionLabelsToggle,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp),
+                    )
+                }
             }
 
             TripBottomBar(
