@@ -23,8 +23,10 @@ import com.mapmory.shared.analytics.NoOpMapmoryAnalytics
 import com.mapmory.shared.navigation.MapmoryBackHandlerRegistry
 import com.mapmory.shared.navigation.MapmoryNavHost
 import com.mapmory.shared.navigation.MapmoryNavigator
+import com.mapmory.shared.navigation.PlatformNavigationGestures
 import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.presentation.splash.MapmorySplashScreen
+import com.mapmory.shared.presentation.components.ProvideScrollToTop
 import com.mapmory.shared.presentation.triprecord.screen.ProvideTripRecordPalettes
 import com.mapmory.shared.presentation.theme.MapmoryTypography
 import kotlinx.coroutines.delay
@@ -67,6 +69,8 @@ fun MapmoryApp(
         backHandlerRegistry.handleBack(navController.currentBackStackEntry?.id) ||
             navigator.navigateBack()
     }
+    var edgeGestureOwnerId by remember { mutableStateOf<String?>(null) }
+    var edgeGestureWasInternal by remember { mutableStateOf(false) }
     var showSplash by rememberSaveable { mutableStateOf(true) }
 
     LaunchedEffect(Unit) {
@@ -91,14 +95,50 @@ fun MapmoryApp(
                 if (showSplash) {
                     MapmorySplashScreen(contentWindowInsets = contentWindowInsets)
                 } else {
-                    MapmoryNavHost(
-                        navController = navController,
-                        navigator = navigator,
-                        container = appContainer,
-                        backHandlerRegistry = backHandlerRegistry,
-                        contentWindowInsets = contentWindowInsets,
-                        developerToolsInfo = developerToolsInfo,
-                    )
+                    ProvideScrollToTop {
+                        MapmoryNavHost(
+                            navController = navController,
+                            navigator = navigator,
+                            container = appContainer,
+                            backHandlerRegistry = backHandlerRegistry,
+                            contentWindowInsets = contentWindowInsets,
+                            developerToolsInfo = developerToolsInfo,
+                        )
+                        PlatformNavigationGestures(
+                            onBackStarted = {
+                                val ownerId = navController.currentBackStackEntry?.id
+                                edgeGestureOwnerId = ownerId
+                                edgeGestureWasInternal =
+                                    backHandlerRegistry.handleGestureBack(ownerId)
+                                edgeGestureWasInternal || navigator.navigateBackKeepingState()
+                            },
+                            onBackCancelled = {
+                                if (edgeGestureWasInternal) {
+                                    backHandlerRegistry.handleGestureForward(edgeGestureOwnerId)
+                                } else {
+                                    navigator.navigateForward()
+                                }
+                                edgeGestureOwnerId = null
+                                edgeGestureWasInternal = false
+                            },
+                            onForwardStarted = {
+                                val ownerId = navController.currentBackStackEntry?.id
+                                edgeGestureOwnerId = ownerId
+                                edgeGestureWasInternal =
+                                    backHandlerRegistry.handleGestureForward(ownerId)
+                                edgeGestureWasInternal || navigator.navigateForward()
+                            },
+                            onForwardCancelled = {
+                                if (edgeGestureWasInternal) {
+                                    backHandlerRegistry.handleGestureBack(edgeGestureOwnerId)
+                                } else {
+                                    navigator.navigateBackKeepingState()
+                                }
+                                edgeGestureOwnerId = null
+                                edgeGestureWasInternal = false
+                            },
+                        )
+                    }
                 }
             }
         }

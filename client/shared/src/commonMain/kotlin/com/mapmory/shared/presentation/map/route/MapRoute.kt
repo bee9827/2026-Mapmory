@@ -46,6 +46,26 @@ internal fun MapRoute(
     val scope = rememberCoroutineScope()
     val analytics = LocalMapmoryAnalytics.current
     val latestNestedBack = rememberUpdatedState { viewModel.closeProvince() }
+    var gestureClosedProvinceCode by remember { mutableStateOf<String?>(null) }
+    val latestGestureBack = rememberUpdatedState {
+        val provinceCode = viewModel.uiState.koreaMap.provinceCodeOrNull()
+        if (provinceCode == null) {
+            false
+        } else {
+            gestureClosedProvinceCode = provinceCode
+            viewModel.closeProvince()
+        }
+    }
+    val latestGestureForward = rememberUpdatedState {
+        val provinceCode = gestureClosedProvinceCode
+        if (provinceCode == null) {
+            false
+        } else {
+            gestureClosedProvinceCode = null
+            scope.launch { viewModel.openProvince(provinceCode) }
+            true
+        }
+    }
     var showRecordIntroduction by remember(onboardingPreference) {
         mutableStateOf(!onboardingPreference.hasSeenRecordIntroduction())
     }
@@ -63,7 +83,11 @@ internal fun MapRoute(
     }
 
     DisposableEffect(viewModel, backHandlerRegistry) {
-        val registration = backHandlerRegistry.register(backHandlerOwnerId) {
+        val registration = backHandlerRegistry.register(
+            backHandlerOwnerId,
+            gestureBack = { latestGestureBack.value() },
+            gestureForward = { latestGestureForward.value() },
+        ) {
             latestNestedBack.value()
         }
         onDispose {
@@ -102,6 +126,7 @@ internal fun MapRoute(
                 else -> viewModel.visitedProvinceCodes.size
             },
             onMapScopeChange = { selectedScope ->
+                gestureClosedProvinceCode = null
                 analytics.logEvent(
                     MapmoryAnalyticsEvent.MAP_SCOPE_CHANGED,
                     mapOf("scope" to selectedScope.name.lowercase()),
@@ -133,6 +158,7 @@ internal fun MapRoute(
                             showRegionLabels = showRegionLabels,
                             isProvinceOverview = true,
                             onRegionClick = { provinceCode ->
+                                gestureClosedProvinceCode = null
                                 val selectedLocation = regionCatalog.findByCode(provinceCode)
                                 if (selectedLocation?.type == LocationType.DISTRICT) {
                                     openLocation(selectedLocation, forceEditor = true)
@@ -154,6 +180,7 @@ internal fun MapRoute(
                             message = mapState.message,
                             actionLabel = "다시 시도",
                             onAction = {
+                                gestureClosedProvinceCode = null
                                 scope.launch { viewModel.openProvince(mapState.provinceCode) }
                             },
                         )
@@ -179,6 +206,7 @@ internal fun MapRoute(
             },
             mapDetailTotal = (uiState.koreaMap as? KoreaMapUiState.DistrictDetail)?.regions?.size,
             onMapDetailBackClick = {
+                gestureClosedProvinceCode = null
                 analytics.logEvent(MapmoryAnalyticsEvent.MAP_DETAIL_BACK_CLICKED)
                 viewModel.closeProvince()
             },

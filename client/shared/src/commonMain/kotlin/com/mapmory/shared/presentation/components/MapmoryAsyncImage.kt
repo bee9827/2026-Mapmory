@@ -1,5 +1,7 @@
 package com.mapmory.shared.presentation.components
 
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -7,7 +9,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
@@ -35,7 +37,7 @@ import com.mapmory.shared.presentation.triprecord.screen.TripPhotoPlaceholder
 internal data class MapmoryImageTransitionScope(
     val sharedScope: SharedTransitionScope,
     val visibilityScope: AnimatedVisibilityScope,
-    val painters: SnapshotStateMap<String, Painter>,
+    val painters: MutableMap<String, Painter>,
 ) {
     val isTransitionActive: Boolean
         get() = sharedScope.isTransitionActive ||
@@ -58,8 +60,21 @@ internal fun MapmoryAsyncImage(
     shape: Shape = RoundedCornerShape(18.dp),
     contentScale: ContentScale = ContentScale.Crop,
     sharedImageKey: String? = null,
+    sharedCornerRadius: Dp = 18.dp,
 ) {
     val transition = LocalMapmoryImageTransitionScope.current
+    // Both incoming and outgoing photos follow the same timeline as their bounds.
+    // The fullscreen photo starts rounded instead of switching to a rectangle on entry.
+    val animatedShape = if (transition != null && sharedImageKey != null) {
+        val cornerRadius by transition.visibilityScope.transition.animateDp(
+            transitionSpec = { tween(200, easing = FastOutSlowInEasing) },
+            label = "photo-corner-radius",
+        ) { state ->
+            val isThumbnail = contentScale != ContentScale.Fit
+            if ((state == EnterExitState.Visible) == isThumbnail) sharedCornerRadius else 0.dp
+        }
+        RoundedCornerShape(cornerRadius)
+    } else shape
     var lastPainter by remember(sharedImageKey, contentDescription) {
         mutableStateOf(sharedImageKey?.let { transition?.painters?.get(it) })
     }
@@ -68,6 +83,8 @@ internal fun MapmoryAsyncImage(
     val primaryModel: Any? = imageUri ?: imageBytes
     val fallbackModel: Any? = fallbackUri ?: fallbackBytes ?: imageBytes
     val model = if (useFallback || primaryModel == null) fallbackModel else primaryModel
+    val animateRetainedPhoto = lastPainter != null && transition?.isTransitionActive == true
+    var imageLoaded by remember(model, cacheKey, animateRetainedPhoto) { mutableStateOf(false) }
     val context = LocalPlatformContext.current
     val request = remember(context, model, cacheKey, useFallback, blackLoadingBackground) {
         ImageRequest.Builder(context).data(model).apply {
@@ -95,7 +112,7 @@ internal fun MapmoryAsyncImage(
                 photoSize.sharedElement(
                     sharedContentState = rememberSharedContentState(sharedImageKey),
                     animatedVisibilityScope = transition.visibilityScope,
-                    boundsTransform = { _, _ -> tween(320, easing = FastOutSlowInEasing) },
+                    boundsTransform = { _, _ -> tween(200, easing = FastOutSlowInEasing) },
                 )
             }
         } else photoSize
@@ -103,17 +120,27 @@ internal fun MapmoryAsyncImage(
             ContentScale.Crop
         } else contentScale
         if (model == null) {
-            if (blackLoadingBackground) {
-                Box(imageModifier.clip(shape).background(Color.Black))
+            val retainedPainter = lastPainter
+            if (retainedPainter != null) {
+                Image(
+                    painter = retainedPainter,
+                    contentDescription = contentDescription,
+                    contentScale = photoContentScale,
+                    modifier = imageModifier.clip(animatedShape),
+                )
+            } else if (blackLoadingBackground) {
+                Box(imageModifier.clip(animatedShape).background(Color.Black))
             } else {
-                TripPhotoPlaceholder(imageModifier, shape)
+                TripPhotoPlaceholder(imageModifier, animatedShape)
             }
         } else {
-            Box(modifier = imageModifier.clip(shape).then(
+            Box(modifier = imageModifier.clip(animatedShape).then(
                 if (blackLoadingBackground) Modifier.background(Color.Black) else Modifier,
             )) {
                 val retainedPainter = lastPainter
-                if (showPlaceholder && retainedPainter != null) {
+                // Keep the last decoded frame underneath Coil during preview/full-size swaps.
+                // Loading callbacks can precede the first rendered frame on iOS.
+                if (retainedPainter != null && (!imageLoaded || animateRetainedPhoto)) {
                     Image(
                         painter = retainedPainter,
                         contentDescription = null,
@@ -123,19 +150,20 @@ internal fun MapmoryAsyncImage(
                 } else if (showPlaceholder && !blackLoadingBackground) {
                     TripPhotoPlaceholder(
                         modifier = Modifier.fillMaxSize(),
-                        shape = shape,
+                        shape = animatedShape,
                     )
                 }
-                AsyncImage(
+                if (!animateRetainedPhoto) AsyncImage(
                     model = request,
                     contentDescription = contentDescription,
                     contentScale = photoContentScale,
                     modifier = Modifier.fillMaxSize(),
-                    onLoading = { showPlaceholder = true },
+                    onLoading = { showPlaceholder = true; imageLoaded = false },
                     onSuccess = { state ->
                         lastPainter = state.painter
                         sharedImageKey?.let { transition?.painters?.set(it, state.painter) }
                         showPlaceholder = false
+                        imageLoaded = true
                     },
                     onError = {
                         showPlaceholder = true

@@ -24,6 +24,7 @@ import com.mapmory.shared.domain.region.RegionCatalog
 import com.mapmory.shared.navigation.MapmoryBackHandlerRegistry
 import com.mapmory.shared.navigation.PlatformBackHandler
 import com.mapmory.shared.presentation.triprecord.screen.NewTripRecordFlowScreen
+import com.mapmory.shared.presentation.triprecord.screen.RetainedPhotoFlowState
 import com.mapmory.shared.presentation.triprecord.screen.TripRecordPalette
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripRecordEditorViewModel
 import kotlinx.coroutines.launch
@@ -46,6 +47,11 @@ internal fun TripRecordEditorRoute(
     onOpenProfile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val retainedPhotoFlow = androidx.lifecycle.viewmodel.compose.viewModel { RetainedPhotoFlowState() }
+    var gestureBack by remember { mutableStateOf<(() -> Boolean)?>(null) }
+    var gestureForward by remember { mutableStateOf<(() -> Boolean)?>(null) }
+    val latestGestureBack by rememberUpdatedState { gestureBack?.invoke() ?: false }
+    val latestGestureForward by rememberUpdatedState { gestureForward?.invoke() ?: false }
     val scope = rememberCoroutineScope()
     val recordedPhotoIds by viewModel.recordedPhotoIds.collectAsState()
     val pendingPhotoIds by viewModel.pendingPhotoIds.collectAsState()
@@ -152,7 +158,11 @@ internal fun TripRecordEditorRoute(
         }
     }
     DisposableEffect(viewModel, backHandlerRegistry) {
-        val registration = backHandlerRegistry.register(backHandlerOwnerId) {
+        val registration = backHandlerRegistry.register(
+            backHandlerOwnerId,
+            gestureBack = { latestGestureBack() },
+            gestureForward = { latestGestureForward() },
+        ) {
             latestBackHandler.value()
         }
         onDispose {
@@ -162,6 +172,11 @@ internal fun TripRecordEditorRoute(
     PlatformBackHandler(onBack = { latestBackHandler.value() })
 
     NewTripRecordFlowScreen(
+        retainedState = retainedPhotoFlow,
+        onGestureHandlersChanged = { back, forward ->
+            gestureBack = back
+            gestureForward = forward
+        },
         recordedPhotoIds = recordedPhotoIds + pendingPhotoIds,
         photoUsageReady = photoUsageReady,
         modifier = modifier,

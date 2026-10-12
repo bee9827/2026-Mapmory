@@ -39,12 +39,18 @@ internal fun TripRecordDetailRoute(
     val scope = rememberCoroutineScope()
     val analytics = LocalMapmoryAnalytics.current
     var photoViewerBackHandler by remember { mutableStateOf<(() -> Boolean)?>(null) }
+    var photoViewerForwardHandler by remember { mutableStateOf<(() -> Boolean)?>(null) }
+    val latestForwardHandler by rememberUpdatedState { photoViewerForwardHandler?.invoke() == true }
     val latestBackHandler by rememberUpdatedState {
         photoViewerBackHandler?.invoke() == true
     }
 
     DisposableEffect(viewModel, backHandlerRegistry) {
-        val registration = backHandlerRegistry.register(backHandlerOwnerId) {
+        val registration = backHandlerRegistry.register(
+            backHandlerOwnerId,
+            gestureBack = { latestBackHandler() },
+            gestureForward = { latestForwardHandler() },
+        ) {
             latestBackHandler()
         }
         onDispose { backHandlerRegistry.unregister(registration) }
@@ -84,5 +90,6 @@ internal fun TripRecordDetailRoute(
         onCreateClick = onOpenEditor,
         onProfileClick = onOpenProfile,
         onInternalBackHandlerChanged = { handler -> photoViewerBackHandler = handler },
+        onForwardHandlerChanged = { handler -> photoViewerForwardHandler = handler },
     )
 }

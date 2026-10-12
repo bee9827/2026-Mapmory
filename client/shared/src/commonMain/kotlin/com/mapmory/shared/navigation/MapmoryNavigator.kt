@@ -2,11 +2,44 @@ package com.mapmory.shared.navigation
 
 import androidx.navigation.NavHostController
 import androidx.navigation.NavDestination.Companion.hasRoute
+import androidx.navigation.toRoute
 
 internal class MapmoryNavigator(
     private val navController: NavHostController,
 ) {
+    private data class ForwardEntry(val route: Any, val fromEntryId: String)
+    private val forwardEntries = mutableListOf<ForwardEntry>()
+
+    fun navigateBackKeepingState(): Boolean {
+        val entry = navController.currentBackStackEntry ?: return false
+        val previous = navController.previousBackStackEntry ?: return false
+        val route: Any = when {
+            entry.destination.hasRoute<EditorRoute>() -> entry.toRoute<EditorRoute>()
+            entry.destination.hasRoute<DetailRoute>() -> entry.toRoute<DetailRoute>()
+            entry.destination.hasRoute<RecordsRoute>() -> entry.toRoute<RecordsRoute>()
+            entry.destination.hasRoute<ProfileRoute>() -> ProfileRoute
+            else -> return false
+        }
+        if (!navController.popBackStack(entry.destination.id, inclusive = true, saveState = true)) return false
+        forwardEntries += ForwardEntry(route, previous.id)
+        return true
+    }
+
+    fun navigateForward(): Boolean {
+        val entry = forwardEntries.lastOrNull() ?: return false
+        if (navController.currentBackStackEntry?.id != entry.fromEntryId) return false
+        forwardEntries.removeAt(forwardEntries.lastIndex)
+        navController.navigate(entry.route) { restoreState = true }
+        return true
+    }
+
+    private fun clearForwardHistory() {
+        forwardEntries.forEach { navController.clearBackStack(it.route) }
+        forwardEntries.clear()
+    }
+
     fun navigateBack(): Boolean {
+        clearForwardHistory()
         if (navController.currentDestination?.id == navController.graph.startDestinationId) {
             return false
         }
@@ -38,20 +71,27 @@ internal class MapmoryNavigator(
         recordId: Long? = null,
         selectedLocationId: Long? = null,
     ) {
+        clearForwardHistory()
         navController.navigate(EditorRoute(recordId, selectedLocationId))
     }
 
     fun navigateToDetail(recordId: Long, locationName: String? = null, latestDate: String? = null) {
+        // Navigation updates the current entry synchronously, before the old list leaves composition.
+        // Ignore any further card clicks delivered from that outgoing list, including other IDs.
+        if (navController.currentDestination?.hasRoute<DetailRoute>() == true) return
+        clearForwardHistory()
         navController.navigate(DetailRoute(recordId, locationName, latestDate))
     }
 
     fun navigateAfterEdit(recordId: Long) {
+        clearForwardHistory()
         if (!navController.popBackStack()) {
             navigateToDetail(recordId)
         }
     }
 
     private fun navigateToTab(route: Any) {
+        clearForwardHistory()
         // Detail/editor entries are temporary flows, not a tab's saved destination.
         while (navController.currentDestination?.let {
                 it.hasRoute<DetailRoute>() || it.hasRoute<EditorRoute>()

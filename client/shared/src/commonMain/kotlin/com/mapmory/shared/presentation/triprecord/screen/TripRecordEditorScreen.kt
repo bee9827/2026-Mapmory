@@ -1,5 +1,7 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import com.mapmory.shared.presentation.components.ScrollToTopEffect
+
 import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -232,7 +234,10 @@ fun TripRecordEditorScreen(
         },
     )
     val locationResultsListState = rememberLazyListState()
+    val editorScrollState = rememberScrollState()
+    ScrollToTopEffect(editorScrollState, enabled = !showRecommendationSheet)
     val recommendationGridState = rememberLazyGridState()
+    ScrollToTopEffect(recommendationGridState, enabled = showRecommendationSheet)
     LaunchedEffect(recommendationPagingState.generation) {
         if (recommendationPagingState.generation != null) {
             recommendationGridState.scrollToItem(0)
@@ -306,7 +311,7 @@ fun TripRecordEditorScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(editorScrollState)
                             .padding(bottom = 32.dp),
                     ) {
                         PhotoSection(
@@ -1407,7 +1412,8 @@ private fun locationContext(location: Location, locations: List<Location>): Stri
     else -> locations.firstOrNull { it.id == location.parentId }?.name ?: "대한민국"
 }
 
-private val consumeLocationListOverscrollConnection = object : NestedScrollConnection {
+// Keep drags and flings at search-list boundaries from scrolling the surrounding form.
+internal val consumeLocationListOverscrollConnection = object : NestedScrollConnection {
     override fun onPostScroll(
         consumed: Offset,
         available: Offset,
