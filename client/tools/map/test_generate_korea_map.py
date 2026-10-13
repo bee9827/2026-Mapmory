@@ -75,6 +75,26 @@ class GenerateKoreaMapTest(unittest.TestCase):
         self.assertLess(len(simplified), len(ring))
         self.assertIn([2, 2], simplified)
 
+    def test_대구로_편입된_군위군은_경북과_맞닿는_경계를_유지한다(self):
+        gunwi = MODULE.Boundary(
+            "KR-27", "27720", "군위군",
+            [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]],
+        )
+        neighbor = MODULE.Boundary(
+            "KR-47", "47730", "의성군",
+            [[[0, 1], [1, 1], [1, 2], [0, 2], [0, 1]]],
+        )
+        lines = MODULE.overview_boundary_lines([gunwi, neighbor])
+        edges = {
+            MODULE.normalized_edge(tuple(start), tuple(end))
+            for line in lines
+            for start, end in zip(line, line[1:])
+        }
+        self.assertEqual({
+            MODULE.normalized_edge(tuple(start), tuple(end))
+            for start, end in zip(gunwi.rings[0], gunwi.rings[0][1:])
+        }, edges)
+
     def test_독도는_전국_개요에서도_주요_섬_윤곽을_유지한다(self):
         ring = [
             [131.86941, 37.2410],
