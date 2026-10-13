@@ -508,7 +508,11 @@ def overview_boundary_lines(boundaries: list[Boundary]) -> list[list[tuple[float
                 if start != end:
                     edge_owners[(boundary.province_code, normalized_edge(start, end))].add(boundary.code)
 
-    edges = sorted(edge for (_, edge), owners in edge_owners.items() if len(owners) > 1)
+    # Gunwi moved to Daegu after the province geometry source; retain its missing perimeter.
+    edges = sorted({
+        edge for (_, edge), owners in edge_owners.items()
+        if len(owners) > 1 or "27720" in owners
+    })
     adjacency: dict[tuple[float, float], set[tuple[float, float]]] = defaultdict(set)
     for start, end in edges:
         adjacency[start].add(end)
