@@ -9,6 +9,10 @@ import com.mapmory.shared.analytics.LocalMapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
 import com.mapmory.shared.presentation.triprecord.screen.TripProfileScreen
 import com.mapmory.shared.presentation.triprecord.viewmodel.TripStatisticsViewModel
+import com.mapmory.shared.domain.model.ServiceFeedbackCategory
+import com.mapmory.shared.domain.model.ServiceFeedbackPlatform
+import com.mapmory.shared.domain.repository.ServiceFeedbackRepository
+import com.mapmory.shared.presentation.feedback.currentServiceFeedbackPlatform
 import kotlinx.coroutines.launch
 
 @Composable
@@ -21,6 +25,7 @@ internal fun TripProfileRoute(
     onOpenProfile: () -> Unit,
     developerToolsInfo: MapmoryDeveloperToolsInfo?,
     onOpenDeveloperTools: () -> Unit,
+    serviceFeedbackRepository: ServiceFeedbackRepository?,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -50,5 +55,9 @@ internal fun TripProfileRoute(
         },
         developerToolsInfo = developerToolsInfo,
         onOpenDeveloperTools = onOpenDeveloperTools,
+        onSubmitFeedback = { category: ServiceFeedbackCategory, content: String ->
+            serviceFeedbackRepository?.submit(category, content, currentServiceFeedbackPlatform())
+                ?: Result.failure(IllegalStateException("의견 보내기를 사용할 수 없습니다."))
+        },
     )
 }

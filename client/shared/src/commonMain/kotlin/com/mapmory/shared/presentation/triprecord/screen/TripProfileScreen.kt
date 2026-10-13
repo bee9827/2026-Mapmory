@@ -57,6 +57,10 @@ import com.mapmory.shared.preview.previewStatistics
 import kotlin.math.abs
 import com.mapmory.shared.analytics.LocalMapmoryAnalytics
 import com.mapmory.shared.analytics.MapmoryAnalyticsEvent
+import com.mapmory.shared.domain.model.ServiceFeedbackCategory
+import com.mapmory.shared.domain.model.ServiceFeedbackPlatform
+import com.mapmory.shared.presentation.feedback.ServiceFeedbackDialog
+import com.mapmory.shared.presentation.feedback.currentServiceFeedbackPlatform
 
 @Composable
 fun TripProfileScreen(
@@ -68,12 +72,16 @@ fun TripProfileScreen(
     developerToolsInfo: MapmoryDeveloperToolsInfo? = null,
     onOpenDeveloperTools: () -> Unit = {},
     statisticsUiState: TripStatisticsUiState = TripStatisticsUiState.Success(TripStatisticsUiModel.Empty),
+    onSubmitFeedback: suspend (ServiceFeedbackCategory, String) -> Result<Unit> = { _, _ ->
+        Result.failure(IllegalStateException("의견 보내기를 사용할 수 없습니다."))
+    },
     modifier: Modifier = Modifier,
 ) {
     var showSettings by remember { mutableStateOf(false) }
-    val uriHandler = LocalUriHandler.current
+    var showFeedback by remember { mutableStateOf(false) }
     val theme = LocalMapmoryTheme.current
     val analytics = LocalMapmoryAnalytics.current
+    val uriHandler = LocalUriHandler.current
 
     TripRecordBackground(modifier = modifier, backgroundColor = TripRecordPalette.current.pageBackground) {
         Column(Modifier.fillMaxSize().background(TripRecordPalette.current.pageBackground)) {
@@ -172,9 +180,8 @@ fun TripProfileScreen(
                     )
                     TextButton(
                         onClick = {
-                            uriHandler.openUri(
-                                "https://docs.google.com/forms/d/e/1FAIpQLScToKllNctPYx5zSCp3kllrIUYcdwnasw1tczC3S-ZzULRxRw/viewform?usp=header",
-                            )
+                            showSettings = false
+                            showFeedback = true
                         },
                     ) {
                         Text("의견 보내기", color = TripRecordPalette.current.primary)
@@ -214,6 +221,14 @@ fun TripProfileScreen(
                     Text("닫기", color = TripRecordPalette.current.secondaryText)
                 }
             },
+        )
+    }
+
+    if (showFeedback) {
+        ServiceFeedbackDialog(
+            platform = currentServiceFeedbackPlatform(),
+            onDismiss = { showFeedback = false },
+            onSubmit = onSubmitFeedback,
         )
     }
 }

@@ -154,6 +154,7 @@ internal fun MapmoryNavHost(
                 onOpenProfile = navigator::navigateToProfile,
                 developerToolsInfo = developerToolsInfo,
                 onOpenDeveloperTools = navigator::navigateToDeveloperTools,
+                serviceFeedbackRepository = container.serviceFeedbackRepository,
             )
         }
 

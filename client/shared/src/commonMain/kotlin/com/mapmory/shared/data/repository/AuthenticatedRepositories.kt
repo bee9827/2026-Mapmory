@@ -16,6 +16,9 @@ import com.mapmory.shared.domain.repository.TagRepository
 import com.mapmory.shared.domain.repository.TripRecordRepository
 import com.mapmory.shared.domain.repository.ProgressReportingTripRecordRepository
 import com.mapmory.shared.domain.repository.TripStatisticsRepository
+import com.mapmory.shared.domain.model.ServiceFeedbackCategory
+import com.mapmory.shared.domain.model.ServiceFeedbackPlatform
+import com.mapmory.shared.domain.repository.ServiceFeedbackRepository
 
 internal class AuthenticatedTripRecordRepository(
     private val session: GuestSessionManager,
@@ -99,6 +102,20 @@ internal class AuthenticatedTripStatisticsRepository(
             onSuccess = { delegate.getStatistics() },
             onFailure = Result.Companion::failure,
         )
+}
+
+internal class AuthenticatedServiceFeedbackRepository(
+    private val session: GuestSessionManager,
+    private val delegate: ServiceFeedbackRepository,
+) : ServiceFeedbackRepository {
+    override suspend fun submit(
+        category: ServiceFeedbackCategory,
+        content: String,
+        platform: ServiceFeedbackPlatform,
+    ): Result<Unit> = session.ensureAuthenticated().fold(
+        onSuccess = { delegate.submit(category, content, platform) },
+        onFailure = Result.Companion::failure,
+    )
 }
 
 internal class AuthenticatedPlaceRepository(

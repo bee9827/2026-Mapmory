@@ -24,6 +24,13 @@ data class ApiResponseDto<T>(
 )
 
 @Serializable
+data class ServiceFeedbackRequestDto(
+    val category: String,
+    val content: String,
+    val platform: String,
+)
+
+@Serializable
 data class GuestLoginResponseDto(
     val accessToken: String,
     val refreshToken: String,
