@@ -17,6 +17,7 @@ import com.mapmory.shared.data.remote.PresignedPhotoRemoteSource
 import com.mapmory.shared.data.remote.TagRemoteRepository
 import com.mapmory.shared.data.remote.TripRecordRemoteRepository
 import com.mapmory.shared.data.remote.TripStatisticsRemoteRepository
+import com.mapmory.shared.data.remote.ServiceFeedbackRemoteRepository
 import com.mapmory.shared.data.remote.createHttpClient
 import com.mapmory.shared.data.remote.installMapmoryAuthRetry
 import com.mapmory.shared.data.repository.AuthenticatedMapSummaryRepository
@@ -24,6 +25,7 @@ import com.mapmory.shared.data.repository.AuthenticatedPlaceRepository
 import com.mapmory.shared.data.repository.AuthenticatedTagRepository
 import com.mapmory.shared.data.repository.AuthenticatedTripRecordRepository
 import com.mapmory.shared.data.repository.AuthenticatedTripStatisticsRepository
+import com.mapmory.shared.data.repository.AuthenticatedServiceFeedbackRepository
 import com.mapmory.shared.data.repository.CachedTripRecordRepository
 import com.mapmory.shared.data.repository.TripRecordListCache
 import com.mapmory.shared.data.repository.MemoryTripRecordListCache
@@ -46,6 +48,7 @@ import com.mapmory.shared.domain.repository.PlaceRepository
 import com.mapmory.shared.domain.repository.TagRepository
 import com.mapmory.shared.domain.repository.TripRecordRepository
 import com.mapmory.shared.domain.repository.TripStatisticsRepository
+import com.mapmory.shared.domain.repository.ServiceFeedbackRepository
 import com.mapmory.shared.domain.usecase.CreateTripRecordUseCase
 import com.mapmory.shared.domain.usecase.CreateTagUseCase
 import com.mapmory.shared.domain.usecase.DeleteTripRecordUseCase
@@ -76,6 +79,7 @@ interface AppContainer {
     val tripRecordRepository: TripRecordRepository
     val mapSummaryRepository: MapSummaryRepository
     val tripStatisticsRepository: TripStatisticsRepository
+    val serviceFeedbackRepository: ServiceFeedbackRepository?
     val tagRepository: TagRepository
     val themePreference: ThemePreference
     val onboardingPreference: OnboardingPreference
@@ -155,6 +159,7 @@ private class DefaultAppContainer(
     tripRecordRepository: TripRecordRepository,
     override val mapSummaryRepository: MapSummaryRepository,
     override val tripStatisticsRepository: TripStatisticsRepository,
+    override val serviceFeedbackRepository: ServiceFeedbackRepository?,
     override val tagRepository: TagRepository,
     private val placeRepository: PlaceRepository?,
     override val themePreference: ThemePreference,
@@ -211,6 +216,7 @@ fun createAppContainer(
     tripStatisticsRepository: TripStatisticsRepository = requireNotNull(
         tripRecordRepository as? TripStatisticsRepository,
     ) { "여행 통계 Repository를 함께 전달해 주세요." },
+    serviceFeedbackRepository: ServiceFeedbackRepository? = null,
     tripStatisticsCache: TripStatisticsCache = MemoryTripStatisticsCache(),
     tagRepository: TagRepository = requireNotNull(
         tripRecordRepository as? TagRepository,
@@ -237,6 +243,7 @@ fun createAppContainer(
         tripRecordRepository = tripRecordRepository,
         mapSummaryRepository = cachedMapSummary,
         tripStatisticsRepository = cachedTripStatistics,
+        serviceFeedbackRepository = serviceFeedbackRepository,
         tagRepository = tagRepository,
         placeRepository = placeRepository,
         themePreference = themePreference,
@@ -281,6 +288,11 @@ fun createRemoteAppContainer(
             accessTokenProvider = accessTokenProvider,
         ),
         tripStatisticsRepository = TripStatisticsRemoteRepository(
+            client = client,
+            apiBaseUrl = apiBaseUrl,
+            accessTokenProvider = accessTokenProvider,
+        ),
+        serviceFeedbackRepository = ServiceFeedbackRemoteRepository(
             client = client,
             apiBaseUrl = apiBaseUrl,
             accessTokenProvider = accessTokenProvider,
@@ -380,6 +392,11 @@ internal fun createGuestRemoteAppContainer(
         apiBaseUrl = apiBaseUrl,
         accessTokenProvider = session,
     )
+    val remoteServiceFeedback = ServiceFeedbackRemoteRepository(
+        client = client,
+        apiBaseUrl = apiBaseUrl,
+        accessTokenProvider = session,
+    )
     val remoteTags = TagRemoteRepository(
         client = client,
         apiBaseUrl = apiBaseUrl,
@@ -418,6 +435,7 @@ internal fun createGuestRemoteAppContainer(
         mapSummaryRepository = AuthenticatedMapSummaryRepository(session, remoteMapSummary),
         mapSummaryCache = mapSummaryCache,
         tripStatisticsRepository = AuthenticatedTripStatisticsRepository(session, remoteTripStatistics),
+        serviceFeedbackRepository = AuthenticatedServiceFeedbackRepository(session, remoteServiceFeedback),
         tripStatisticsCache = tripStatisticsCache,
         tagRepository = AuthenticatedTagRepository(session, remoteTags),
         placeRepository = AuthenticatedPlaceRepository(session, remotePlaces),
