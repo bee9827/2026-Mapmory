@@ -86,8 +86,9 @@ fun KoreaMapArtwork(
         fontWeight = FontWeight.Bold,
     )
     val overviewDistrictLabelStyle = labelStyle.copy(
-        color = if (isDark) Color(0xFFAAB6AD) else Color(0xFF87938A),
+        color = if (isDark) Color(0xFFAAB6AD) else Color(0xFF5D6E62),
     )
+    val visitedOverviewLabelColor = Color(0xFF07170F)
     val labelHitPadding = with(LocalDensity.current) {
         (if (isProvinceOverview) 2.dp else 12.dp).toPx()
     }
@@ -195,6 +196,7 @@ fun KoreaMapArtwork(
         showRegionLabels,
         isProvinceOverview,
         overviewData,
+        visitedRegionCodes,
     ) {
         if (!showRegionLabels || !projection.isValid) {
             emptyList()
@@ -205,7 +207,16 @@ fun KoreaMapArtwork(
                     PreparedKoreaLabel(
                         code = label.code,
                         center = projection.project(label.point),
-                        layout = textMeasurer.measure(label.name, overviewDistrictLabelStyle),
+                        layout = textMeasurer.measure(
+                            label.name,
+                            overviewDistrictLabelStyle.copy(
+                                color = if (label.provinceCode in visitedRegionCodes) {
+                                    visitedOverviewLabelColor
+                                } else {
+                                    overviewDistrictLabelStyle.color
+                                },
+                            ),
+                        ),
                     )
                 }
             val cityLabels = regions.mapNotNull { region ->
@@ -214,7 +225,16 @@ fun KoreaMapArtwork(
                 PreparedKoreaLabel(
                     code = region.code,
                     center = projection.project(labelPoint),
-                    layout = textMeasurer.measure(name, labelStyle),
+                    layout = textMeasurer.measure(
+                        name,
+                        labelStyle.copy(
+                            color = if (region.code in visitedRegionCodes) {
+                                visitedOverviewLabelColor
+                            } else {
+                                labelStyle.color
+                            },
+                        ),
+                    ),
                 )
             }
             districtLabels + cityLabels
