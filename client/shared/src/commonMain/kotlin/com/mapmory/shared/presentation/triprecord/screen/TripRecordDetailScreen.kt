@@ -8,6 +8,9 @@ import com.mapmory.shared.presentation.components.LocalMapmoryImageTransitionSco
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,15 +50,21 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
@@ -463,6 +472,19 @@ private fun ExpandedTripPhotoViewer(
             modifier = Modifier.fillMaxSize(),
         ) { page ->
             val photo = photos[page]
+            var zoom by remember(photo.id) { mutableStateOf(1f) }
+            var pan by remember(photo.id) { mutableStateOf(Offset.Zero) }
+            var viewportSize by remember(photo.id) { mutableStateOf(IntSize.Zero) }
+            val transformableState = rememberTransformableState { _, zoomChange, panChange, _ ->
+                val nextZoom = (zoom * zoomChange).coerceIn(1f, 4f)
+                val maxPanX = viewportSize.width * (nextZoom - 1f) / 2f
+                val maxPanY = viewportSize.height * (nextZoom - 1f) / 2f
+                zoom = nextZoom
+                pan = if (nextZoom == 1f) Offset.Zero else Offset(
+                    x = (pan.x + panChange.x).coerceIn(-maxPanX, maxPanX),
+                    y = (pan.y + panChange.y).coerceIn(-maxPanY, maxPanY),
+                )
+            }
             val isCurrent = page == pagerState.currentPage
             val localBytes = localPreview.takeIf { isCurrent }
             val awaitingLocalPhoto = isCurrent && !localLookupFinished &&
@@ -494,7 +516,32 @@ private fun ExpandedTripPhotoViewer(
                     sharedImageKey = photo.id.takeIf { isCurrent },
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(vertical = 104.dp),
+                        .padding(vertical = 104.dp)
+                        .clipToBounds()
+                        .onSizeChanged { viewportSize = it }
+                        .transformable(
+                            state = transformableState,
+                            canPan = { zoom > 1f },
+                            lockRotationOnZoomPan = true,
+                        )
+                        .pointerInput(photo.id) {
+                            detectTapGestures(
+                                onDoubleTap = {
+                                    if (zoom > 1f) {
+                                        zoom = 1f
+                                        pan = Offset.Zero
+                                    } else {
+                                        zoom = 2f
+                                    }
+                                },
+                            )
+                        }
+                        .graphicsLayer {
+                            scaleX = zoom
+                            scaleY = zoom
+                            translationX = pan.x
+                            translationY = pan.y
+                        },
                     shape = RectangleShape,
                     sharedCornerRadius = 14.dp,
                     contentScale = ContentScale.Fit,
