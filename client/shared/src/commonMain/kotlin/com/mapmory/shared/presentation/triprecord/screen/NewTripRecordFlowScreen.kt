@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -78,6 +79,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
@@ -1254,6 +1256,8 @@ private fun LocationStep(
     onBackClick: () -> Unit,
     onCompleteClick: () -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val locationScrollState = rememberScrollState()
     ScrollToTopEffect(locationScrollState)
     val queryMatchesSelectedRegion = searchQuery.trim().equals(
@@ -1295,7 +1299,15 @@ private fun LocationStep(
     val showRegionResults = uiState.manualRegionRequired && searchQuery.isNotBlank()
     val canLoadPhotos = uiState.selectedLocation != null &&
         !uiState.isSelectingPlace && !uiState.manualRegionRequired
-    Column(Modifier.fillMaxSize()) {
+    Column(
+        Modifier.fillMaxSize().pointerInput(focusManager, keyboardController) {
+            detectTapGestures {
+                showSearchResults = false
+                focusManager.clearFocus(force = true)
+                keyboardController?.hide()
+            }
+        },
+    ) {
         FlowTopBar(
             onBackClick = onBackClick,
         )
@@ -1335,7 +1347,11 @@ private fun LocationStep(
                     Popup(
                         popupPositionProvider = popupPosition,
                         onDismissRequest = { showSearchResults = false },
-                        properties = PopupProperties(focusable = false),
+                        // Let background taps reach the screen; input taps keep editing.
+                        properties = PopupProperties(
+                            focusable = false,
+                            dismissOnClickOutside = false,
+                        ),
                     ) {
                         Column(
                             Modifier.width(with(density) { searchFieldWidth.toDp() })
@@ -1356,6 +1372,8 @@ private fun LocationStep(
                                     selectedLocationId = uiState.selectedLocation?.id,
                                     onLocationSelected = {
                                         showSearchResults = false
+                                        focusManager.clearFocus(force = true)
+                                        keyboardController?.hide()
                                         onLocationSelected(it)
                                     },
                                     modifier = Modifier.padding(top = 8.dp),
@@ -1369,6 +1387,8 @@ private fun LocationStep(
                                     errorMessage = uiState.placeSearchErrorMessage,
                                     onPlaceSelected = {
                                         showSearchResults = false
+                                        focusManager.clearFocus(force = true)
+                                        keyboardController?.hide()
                                         onPlaceCandidateSelected(it)
                                     },
                                     modifier = Modifier.padding(top = 8.dp),
