@@ -115,7 +115,7 @@ fun TripRecordSummary.toTripRecordItemUiState(
     endDate = endDate,
     locationName = locationName,
     tags = tags,
-    photoCount = media.size.takeIf { it > 0 },
+    photoCount = photoCount ?: media.size.takeIf { it > 0 },
     photos = thumbnailPreviewBytes?.let { bytes ->
         listOf(
             TripRecordPhotoUiState(

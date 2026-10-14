@@ -98,6 +98,7 @@ data class TagRequestDto(
 @Serializable
 data class TripRecordListItemDto(
     val id: Long,
+    val photoCount: Int? = null,
     val title: String? = null,
     val regionName: String,
     val startDate: String,
