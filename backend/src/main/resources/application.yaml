@@ -81,6 +81,12 @@ upload:
       region: ${AWS_REGION:ap-northeast-2}
       # 공용 버킷에서 우리 객체를 모으기 위한 접두사. 전용 버킷이면 비워 둔다.
       key-prefix: ${AWS_S3_KEY_PREFIX:}
+      # 작은 요청은 보통 수십 ms라 2초가 지나면 다시 시도한다(AWS S3 성능 가이드).
+      # 재시도를 합쳐도 호출 하나는 6초 안에 끝나, S3가 멈춰도 요청 스레드를 오래 쥐지 않는다.
+      client:
+        attempt-timeout: 2s
+        total-timeout: 6s
+        max-attempts: 3
 
 waitlist:
   cors:
