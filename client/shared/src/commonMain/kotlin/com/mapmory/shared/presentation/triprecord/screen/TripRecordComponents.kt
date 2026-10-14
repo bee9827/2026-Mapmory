@@ -1,5 +1,6 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import com.mapmory.shared.presentation.components.MapmoryBackButton
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -58,24 +59,25 @@ internal fun TripRecordTopBar(
         modifier = modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .height(64.dp)
-            .padding(horizontal = 8.dp),
+            .height(56.dp)
+            .padding(horizontal = 12.dp),
     ) {
         if (onBackClick != null) {
-            TripIconButton(
-                label = "←",
-                contentDescription = "뒤로가기",
+            MapmoryBackButton(
+                color = TripRecordPalette.current.headingText,
                 onClick = onBackClick,
                 modifier = Modifier.align(Alignment.CenterStart),
             )
         }
-        Text(
-            text = title,
-            color = TripRecordPalette.current.text,
-            fontSize = 19.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.align(Alignment.Center),
-        )
+        if (title.isNotEmpty()) {
+            Text(
+                text = title,
+                color = TripRecordPalette.current.text,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
         trailing?.let { content ->
             Box(
                 modifier = Modifier.align(Alignment.CenterEnd),
