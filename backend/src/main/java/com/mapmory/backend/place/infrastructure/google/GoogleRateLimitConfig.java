@@ -18,7 +18,7 @@ class GoogleRateLimitConfig {
     static final String AUTOCOMPLETE_BUDGET = "googleAutocompleteBudget";
     static final String DETAILS_BUDGET = "googleDetailsBudget";
 
-    // 분당 한도는 Google 할당량(분당)을 넘지 않게 하는 값이라 서버마다 메모리에서 따로 센다.
+    // 분당 한도는 짧은 시간에 몰린 요청이 월 한도를 한꺼번에 쓰지 못하게 하는 값이라 서버마다 메모리에서 따로 센다.
     @Bean(REQUEST_PACE)
     Bucket googleRequestPace(GoogleRateLimitProperties properties) {
         int perMinute = properties.requestsPerMinute();
@@ -27,20 +27,21 @@ class GoogleRateLimitConfig {
                 .build();
     }
 
-    // 하루 한도는 무료 사용량을 지키는 값이라 서버 전체가 함께 세도록 DB 버킷(place_rate_limit_bucket)에 쓴다.
+    // 월 한도는 Google 월 무료 사용량을 지키는 값이라 서버 전체가 함께 세도록 DB 버킷(place_rate_limit_bucket)에 쓴다.
     @Bean(AUTOCOMPLETE_BUDGET)
     BucketConfiguration googleAutocompleteBudget(GoogleRateLimitProperties properties) {
-        return daily(properties.autocompletePerDay());
+        return monthly(properties.autocompletePerMonth());
     }
 
     @Bean(DETAILS_BUDGET)
     BucketConfiguration googleDetailsBudget(GoogleRateLimitProperties properties) {
-        return daily(properties.detailsPerDay());
+        return monthly(properties.detailsPerMonth());
     }
 
-    private static BucketConfiguration daily(int capacity) {
+    // 달이 바뀌면 키(연월)가 바뀌어 새로 센다. 한 달 안에 다시 차지 않도록 채우는 주기를 가장 긴 달로 둔다.
+    private static BucketConfiguration monthly(int capacity) {
         return BucketConfiguration.builder()
-                .addLimit(bandwidth -> bandwidth.capacity(capacity).refillIntervally(capacity, Duration.ofDays(1)))
+                .addLimit(bandwidth -> bandwidth.capacity(capacity).refillIntervally(capacity, Duration.ofDays(31)))
                 .build();
     }
 }

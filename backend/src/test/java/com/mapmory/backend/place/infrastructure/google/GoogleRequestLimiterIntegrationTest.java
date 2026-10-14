@@ -11,7 +11,7 @@ import io.github.bucket4j.mysql.MySQLSelectForUpdateBasedProxyManager;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +30,7 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
     HikariDataSource dataSource;
 
     @Test
-    void 자동완성과_상세_조회의_하루_한도를_DB에_따로_센다() {
+    void 자동완성과_상세_조회의_월_한도를_DB에_따로_센다() {
         GoogleRequestLimiter first = limiter(2, 1, 10_000);
 
         first.reserveAutocomplete();
@@ -43,15 +43,15 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    void 속도_제한에_걸린_요청은_하루_한도를_쓰지_않는다() {
+    void 속도_제한에_걸린_요청은_월_한도를_쓰지_않는다() {
         GoogleRequestLimiter limiter = limiter(2, 1, 1);
 
         limiter.reserveAutocomplete();
         assertError(limiter::reserveAutocomplete, "PLACE_RATE_LIMITED");
         assertError(limiter::reserveDetails, "PLACE_RATE_LIMITED");
 
-        assertThat(availableToday("google:autocomplete:", 2)).isEqualTo(1);
-        assertThat(availableToday("google:details:", 1)).isEqualTo(1);
+        assertThat(availableThisMonth("google:autocomplete:", 2)).isEqualTo(1);
+        assertThat(availableThisMonth("google:details:", 1)).isEqualTo(1);
     }
 
     @Test
@@ -69,9 +69,9 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
         }
     }
 
-    private GoogleRequestLimiter limiter(int autocompletePerDay, int detailsPerDay, int requestsPerMinute) {
+    private GoogleRequestLimiter limiter(int autocompletePerMonth, int detailsPerMonth, int requestsPerMinute) {
         GoogleRateLimitProperties properties =
-                new GoogleRateLimitProperties(autocompletePerDay, detailsPerDay, requestsPerMinute);
+                new GoogleRateLimitProperties(autocompletePerMonth, detailsPerMonth, requestsPerMinute);
         GoogleRateLimitConfig config = new GoogleRateLimitConfig();
         return new GoogleRequestLimiter(
                 bucketManager,
@@ -89,11 +89,12 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
         return held;
     }
 
-    private long availableToday(String prefix, int capacity) {
-        BucketConfiguration daily = BucketConfiguration.builder()
-                .addLimit(bandwidth -> bandwidth.capacity(capacity).refillIntervally(capacity, Duration.ofDays(1)))
+    // 월 한도 키는 UTC 기준 연월이다(예: google:autocomplete:2026-10).
+    private long availableThisMonth(String prefix, int capacity) {
+        BucketConfiguration monthly = BucketConfiguration.builder()
+                .addLimit(bandwidth -> bandwidth.capacity(capacity).refillIntervally(capacity, Duration.ofDays(31)))
                 .build();
-        return bucketManager.getProxy(prefix + LocalDate.now(ZoneOffset.UTC), () -> daily).getAvailableTokens();
+        return bucketManager.getProxy(prefix + YearMonth.now(ZoneOffset.UTC), () -> monthly).getAvailableTokens();
     }
 
     private void assertError(Runnable action, String expectedCode) {

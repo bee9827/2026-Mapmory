@@ -6,7 +6,7 @@ import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.BucketExceptions.BucketExecutionException;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
-import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  * Google 호출 직전에 한도를 확인한다. Google은 월 무료 사용량을 넘으면 과금되므로 Geoapify 한도와 따로 센다.
  * 회원별 검색·선택 한도는 기존 {@code PlaceRateLimitPort}가 그대로 적용한다.
  *
- * <p>버킷은 {@link GoogleRateLimitConfig}가 만든다. 분당 한도는 서버 메모리에서, 하루 한도는 DB에서 센다.
+ * <p>버킷은 {@link GoogleRateLimitConfig}가 만든다. 분당 한도는 서버 메모리에서, 월 한도는 DB에서 센다.
  * 그래서 분당 한도에 걸린 요청은 커넥션 없이 바로 거절된다.
  */
 @Component
@@ -41,15 +41,15 @@ public class GoogleRequestLimiter {
         this.detailsBudget = detailsBudget;
     }
 
-    // 분당 한도를 먼저 확인한다. 거절된 요청이 DB에 가지 않고 하루 한도도 쓰지 않게 하기 위해서다.
+    // 분당 한도를 먼저 확인한다. 거절된 요청이 DB에 가지 않고 월 한도도 쓰지 않게 하기 위해서다.
     public void reserveAutocomplete() {
         reservePace();
-        consume(AUTOCOMPLETE_BUDGET + today(), autocompleteBudget, PlaceErrorCode.PLACE_SEARCH_BUDGET_EXHAUSTED);
+        consume(AUTOCOMPLETE_BUDGET + thisMonth(), autocompleteBudget, PlaceErrorCode.PLACE_SEARCH_BUDGET_EXHAUSTED);
     }
 
     public void reserveDetails() {
         reservePace();
-        consume(DETAILS_BUDGET + today(), detailsBudget, PlaceErrorCode.PLACE_PROVIDER_BUDGET_EXHAUSTED);
+        consume(DETAILS_BUDGET + thisMonth(), detailsBudget, PlaceErrorCode.PLACE_PROVIDER_BUDGET_EXHAUSTED);
     }
 
     private void reservePace() {
@@ -69,7 +69,8 @@ public class GoogleRequestLimiter {
         }
     }
 
-    private static String today() {
-        return LocalDate.now(ZoneOffset.UTC).toString();
+    // Google 월 사용량은 태평양 시간 기준이라 UTC 월과 몇 시간 어긋난다. 월 한도를 무료 사용량보다 작게 둔 이유다.
+    private static String thisMonth() {
+        return YearMonth.now(ZoneOffset.UTC).toString();
     }
 }
