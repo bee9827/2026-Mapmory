@@ -8,7 +8,7 @@
 4. 서버가 장소 ID와 출처를 저장한다. Google 장소는 약관상 이름을 저장하지 않는다(`placeName`이 `null`). 요청에 지역이 있으면 다시 조회하지 않는다. 다시 받을 값이 국가뿐이고 출처는 상수이기 때문이다. 이때 장소 국가를 모르므로 요청 지역과 맞는지 확인하지 않는다. 요청에 지역이 없으면 3번처럼 다시 조회해 지역을 정한다. 상세 응답에는 `placeProvider`, `placeId`, `placeName`, `placeAttribution`, `placeAttributionUrl`이 포함된다.
 
 `TravelRecord`는 이 다섯 값을 `RecordedPlace` 값 객체 하나로 다룬다. DB 컬럼과 API 응답 필드는 기존 형태를 유지한다.
-`place/application`에는 검색·선택 서비스와 제공자 중립 모델이 있고, 장소 조회 계약은 `application/port`에 있다. `infrastructure/google`의 `GooglePlacesClient`가 이 포트를 구현한다. `web`은 API와 응답 변환을, `web/ratelimit`의 인터셉터는 회원 한도 확인을 담당한다. 인터셉터는 `infrastructure/ratelimit`의 `MemberPlaceRateLimiter`를 바로 부른다. 여행 기록 서비스는 application의 포트와 모델만 참조한다. 예전 Geoapify 장소로 저장된 기록은 `placeProvider`가 `GEOAPIFY`로 남는다.
+`place/application`에는 검색·선택 서비스와 제공자 중립 모델이 있고, 장소 조회 계약은 `application/port`에 있다. `infrastructure/google`의 `GooglePlacesClient`가 이 포트를 구현한다. `web`은 API와 응답 변환을 담당한다. 회원별 호출 한도는 인터셉터부터 DB 버킷까지 기능 루트의 `ratelimit` 한 패키지에 있다. 여행 기록 서비스는 application의 포트와 모델만 참조한다. 예전 Geoapify 장소로 저장된 기록은 `placeProvider`가 `GEOAPIFY`로 남는다.
 
 예시 저장 요청의 장소·지역 부분:
 
@@ -49,7 +49,7 @@
 
 ## 호출 한도
 
-한도는 두 층이다. 들어오는 요청은 회원별로, 나가는 Google 호출은 키 전체로 센다. 버킷은 모두 infrastructure에 있다.
+한도는 두 층이다. 들어오는 요청은 회원별로, 나가는 Google 호출은 키 전체로 센다.
 
 - **회원 한도**(`place.rate-limit`, `MemberPlaceRateLimiter`): 한 회원이 많이 부르지 못하게 한다. 검색은 회원별 1분에 20회, 후보 선택은 회원별 UTC 하루 100회다. 서버 여러 대가 함께 세도록 DB(`place_rate_limit_bucket`, Bucket4j MySQL)에서 센다. `PlaceRateLimitWebConfig`가 URL마다 확인할 한도를 정하고, 인터셉터가 컨트롤러에 들어가기 전에 확인한다. 요청 값 검증보다 먼저라 400으로 끝날 요청도 횟수에 들어간다. 넘으면 `PLACE_RATE_LIMITED`(429)다.
 - **Google 한도**(`google.places.rate-limit`, `GoogleRequestLimiter`): 우리 Google 키 전체의 사용량을 막는다. `GooglePlacesClient`가 Google을 부르기 직전에 확인하므로, 회원 한도를 거치지 않는 기록 저장 재조회도 함께 센다. 자동완성·상세 각각 UTC 하루 300회는 무료 사용량을 지키는 값이라 서버 전체가 함께 세도록 DB에서, 서버마다 분당 2,400회는 Google 할당량(자동완성 분당 12,000회)을 넘지 않게 하는 값이라 메모리에서 센다. 메모리 분당 한도를 먼저 보고 DB 하루 한도를 본다. 분당 한도는 `PLACE_RATE_LIMITED`(429), 하루 자동완성 한도는 `PLACE_SEARCH_BUDGET_EXHAUSTED`(429), 하루 상세 한도는 `PLACE_PROVIDER_BUDGET_EXHAUSTED`(503)다.

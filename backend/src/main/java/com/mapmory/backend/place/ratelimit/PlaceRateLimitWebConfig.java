@@ -1,6 +1,5 @@
-package com.mapmory.backend.place.web.ratelimit;
+package com.mapmory.backend.place.ratelimit;
 
-import com.mapmory.backend.place.infrastructure.ratelimit.MemberPlaceRateLimiter;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;

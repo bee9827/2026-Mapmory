@@ -1,4 +1,4 @@
-package com.mapmory.backend.place.infrastructure.ratelimit;
+package com.mapmory.backend.place.ratelimit;
 
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.place.application.PlaceErrorCode;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  * Google 호출 한도는 {@code GooglePlacesClient}가 따로 확인한다.
  */
 @Component
-public class MemberPlaceRateLimiter {
+class MemberPlaceRateLimiter {
 
     private static final String SEARCH = "place:search:member:";
     private static final String SELECTION = "place:selection:member:";
@@ -24,7 +24,7 @@ public class MemberPlaceRateLimiter {
     private final BucketConfiguration searchLimit;
     private final BucketConfiguration selectionLimit;
 
-    public MemberPlaceRateLimiter(
+    MemberPlaceRateLimiter(
             ProxyManager<String> bucketManager,
             @Qualifier(PlaceRateLimitConfig.MEMBER_SEARCH_LIMIT) BucketConfiguration searchLimit,
             @Qualifier(PlaceRateLimitConfig.MEMBER_SELECTION_LIMIT) BucketConfiguration selectionLimit

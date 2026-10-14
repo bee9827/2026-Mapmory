@@ -1,4 +1,4 @@
-package com.mapmory.backend.place.infrastructure.ratelimit;
+package com.mapmory.backend.place.ratelimit;
 
 import static io.github.bucket4j.distributed.ExpirationAfterWriteStrategy.basedOnTimeForRefillingBucketUpToMax;
 

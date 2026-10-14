@@ -1,4 +1,4 @@
-package com.mapmory.backend.place.web.ratelimit;
+package com.mapmory.backend.place.ratelimit;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;

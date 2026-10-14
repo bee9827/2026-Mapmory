@@ -1,4 +1,4 @@
-package com.mapmory.backend.place.web.ratelimit;
+package com.mapmory.backend.place.ratelimit;
 
 import com.mapmory.backend.auth.exception.AuthErrorCode;
 import com.mapmory.backend.common.exception.BusinessException;

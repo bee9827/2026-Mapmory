@@ -1,13 +1,13 @@
-package com.mapmory.backend.place.infrastructure.ratelimit;
+package com.mapmory.backend.place.ratelimit;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "place.rate-limit")
-public record PlaceRateLimitProperties(
+record PlaceRateLimitProperties(
         int searchesPerMemberPerMinute,
         int selectionsPerMemberPerDay
 ) {
-    public PlaceRateLimitProperties {
+    PlaceRateLimitProperties {
         if (searchesPerMemberPerMinute < 1 || selectionsPerMemberPerDay < 1) {
             throw new IllegalArgumentException("장소 회원 한도 설정이 올바르지 않습니다.");
         }

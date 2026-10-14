@@ -1,4 +1,4 @@
-package com.mapmory.backend.place.infrastructure.ratelimit;
+package com.mapmory.backend.place.ratelimit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

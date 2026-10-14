@@ -1,4 +1,4 @@
-package com.mapmory.backend.place.infrastructure.ratelimit;
+package com.mapmory.backend.place.ratelimit;
 
 import io.github.bucket4j.mysql.MySQLSelectForUpdateBasedProxyManager;
 import org.springframework.scheduling.annotation.Scheduled;
