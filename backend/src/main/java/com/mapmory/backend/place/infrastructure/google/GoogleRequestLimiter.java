@@ -54,6 +54,12 @@ public class GoogleRequestLimiter {
         consume(details);
     }
 
+    public void refundAutocomplete() {
+    }
+
+    public void refundDetails() {
+    }
+
     private void reservePace() {
         if (!requestPace.tryConsume(1)) {
             throw new BusinessException(PlaceErrorCode.PLACE_RATE_LIMITED);

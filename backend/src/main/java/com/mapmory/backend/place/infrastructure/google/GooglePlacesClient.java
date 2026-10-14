@@ -5,6 +5,7 @@ import com.mapmory.backend.place.application.PlaceErrorCode;
 import com.mapmory.backend.place.application.model.PlaceCandidate;
 import com.mapmory.backend.place.application.model.PlaceDetails;
 import com.mapmory.backend.place.application.port.PlaceLookupPort;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,17 +39,20 @@ public class GooglePlacesClient implements PlaceLookupPort {
     private final RestClient restClient;
     private final String apiKey;
     private final GoogleRequestLimiter requestLimiter;
+    private final CircuitBreaker circuitBreaker;
     private final GooglePlaceMapper mapper = new GooglePlaceMapper();
 
     public GooglePlacesClient(
             RestClient.Builder builder,
             @Value("${google.places.base-url:https://places.googleapis.com}") String baseUrl,
             @Value("${google.places.api-key:}") String apiKey,
-            GoogleRequestLimiter requestLimiter
+            GoogleRequestLimiter requestLimiter,
+            CircuitBreaker circuitBreaker
     ) {
         this.restClient = builder.baseUrl(baseUrl).build();
         this.apiKey = apiKey;
         this.requestLimiter = requestLimiter;
+        this.circuitBreaker = circuitBreaker;
     }
 
     @Override
