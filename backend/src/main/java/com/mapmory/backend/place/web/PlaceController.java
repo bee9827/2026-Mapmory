@@ -38,7 +38,7 @@ public class PlaceController {
     public ResponseEntity<TravelRecordResponse<List<PlaceCandidateResponse>>> search(
             @AuthenticationPrincipal Long memberId,
             @RequestParam @NotBlank @Size(max = 100) String query,
-            @RequestParam(required = false) @Pattern(regexp = SESSION_TOKEN) String sessionToken
+            @RequestParam @Pattern(regexp = SESSION_TOKEN) String sessionToken
     ) {
         return ResponseEntity.ok(TravelRecordResponse.of(
                 placeSearchService.search(memberId, query, sessionToken).stream().map(PlaceCandidateResponse::from).toList()));

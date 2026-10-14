@@ -133,17 +133,17 @@ class TravelRecordServiceTest {
     }
 
     @Test
-    void 선택한_장소_ID로_조회한_이름을_여행_일지에_저장한다() {
+    void 선택한_장소를_제공자와_출처_표기와_함께_여행_일지에_저장한다() {
         Region district = mock(Region.class);
         TravelRecordCommand command = new TravelRecordCommand(
                 "KR", "11", "11560", "한강 산책", "",
-                LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
+                LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "ChIJ-park"
         );
         when(regionResolver.resolve("KR", "11", "11560")).thenReturn(district);
-        when(placeLookupPort.findForRecord("park-1"))
-                .thenReturn(new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932,
-                        "© OpenStreetMap contributors", "https://www.openstreetmap.org/copyright"));
-        when(placeLookupPort.providerCode("park-1")).thenReturn("TEST_PROVIDER");
+        when(placeLookupPort.findForRecord("ChIJ-park"))
+                .thenReturn(new PlaceDetails("ChIJ-park", null, null,
+                        "Google Maps", "https://www.google.com/maps", List.of()));
+        when(placeLookupPort.providerCode()).thenReturn("GOOGLE");
         when(travelRecordRepository.save(any(TravelRecord.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -151,20 +151,20 @@ class TravelRecordServiceTest {
 
         assertThat(result.getRegion()).isEqualTo(district);
         assertThat(result.getPlace()).isEqualTo(new RecordedPlace(
-                "TEST_PROVIDER", "park-1", "여의도한강공원",
-                "© OpenStreetMap contributors", "https://www.openstreetmap.org/copyright"));
+                "GOOGLE", "ChIJ-park", null, "Google Maps", "https://www.google.com/maps"));
     }
 
     @Test
-    void 장소_ID만_보내면_좌표로_추천한_지역에_저장한다() {
+    void 장소_ID만_보내면_장소로_추천한_지역에_저장한다() {
         Region district = mock(Region.class);
         TravelRecordCommand command = new TravelRecordCommand(
                 null, null, null, "한강 산책", "",
-                LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
+                LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "ChIJ-park"
         );
-        PlaceDetails place = new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932, null, null);
-        when(placeLookupPort.findById("park-1")).thenReturn(place);
-        when(placeLookupPort.providerCode("park-1")).thenReturn("GEOAPIFY");
+        PlaceDetails place = new PlaceDetails("ChIJ-park", null, "KR",
+                "Google Maps", "https://www.google.com/maps", List.of("서울특별시", "영등포구"));
+        when(placeLookupPort.findById("ChIJ-park")).thenReturn(place);
+        when(placeLookupPort.providerCode()).thenReturn("GOOGLE");
         when(placeSelectionService.suggestedRegion(place)).thenReturn(district);
         when(travelRecordRepository.save(any(TravelRecord.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -172,38 +172,23 @@ class TravelRecordServiceTest {
         TravelRecord result = travelRecordService.create(member, command);
 
         assertThat(result.getRegion()).isEqualTo(district);
-        assertThat(result.getPlace().name()).isEqualTo("여의도한강공원");
+        assertThat(result.getPlace().id()).isEqualTo("ChIJ-park");
     }
 
     @Test
-    void 장소_좌표에_맞는_지역이_없으면_직접_지역을_고르게_한다() {
+    void 장소로_지역을_찾지_못하면_직접_지역을_고르게_한다() {
         TravelRecordCommand command = new TravelRecordCommand(
                 null, null, null, "한강 산책", "",
-                LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
+                LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "ChIJ-park"
         );
-        PlaceDetails place = new PlaceDetails("park-1", "한강공원", "KR", 37.5, 127.0, null, null);
-        when(placeLookupPort.findById("park-1")).thenReturn(place);
+        PlaceDetails place = new PlaceDetails("ChIJ-park", null, "KR",
+                "Google Maps", "https://www.google.com/maps", List.of());
+        when(placeLookupPort.findById("ChIJ-park")).thenReturn(place);
 
         assertThatThrownBy(() -> travelRecordService.create(member, command))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code())
                         .isEqualTo("REGION_REQUIRED"));
-        verify(travelRecordRepository, never()).save(any(TravelRecord.class));
-    }
-
-    @Test
-    void 장소의_국가와_요청_국가가_다르면_저장하지_않는다() {
-        TravelRecordCommand command = new TravelRecordCommand(
-                "KR", "11", "11560", "한강 산책", "",
-                LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
-        );
-        when(placeLookupPort.findForRecord("park-1"))
-                .thenReturn(new PlaceDetails("park-1", "도쿄 타워", "JP", 35.6586, 139.7454, null, null));
-
-        assertThatThrownBy(() -> travelRecordService.create(member, command))
-                .isInstanceOf(BusinessException.class)
-                .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code())
-                        .isEqualTo("PLACE_COUNTRY_MISMATCH"));
         verify(travelRecordRepository, never()).save(any(TravelRecord.class));
     }
 
