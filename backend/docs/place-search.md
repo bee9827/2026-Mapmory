@@ -8,7 +8,7 @@
 4. 서버가 장소 ID와 출처를 저장한다. Google 장소는 약관상 이름을 저장하지 않는다(`placeName`이 `null`). 요청에 지역이 있으면 다시 조회하지 않는다. 다시 받을 값이 국가뿐이고 출처는 상수이기 때문이다. 이때 장소 국가를 모르므로 요청 지역과 맞는지 확인하지 않는다. 요청에 지역이 없으면 3번처럼 다시 조회해 지역을 정한다. 상세 응답에는 `placeProvider`, `placeId`, `placeName`, `placeAttribution`, `placeAttributionUrl`이 포함된다.
 
 `TravelRecord`는 이 다섯 값을 `RecordedPlace` 값 객체 하나로 다룬다. DB 컬럼과 API 응답 필드는 기존 형태를 유지한다.
-`place/application`에는 검색·선택 서비스와 제공자 중립 모델이 있고, 장소 조회와 회원 한도 계약은 `application/port`에 있다. `infrastructure/google`의 `GooglePlacesClient`가 장소 조회 포트를, `infrastructure/ratelimit`의 `MemberPlaceRateLimiter`가 회원 한도 포트를 구현한다. `web`은 API와 응답 변환을, `web/ratelimit`의 인터셉터는 회원 한도 확인을 담당한다. 여행 기록 서비스는 application의 포트와 모델만 참조한다. 예전 Geoapify 장소로 저장된 기록은 `placeProvider`가 `GEOAPIFY`로 남는다.
+`place/application`에는 검색·선택 서비스와 제공자 중립 모델이 있고, 장소 조회 계약은 `application/port`에 있다. `infrastructure/google`의 `GooglePlacesClient`가 이 포트를 구현한다. `web`은 API와 응답 변환을, `web/ratelimit`의 인터셉터는 회원 한도 확인을 담당한다. 인터셉터는 `infrastructure/ratelimit`의 `MemberPlaceRateLimiter`를 바로 부른다. 여행 기록 서비스는 application의 포트와 모델만 참조한다. 예전 Geoapify 장소로 저장된 기록은 `placeProvider`가 `GEOAPIFY`로 남는다.
 
 예시 저장 요청의 장소·지역 부분:
 

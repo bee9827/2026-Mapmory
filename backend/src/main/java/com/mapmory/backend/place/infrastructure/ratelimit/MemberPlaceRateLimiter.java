@@ -2,7 +2,6 @@ package com.mapmory.backend.place.infrastructure.ratelimit;
 
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.place.application.PlaceErrorCode;
-import com.mapmory.backend.place.application.port.PlaceRateLimitPort;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.BucketExceptions.BucketExecutionException;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
@@ -12,10 +11,11 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 /**
- * 회원별 장소 검색·선택 횟수를 DB 버킷으로 센다. 제공자 호출 한도는 각 제공자 클라이언트가 따로 확인한다.
+ * 회원별 장소 검색·선택 횟수를 DB 버킷으로 센다. 장소 API 인터셉터가 컨트롤러에 들어가기 전에 부른다.
+ * Google 호출 한도는 {@code GooglePlacesClient}가 따로 확인한다.
  */
 @Component
-public class MemberPlaceRateLimiter implements PlaceRateLimitPort {
+public class MemberPlaceRateLimiter {
 
     private static final String SEARCH = "place:search:member:";
     private static final String SELECTION = "place:selection:member:";
@@ -34,12 +34,10 @@ public class MemberPlaceRateLimiter implements PlaceRateLimitPort {
         this.selectionLimit = selectionLimit;
     }
 
-    @Override
     public void checkSearch(Long memberId) {
         consume(SEARCH + requireMemberId(memberId), searchLimit);
     }
 
-    @Override
     public void checkSelection(Long memberId) {
         // 날짜를 키에 넣어 UTC 날짜가 바뀌면 새로 센다.
         consume(SELECTION + requireMemberId(memberId) + ":" + LocalDate.now(ZoneOffset.UTC), selectionLimit);
