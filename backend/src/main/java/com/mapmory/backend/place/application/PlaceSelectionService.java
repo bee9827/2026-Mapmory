@@ -4,7 +4,6 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.place.application.model.PlaceDetails;
 import com.mapmory.backend.place.application.model.SelectedPlace;
 import com.mapmory.backend.place.application.port.PlaceLookupPort;
-import com.mapmory.backend.place.application.port.PlaceRateLimitPort;
 import com.mapmory.backend.region.Region;
 import com.mapmory.backend.region.RegionResolver;
 import org.springframework.stereotype.Service;
@@ -13,24 +12,20 @@ import org.springframework.stereotype.Service;
 public class PlaceSelectionService {
 
     private final PlaceLookupPort placeLookupPort;
-    private final PlaceRateLimitPort rateLimitPort;
     private final RegionResolver regionResolver;
     private final KoreanAddressRegionMatcher addressRegionMatcher;
 
     public PlaceSelectionService(
             PlaceLookupPort placeLookupPort,
-            PlaceRateLimitPort rateLimitPort,
             RegionResolver regionResolver,
             KoreanAddressRegionMatcher addressRegionMatcher
     ) {
         this.placeLookupPort = placeLookupPort;
-        this.rateLimitPort = rateLimitPort;
         this.regionResolver = regionResolver;
         this.addressRegionMatcher = addressRegionMatcher;
     }
 
-    public SelectedPlace select(Long memberId, String placeId, String sessionToken) {
-        rateLimitPort.checkSelection(memberId);
+    public SelectedPlace select(String placeId, String sessionToken) {
         PlaceDetails place = placeLookupPort.findForSelection(placeId, sessionToken);
         return new SelectedPlace(place, suggestedRegion(place));
     }

@@ -32,7 +32,7 @@ class PlaceControllerTest {
         PlaceSelectionService selectionService = mock(PlaceSelectionService.class);
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(searchService, selectionService)).build();
         String token = "0b6f8f4e-5d0a-4c9a-9f43-0c1c2f5f2b11";
-        when(searchService.search(null, "한강공원", token))
+        when(searchService.search("한강공원", token))
                 .thenReturn(List.of(new PlaceCandidate("park-1", "여의도한강공원", "서울 영등포구", null, null)));
 
         mockMvc.perform(get("/api/v1/places/search").param("query", "한강공원").param("sessionToken", token))
@@ -60,8 +60,8 @@ class PlaceControllerTest {
         PlaceSelectionService selectionService = mock(PlaceSelectionService.class);
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(searchService, selectionService)).build();
         String token = "0b6f8f4e-5d0a-4c9a-9f43-0c1c2f5f2b11";
-        when(searchService.search(null, "경복", token)).thenReturn(List.of());
-        when(selectionService.select(null, "ChIJ-gyeong", token))
+        when(searchService.search("경복", token)).thenReturn(List.of());
+        when(selectionService.select("ChIJ-gyeong", token))
                 .thenReturn(new SelectedPlace(
                         new PlaceDetails("ChIJ-gyeong", null, "KR", null, null, List.of()), null));
 
@@ -71,8 +71,8 @@ class PlaceControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.name").doesNotExist());
 
-        verify(searchService).search(null, "경복", token);
-        verify(selectionService).select(null, "ChIJ-gyeong", token);
+        verify(searchService).search("경복", token);
+        verify(selectionService).select("ChIJ-gyeong", token);
     }
 
     @Test
@@ -85,9 +85,9 @@ class PlaceControllerTest {
         proxyFactory.addAdvice(new MethodValidationInterceptor((jakarta.validation.Validator) validator));
         PlaceController controller = (PlaceController) proxyFactory.getProxy();
 
-        assertThatThrownBy(() -> controller.search(null, "경복", "a".repeat(37)))
+        assertThatThrownBy(() -> controller.search("경복", "a".repeat(37)))
                 .isInstanceOf(ConstraintViolationException.class);
-        controller.search(null, "경복", "a".repeat(36));
+        controller.search("경복", "a".repeat(36));
     }
 
     @Test
@@ -95,7 +95,7 @@ class PlaceControllerTest {
         PlaceSearchService searchService = mock(PlaceSearchService.class);
         PlaceSelectionService selectionService = mock(PlaceSelectionService.class);
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new PlaceController(searchService, selectionService)).build();
-        when(selectionService.select(null, "ChIJ-park", null))
+        when(selectionService.select("ChIJ-park", null))
                 .thenReturn(new SelectedPlace(
                         new PlaceDetails("ChIJ-park", null, "KR", null, null, List.of()), null));
 
