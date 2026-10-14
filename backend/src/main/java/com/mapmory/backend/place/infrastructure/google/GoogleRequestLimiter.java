@@ -54,6 +54,15 @@ public class GoogleRequestLimiter {
         consume(details);
     }
 
+    /** Google이 과금하지 않은 호출(5xx, 연결 실패)은 월 한도를 돌려준다. 분당 한도는 몰린 요청을 막는 값이라 돌려주지 않는다. */
+    public void refundAutocomplete() {
+        refund(autocomplete);
+    }
+
+    public void refundDetails() {
+        refund(details);
+    }
+
     private void reservePace() {
         if (!requestPace.tryConsume(1)) {
             throw new BusinessException(PlaceErrorCode.PLACE_RATE_LIMITED);
@@ -72,6 +81,19 @@ public class GoogleRequestLimiter {
             throw new BusinessException(budget.exhaustedError());
         }
         alertIfRunningOut(budget, probe.getRemainingTokens());
+    }
+
+    // 돌려주지 못하면 실제보다 많이 쓴 것으로 셀 뿐이다. 이미 정해진 Google 장애 응답을 돌려주기 실패로 바꾸지 않는다.
+    private void refund(Budget budget) {
+        try {
+            bucketManager.getProxy(budget.key(), budget::configuration).addTokens(1);
+        } catch (BucketExecutionException exception) {
+            log.atWarn()
+                    .addKeyValue("event", "GOOGLE_PLACES_BUDGET_REFUND_FAILED")
+                    .addKeyValue("budget", budget.name())
+                    .setCause(exception)
+                    .log("Google {} 월 한도를 돌려주지 못했다", budget.name());
+        }
     }
 
     /**

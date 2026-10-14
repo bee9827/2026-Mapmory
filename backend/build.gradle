@@ -31,6 +31,7 @@ dependencies {
     implementation 'org.flywaydb:flyway-mysql'
     implementation 'com.bucket4j:bucket4j_jdk17-core:8.20.0'
     implementation 'com.bucket4j:bucket4j_jdk17-mysql:8.20.0'
+    implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.4.0'
 
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'

@@ -1,6 +1,8 @@
 package com.mapmory.backend.place.infrastructure.google;
 
+import static com.mapmory.backend.support.LogEvents.field;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.qos.logback.classic.Logger;
@@ -96,6 +98,47 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
         }
     }
 
+    @Test
+    void 돌려준_만큼_월_한도를_다시_쓴다() {
+        GoogleRequestLimiter limiter = limiter(1, 1, 10_000);
+        limiter.reserveAutocomplete();
+        limiter.reserveDetails();
+
+        limiter.refundAutocomplete();
+        limiter.refundDetails();
+
+        limiter.reserveAutocomplete();
+        limiter.reserveDetails();
+        assertError(limiter::reserveAutocomplete, "PLACE_SEARCH_BUDGET_EXHAUSTED");
+        assertError(limiter::reserveDetails, "PLACE_PROVIDER_BUDGET_EXHAUSTED");
+    }
+
+    @Test
+    void 돌려줘도_월_한도보다_많아지지_않는다() {
+        GoogleRequestLimiter limiter = limiter(2, 1, 10_000);
+
+        limiter.refundAutocomplete();
+        limiter.refundDetails();
+
+        assertThat(availableThisMonth("google:autocomplete:", 2)).isEqualTo(2);
+        assertThat(availableThisMonth("google:details:", 1)).isEqualTo(1);
+    }
+
+    // 돌려주기는 Google 장애 응답을 만드는 중에 한다. 돌려주기에 실패했다고 503 대신 500을 내지 않는다.
+    @Test
+    void 한도_저장소가_장애여도_돌려주기_실패는_응답을_바꾸지_않는다() throws SQLException {
+        GoogleRequestLimiter limiter = limiter(2, 1, 10_000);
+
+        List<Connection> held = holdAllConnections();
+        try {
+            assertThatCode(limiter::refundAutocomplete).doesNotThrowAnyException();
+        } finally {
+            for (Connection connection : held) {
+                connection.close();
+            }
+        }
+    }
+
     private GoogleRequestLimiter limiter(int autocompletePerMonth, int detailsPerMonth, int requestsPerMinute) {
         GoogleRateLimitProperties properties =
                 new GoogleRateLimitProperties(autocompletePerMonth, detailsPerMonth, requestsPerMinute);
@@ -122,14 +165,6 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
                 .addLimit(bandwidth -> bandwidth.capacity(capacity).refillIntervally(capacity, Duration.ofDays(31)))
                 .build();
         return bucketManager.getProxy(prefix + YearMonth.now(ZoneOffset.UTC), () -> monthly).getAvailableTokens();
-    }
-
-    private static Object field(ILoggingEvent event, String key) {
-        return event.getKeyValuePairs().stream()
-                .filter(pair -> pair.key.equals(key))
-                .map(pair -> pair.value)
-                .findFirst()
-                .orElse(null);
     }
 
     private void assertError(Runnable action, String expectedCode) {
