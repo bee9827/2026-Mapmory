@@ -5,7 +5,7 @@
 1. 로그인한 사용자가 `GET /api/v1/places/search?query=한강공원`을 호출한다. `data`는 `placeId`, `name`, `address`, `attribution`, `attributionUrl`이 담긴 후보 배열이다.
 2. 후보를 고르면 `GET /api/v1/places/{placeId}`를 호출한다. 응답의 `suggestedRegion`에 국가·시도·시군구 코드와 이름이 있다. 경계에서 찾지 못하면 `suggestedRegion`은 `null`, `manualRegionRequired`는 `true`다.
 3. 기존 `POST /api/v1/travel-records` 요청에 `placeId`만 추가하면 서버가 추천 지역을 자동 적용한다. 사용자가 추천 지역을 수정한 경우 `countryCode`, `provinceCode`, `districtCode`를 함께 보낸다. 국외 장소는 국가 코드를 자동 적용한다.
-4. 서버가 장소 ID를 제공자에 다시 조회해 국가를 검증하고 장소 ID와 출처를 저장한다. Geoapify 장소는 이름도 저장하지만 Google 장소는 약관상 이름을 저장하지 않는다(`placeName`이 `null`). 요청 국가와 장소 국가가 다르면 `PLACE_COUNTRY_MISMATCH`로 거절한다. 상세 응답에는 `placeProvider`, `placeId`, `placeName`, `placeAttribution`, `placeAttributionUrl`이 포함된다.
+4. 서버가 장소 ID와 출처를 저장한다. Geoapify 장소는 이름도 저장하지만 Google 장소는 약관상 이름을 저장하지 않는다(`placeName`이 `null`). Geoapify 장소는 다시 조회해 이름을 받고, 요청 국가와 장소 국가가 다르면 `PLACE_COUNTRY_MISMATCH`로 거절한다. Google 장소는 요청에 지역이 있으면 다시 조회하지 않는다. 다시 받을 값이 국가뿐이고 출처는 상수이기 때문이다. 이때 국가 검사는 하지 않는다. 요청에 지역이 없으면 3번처럼 다시 조회해 지역을 정한다. 상세 응답에는 `placeProvider`, `placeId`, `placeName`, `placeAttribution`, `placeAttributionUrl`이 포함된다.
 
 `TravelRecord`는 이 다섯 값을 `RecordedPlace` 값 객체 하나로 다룬다. DB 컬럼과 API 응답 필드는 기존 형태를 유지한다.
 `place/application`에는 검색·선택 서비스와 제공자 중립 모델이 있고, 외부 검색 및 지역 판정 계약은 `application/port`에 있다. `infrastructure/PlaceLookupRouter`가 `infrastructure/google`과 `infrastructure/geoapify` 중 제공자를 고르고, `infrastructure/region`이 지역 판정 포트를 구현한다. `web`은 API와 응답 변환을 담당한다. 여행 기록 서비스는 application의 포트와 모델만 참조한다. 제공자 코드(`GOOGLE`, `GEOAPIFY`)는 장소 ID 형식으로 라우터가 정한다.

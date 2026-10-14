@@ -138,11 +138,11 @@ class TravelRecordExternalCallTransactionTest extends IntegrationTest {
         return id.longValue();
     }
 
+    // 지역 없이 장소만 보내 서버가 Google 조회로 지역을 정하는 경로를 탄다. 지역을 보내면 Google을 부르지 않는다.
     private String recordBody(String... objectKeys) {
         String keys = String.join(", ", java.util.Arrays.stream(objectKeys).map("\"%s\""::formatted).toList());
         return """
                 {
-                  "countryCode": "JP",
                   "title": "도쿄 여행",
                   "content": "기록 본문",
                   "startDate": "2026-08-01",

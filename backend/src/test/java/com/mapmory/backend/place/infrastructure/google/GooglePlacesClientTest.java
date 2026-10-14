@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -84,7 +85,7 @@ class GooglePlacesClientTest {
     }
 
     @Test
-    void 저장용_조회는_Essentials_필드만_요청해_이름과_좌표를_받지_않는다() {
+    void 지역을_정하는_조회는_Essentials_필드만_요청해_이름과_좌표를_받지_않는다() {
         server.expect(requestToUriTemplate(BASE_URL + "/v1/places/{id}?languageCode=ko", "ChIJ-bundang"))
                 .andExpect(header("X-Goog-FieldMask", "id,addressComponents"))
                 .andRespond(withSuccess("""
@@ -104,6 +105,38 @@ class GooglePlacesClientTest {
         assertThat(place.addressAreas()).containsExactly("경기도", "성남시", "분당구");
         server.verify();
         verify(limiter).reserveDetails();
+    }
+
+    @Test
+    void 기록에_붙일_장소는_Google을_부르지_않고_출처_표기와_함께_만든다() {
+        PlaceDetails place = client.recordedPlace("ChIJ-bundang");
+
+        assertThat(place.placeId()).isEqualTo("ChIJ-bundang");
+        assertThat(place.name()).isNull();
+        assertThat(place.countryCode()).isNull();
+        assertThat(place.attribution()).isEqualTo("Google Maps");
+        assertThat(place.attributionUrl()).isEqualTo("https://www.google.com/maps");
+        server.verify();
+        verifyNoInteractions(limiter);
+    }
+
+    @Test
+    void 기록에_붙일_장소_ID_형식이_틀리면_거절한다() {
+        assertThatThrownBy(() -> client.recordedPlace("../places"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code())
+                        .isEqualTo("INVALID_PLACE_ID"));
+    }
+
+    @Test
+    void API_키를_뺀_뒤에는_Google_장소를_기록에_붙이지_않는다() {
+        GooglePlacesClient unconfigured =
+                new GooglePlacesClient(RestClient.builder(), BASE_URL, "", mock(GoogleRequestLimiter.class));
+
+        assertThatThrownBy(() -> unconfigured.recordedPlace("ChIJ-bundang"))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code())
+                        .isEqualTo("PLACE_PROVIDER_UNAVAILABLE"));
     }
 
     @Test

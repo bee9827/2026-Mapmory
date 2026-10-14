@@ -81,10 +81,20 @@ public class GooglePlacesClient {
         return details(placeId, null);
     }
 
+    /**
+     * 기록에 붙일 장소를 Google을 다시 부르지 않고 만든다. 이름은 저장하지 않고 출처 표기는 상수라 다시 받을 값이 없다.
+     *
+     * <p>국가는 확인하지 않아 null이다. 앱을 고쳐 다른 나라 장소를 붙여도 그 회원의 기록에만 영향이 간다.
+     * 키를 뺀 뒤에는 새 Google 장소를 받지 않도록 제공자 장애로 알린다.
+     */
+    public PlaceDetails recordedPlace(String placeId) {
+        validatePlaceId(placeId);
+        requireConfigured();
+        return new PlaceDetails(placeId, null, null, null, null, ATTRIBUTION, ATTRIBUTION_URL);
+    }
+
     private PlaceDetails details(String placeId, String sessionToken) {
-        if (placeId == null || !placeId.matches("[A-Za-z0-9_-]{1,255}")) {
-            throw new BusinessException(PlaceErrorCode.INVALID_PLACE_ID);
-        }
+        validatePlaceId(placeId);
         requireConfigured();
         requestLimiter.reserveDetails();
         JsonNode response = call(true, () -> restClient.get()
@@ -127,6 +137,12 @@ public class GooglePlacesClient {
             return true;
         }
         return status == 400 && !exception.getResponseBodyAsString().contains("API_KEY");
+    }
+
+    private static void validatePlaceId(String placeId) {
+        if (placeId == null || !placeId.matches("[A-Za-z0-9_-]{1,255}")) {
+            throw new BusinessException(PlaceErrorCode.INVALID_PLACE_ID);
+        }
     }
 
     private void requireConfigured() {

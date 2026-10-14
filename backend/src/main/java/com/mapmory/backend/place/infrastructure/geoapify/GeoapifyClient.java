@@ -68,6 +68,11 @@ public class GeoapifyClient implements PlaceLookupPort {
     }
 
     @Override
+    public PlaceDetails findForRecord(String placeId) {
+        return findById(placeId);
+    }
+
+    @Override
     public PlaceDetails findById(String placeId) {
         if (placeId == null || !placeId.matches("[A-Za-z0-9_-]{1,255}")) {
             throw new BusinessException(PlaceErrorCode.INVALID_PLACE_ID);

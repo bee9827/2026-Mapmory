@@ -59,6 +59,12 @@ public class PlaceLookupRouter implements PlaceLookupPort {
         return isGooglePlaceId(placeId) ? google.findById(placeId) : geoapify.findById(placeId);
     }
 
+    @Override
+    public PlaceDetails findForRecord(String placeId) {
+        // Geoapify 장소는 저장할 이름을 받아야 해서 조회한다.
+        return isGooglePlaceId(placeId) ? google.recordedPlace(placeId) : geoapify.findById(placeId);
+    }
+
     private static boolean isGooglePlaceId(String placeId) {
         return placeId != null && !GEOAPIFY_PLACE_ID.matcher(placeId).matches();
     }

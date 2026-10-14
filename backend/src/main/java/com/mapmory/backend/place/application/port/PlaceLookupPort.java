@@ -17,7 +17,14 @@ public interface PlaceLookupPort {
     PlaceDetails findForSelection(String placeId, String sessionToken);
 
     /**
-     * 기록 저장 시 국가를 검증하려고 다시 조회한다. 제공자 약관상 저장할 수 없는 이름은 null로 돌려준다.
+     * 기록 저장 요청에 지역이 없을 때, 장소로 지역을 정하려고 다시 조회한다. 제공자 약관상 저장할 수 없는 이름은
+     * null로 돌려준다.
      */
     PlaceDetails findById(String placeId);
+
+    /**
+     * 지역이 정해진 기록에 붙일 장소. 다시 조회해도 얻을 값이 없는 제공자(Google)는 조회하지 않고, 그때 국가는
+     * null이라 국가 검사를 하지 않는다.
+     */
+    PlaceDetails findForRecord(String placeId);
 }
