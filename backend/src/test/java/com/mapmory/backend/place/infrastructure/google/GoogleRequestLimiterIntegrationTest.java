@@ -31,12 +31,12 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
 
     @Test
     void 자동완성과_상세_조회의_하루_한도를_DB에_따로_센다() {
-        GoogleRequestLimiter first = new GoogleRequestLimiter(bucketManager, 2, 1, 10_000);
+        GoogleRequestLimiter first = limiter(2, 1, 10_000);
 
         first.reserveAutocomplete();
         first.reserveDetails();
 
-        GoogleRequestLimiter second = new GoogleRequestLimiter(bucketManager, 2, 1, 10_000);
+        GoogleRequestLimiter second = limiter(2, 1, 10_000);
         second.reserveAutocomplete();
         assertError(second::reserveAutocomplete, "PLACE_SEARCH_BUDGET_EXHAUSTED");
         assertError(second::reserveDetails, "PLACE_PROVIDER_BUDGET_EXHAUSTED");
@@ -44,7 +44,7 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
 
     @Test
     void 속도_제한에_걸린_요청은_하루_한도를_쓰지_않는다() {
-        GoogleRequestLimiter limiter = new GoogleRequestLimiter(bucketManager, 2, 1, 1);
+        GoogleRequestLimiter limiter = limiter(2, 1, 1);
 
         limiter.reserveAutocomplete();
         assertError(limiter::reserveAutocomplete, "PLACE_RATE_LIMITED");
@@ -56,7 +56,7 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
 
     @Test
     void 속도_제한에_걸린_요청은_커넥션_풀이_고갈돼도_커넥션_없이_거절한다() throws SQLException {
-        GoogleRequestLimiter limiter = new GoogleRequestLimiter(bucketManager, 2, 1, 1);
+        GoogleRequestLimiter limiter = limiter(2, 1, 1);
         limiter.reserveAutocomplete();
 
         List<Connection> held = holdAllConnections();
@@ -67,6 +67,18 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
                 connection.close();
             }
         }
+    }
+
+    private GoogleRequestLimiter limiter(int autocompletePerDay, int detailsPerDay, int requestsPerMinute) {
+        GoogleRateLimitProperties properties =
+                new GoogleRateLimitProperties(autocompletePerDay, detailsPerDay, requestsPerMinute);
+        GoogleRateLimitConfig config = new GoogleRateLimitConfig();
+        return new GoogleRequestLimiter(
+                bucketManager,
+                config.googleRequestPace(properties),
+                config.googleAutocompleteBudget(properties),
+                config.googleDetailsBudget(properties)
+        );
     }
 
     private List<Connection> holdAllConnections() throws SQLException {
