@@ -16,6 +16,7 @@
 		A10000000000000000000007 /* FirebaseAnalyticsLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* FirebaseAnalyticsLogger.swift */; };
 		A10000000000000000000008 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* PrivacyInfo.xcprivacy */; };
 		A10000000000000000000009 /* KeychainAuthTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* KeychainAuthTokenStore.swift */; };
+		D10000000000000000000001 = {isa = PBXBuildFile; productRef = D10000000000000000000002; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000006 /* FirebaseAnalytics in Frameworks */,
+                D10000000000000000000001,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -88,6 +90,7 @@
 			packageProductDependencies = (
 				C10000000000000000000001 /* FirebaseAnalytics */,
 				C10000000000000000000002 /* FirebaseCore */,
+                D10000000000000000000002,
 			);
 			name = Mapmory;
 			productName = Mapmory;
@@ -365,6 +368,7 @@
 			package = C00000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCore;
 		};
+		D10000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = C00000000000000000000001; productName = FirebaseRemoteConfig; };
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin XCConfigurationList section */

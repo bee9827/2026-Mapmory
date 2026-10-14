@@ -37,6 +37,11 @@ class MainActivity : ComponentActivity() {
     private val analyticsLogger by lazy { FirebaseAnalyticsLogger(applicationContext) }
     private val developerToolsInfo by lazy { loadDeveloperToolsInfo() }
 
+    override fun onResume() {
+        super.onResume()
+        appViewModel.forceUpdate.refresh()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -76,6 +81,8 @@ class MainActivity : ComponentActivity() {
                         contentWindowInsets = WindowInsets.safeDrawing,
                         onThemeChanged = { isDarkTheme = it },
                         developerToolsInfo = developerToolsInfo,
+                        updateState = appViewModel.forceUpdate.state,
+                        onRetryUpdateCheck = appViewModel.forceUpdate::refresh,
                     )
                     BackHandler {
                         if (navigation.popBackStack()) {

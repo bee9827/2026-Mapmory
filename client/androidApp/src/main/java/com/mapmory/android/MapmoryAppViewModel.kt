@@ -14,6 +14,8 @@ import com.mapmory.shared.data.settings.AndroidOnboardingPreference
 import com.mapmory.shared.data.settings.AndroidThemePreference
 
 class MapmoryAppViewModel(application: Application) : AndroidViewModel(application) {
+    val forceUpdate = com.mapmory.android.update.AndroidForceUpdateController(application)
+
     private val configuredApiBaseUrl = application.getString(R.string.mapmory_api_base_url)
 
     val container: AppContainer = createGuestRemoteAppContainer(
@@ -29,6 +31,7 @@ class MapmoryAppViewModel(application: Application) : AndroidViewModel(applicati
     )
 
     override fun onCleared() {
+        forceUpdate.close()
         container.close()
     }
 }
