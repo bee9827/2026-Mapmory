@@ -5,9 +5,12 @@ import com.mapmory.backend.place.application.PlaceErrorCode;
 import io.github.bucket4j.Bucket;
 import io.github.bucket4j.BucketConfiguration;
 import io.github.bucket4j.BucketExceptions.BucketExecutionException;
+import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -21,13 +24,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class GoogleRequestLimiter {
 
-    private static final String AUTOCOMPLETE_BUDGET = "google:autocomplete:";
-    private static final String DETAILS_BUDGET = "google:details:";
+    private static final Logger log = LoggerFactory.getLogger(GoogleRequestLimiter.class);
 
     private final ProxyManager<String> bucketManager;
     private final Bucket requestPace;
-    private final BucketConfiguration autocompleteBudget;
-    private final BucketConfiguration detailsBudget;
+    private final Budget autocomplete;
+    private final Budget details;
 
     public GoogleRequestLimiter(
             ProxyManager<String> bucketManager,
@@ -37,19 +39,19 @@ public class GoogleRequestLimiter {
     ) {
         this.bucketManager = bucketManager;
         this.requestPace = requestPace;
-        this.autocompleteBudget = autocompleteBudget;
-        this.detailsBudget = detailsBudget;
+        this.autocomplete = new Budget("autocomplete", autocompleteBudget, PlaceErrorCode.PLACE_SEARCH_BUDGET_EXHAUSTED);
+        this.details = new Budget("details", detailsBudget, PlaceErrorCode.PLACE_PROVIDER_BUDGET_EXHAUSTED);
     }
 
     // 분당 한도를 먼저 확인한다. 거절된 요청이 DB에 가지 않고 월 한도도 쓰지 않게 하기 위해서다.
     public void reserveAutocomplete() {
         reservePace();
-        consume(AUTOCOMPLETE_BUDGET + thisMonth(), autocompleteBudget, PlaceErrorCode.PLACE_SEARCH_BUDGET_EXHAUSTED);
+        consume(autocomplete);
     }
 
     public void reserveDetails() {
         reservePace();
-        consume(DETAILS_BUDGET + thisMonth(), detailsBudget, PlaceErrorCode.PLACE_PROVIDER_BUDGET_EXHAUSTED);
+        consume(details);
     }
 
     private void reservePace() {
@@ -58,19 +60,51 @@ public class GoogleRequestLimiter {
         }
     }
 
-    private void consume(String key, BucketConfiguration configuration, PlaceErrorCode exhaustedError) {
+    private void consume(Budget budget) {
+        ConsumptionProbe probe;
         try {
-            if (!bucketManager.getProxy(key, () -> configuration).tryConsume(1)) {
-                throw new BusinessException(exhaustedError);
-            }
+            probe = bucketManager.getProxy(budget.key(), budget::configuration).tryConsumeAndReturnRemaining(1);
         } catch (BucketExecutionException exception) {
             // 한도 저장소가 장애일 때 외부 API를 호출하면 사용량을 통제할 수 없다.
             throw new BusinessException(PlaceErrorCode.PLACE_PROVIDER_UNAVAILABLE);
         }
+        if (!probe.isConsumed()) {
+            throw new BusinessException(budget.exhaustedError());
+        }
+        alertIfRunningOut(budget, probe.getRemainingTokens());
     }
 
-    // Google 월 사용량은 태평양 시간 기준이라 UTC 월과 몇 시간 어긋난다. 월 한도를 무료 사용량보다 작게 둔 이유다.
-    private static String thisMonth() {
-        return YearMonth.now(ZoneOffset.UTC).toString();
+    /**
+     * 월 한도의 80%를 쓴 순간과 다 쓴 순간에 ERROR 로그를 한 번씩 남긴다. 운영의 ERROR 로그 알람이 Discord로 알린다.
+     * 버킷은 한 번에 한 요청만 꺼내므로 남은 개수가 그 값이 되는 요청은 달마다 하나뿐이다.
+     */
+    private static void alertIfRunningOut(Budget budget, long remaining) {
+        long capacity = budget.capacity();
+        boolean exhausted = remaining == 0;
+        boolean eightyPercentUsed = capacity >= 5 && remaining == capacity / 5;
+        if (!exhausted && !eightyPercentUsed) {
+            return;
+        }
+        log.atError()
+                .addKeyValue("event", "GOOGLE_PLACES_BUDGET")
+                .addKeyValue("budget", budget.name())
+                .addKeyValue("remaining", remaining)
+                .addKeyValue("capacity", capacity)
+                .log(exhausted
+                                ? "Google {} 월 한도를 다 썼다: 남은 {}/{}"
+                                : "Google {} 월 한도의 80%를 썼다: 남은 {}/{}",
+                        budget.name(), remaining, capacity);
+    }
+
+    private record Budget(String name, BucketConfiguration configuration, PlaceErrorCode exhaustedError) {
+
+        // Google 월 사용량은 태평양 시간 기준이라 UTC 월과 몇 시간 어긋난다. 월 한도를 무료 사용량보다 작게 둔 이유다.
+        String key() {
+            return "google:" + name + ":" + YearMonth.now(ZoneOffset.UTC);
+        }
+
+        long capacity() {
+            return configuration.getBandwidths()[0].getCapacity();
+        }
     }
 }

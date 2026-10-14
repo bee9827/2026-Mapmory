@@ -3,6 +3,9 @@ package com.mapmory.backend.place.infrastructure.google;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.common.exception.BusinessException;
 import io.github.bucket4j.BucketConfiguration;
@@ -16,6 +19,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
 
@@ -40,6 +44,29 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
         second.reserveAutocomplete();
         assertError(second::reserveAutocomplete, "PLACE_SEARCH_BUDGET_EXHAUSTED");
         assertError(second::reserveDetails, "PLACE_PROVIDER_BUDGET_EXHAUSTED");
+    }
+
+    @Test
+    void 월_한도의_80퍼센트를_쓴_순간과_다_쓴_순간에_한_번씩_ERROR_로그를_남긴다() {
+        GoogleRequestLimiter limiter = limiter(5, 5, 10_000);
+        Logger logger = (Logger) LoggerFactory.getLogger(GoogleRequestLimiter.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            for (int i = 0; i < 5; i++) {
+                limiter.reserveAutocomplete();
+            }
+            assertError(limiter::reserveAutocomplete, "PLACE_SEARCH_BUDGET_EXHAUSTED");
+            limiter.reserveDetails();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        // 운영의 ERROR 로그 알람이 Discord로 알린다. 한도에 걸린 요청과 상세 1건은 로그를 남기지 않는다.
+        assertThat(appender.list).allSatisfy(event -> assertThat(event.getLevel().toString()).isEqualTo("ERROR"));
+        assertThat(appender.list).extracting(event -> field(event, "budget") + ":" + field(event, "remaining"))
+                .containsExactly("autocomplete:1", "autocomplete:0");
     }
 
     @Test
@@ -95,6 +122,14 @@ class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
                 .addLimit(bandwidth -> bandwidth.capacity(capacity).refillIntervally(capacity, Duration.ofDays(31)))
                 .build();
         return bucketManager.getProxy(prefix + YearMonth.now(ZoneOffset.UTC), () -> monthly).getAvailableTokens();
+    }
+
+    private static Object field(ILoggingEvent event, String key) {
+        return event.getKeyValuePairs().stream()
+                .filter(pair -> pair.key.equals(key))
+                .map(pair -> pair.value)
+                .findFirst()
+                .orElse(null);
     }
 
     private void assertError(Runnable action, String expectedCode) {
