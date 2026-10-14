@@ -59,7 +59,8 @@ class MapmoryAppNavigationTest {
             MapmoryApp(
                 container = container,
                 developerToolsInfo = MapmoryDeveloperToolsInfo(
-                    appVersion = "0.1.7",
+                    versionName = "0.1.7",
+                    versionCode = 10L,
                     applicationId = "com.mapmory.android",
                     buildType = "debug",
                     apiBaseUrl = "https://dev-api.map-mory.com/api/v1",
@@ -71,7 +72,10 @@ class MapmoryAppNavigationTest {
 
         openSettings()
         composeRule.onNodeWithText("개발자 도구").performClick()
+        composeRule.onNodeWithText("versionName").assertIsDisplayed()
         composeRule.onNodeWithText("0.1.7").assertIsDisplayed()
+        composeRule.onNodeWithText("versionCode").assertIsDisplayed()
+        composeRule.onNodeWithText("10").assertIsDisplayed()
         composeRule.onNodeWithText("com.mapmory.android").assertIsDisplayed()
         composeRule.onNodeWithText("개발 서버").assertIsDisplayed()
         composeRule.onNodeWithText("https://dev-api.map-mory.com/api/v1").assertIsDisplayed()

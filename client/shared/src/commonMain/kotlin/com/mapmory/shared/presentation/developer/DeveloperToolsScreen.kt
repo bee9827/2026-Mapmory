@@ -76,7 +76,8 @@ internal fun DeveloperToolsScreen(
                     DeveloperInfoCard(
                         title = "앱 정보",
                         rows = listOf(
-                            "앱 버전" to info.appVersion,
+                            "versionName" to info.versionName,
+                            "versionCode" to info.versionCode.toString(),
                             "패키지" to info.applicationId,
                             "빌드 유형" to info.buildType,
                         ),

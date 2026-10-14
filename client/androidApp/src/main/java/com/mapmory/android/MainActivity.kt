@@ -105,9 +105,15 @@ private fun MainActivity.loadDeveloperToolsInfo(): MapmoryDeveloperToolsInfo? {
     val isDebuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
     if (!isDebuggable) return null
 
-    val appVersion = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+    val packageInfo = packageManager.getPackageInfo(packageName, 0)
+    val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        packageInfo.longVersionCode
+    } else {
+        packageInfo.versionCode.toLong()
+    }
     return MapmoryDeveloperToolsInfo(
-        appVersion = appVersion,
+        versionName = packageInfo.versionName.orEmpty(),
+        versionCode = versionCode,
         applicationId = packageName,
         buildType = "debug",
         apiBaseUrl = getString(R.string.mapmory_api_base_url),
