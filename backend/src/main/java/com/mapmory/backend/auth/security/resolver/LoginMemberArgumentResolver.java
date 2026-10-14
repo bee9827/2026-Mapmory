@@ -25,6 +25,8 @@ import org.springframework.web.method.support.ModelAndViewContainer;
  * {@code MemberRepository.getReferenceById}도 리포지토리 기본 트랜잭션을 열면서 커넥션을 빌리므로
  * 트랜잭션 없이 {@link EntityManager#getReference}를 쓴다.
  * 프록시의 id 외 필드는 트랜잭션 밖에서 읽으면 예외가 나므로, 회원 정보가 필요하면 서비스 트랜잭션 안에서 읽는다.
+ * 회원의 존재도 확인하지 않아, 회원 행이 없는 토큰은 조회에서 빈 결과를, 저장에서 외래 키 위반(500)을 낸다.
+ * 회원 삭제 기능을 만들 때 함께 다룬다(ADR 0009 2026-10-14 구현 업데이트).
  */
 @Component
 public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolver {
