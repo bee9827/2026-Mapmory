@@ -52,11 +52,11 @@ google:
     # Places API (New) 키. 비어 있으면 장소 검색과 선택이 PLACE_PROVIDER_UNAVAILABLE로 실패한다. (docs/place-search.md)
     api-key: ${GOOGLE_PLACES_API_KEY:}
     rate-limit:
-      # 월 무료 사용량(Autocomplete 10,000건, Place Details Essentials 10,000건)을 넘지 않도록 하루 한도를 둔다.
-      autocomplete-per-day: 300
-      details-per-day: 300
-      # 서버마다 메모리에서 센다. Google 할당량(자동완성 분당 12,000회)을 서버 5대까지 넘지 않는 값이다.
-      requests-per-minute: 2400
+      # 월 무료 사용량(Autocomplete 10,000건, Place Details Essentials 10,000건)을 넘지 않도록 UTC 달마다 센다.
+      autocomplete-per-month: 9000
+      details-per-month: 9000
+      # 서버마다 메모리에서 센다. 몰린 요청이 월 한도를 다 쓰는 데 2시간 반(9,000 / 60)은 걸리게 한다.
+      requests-per-minute: 60
 
 apple:
   # identity token의 aud로 허용할 값 목록(쉼표 구분). iOS 네이티브 로그인은 앱 번들 ID가 aud로 들어간다.

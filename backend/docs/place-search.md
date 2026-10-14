@@ -36,7 +36,7 @@
 - **출처 표기**: 후보 목록의 위나 아래, 같은 영역 안에 Google Maps 로고(높이 16~19dp)를 둔다. 공간이 부족하면 `Google Maps` 글자(12~16sp, 번역 금지)로 대신할 수 있다([Places 정책](https://developers.google.com/maps/documentation/places/web-service/policies)).
 - **이름 표시**: 선택 응답의 `name`은 Google 장소에서 `null`이다. 클라이언트는 고른 후보의 `name`을 표시한다. `displayName`(Pro 필드)을 요청하지 않아 세션이 Essentials로 끝난다.
 - **sessionToken**: 검색을 시작할 때 UUID(36자)를 만들어 검색마다 보내고, 후보를 고를 때 같은 토큰을 선택 API에 보낸다. 선택 후나 검색을 지울 때는 새 토큰을 만든다. 서버는 영문·숫자·`-`·`_` 36자 이하만 받는다. Google 제한이 36자다.
-- **과금**: Essentials 상세 조회로 끝난 세션은 Autocomplete 12번째 요청까지 요청당(Autocomplete Requests, 월 10,000건 무료), 13번째부터 무료다. 상세 조회는 Place Details Essentials(월 10,000건 무료)다. 기록 저장 때 재조회도 Essentials다([세션 과금](https://developers.google.com/maps/documentation/places/web-service/session-pricing)). 실제 비용 상한은 Google Cloud 콘솔의 할당량으로도 걸어 둔다. 서버가 거는 한도는 아래 '호출 한도'에 있다.
+- **과금**: Essentials 상세 조회로 끝난 세션은 Autocomplete 12번째 요청까지 요청당(Autocomplete Requests, 월 10,000건 무료), 13번째부터 무료다. 상세 조회는 Place Details Essentials(월 10,000건 무료)다. 기록 저장 때 재조회도 Essentials다([세션 과금](https://developers.google.com/maps/documentation/places/web-service/session-pricing)). Places는 Google Cloud에서 지출 상한을 걸 수 없어, 서버의 Google 월 한도(아래 '호출 한도')가 사실상 비용 상한이다. Google Cloud에는 예산 알림만 걸어 둔다.
 - **국가 코드**: Google은 괌·사이판·홍콩·마카오를 별도 국가 코드(GU·MP·HK·MO)로 주며, 그대로 쓴다. DB 국가 목록(V6)에는 있지만 앱 지역 목록(`GeneratedWorldMapData`)에는 아직 없다.
 - **오류**: 상세 조회의 404와, API 키 오류가 아닌 400은 `PLACE_NOT_FOUND`다. 잘못된 키(400 `API_KEY_*`)를 포함한 나머지와 검색 실패는 `PLACE_PROVIDER_UNAVAILABLE`이다.
 - **약관 고지**: 앱 이용약관과 개인정보 처리방침에 Google 서비스 약관과 개인정보처리방침을 포함해야 한다(Places 정책).
@@ -52,7 +52,7 @@
 한도는 두 층이다. 들어오는 요청은 회원별로, 나가는 Google 호출은 키 전체로 센다.
 
 - **회원 한도**(`place.rate-limit`, `MemberPlaceRateLimiter`): 한 회원이 많이 부르지 못하게 한다. 검색은 회원별 1분에 20회, 후보 선택은 회원별 UTC 하루 100회다. 서버 여러 대가 함께 세도록 DB(`place_rate_limit_bucket`, Bucket4j MySQL)에서 센다. `PlaceRateLimitWebConfig`가 URL마다 확인할 한도를 정하고, 인터셉터가 컨트롤러에 들어가기 전에 확인한다. 요청 값 검증보다 먼저라 400으로 끝날 요청도 횟수에 들어간다. 넘으면 `PLACE_RATE_LIMITED`(429)다.
-- **Google 한도**(`google.places.rate-limit`, `GoogleRequestLimiter`): 우리 Google 키 전체의 사용량을 막는다. `GooglePlacesClient`가 Google을 부르기 직전에 확인하므로, 회원 한도를 거치지 않는 기록 저장 재조회도 함께 센다. 자동완성·상세 각각 UTC 하루 300회는 무료 사용량을 지키는 값이라 서버 전체가 함께 세도록 DB에서, 서버마다 분당 2,400회는 Google 할당량(자동완성 분당 12,000회)을 넘지 않게 하는 값이라 메모리에서 센다. 메모리 분당 한도를 먼저 보고 DB 하루 한도를 본다. 분당 한도는 `PLACE_RATE_LIMITED`(429), 하루 자동완성 한도는 `PLACE_SEARCH_BUDGET_EXHAUSTED`(429), 하루 상세 한도는 `PLACE_PROVIDER_BUDGET_EXHAUSTED`(503)다.
+- **Google 한도**(`google.places.rate-limit`, `GoogleRequestLimiter`): 우리 Google 키 전체의 사용량을 막는다. `GooglePlacesClient`가 Google을 부르기 직전에 확인하므로, 회원 한도를 거치지 않는 기록 저장 재조회도 함께 센다. 자동완성·상세 각각 UTC 달마다 9,000회는 무료 사용량(월 10,000건)을 지키는 값이라 서버 전체가 함께 세도록 DB에서 센다. 무료 사용량은 매달 1일 태평양 시간 자정에 다시 차서 UTC 달과 몇 시간 어긋나므로 10,000보다 작게 둔다([요금 안내](https://developers.google.com/maps/billing-and-pricing/pay-as-you-go)). 서버마다 분당 60회는 몰린 요청이 월 한도를 한꺼번에 쓰지 못하게 하는 값이라 메모리에서 센다. 메모리 분당 한도를 먼저 보고 DB 월 한도를 본다. 분당 한도는 `PLACE_RATE_LIMITED`(429), 월 자동완성 한도는 `PLACE_SEARCH_BUDGET_EXHAUSTED`(429), 월 상세 한도는 `PLACE_PROVIDER_BUDGET_EXHAUSTED`(503)다. 월 한도의 80%를 쓴 순간과 다 쓴 순간에 ERROR 로그(`event=GOOGLE_PLACES_BUDGET`)를 한 번씩 남겨 운영 ERROR 로그 알람(Discord)으로 알린다.
 - DB 한도 저장소에 닿지 못하면 사용량을 통제할 수 없으므로 `PLACE_PROVIDER_UNAVAILABLE`(503)로 거절한다. 만료된 버킷은 하루 한 번(UTC 04:30) 정리한다.
 
 ## 확인 범위
