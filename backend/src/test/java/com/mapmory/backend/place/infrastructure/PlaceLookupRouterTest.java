@@ -67,6 +67,23 @@ class PlaceLookupRouterTest {
     }
 
     @Test
+    void 지역이_정해진_기록에_붙일_Google_장소는_Google을_조회하지_않는다() {
+        router.findForRecord(GOOGLE_ID);
+
+        verify(google).recordedPlace(GOOGLE_ID);
+        verify(google, never()).findById(GOOGLE_ID);
+        verifyNoInteractions(geoapify);
+    }
+
+    @Test
+    void 기록에_붙일_Geoapify_장소는_이름을_받으려고_조회한다() {
+        router.findForRecord(GEOAPIFY_ID);
+
+        verify(geoapify).findById(GEOAPIFY_ID);
+        verifyNoInteractions(google);
+    }
+
+    @Test
     void Google_장소는_선택과_저장_조회를_구분한다() {
         when(google.isConfigured()).thenReturn(true);
 

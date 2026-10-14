@@ -140,7 +140,7 @@ class TravelRecordServiceTest {
                 LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
         );
         when(regionResolver.resolve("KR", "11", "11560")).thenReturn(district);
-        when(placeLookupPort.findById("park-1"))
+        when(placeLookupPort.findForRecord("park-1"))
                 .thenReturn(new PlaceDetails("park-1", "여의도한강공원", "KR", 37.528, 126.932,
                         "© OpenStreetMap contributors", "https://www.openstreetmap.org/copyright"));
         when(placeLookupPort.providerCode("park-1")).thenReturn("TEST_PROVIDER");
@@ -197,7 +197,7 @@ class TravelRecordServiceTest {
                 "KR", "11", "11560", "한강 산책", "",
                 LocalDate.of(2026, 8, 11), null, List.of(), List.of(), "park-1"
         );
-        when(placeLookupPort.findById("park-1"))
+        when(placeLookupPort.findForRecord("park-1"))
                 .thenReturn(new PlaceDetails("park-1", "도쿄 타워", "JP", 35.6586, 139.7454, null, null));
 
         assertThatThrownBy(() -> travelRecordService.create(member, command))
