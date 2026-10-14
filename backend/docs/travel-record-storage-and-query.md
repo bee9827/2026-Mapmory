@@ -151,7 +151,7 @@ GET /api/v1/travel-records?countryCode=KR&provinceCode=49&districtCode=50110
 | 조건 | 응답 |
 | --- | --- |
 | `X-Member-Id` 누락·형식 오류·0 이하 | `400 VALIDATION_ERROR` |
-| 회원이 존재하지 않음 | `404 MEMBER_NOT_FOUND` |
+| 회원이 존재하지 않음 | 확인하지 않는다. `200 OK`와 빈 목록 (ADR 0009 2026-10-14 구현 업데이트) |
 | `provinceCode`에 `countryCode`가 없음 | `400 REGION_REQUIRED` |
 | `districtCode`에 `countryCode` 또는 `provinceCode`가 없음 | `400 REGION_REQUIRED` |
 | 지역 코드 형식 오류, `page < 0`, `size`가 1 미만 또는 100 초과 | `400 VALIDATION_ERROR` |
