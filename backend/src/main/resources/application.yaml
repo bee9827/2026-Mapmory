@@ -55,7 +55,8 @@ google:
       # 월 무료 사용량(Autocomplete 10,000건, Place Details Essentials 10,000건)을 넘지 않도록 하루 한도를 둔다.
       autocomplete-per-day: 300
       details-per-day: 300
-      requests-per-second: 4
+      # 서버마다 메모리에서 센다. Google 할당량(자동완성 분당 12,000회)을 서버 5대까지 넘지 않는 값이다.
+      requests-per-minute: 2400
 
 apple:
   # identity token의 aud로 허용할 값 목록(쉼표 구분). iOS 네이티브 로그인은 앱 번들 ID가 aud로 들어간다.
