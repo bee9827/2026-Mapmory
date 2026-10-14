@@ -15,7 +15,7 @@
 | 인증 | `Authorization: Bearer {accessToken}` |
 | 페이지네이션 | `page` 기본 0, `size` 기본 20·최대 100 |
 
-`/auth/**`, `/admin/**`, `/health`를 제외한 API는 유효한 Access Token이 필요하다. `/auth/login/kakao`와 `/auth/login/google`은 인증 없이 호출하지만, 게스트가 계정을 연결할 때는 게스트 Access Token을 함께 보낸다. 관리자 API는 현재 인증 없이 호출 가능하다. 여행 기록과 태그는 비공개이며 소유자 본인만 접근할 수 있다. 다른 회원의 리소스 ID를 요청해도 존재 여부를 숨기기 위해 `404`를 반환한다.
+`/auth/**`, `/admin/**`, `/health`를 제외한 API는 유효한 Access Token이 필요하다. `/auth/login/kakao`, `/auth/login/google`, `/auth/login/apple`은 인증 없이 호출하지만, 게스트가 계정을 연결할 때는 게스트 Access Token을 함께 보낸다. 관리자 API는 현재 인증 없이 호출 가능하다. 여행 기록과 태그는 비공개이며 소유자 본인만 접근할 수 있다. 다른 회원의 리소스 ID를 요청해도 존재 여부를 숨기기 위해 `404`를 반환한다.
 
 ### API 목록
 
@@ -23,6 +23,7 @@
 | --- | --- | --- | --- |
 | 구현됨 | `POST` | `/auth/login/kakao` | 카카오 로그인 |
 | 구현됨 | `POST` | `/auth/login/google` | 구글 로그인 |
+| 구현됨 | `POST` | `/auth/login/apple` | 애플 로그인 |
 | 구현됨 | `POST` | `/auth/login/guest` | 게스트 로그인 |
 | 구현됨 | `POST` | `/auth/token/refresh` | Access·Refresh Token 회전 재발급 |
 | 구현됨 | `POST` | `/auth/logout` | Refresh Token 폐기 |
@@ -185,6 +186,26 @@ Access Token이 아니라 ID Token을 보낸다.
 
 같은 사람이라도 카카오 회원과 구글 회원은 별개 회원이다. 계정 병합은 지원하지 않는다.
 
+### 애플 로그인
+
+`POST /api/v1/auth/login/apple`
+
+앱이 Sign in with Apple(`ASAuthorizationAppleIDCredential`)로 받은 **identity token**을 전달하면,
+서버가 애플 공개키로 서명과 `iss`·`aud`·`exp`·`sub`를 검증한 뒤 Mapmory 토큰을 발급한다.
+`aud`는 iOS 앱 번들 ID여야 한다. authorization code가 아니라 identity token을 보낸다.
+
+```json
+{
+  "identityToken": "apple-identity-token"
+}
+```
+
+`identityToken`은 `credential.identityToken`을 UTF-8 문자열로 바꾼 값이다.
+애플은 토큰에 이름을 넣지 않으므로 애플 회원은 기본 이름(예: `회원58213`)으로 시작한다.
+
+게스트 승격 규칙, 결과 표, 응답 형식은 카카오 로그인과 같다. 같은 사람이라도 카카오·구글 회원과
+애플 회원은 별개 회원이다.
+
 ### 게스트 로그인
 
 `POST /api/v1/auth/login/guest`
@@ -258,12 +279,14 @@ Access Token이 아니라 ID Token을 보낸다.
 | `401` | `EXPIRED_ACCESS_TOKEN` | Access Token이 만료됨 |
 | `401` | `INVALID_KAKAO_TOKEN` | 카카오 Access Token이 유효하지 않음 |
 | `401` | `INVALID_GOOGLE_TOKEN` | 구글 ID Token이 유효하지 않음 (서명·발급자·대상 앱·만료). Android가 웹 클라이언트 ID가 아닌 Android 클라이언트 ID로 토큰을 받은 경우도 대상 앱 불일치로 여기에 해당 |
+| `401` | `INVALID_APPLE_TOKEN` | 애플 identity token이 유효하지 않음 (서명·발급자·대상 앱·만료). 서버 `APPLE_CLIENT_IDS`에 번들 ID가 없을 때도 해당 |
 | `401` | `INVALID_REFRESH_TOKEN` | Refresh Token이 유효하지 않거나 폐기됨 |
 | `401` | `EXPIRED_REFRESH_TOKEN` | Refresh Token이 만료됨 |
 | `403` | `ACCESS_DENIED` | 리소스 접근 권한 없음 |
 | `429` | `GUEST_LOGIN_RATE_LIMITED` | 게스트 로그인 요청이 한도를 초과함 |
 | `503` | `KAKAO_UNAVAILABLE` | 카카오 인증 서버를 일시적으로 사용할 수 없음. 카카오가 회원번호 없이 응답하거나 빈 본문을 준 경우도 해당 |
 | `503` | `GOOGLE_UNAVAILABLE` | 구글 공개키를 받아오지 못해 검증할 수 없음 |
+| `503` | `APPLE_UNAVAILABLE` | 애플 공개키를 받아오지 못해 검증할 수 없음 |
 
 ## 3. Upload API
 
