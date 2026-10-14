@@ -294,9 +294,11 @@ class GooglePlacesClientTest {
             server.verify();
         }
 
+        // 운영 알람은 ERROR 로그를 Discord로 보낸다. 장애 동안 60초마다 다시 열려도 알림은 장애 하나에 한 번이다.
         @Test
-        void 회로가_열리고_닫힐_때_WARN_로그를_남긴다() {
+        void 닫혀_있다_열릴_때만_ERROR로_알리고_나머지_상태_변화는_WARN으로_남긴다() {
             expectServerErrors(5);
+            expectServerErrors(3);
             expectCandidates(3);
             Logger logger = (Logger) LoggerFactory.getLogger(GoogleCircuitBreakerConfig.class);
             ListAppender<ILoggingEvent> appender = new ListAppender<>();
@@ -305,6 +307,8 @@ class GooglePlacesClientTest {
             try {
                 searchFails(5);
                 clock.advance(Duration.ofSeconds(61));
+                searchFails(3);
+                clock.advance(Duration.ofSeconds(61));
                 for (int i = 0; i < 3; i++) {
                     client.search("경복", null);
                 }
@@ -312,9 +316,9 @@ class GooglePlacesClientTest {
                 logger.detachAppender(appender);
             }
 
-            assertThat(appender.list).allSatisfy(event -> assertThat(event.getLevel().toString()).isEqualTo("WARN"));
-            assertThat(appender.list).extracting(event -> String.valueOf(field(event, "transition")))
-                    .containsExactly("CLOSED_TO_OPEN", "OPEN_TO_HALF_OPEN", "HALF_OPEN_TO_CLOSED");
+            assertThat(appender.list).extracting(event -> field(event, "transition") + ":" + event.getLevel())
+                    .containsExactly("CLOSED_TO_OPEN:ERROR", "OPEN_TO_HALF_OPEN:WARN", "HALF_OPEN_TO_OPEN:WARN",
+                            "OPEN_TO_HALF_OPEN:WARN", "HALF_OPEN_TO_CLOSED:WARN");
         }
 
         private void expectServerErrors(int count) {
