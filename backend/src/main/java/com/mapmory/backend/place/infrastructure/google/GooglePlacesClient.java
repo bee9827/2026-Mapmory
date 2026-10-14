@@ -4,6 +4,7 @@ import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.place.application.PlaceErrorCode;
 import com.mapmory.backend.place.application.model.PlaceCandidate;
 import com.mapmory.backend.place.application.model.PlaceDetails;
+import com.mapmory.backend.place.application.port.PlaceLookupPort;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +24,9 @@ import tools.jackson.databind.JsonNode;
  * 좌표 없이 주소 구성요소(Essentials)만 받아 국가와 시·도·시·군·구를 추천한다.
  */
 @Component
-public class GooglePlacesClient {
+public class GooglePlacesClient implements PlaceLookupPort {
 
+    static final String PROVIDER_CODE = "GOOGLE";
     static final String ATTRIBUTION = "Google Maps";
     static final String ATTRIBUTION_URL = "https://www.google.com/maps";
 
@@ -49,10 +51,12 @@ public class GooglePlacesClient {
         this.requestLimiter = requestLimiter;
     }
 
-    public boolean isConfigured() {
-        return apiKey != null && !apiKey.isBlank();
+    @Override
+    public String providerCode() {
+        return PROVIDER_CODE;
     }
 
+    @Override
     public List<PlaceCandidate> search(String query, String sessionToken) {
         requireConfigured();
         requestLimiter.reserveAutocomplete();
@@ -73,10 +77,12 @@ public class GooglePlacesClient {
     }
 
     /** 같은 sessionToken으로 상세를 조회해 자동완성 세션을 닫는다. 이름은 클라이언트가 후보의 name을 쓴다. */
+    @Override
     public PlaceDetails findForSelection(String placeId, String sessionToken) {
         return details(placeId, sessionToken);
     }
 
+    @Override
     public PlaceDetails findById(String placeId) {
         return details(placeId, null);
     }
@@ -87,10 +93,11 @@ public class GooglePlacesClient {
      * <p>국가는 확인하지 않아 null이다. 앱을 고쳐 다른 나라 장소를 붙여도 그 회원의 기록에만 영향이 간다.
      * 키를 뺀 뒤에는 새 Google 장소를 받지 않도록 제공자 장애로 알린다.
      */
-    public PlaceDetails recordedPlace(String placeId) {
+    @Override
+    public PlaceDetails findForRecord(String placeId) {
         validatePlaceId(placeId);
         requireConfigured();
-        return new PlaceDetails(placeId, null, null, null, null, ATTRIBUTION, ATTRIBUTION_URL);
+        return new PlaceDetails(placeId, null, null, ATTRIBUTION, ATTRIBUTION_URL, List.of());
     }
 
     private PlaceDetails details(String placeId, String sessionToken) {
@@ -146,7 +153,7 @@ public class GooglePlacesClient {
     }
 
     private void requireConfigured() {
-        if (!isConfigured()) {
+        if (apiKey == null || apiKey.isBlank()) {
             throw new BusinessException(PlaceErrorCode.PLACE_PROVIDER_UNAVAILABLE,
                     "GOOGLE_PLACES_API_KEY가 설정되지 않았습니다.");
         }

@@ -297,14 +297,10 @@ public class TravelRecordService {
             return null;
         }
         // 지역이 없으면 장소로 지역을 정해야 해서 제공자에 다시 조회한다. 있으면 기록에 붙일 값만 받는다.
-        PlaceDetails place = hasNoRegion(command)
+        // 지역이 있으면 장소 국가를 모르므로 요청 지역과 맞는지 확인하지 않는다.
+        return hasNoRegion(command)
                 ? placeLookupPort.findById(command.placeId())
                 : placeLookupPort.findForRecord(command.placeId());
-        if (command.countryCode() != null && place.countryCode() != null
-                && !place.countryCode().equals(command.countryCode())) {
-            throw new BusinessException(TravelRecordErrorCode.PLACE_COUNTRY_MISMATCH);
-        }
-        return place;
     }
 
     private static boolean hasNoRegion(TravelRecordCommand command) {
@@ -313,7 +309,7 @@ public class TravelRecordService {
 
     private void setPlace(TravelRecord travelRecord, PlaceDetails place) {
         travelRecord.setPlace(place == null ? null : new RecordedPlace(
-                placeLookupPort.providerCode(place.placeId()), place.placeId(), place.name(),
+                placeLookupPort.providerCode(), place.placeId(), place.name(),
                 place.attribution(), place.attributionUrl()));
     }
 

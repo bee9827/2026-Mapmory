@@ -49,7 +49,7 @@ google:
   client-ids: ${GOOGLE_CLIENT_IDS:}
   jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
   places:
-    # Places API (New) 키. 비어 있으면 장소 검색은 Geoapify를 쓴다. (docs/place-search.md)
+    # Places API (New) 키. 비어 있으면 장소 검색과 선택이 PLACE_PROVIDER_UNAVAILABLE로 실패한다. (docs/place-search.md)
     api-key: ${GOOGLE_PLACES_API_KEY:}
     rate-limit:
       # 월 무료 사용량(Autocomplete 10,000건, Place Details Essentials 10,000건)을 넘지 않도록 UTC 달마다 센다.
@@ -64,15 +64,11 @@ apple:
   client-ids: ${APPLE_CLIENT_IDS:}
   jwk-set-uri: https://appleid.apple.com/auth/keys
 
-geoapify:
-  api-key: ${GEOAPIFY_API_KEY:}
+place:
+  # 회원별 한도. 서버 여러 대가 함께 세도록 DB(place_rate_limit_bucket)에서 센다.
   rate-limit:
     searches-per-member-per-minute: 20
     selections-per-member-per-day: 100
-    searches-per-day: 2000
-    selections-per-day: 400
-    requests-per-day: 2800
-    requests-per-second: 4
 
 upload:
   policy:

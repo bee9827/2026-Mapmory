@@ -78,7 +78,7 @@ class GooglePlacesClientTest {
                         """, MediaType.APPLICATION_JSON));
 
         assertThat(client.findForSelection("ChIJ-gyeong", "session-1"))
-                .isEqualTo(new PlaceDetails("ChIJ-gyeong", null, "KR", null, null,
+                .isEqualTo(new PlaceDetails("ChIJ-gyeong", null, "KR",
                         GooglePlacesClient.ATTRIBUTION, GooglePlacesClient.ATTRIBUTION_URL,
                         List.of("서울특별시", "종로구")));
         server.verify();
@@ -99,8 +99,6 @@ class GooglePlacesClientTest {
         PlaceDetails place = client.findById("ChIJ-bundang");
 
         assertThat(place.name()).isNull();
-        assertThat(place.latitude()).isNull();
-        assertThat(place.longitude()).isNull();
         assertThat(place.countryCode()).isEqualTo("KR");
         assertThat(place.addressAreas()).containsExactly("경기도", "성남시", "분당구");
         server.verify();
@@ -109,7 +107,7 @@ class GooglePlacesClientTest {
 
     @Test
     void 기록에_붙일_장소는_Google을_부르지_않고_출처_표기와_함께_만든다() {
-        PlaceDetails place = client.recordedPlace("ChIJ-bundang");
+        PlaceDetails place = client.findForRecord("ChIJ-bundang");
 
         assertThat(place.placeId()).isEqualTo("ChIJ-bundang");
         assertThat(place.name()).isNull();
@@ -122,7 +120,7 @@ class GooglePlacesClientTest {
 
     @Test
     void 기록에_붙일_장소_ID_형식이_틀리면_거절한다() {
-        assertThatThrownBy(() -> client.recordedPlace("../places"))
+        assertThatThrownBy(() -> client.findForRecord("../places"))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code())
                         .isEqualTo("INVALID_PLACE_ID"));
@@ -133,7 +131,7 @@ class GooglePlacesClientTest {
         GooglePlacesClient unconfigured =
                 new GooglePlacesClient(RestClient.builder(), BASE_URL, "", mock(GoogleRequestLimiter.class));
 
-        assertThatThrownBy(() -> unconfigured.recordedPlace("ChIJ-bundang"))
+        assertThatThrownBy(() -> unconfigured.findForRecord("ChIJ-bundang"))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code())
                         .isEqualTo("PLACE_PROVIDER_UNAVAILABLE"));
@@ -185,7 +183,7 @@ class GooglePlacesClientTest {
     }
 
     @Test
-    void 하루_한도를_넘으면_Google을_호출하지_않는다() {
+    void 월_한도를_넘으면_Google을_호출하지_않는다() {
         doThrow(new BusinessException(PlaceErrorCode.PLACE_SEARCH_BUDGET_EXHAUSTED))
                 .when(limiter).reserveAutocomplete();
 
@@ -201,8 +199,7 @@ class GooglePlacesClientTest {
         GooglePlacesClient unconfigured =
                 new GooglePlacesClient(RestClient.builder(), BASE_URL, "", mock(GoogleRequestLimiter.class));
 
-        assertThat(unconfigured.isConfigured()).isFalse();
-        assertThatThrownBy(() -> unconfigured.search("경복", null))
+        assertThatThrownBy(() -> unconfigured.search("경복", "session-1"))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(error -> assertThat(((BusinessException) error).getErrorCode().code())
                         .isEqualTo("PLACE_PROVIDER_UNAVAILABLE"));

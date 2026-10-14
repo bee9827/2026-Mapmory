@@ -15,8 +15,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 /**
- * Google 호출 직전에 한도를 확인한다. Google은 월 무료 사용량을 넘으면 과금되므로 Geoapify 한도와 따로 센다.
- * 회원별 검색·선택 한도는 기존 {@code PlaceRateLimitPort}가 그대로 적용한다.
+ * Google 호출 직전에 우리 Google 키 전체의 한도를 확인한다. Google은 월 무료 사용량을 넘으면 과금된다.
+ * 회원 한도를 거치지 않는 기록 저장 재조회도 여기서 센다. 회원별 한도는 {@code MemberPlaceRateLimiter}가 따로 센다.
  *
  * <p>버킷은 {@link GoogleRateLimitConfig}가 만든다. 분당 한도는 서버 메모리에서, 월 한도는 DB에서 센다.
  * 그래서 분당 한도에 걸린 요청은 커넥션 없이 바로 거절된다.

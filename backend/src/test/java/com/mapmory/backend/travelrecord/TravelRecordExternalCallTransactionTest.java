@@ -66,8 +66,9 @@ class TravelRecordExternalCallTransactionTest extends IntegrationTest {
     void setUp() {
         given(googlePlacesClient.findById(GOOGLE_PLACE_ID)).willAnswer(invocation -> {
             recordTransactionState();
-            return new PlaceDetails(GOOGLE_PLACE_ID, null, "JP", null, null, null, null);
+            return new PlaceDetails(GOOGLE_PLACE_ID, null, "JP", null, null, List.of());
         });
+        given(googlePlacesClient.providerCode()).willReturn("GOOGLE");
         given(uploadedObjectChecker.exists(anyString())).willAnswer(invocation -> {
             recordTransactionState();
             return true;
