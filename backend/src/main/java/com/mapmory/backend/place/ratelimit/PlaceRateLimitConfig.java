@@ -25,7 +25,7 @@ class PlaceRateLimitConfig {
     static final String MEMBER_SEARCH_LIMIT = "memberSearchLimit";
     static final String MEMBER_SELECTION_LIMIT = "memberSelectionLimit";
 
-    // 회원별 한도와 Google 하루 한도가 함께 쓰는 DB 버킷 저장소다.
+    // 회원별 한도와 Google 월 한도가 함께 쓰는 DB 버킷 저장소다.
     @Bean
     MySQLSelectForUpdateBasedProxyManager<String> placeRateLimitBucketManager(DataSource dataSource) {
         return Bucket4jMySQL.selectForUpdateBasedBuilder(dataSource)

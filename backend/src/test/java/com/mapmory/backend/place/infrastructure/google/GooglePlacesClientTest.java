@@ -183,7 +183,7 @@ class GooglePlacesClientTest {
     }
 
     @Test
-    void 하루_한도를_넘으면_Google을_호출하지_않는다() {
+    void 월_한도를_넘으면_Google을_호출하지_않는다() {
         doThrow(new BusinessException(PlaceErrorCode.PLACE_SEARCH_BUDGET_EXHAUSTED))
                 .when(limiter).reserveAutocomplete();
 
