@@ -45,6 +45,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
 
 @ExtendWith(MockitoExtension.class)
 class TravelRecordServiceTest {
@@ -107,7 +108,8 @@ class TravelRecordServiceTest {
                 FIXED_CLOCK,
                 uploadedObjectVerifier,
                 placeLookupPort,
-                placeSelectionService
+                placeSelectionService,
+                mock(PlatformTransactionManager.class)
         );
     }
 
@@ -481,15 +483,6 @@ class TravelRecordServiceTest {
 
     @Test
     void 수정_요청의_중복_Object_Key를_거부한다() {
-        Region japan = Region.of(null, null, "JP", "일본", RegionType.COUNTRY);
-        TravelRecord travelRecord = TravelRecord.of(
-                mock(Member.class),
-                japan,
-                "일본 여행",
-                "본문",
-                LocalDate.of(2026, 8, 11),
-                null
-        );
         TravelRecordCommand command = new TravelRecordCommand(
                 "JP",
                 null,
@@ -501,8 +494,6 @@ class TravelRecordServiceTest {
                 List.of("travel-records/10/a.jpg", "travel-records/10/a.jpg"),
                 List.of()
             );
-        when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
-                .thenReturn(Optional.of(travelRecord));
 
         assertError(() -> travelRecordService.update(member, 101L, command), "INVALID_OBJECT_KEY");
         verify(regionResolver, never()).resolve("JP", null, null);
@@ -532,7 +523,6 @@ class TravelRecordServiceTest {
             );
         when(travelRecordRepository.findByIdAndMemberId(101L, 10L))
                 .thenReturn(Optional.of(travelRecord));
-        when(regionResolver.resolve("JP", null, null)).thenReturn(japan);
         when(travelRecordRepository.existsMediaByObjectKeyIn(List.of("travel-records/20/used.jpg")))
                 .thenReturn(true);
 
