@@ -69,7 +69,7 @@ internal fun MapRoute(
     var showRecordIntroduction by remember(onboardingPreference) {
         mutableStateOf(!onboardingPreference.hasSeenRecordIntroduction())
     }
-    var showRegionLabels by remember { mutableStateOf(true) }
+    var showRegionLabels by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         analytics.logEvent(
@@ -123,7 +123,7 @@ internal fun MapRoute(
             visitedCount = when {
                 uiState.scope == MapScope.WORLD -> viewModel.visitedCountryCodes.size
                 selectedProvinceCode != null -> viewModel.visitedDistrictCount(selectedProvinceCode)
-                else -> viewModel.visitedProvinceCodes.size
+                else -> viewModel.visitedKoreaDistrictCodes.size
             },
             onMapScopeChange = { selectedScope ->
                 gestureClosedProvinceCode = null
@@ -152,8 +152,7 @@ internal fun MapRoute(
                     MapScope.KOREA -> when (val mapState = uiState.koreaMap) {
                         KoreaMapUiState.ProvinceOverview -> MapArtwork(
                             scope = MapScope.KOREA,
-                            visitedRegionCodes = viewModel.visitedProvinceCodes +
-                                viewModel.visitedDistrictCodes("KR-47"),
+                            visitedRegionCodes = viewModel.visitedKoreaDistrictCodes,
                             koreaRegions = GeneratedKoreaMapData.provinces,
                             showRegionLabels = showRegionLabels,
                             isProvinceOverview = true,
@@ -204,7 +203,11 @@ internal fun MapRoute(
             mapDetailTitle = selectedProvinceCode?.let { provinceCode ->
                 GeneratedKoreaMapData.provinces.firstOrNull { it.code == provinceCode }?.name
             },
-            mapDetailTotal = (uiState.koreaMap as? KoreaMapUiState.DistrictDetail)?.regions?.size,
+            mapDetailTotal = when {
+                selectedProvinceCode != null -> (uiState.koreaMap as? KoreaMapUiState.DistrictDetail)?.regions?.size
+                uiState.scope == MapScope.KOREA -> viewModel.koreaDistrictCount
+                else -> null
+            },
             onMapDetailBackClick = {
                 gestureClosedProvinceCode = null
                 analytics.logEvent(MapmoryAnalyticsEvent.MAP_DETAIL_BACK_CLICKED)
