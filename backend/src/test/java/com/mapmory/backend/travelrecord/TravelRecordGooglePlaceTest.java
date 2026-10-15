@@ -12,15 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
-import com.mapmory.backend.place.infrastructure.google.GoogleRequestLimiter;
 import com.mapmory.backend.recordmedia.ExpiringUrl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -28,22 +25,15 @@ import org.springframework.test.web.servlet.MvcResult;
  * 지역을 함께 보낸 기록 저장·수정에서 Google 장소를 붙일 때 Google 상세 조회를 하지 않는지 확인한다.
  *
  * <p>장소를 고를 때(select) 이미 상세 조회를 했다. 지역이 정해져 있으면 저장 때 다시 조회해도 쓸 값이 국가 코드뿐인데,
- * Google 이름은 저장하지 않고 출처 표기는 상수라 Google 없이 끝낼 수 있다. Google 주소는 닿지 않는 곳으로 둬서,
- * 조회를 시도하면 PLACE_PROVIDER_UNAVAILABLE로 실패하게 했다.
+ * Google 이름은 저장하지 않고 출처 표기는 상수라 Google 없이 끝낼 수 있다. Google 주소는 IntegrationTest가
+ * 닿지 않는 곳으로 둬서, 조회를 시도하면 PLACE_PROVIDER_UNAVAILABLE로 실패한다.
  */
-@TestPropertySource(properties = {
-        "google.places.api-key=test-key",
-        "google.places.base-url=http://127.0.0.1:9"
-})
 class TravelRecordGooglePlaceTest extends IntegrationTest {
 
     private static final String GOOGLE_PLACE_ID = "ChIJTokyoTower";
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockitoBean
-    private GoogleRequestLimiter googleRequestLimiter;
 
     @BeforeEach
     void setUp() {

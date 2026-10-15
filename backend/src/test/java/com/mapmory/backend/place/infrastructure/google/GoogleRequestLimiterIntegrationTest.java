@@ -23,10 +23,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.TestPropertySource;
 
-// 커넥션을 기다리는 테스트가 오래 멈추지 않게 대기 시간을 줄인다.
-@TestPropertySource(properties = "spring.datasource.hikari.connection-timeout=500")
 class GoogleRequestLimiterIntegrationTest extends IntegrationTest {
 
     @Autowired
