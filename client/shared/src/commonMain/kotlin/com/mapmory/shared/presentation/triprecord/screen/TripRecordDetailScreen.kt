@@ -7,7 +7,6 @@ import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import com.mapmory.shared.presentation.components.LocalMapmoryImageTransitionScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -58,7 +57,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -232,7 +230,7 @@ private fun TripRecordPhotoAlbum(
     var isPinching by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize()) {
         TripRecordTopBar(
-            title = record.locationName,
+            title = "",
             onBackClick = onBackClick,
             trailing = {
                 DetailMoreButton(
@@ -240,12 +238,6 @@ private fun TripRecordPhotoAlbum(
                     onDeleteClick = onDeleteClick,
                 )
             },
-        )
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(TripRecordPalette.current.line),
         )
         Box(
             modifier = Modifier
@@ -365,13 +357,13 @@ private fun AlbumPhotoRow(
                 contentDescription = "$displayDate 여행 사진 확대",
                 sharedImageKey = photo.id,
                 sharedCornerRadius = 14.dp,
+                onClick = { onPhotoClick(photo) },
                 modifier = Modifier
                     .weight(1f)
                     .aspectRatio(1f)
                     .semantics {
                         contentDescription = "$displayDate 여행 사진 확대"
-                    }
-                    .clickable(role = Role.Button) { onPhotoClick(photo) },
+                    },
                 shape = RoundedCornerShape(14.dp),
             )
         }

@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +65,8 @@ internal fun MapmoryAsyncImage(
     contentScale: ContentScale = ContentScale.Crop,
     sharedImageKey: String? = null,
     sharedCornerRadius: Dp = 18.dp,
+    onClick: (() -> Unit)? = null,
+    onReadyChanged: (Boolean) -> Unit = {},
 ) {
     val transition = LocalMapmoryImageTransitionScope.current
     // Both incoming and outgoing photos follow the same timeline as their bounds.
@@ -85,6 +91,9 @@ internal fun MapmoryAsyncImage(
     val model = if (useFallback || primaryModel == null) fallbackModel else primaryModel
     val animateRetainedPhoto = lastPainter != null && transition?.isTransitionActive == true
     var imageLoaded by remember(model, cacheKey, animateRetainedPhoto) { mutableStateOf(false) }
+    val isReady = imageLoaded || animateRetainedPhoto
+    val latestOnReadyChanged by rememberUpdatedState(onReadyChanged)
+    LaunchedEffect(isReady) { latestOnReadyChanged(isReady) }
     val context = LocalPlatformContext.current
     val request = remember(context, model, cacheKey, useFallback, blackLoadingBackground) {
         ImageRequest.Builder(context).data(model).apply {
@@ -98,7 +107,10 @@ internal fun MapmoryAsyncImage(
 
     // Keep the fullscreen backdrop outside the shared element. Only the photo's
     // fitted rectangle moves, and Crop reveals its edges as that rectangle grows.
-    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+    BoxWithConstraints(
+        modifier.then(if (onClick != null) Modifier.clickable(enabled = isReady, role = Role.Button, onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
         val intrinsicSize = lastPainter?.intrinsicSize
         val ratio = intrinsicSize?.let { size ->
             (size.width / size.height).takeIf { it.isFinite() && it > 0f }

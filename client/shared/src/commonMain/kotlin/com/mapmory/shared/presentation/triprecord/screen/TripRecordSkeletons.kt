@@ -117,10 +117,9 @@ internal fun TripRecordDetailSkeleton(
     val visibleLocationName = locationName?.takeIf { it.isNotBlank() } ?: "여행"
     Column(modifier.fillMaxSize()) {
         TripRecordTopBar(
-            title = visibleLocationName,
+            title = "",
             onBackClick = onBackClick,
         )
-        Spacer(Modifier.fillMaxWidth().height(1.dp).background(TripRecordPalette.current.line))
         Column(
             Modifier.fillMaxWidth()
                 .navigationBarsPadding()
