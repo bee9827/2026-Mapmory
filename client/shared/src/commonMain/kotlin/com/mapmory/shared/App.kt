@@ -92,6 +92,7 @@ fun MapmoryApp(
     }
 
     CompositionLocalProvider(
+        com.mapmory.shared.navigation.LocalNavigationGestureMotion provides remember { com.mapmory.shared.navigation.NavigationGestureMotion() },
         LocalMapmoryTheme provides themeState,
         LocalMapmoryAnalytics provides analytics,
     ) {

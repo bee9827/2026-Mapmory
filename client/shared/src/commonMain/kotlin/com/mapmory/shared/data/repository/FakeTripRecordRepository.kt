@@ -258,6 +258,7 @@ class FakeTripRecordRepository(
 
 private fun TripRecordData.toSummary(): TripRecordSummary = TripRecordSummary(
     id = id,
+    photoCount = media.size,
     title = title,
     startDate = startDate,
     endDate = endDate,

@@ -365,6 +365,10 @@ def write_provinces(
     if override_source:
         override_features = read_province_features(override_source, override_tolerance)
         features = merge_province_features(features, override_features, PROVINCE_OVERRIDE_CODES)
+    # The 2018 province source predates Gunwi's transfer. Always apply this pinned
+    # correction after source overrides, just as district canonicalization does.
+    corrections = read_province_features(Path(__file__).with_name("data") / "gunwi-province-overrides.geojson")
+    features = merge_province_features(features, corrections, frozenset({"KR-27", "KR-47"}))
     feature_parts = partition_province_features(features)
     names = [
         write_province_part(output, index, part)
