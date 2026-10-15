@@ -1293,10 +1293,10 @@ private fun LocationStep(
         !queryMatchesSelectedRegion &&
         !searchQuery.trim().equals(uiState.selectedPlace?.name, ignoreCase = true)
     val showRegionResults = uiState.manualRegionRequired && searchQuery.isNotBlank()
-    val canLoadPhotos = uiState.selectedPlace != null && !uiState.isSelectingPlace
+    val canLoadPhotos = uiState.selectedLocation != null &&
+        !uiState.isSelectingPlace && !uiState.manualRegionRequired
     Column(Modifier.fillMaxSize()) {
         FlowTopBar(
-            title = "사진 불러오기",
             onBackClick = onBackClick,
         )
         Column(
@@ -1317,7 +1317,6 @@ private fun LocationStep(
             )
             FlowSectionTitle(
                 title = "장소",
-                badge = "필수",
                 modifier = Modifier.padding(top = 30.dp),
             )
             Box(
@@ -1657,7 +1656,7 @@ private val GoogleMapsAttributionColor = Color(0xFF5E5E5E)
 
 @Composable
 private fun FlowTopBar(
-    title: String,
+    title: String = "",
     onBackClick: () -> Unit,
     actionLabel: String? = null,
     actionStatusLabel: String? = null,
@@ -1719,19 +1718,12 @@ private fun FlowTopBar(
                 }
             },
         )
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(TripRecordPalette.current.line),
-        )
     }
 }
 
 @Composable
 private fun FlowSectionTitle(
     title: String,
-    badge: String,
     helper: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -1743,13 +1735,7 @@ private fun FlowSectionTitle(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            Text(
-                text = badge,
-                color = TripRecordPalette.current.accent,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 8.dp, bottom = 2.dp),
-            )
+
         }
         helper?.let {
             Text(
@@ -1923,7 +1909,7 @@ private fun PhotoLoadingStep(
     onRetry: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
-        FlowTopBar(title = "사진 불러오기", onBackClick = onBackClick)
+        FlowTopBar(onBackClick = onBackClick)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2645,6 +2631,7 @@ private fun PhotoSelectionCard(
     DisposableEffect(photo.id, dragSelectionController) {
         onDispose { dragSelectionController.remove(photo.id) }
     }
+    var imageReady by remember(photo.id, photo.previewUri, photo.previewBytes) { mutableStateOf(false) }
     val cardShape = RoundedCornerShape(16.dp)
     Box(
         modifier = modifier
@@ -2682,6 +2669,7 @@ private fun PhotoSelectionCard(
             imageUri = photo.previewUri ?: photo.fullResolutionUri.takeIf { photo.previewBytes == null },
             sharedImageKey = "picker:${photo.id}",
             sharedCornerRadius = 16.dp,
+            onReadyChanged = { imageReady = it },
             cacheKey = "picker-preview:${photo.id}",
             contentDescription = photo.displayName,
             modifier = Modifier.fillMaxSize(),
@@ -2696,7 +2684,7 @@ private fun PhotoSelectionCard(
                     .padding(6.dp),
             )
         }
-        if (showPreviewButton) {
+        if (showPreviewButton && imageReady) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
