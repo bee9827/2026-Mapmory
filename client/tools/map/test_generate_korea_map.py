@@ -15,6 +15,28 @@ SPEC.loader.exec_module(MODULE)
 
 
 class GenerateKoreaMapTest(unittest.TestCase):
+    def test_시도_재생성에도_군위_편입_보정을_자동_적용한다(self):
+        # Even an old source must not overwrite the pinned transfer correction.
+        features = [
+            {"type": "Feature", "properties": {"shapeISO": code},
+             "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]}}
+            for code in MODULE.PROVINCE_NAMES
+        ]
+        correction_path = MODULE_PATH.with_name("data") / "gunwi-province-overrides.geojson"
+        corrections = MODULE.read_province_features(correction_path)
+        gunwi = (128.72472, 36.16710)
+        for code, _, rings in corrections:
+            self.assertEqual(code == "KR-27", any(MODULE._point_in_ring(gunwi, ring) for ring in rings))
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            source = directory / "old-source.json"
+            source.write_text(json.dumps({"features": features}))
+            MODULE.write_provinces(directory, source)
+            generated = "\n".join(path.read_text() for path in directory.glob("GeneratedKoreaMapDataPart*.kt"))
+            for _, _, rings in corrections:
+                for ring in rings:
+                    self.assertIn(MODULE.ring_expression(ring), generated)
+
     def test_시도별_번들_리소스는_정규_코드를_사용한다(self):
         client_dir = MODULE_PATH.parents[2]
         resource_dir = client_dir / "shared/src/commonMain/composeResources/files"
