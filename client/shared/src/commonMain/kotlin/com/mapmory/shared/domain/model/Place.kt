@@ -8,6 +8,7 @@ data class PlaceCandidate(
     val attributionUrl: String?,
 )
 
+@kotlinx.serialization.Serializable
 data class PlaceReference(
     val placeId: String,
     // Google 장소는 서버가 이름을 저장하지 않아 저장된 기록에서는 null이다.

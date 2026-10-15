@@ -4,7 +4,11 @@ package com.mapmory.shared.data.media
 
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.usePinned
+import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSCachesDirectory
+import platform.Foundation.NSURL
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import platform.Foundation.NSData
 import platform.Foundation.NSFileManager
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
@@ -22,6 +26,15 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 class IosLocalPhotoDataSource : LocalPhotoDataSource {
+    override suspend fun release(localId: String) {
+        val root = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
+        val directory = "$root/mapmory-upload-originals"
+        val prefix = "$localId:".encodeToByteArray().joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+        val manager = NSFileManager.defaultManager
+        manager.contentsOfDirectoryAtPath(directory, null)?.filterIsInstance<String>()
+            ?.filter { it.startsWith(prefix) }?.forEach { manager.removeItemAtPath("$directory/$it", null) }
+    }
+
     override suspend fun capturedAt(localId: String): String? {
         val asset = PHAsset.fetchAssetsWithLocalIdentifiers(listOf(localId), null).firstObject as? PHAsset
             ?: return null
@@ -50,22 +63,33 @@ class IosLocalPhotoDataSource : LocalPhotoDataSource {
             ?: resources.firstOrNull()
             ?: return null
 
-        return suspendCoroutine { continuation ->
-            val chunks = mutableListOf<ByteArray>()
-            val options = PHAssetResourceRequestOptions().apply {
-                networkAccessAllowed = true
+        val root = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
+        val directory = "$root/mapmory-upload-originals"
+        val manager = NSFileManager.defaultManager
+        if (!manager.createDirectoryAtPath(directory, true, null, null)) return null
+        val version = asset.modificationDate?.timeIntervalSinceReferenceDate ?: 0.0
+        val key = "$localId:$version".encodeToByteArray().joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+        val path = "$directory/$key"
+        if (!manager.fileExistsAtPath(path)) {
+            val temporary = "$directory/${NSUUID().UUIDString}.part"
+            val success = suspendCoroutine<Boolean> { continuation ->
+                PHAssetResourceManager.defaultManager().writeDataForAssetResource(
+                    resource,
+                    toFile = NSURL.fileURLWithPath(temporary),
+                    options = PHAssetResourceRequestOptions().apply { networkAccessAllowed = true },
+                ) { error -> continuation.resume(error == null) }
             }
-            PHAssetResourceManager.defaultManager().requestDataForAssetResource(
-                resource,
-                options,
-                dataReceivedHandler = { data -> data?.let { chunks += it.toByteArray() } },
-                completionHandler = { error ->
-                    continuation.resume(
-                        if (error == null) chunks.joinToByteArray().takeIf(ByteArray::isNotEmpty)
-                        else null,
-                    )
-                },
-            )
+            if (!success) {
+                manager.removeItemAtPath(temporary, null)
+                return null
+            }
+            if (!manager.moveItemAtPath(temporary, path, null)) {
+                manager.removeItemAtPath(temporary, null)
+                if (!manager.fileExistsAtPath(path)) return null
+            }
+        }
+        return withContext(Dispatchers.Default) {
+            NSData.dataWithContentsOfFile(path)?.toByteArray()?.takeIf(ByteArray::isNotEmpty)
         }
     }
 }
@@ -73,7 +97,7 @@ class IosLocalPhotoDataSource : LocalPhotoDataSource {
 internal fun cacheIosPickerPhoto(data: NSData): String? {
     if (data.length == 0UL) return null
     val root = NSSearchPathForDirectoriesInDomains(
-        NSCachesDirectory,
+        NSApplicationSupportDirectory,
         NSUserDomainMask,
         true,
     ).firstOrNull() ?: return null
@@ -108,16 +132,6 @@ private fun NSData.toByteArray(): ByteArray {
     return ByteArray(length.toInt()).also { bytes ->
         bytes.usePinned { pinned -> getBytes(pinned.addressOf(0), length) }
     }
-}
-
-private fun List<ByteArray>.joinToByteArray(): ByteArray {
-    val result = ByteArray(sumOf(ByteArray::size))
-    var offset = 0
-    forEach { chunk ->
-        chunk.copyInto(result, destinationOffset = offset)
-        offset += chunk.size
-    }
-    return result
 }
 
 private const val IosPendingPhotoPrefix = "mapmory-cache://"

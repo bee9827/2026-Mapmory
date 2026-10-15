@@ -14,21 +14,29 @@ import com.mapmory.shared.data.settings.AndroidOnboardingPreference
 import com.mapmory.shared.data.settings.AndroidThemePreference
 
 class MapmoryAppViewModel(application: Application) : AndroidViewModel(application) {
-    private val configuredApiBaseUrl = application.getString(R.string.mapmory_api_base_url)
+    val container: AppContainer = UploadContainer.get(application)
+}
 
-    val container: AppContainer = createGuestRemoteAppContainer(
-        apiBaseUrl = configuredApiBaseUrl,
-        tokenStore = AndroidAuthTokenStore(application, configuredApiBaseUrl),
-        photoPreviewCache = AndroidPhotoPreviewCache(application),
-        localPhotoDataSource = AndroidLocalPhotoDataSource(application),
-        mapSummaryCache = AndroidMapSummaryCache(application),
-        tripStatisticsCache = AndroidTripStatisticsCache(application),
-        tripRecordListCache = AndroidTripRecordListCache(application, configuredApiBaseUrl),
-        themePreference = AndroidThemePreference(application),
-        onboardingPreference = AndroidOnboardingPreference(application),
-    )
+internal object UploadContainer {
+    @Volatile private var instance: AppContainer? = null
 
-    override fun onCleared() {
-        container.close()
+    @Synchronized
+    fun get(context: android.content.Context): AppContainer {
+        instance?.let { return it }
+        val application = context.applicationContext
+        val configuredApiBaseUrl = application.getString(R.string.mapmory_api_base_url)
+        val execution = AndroidBackgroundSaveExecution(application, configuredApiBaseUrl)
+        return createGuestRemoteAppContainer(
+            apiBaseUrl = configuredApiBaseUrl,
+            tokenStore = AndroidAuthTokenStore(application, configuredApiBaseUrl),
+            photoPreviewCache = AndroidPhotoPreviewCache(application),
+            localPhotoDataSource = AndroidLocalPhotoDataSource(application),
+            mapSummaryCache = AndroidMapSummaryCache(application),
+            tripStatisticsCache = AndroidTripStatisticsCache(application),
+            tripRecordListCache = AndroidTripRecordListCache(application, configuredApiBaseUrl),
+            themePreference = AndroidThemePreference(application),
+            onboardingPreference = AndroidOnboardingPreference(application),
+            backgroundSaveExecution = execution,
+        ).also { instance = it }
     }
 }

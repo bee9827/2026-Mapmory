@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.time.TimeSource
+import kotlin.math.ceil
 
 enum class BackgroundSaveStatus {
     QUEUED,
@@ -29,10 +31,16 @@ data class BackgroundTripRecordSave(
     val photoCount: Int,
     val status: BackgroundSaveStatus,
     val progressPercent: Int = 0,
+    val remainingSeconds: Long? = null,
     val errorMessage: String? = null,
 )
 
 interface BackgroundSaveExecution {
+    val store: BackgroundSaveStore get() = EmptyBackgroundSaveStore
+    fun attach(saver: BackgroundTripRecordSaver) {}
+    fun onQueued() {}
+    fun onProgress(save: BackgroundTripRecordSave) {}
+    fun onCompleted(save: BackgroundTripRecordSave) {}
     suspend fun <T> run(block: suspend () -> T): T
 }
 
@@ -49,9 +57,11 @@ class BackgroundTripRecordSaver internal constructor(
     private val automaticRetryDelayMillis: Long = AutomaticRetryDelayMillis,
 ) {
     private val queueMutex = Mutex()
+    private val serverSaveStarted = mutableSetOf<Long>()
     private val drafts = mutableMapOf<Long, TripRecordDraft>()
     private val mutableSaves = MutableStateFlow<List<BackgroundTripRecordSave>>(emptyList())
     private var nextId = 0L
+    private val attemptStarts = mutableMapOf<Long, TimeSource.Monotonic.ValueTimeMark>()
 
     val saves: StateFlow<List<BackgroundTripRecordSave>> = mutableSaves.asStateFlow()
     private val mutablePendingPhotoIds = MutableStateFlow<Set<String>>(emptySet())
@@ -63,6 +73,30 @@ class BackgroundTripRecordSaver internal constructor(
         }.toSet()
     }
 
+    init {
+        execution.store.read().forEach { pending ->
+            nextId = maxOf(nextId, pending.id)
+            drafts[pending.id] = pending.draft
+            if (pending.serverSaveStarted) serverSaveStarted += pending.id
+            mutableSaves.value += BackgroundTripRecordSave(
+                id = pending.id, title = pending.draft.title.ifBlank { "사진 업로드 중" },
+                locationName = pending.locationName, startDate = pending.draft.startDate,
+                photoCount = pending.draft.mediaObjectKeys.size,
+                status = if (pending.serverSaveStarted) BackgroundSaveStatus.FAILED else BackgroundSaveStatus.QUEUED,
+                errorMessage = if (pending.serverSaveStarted) "저장 결과를 확인하지 못했어요. 목록에 기록이 있는지 확인한 후 다시 시도해 주세요." else null,
+            )
+        }
+        updatePendingPhotoIds()
+        execution.attach(this)
+        mutableSaves.value.filter { it.status == BackgroundSaveStatus.QUEUED }.forEach { launch(it.id) }
+    }
+
+    private fun persist() {
+        execution.store.write(mutableSaves.value.mapNotNull { save ->
+            drafts[save.id]?.let { PendingTripRecordSave(save.id, save.locationName, it, save.id in serverSaveStarted) }
+        })
+    }
+
     fun enqueue(draft: TripRecordDraft, locationName: String): Long {
         val id = ++nextId
         drafts[id] = draft
@@ -70,13 +104,15 @@ class BackgroundTripRecordSaver internal constructor(
         mutableSaves.update { current ->
             current + BackgroundTripRecordSave(
                 id = id,
-                title = draft.title.ifBlank { "제목 없는 기록" },
+                title = draft.title.ifBlank { "사진 업로드 중" },
                 locationName = locationName,
                 startDate = draft.startDate,
                 photoCount = draft.mediaObjectKeys.size,
                 status = BackgroundSaveStatus.QUEUED,
             )
         }
+        persist()
+        execution.onQueued()
         launch(id)
         return id
     }
@@ -85,32 +121,47 @@ class BackgroundTripRecordSaver internal constructor(
         if (drafts[id] == null) return
         val failed = mutableSaves.value.firstOrNull { save -> save.id == id } ?: return
         if (failed.status != BackgroundSaveStatus.FAILED) return
+        serverSaveStarted.remove(id)
+        persist()
         mutableSaves.update { current ->
             current.map { save ->
                 if (save.id == id) {
                     save.copy(
                         status = BackgroundSaveStatus.QUEUED,
                         progressPercent = 0,
+                        remainingSeconds = null,
                         errorMessage = null,
                     )
                 }
                 else save
             }
         }
+        execution.onQueued()
         launch(id)
     }
 
     fun dismissFailure(id: Long) {
         if (mutableSaves.value.none { it.id == id && it.status == BackgroundSaveStatus.FAILED }) return
         drafts.remove(id)
+        serverSaveStarted.remove(id)
+        attemptStarts.remove(id)
         updatePendingPhotoIds()
         mutableSaves.update { current -> current.filterNot { save -> save.id == id } }
+        persist()
     }
 
     private fun launch(id: Long) {
         scope.launch {
             queueMutex.withLock {
-                save(id)
+                try {
+                    save(id)
+                } catch (error: kotlinx.coroutines.CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    mutableSaves.update { saves -> saves.map { save ->
+                        if (save.id == id) save.copy(status = BackgroundSaveStatus.FAILED, errorMessage = error.toBackgroundSaveMessage()) else save
+                    } }
+                }
             }
         }
     }
@@ -123,6 +174,7 @@ class BackgroundTripRecordSaver internal constructor(
                     save.copy(
                         status = BackgroundSaveStatus.SAVING,
                         progressPercent = 0,
+                        remainingSeconds = null,
                         errorMessage = null,
                     )
                 }
@@ -131,20 +183,24 @@ class BackgroundTripRecordSaver internal constructor(
         }
 
         val result = execution.run {
-            var latest = create(id, draft, attempt = 0)
-            if (latest.isFailure) {
-                updateProgress(id, FirstAttemptCompleteProgress)
+            var latest = create(id, draft)
+            if (latest.isFailure && id !in serverSaveStarted) {
                 delay(automaticRetryDelayMillis)
-                latest = create(id, draft, attempt = 1)
+                latest = create(id, draft)
             }
             latest
         }
 
         result.fold(
             onSuccess = {
+                val completed = mutableSaves.value.firstOrNull { it.id == id }
+                attemptStarts.remove(id)
                 drafts.remove(id)
+                serverSaveStarted.remove(id)
                 updatePendingPhotoIds()
                 mutableSaves.update { current -> current.filterNot { save -> save.id == id } }
+                persist()
+                completed?.let(execution::onCompleted)
                 onSaved()
             },
             onFailure = { error ->
@@ -174,29 +230,35 @@ class BackgroundTripRecordSaver internal constructor(
         }
         return draft.copy(
             localMedia = draft.localMedia.map { media ->
-                media.copy(previewBytes = null, originalBytes = null)
+                media.copy(previewBytes = null)
             },
-        ).also { compact -> drafts[id] = compact }
-    }
-
-    private suspend fun create(id: Long, draft: TripRecordDraft, attempt: Int) =
-        (repository as? ProgressReportingTripRecordRepository)?.createTripRecord(draft) { progress ->
-            val bounded = progress.coerceIn(0, 100)
-            val displayed = if (attempt == 0) {
-                bounded / 2
-            } else {
-                FirstAttemptCompleteProgress + bounded / 2
-            }
-            updateProgress(id, displayed)
-        } ?: repository.createTripRecord(draft)
-
-    private fun updateProgress(id: Long, progress: Int) {
-        mutableSaves.update { current ->
-            current.map { save ->
-                if (save.id == id) save.copy(progressPercent = progress.coerceIn(0, 100)) else save
-            }
+        ).also { compact ->
+            drafts[id] = compact
+            persist()
         }
     }
+
+    private suspend fun create(id: Long, draft: TripRecordDraft): Result<com.mapmory.shared.domain.model.TripRecordData> {
+        attemptStarts[id] = TimeSource.Monotonic.markNow()
+        updateProgress(id, 0)
+        return (repository as? ProgressReportingTripRecordRepository)?.createTripRecord(draft) { progress ->
+            updateProgress(id, progress)
+        } ?: repository.createTripRecord(draft)
+    }
+
+    private fun updateProgress(id: Long, progress: Int) {
+        val bounded = progress.coerceIn(0, 100)
+        if (bounded >= 95 && serverSaveStarted.add(id)) persist()
+        val elapsed = attemptStarts[id]?.elapsedNow()?.inWholeMilliseconds ?: 0L
+        val remaining = estimateUploadRemainingSeconds(elapsed, bounded)
+        mutableSaves.update { current ->
+            current.map { save ->
+                if (save.id == id) save.copy(progressPercent = bounded, remainingSeconds = remaining) else save
+            }
+        }
+        mutableSaves.value.firstOrNull { it.id == id }?.let(execution::onProgress)
+    }
+
 }
 
 private fun Throwable.toBackgroundSaveMessage(): String {
@@ -212,5 +274,11 @@ private fun Throwable.toBackgroundSaveMessage(): String {
 }
 
 private const val AutomaticRetryDelayMillis = 1_000L
-private const val FirstAttemptCompleteProgress = 50
 private const val DefaultFailureMessage = "기록 저장에 실패했어요. 앱에서 다시 시도해 주세요."
+
+// No estimate before a completed unit; iCloud acquisition time is included in elapsed time.
+internal fun estimateUploadRemainingSeconds(elapsedMillis: Long, progressPercent: Int): Long? {
+    if (elapsedMillis < 1_000 || progressPercent !in 1..94) return null
+    return ceil(elapsedMillis.toDouble() * (100 - progressPercent) / progressPercent / 1_000)
+        .toLong().coerceAtLeast(1)
+}

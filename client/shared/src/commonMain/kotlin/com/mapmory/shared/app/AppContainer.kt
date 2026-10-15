@@ -172,7 +172,7 @@ private class DefaultAppContainer(
     private val recordedPhotoIndex = com.mapmory.shared.data.media.RecordedPhotoIndex(photoPreviewCache)
     override val tripRecordRepository: TripRecordRepository =
         com.mapmory.shared.data.repository.PhotoUsageTripRecordRepository(tripRecordRepository, recordedPhotoIndex)
-    private val backgroundSaveScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val backgroundSaveScope = CoroutineScope(SupervisorJob() + backgroundSaveDispatcher())
     private val mutableTripRecordRevision = MutableStateFlow(0L)
     override val tripRecordRevision: StateFlow<Long> = mutableTripRecordRevision.asStateFlow()
     private val notifyTripRecordsChanged = {
