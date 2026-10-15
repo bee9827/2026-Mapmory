@@ -1,5 +1,8 @@
 package com.mapmory.shared.presentation.components
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +32,7 @@ internal fun <T> MapmoryPhotoExpansion(
     photo: T?,
     content: @Composable (T?) -> Unit,
 ) {
+    val gestureMotion = com.mapmory.shared.navigation.LocalNavigationGestureMotion.current
     SharedTransitionLayout(Modifier.fillMaxSize()) {
         val sharedScope = this
         val painters = remember { mutableMapOf<String, Painter>() }
@@ -36,12 +40,13 @@ internal fun <T> MapmoryPhotoExpansion(
             targetState = photo,
             contentKey = { it != null },
             transitionSpec = {
-                photoExpansionTransition(isOpening = targetState != null)
+                if (gestureMotion.isActive) EnterTransition.None togetherWith ExitTransition.None
+                else photoExpansionTransition(isOpening = targetState != null)
             },
             label = "photo-expansion",
         ) { targetPhoto ->
             CompositionLocalProvider(
-                LocalMapmoryImageTransitionScope provides MapmoryImageTransitionScope(sharedScope, this, painters),
+                LocalMapmoryImageTransitionScope provides if (gestureMotion.isActive) null else MapmoryImageTransitionScope(sharedScope, this, painters),
             ) { content(targetPhoto) }
         }
     }

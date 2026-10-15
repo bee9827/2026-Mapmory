@@ -21,6 +21,7 @@ import androidx.navigationevent.NavigationEventInfo
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import platform.CoreGraphics.CGAffineTransformMakeTranslation
 import platform.UIKit.UIView
@@ -39,6 +40,10 @@ internal actual fun PlatformNavigationGestures(
         .navigationEventDispatcher
     val viewController = LocalUIViewController.current
     val scope = rememberCoroutineScope()
+    val motion = LocalNavigationGestureMotion.current
+    var preparation by remember { mutableStateOf<Job?>(null) }
+    var destinationReady by remember { mutableStateOf(false) }
+    var pendingProgress by remember { mutableStateOf(0f) }
     val progress = remember { Animatable(0f) }
     var direction by remember { mutableStateOf(0f) }
     var snapshotWidth by remember { mutableStateOf(0.0) }
@@ -52,6 +57,11 @@ internal actual fun PlatformNavigationGestures(
     val latestForwardCancelled by rememberUpdatedState(onForwardCancelled)
 
     fun removeSnapshot() {
+        preparation?.cancel()
+        preparation = null
+        destinationReady = false
+        pendingProgress = 0f
+        motion.isActive = false
         translatedView?.setTransform(CGAffineTransformMakeTranslation(0.0, 0.0))
         translatedView = null
         snapshot?.removeFromSuperview()
@@ -83,30 +93,37 @@ internal actual fun PlatformNavigationGestures(
             captured.setFrame(rootView.bounds)
             rootView.addSubview(captured)
         }
+        motion.isActive = true
         navigationStarted = navigate()
         if (!navigationStarted) removeSnapshot()
-        scope.launch { progress.snapTo(0f) }
+        if (navigationStarted) preparation = scope.launch {
+            progress.snapTo(0f)
+            // Navigation changes state synchronously, but Compose draws the destination later.
+            // Keep the outgoing snapshot still until the destination has had a render frame.
+            withFrameNanos { }
+            withFrameNanos { }
+            destinationReady = true
+            if (!settling) progress.snapTo(pendingProgress)
+        }
     }
 
     fun updateGesture(event: NavigationEvent) {
         if (!navigationStarted || settling) return
-        scope.launch { progress.snapTo(event.progress.coerceIn(0f, 1f)) }
+        pendingProgress = event.progress.coerceIn(0f, 1f)
+        if (destinationReady) scope.launch { progress.snapTo(pendingProgress) }
     }
 
     fun cancelGesture(restore: () -> Unit) {
         if (!navigationStarted || settling) return
         settling = true
-        val isForward = direction < 0f
-        if (!isForward) restore()
         scope.launch {
+            preparation?.join()
             progress.animateTo(0f, tween(durationMillis = 180))
-            if (isForward) {
-                // Restore only after the destination has slid fully offscreen. Otherwise
-                // its content changes to the previous screen midway through the gesture.
-                restore()
-                withFrameNanos { }
-                withFrameNanos { }
-            }
+            // Restore under the fully covering snapshot (back) or offscreen destination
+            // (forward), so the live screen never changes midway through the gesture.
+            restore()
+            withFrameNanos { }
+            withFrameNanos { }
             removeSnapshot()
         }
     }
@@ -115,13 +132,14 @@ internal actual fun PlatformNavigationGestures(
         if (!navigationStarted || settling) return
         settling = true
         scope.launch {
+            preparation?.join()
             progress.animateTo(1f, tween(durationMillis = 140))
             removeSnapshot()
             progress.snapTo(0f)
         }
     }
 
-    val currentProgress = progress.value
+    val currentProgress = if (destinationReady) progress.value else 0f
     SideEffect {
         if (direction < 0f) {
             translatedView?.setTransform(CGAffineTransformMakeTranslation(
