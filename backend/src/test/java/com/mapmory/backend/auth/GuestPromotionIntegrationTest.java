@@ -11,7 +11,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.auth.application.model.SocialIdentity;
-import com.mapmory.backend.auth.infrastructure.kakao.KakaoIdentityAdapter;
 import com.mapmory.backend.member.AuthProvider;
 import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
@@ -19,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -38,9 +36,6 @@ class GuestPromotionIntegrationTest extends IntegrationTest {
 
     @Autowired
     private MemberRepository memberRepository;
-
-    @MockitoSpyBean
-    private KakaoIdentityAdapter kakaoIdentityAdapter;
 
     @Test
     void 게스트가_카카오_로그인하면_남긴_기록이_그대로_유지된다() throws Exception {

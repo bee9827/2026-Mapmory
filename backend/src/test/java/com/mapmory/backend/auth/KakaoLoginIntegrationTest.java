@@ -12,14 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.auth.application.model.SocialIdentity;
 import com.mapmory.backend.auth.exception.AuthErrorCode;
-import com.mapmory.backend.auth.infrastructure.kakao.KakaoIdentityAdapter;
 import com.mapmory.backend.common.exception.BusinessException;
 import com.mapmory.backend.member.AuthProvider;
 import com.mapmory.backend.member.MemberRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 class KakaoLoginIntegrationTest extends IntegrationTest {
@@ -31,9 +29,6 @@ class KakaoLoginIntegrationTest extends IntegrationTest {
 
     @Autowired
     private MemberRepository memberRepository;
-
-    @MockitoSpyBean
-    private KakaoIdentityAdapter kakaoIdentityAdapter;
 
     @Test
     void 신규_카카오_사용자는_회원으로_생성되고_토큰을_받는다() throws Exception {

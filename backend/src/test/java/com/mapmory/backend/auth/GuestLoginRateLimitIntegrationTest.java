@@ -9,13 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.auth.exception.AuthErrorCode;
-import com.mapmory.backend.auth.infrastructure.kakao.KakaoIdentityAdapter;
 import com.mapmory.backend.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -33,9 +31,6 @@ class GuestLoginRateLimitIntegrationTest extends IntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockitoSpyBean
-    private KakaoIdentityAdapter kakaoIdentityAdapter;
 
     @Test
     void 한도까지는_게스트_로그인이_허용된다() throws Exception {
