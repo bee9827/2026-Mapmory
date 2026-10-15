@@ -22,7 +22,7 @@ internal fun TripRecordListRoute(
     onDismissPendingSave: (Long) -> Unit,
     onOpenMap: () -> Unit,
     onOpenEditor: () -> Unit,
-    onOpenDetail: (Long, String?, String?) -> Unit,
+    onOpenDetail: (Long, String?, String?, Int?) -> Unit,
     onOpenProfile: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -66,6 +66,7 @@ internal fun TripRecordListRoute(
                 recordId,
                 record?.locationName,
                 record?.endDate?.takeIf { it.isNotBlank() } ?: record?.startDate,
+                record?.photoCount,
             )
         },
         onRetryClick = {
