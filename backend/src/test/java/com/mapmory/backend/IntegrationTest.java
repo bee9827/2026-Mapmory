@@ -6,9 +6,11 @@ import com.mapmory.backend.auth.infrastructure.kakao.KakaoIdentityAdapter;
 import com.mapmory.backend.place.infrastructure.google.GooglePlacesClient;
 import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.support.MySqlTestContainerSupport;
+import com.mapmory.backend.support.SecuredTestController;
 import com.mapmory.backend.upload.storage.UploadedObjectChecker;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.context.jdbc.Sql;
@@ -31,9 +33,12 @@ import org.springframework.test.context.jdbc.Sql;
  * 외부 연동 빈(소셜 로그인 adapter, Google Places, S3 업로드 확인, 미디어 URL)도 같은 이유로 여기서 spy로 둔다.
  * stub하지 않으면 실제 메서드를 그대로 부르고, stub은 테스트가 끝나면 초기화되므로 이 빈을 쓰지 않는 테스트의 동작은 바뀌지 않는다.
  * spy는 {@code given(spy.method())}로 stub하면 그 순간 실제 메서드가 불린다. {@code willReturn(...).given(spy).method()}로 stub한다.
+ *
+ * 인증 테스트용 컨트롤러(SecuredTestController)도 같은 이유로 모든 통합 테스트에 등록한다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(SecuredTestController.class)
 @TestPropertySource(properties = "upload.storage.s3.permission-self-check=false")
 @Sql(
         scripts = "/db/cleanup-test-data.sql",
