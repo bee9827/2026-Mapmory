@@ -10,9 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -78,6 +77,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
@@ -192,56 +192,6 @@ internal fun photoGridPinchResultAfterZoom(current: Int, accumulatedZoom: Float)
 
 internal fun shouldShowPhotoPreviewButton(columnCount: Int): Boolean = columnCount < 5
 
-internal data class PhotoPickerScrollBarMetrics(
-    val thumbFraction: Float,
-    val scrollFraction: Float,
-)
-
-internal data class PhotoPickerScrollTarget(
-    val itemIndex: Int,
-    val itemScrollOffset: Int,
-)
-
-internal fun photoPickerScrollTarget(
-    scrollFraction: Float,
-    viewportSize: Int,
-    itemSizes: List<Int>,
-    itemSpacing: Int,
-    contentPaddingBefore: Int,
-    contentPaddingAfter: Int,
-): PhotoPickerScrollTarget? {
-    if (viewportSize <= 0 || itemSizes.isEmpty()) return null
-    val contentSize = contentPaddingBefore + contentPaddingAfter +
-        itemSizes.sum() + itemSpacing * (itemSizes.size - 1).coerceAtLeast(0)
-    val maximumScrollOffset = (contentSize - viewportSize).coerceAtLeast(0)
-    var remainingOffset =
-        (scrollFraction.coerceIn(0f, 1f) * maximumScrollOffset).roundToInt() - contentPaddingBefore
-    if (remainingOffset <= 0) return PhotoPickerScrollTarget(0, 0)
-
-    itemSizes.forEachIndexed { index, itemSize ->
-        if (remainingOffset < itemSize + itemSpacing || index == itemSizes.lastIndex) {
-            return PhotoPickerScrollTarget(
-                itemIndex = index,
-                itemScrollOffset = remainingOffset.coerceIn(0, itemSize),
-            )
-        }
-        remainingOffset -= itemSize + itemSpacing
-    }
-    return PhotoPickerScrollTarget(itemSizes.lastIndex, itemSizes.last())
-}
-
-internal fun photoPickerScrollBarMetrics(
-    scrollOffset: Int,
-    viewportSize: Int,
-    contentSize: Int,
-): PhotoPickerScrollBarMetrics? {
-    if (viewportSize <= 0 || contentSize <= viewportSize) return null
-    val maxScrollOffset = contentSize - viewportSize
-    return PhotoPickerScrollBarMetrics(
-        thumbFraction = (viewportSize.toFloat() / contentSize).coerceIn(0f, 1f),
-        scrollFraction = (scrollOffset.toFloat() / maxScrollOffset).coerceIn(0f, 1f),
-    )
-}
 
 internal fun photoDragAutoScrollVelocity(
     pointerY: Float,
@@ -1254,6 +1204,8 @@ private fun LocationStep(
     onBackClick: () -> Unit,
     onCompleteClick: () -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val locationScrollState = rememberScrollState()
     ScrollToTopEffect(locationScrollState)
     val queryMatchesSelectedRegion = searchQuery.trim().equals(
@@ -1293,10 +1245,18 @@ private fun LocationStep(
         !queryMatchesSelectedRegion &&
         !searchQuery.trim().equals(uiState.selectedPlace?.name, ignoreCase = true)
     val showRegionResults = uiState.manualRegionRequired && searchQuery.isNotBlank()
-    val canLoadPhotos = uiState.selectedPlace != null && !uiState.isSelectingPlace
-    Column(Modifier.fillMaxSize()) {
+    val canLoadPhotos = uiState.selectedLocation != null &&
+        !uiState.isSelectingPlace && !uiState.manualRegionRequired
+    Column(
+        Modifier.fillMaxSize().pointerInput(focusManager, keyboardController) {
+            detectTapGestures {
+                showSearchResults = false
+                focusManager.clearFocus(force = true)
+                keyboardController?.hide()
+            }
+        },
+    ) {
         FlowTopBar(
-            title = "사진 불러오기",
             onBackClick = onBackClick,
         )
         Column(
@@ -1317,7 +1277,6 @@ private fun LocationStep(
             )
             FlowSectionTitle(
                 title = "장소",
-                badge = "필수",
                 modifier = Modifier.padding(top = 30.dp),
             )
             Box(
@@ -1336,7 +1295,11 @@ private fun LocationStep(
                     Popup(
                         popupPositionProvider = popupPosition,
                         onDismissRequest = { showSearchResults = false },
-                        properties = PopupProperties(focusable = false),
+                        // Let background taps reach the screen; input taps keep editing.
+                        properties = PopupProperties(
+                            focusable = false,
+                            dismissOnClickOutside = false,
+                        ),
                     ) {
                         Column(
                             Modifier.width(with(density) { searchFieldWidth.toDp() })
@@ -1357,6 +1320,8 @@ private fun LocationStep(
                                     selectedLocationId = uiState.selectedLocation?.id,
                                     onLocationSelected = {
                                         showSearchResults = false
+                                        focusManager.clearFocus(force = true)
+                                        keyboardController?.hide()
                                         onLocationSelected(it)
                                     },
                                     modifier = Modifier.padding(top = 8.dp),
@@ -1370,6 +1335,8 @@ private fun LocationStep(
                                     errorMessage = uiState.placeSearchErrorMessage,
                                     onPlaceSelected = {
                                         showSearchResults = false
+                                        focusManager.clearFocus(force = true)
+                                        keyboardController?.hide()
                                         onPlaceCandidateSelected(it)
                                     },
                                     modifier = Modifier.padding(top = 8.dp),
@@ -1657,7 +1624,7 @@ private val GoogleMapsAttributionColor = Color(0xFF5E5E5E)
 
 @Composable
 private fun FlowTopBar(
-    title: String,
+    title: String = "",
     onBackClick: () -> Unit,
     actionLabel: String? = null,
     actionStatusLabel: String? = null,
@@ -1719,19 +1686,12 @@ private fun FlowTopBar(
                 }
             },
         )
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(TripRecordPalette.current.line),
-        )
     }
 }
 
 @Composable
 private fun FlowSectionTitle(
     title: String,
-    badge: String,
     helper: String? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -1743,13 +1703,7 @@ private fun FlowSectionTitle(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            Text(
-                text = badge,
-                color = TripRecordPalette.current.accent,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 8.dp, bottom = 2.dp),
-            )
+
         }
         helper?.let {
             Text(
@@ -1923,7 +1877,7 @@ private fun PhotoLoadingStep(
     onRetry: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize()) {
-        FlowTopBar(title = "사진 불러오기", onBackClick = onBackClick)
+        FlowTopBar(onBackClick = onBackClick)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -2353,8 +2307,9 @@ private fun PhotoPickerStep(
                     }
                 }
             }
-            PhotoPickerScrollBar(
+            PhotoListScrollBar(
                 listState = listState,
+                layoutKey = photoGridColumns,
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 5.dp, top = 8.dp, bottom = 8.dp),
@@ -2363,98 +2318,6 @@ private fun PhotoPickerStep(
     }
 }
 
-@Composable
-private fun PhotoPickerScrollBar(
-    listState: androidx.compose.foundation.lazy.LazyListState,
-    modifier: Modifier = Modifier,
-) {
-    val layoutInfo = listState.layoutInfo
-    if (layoutInfo.visibleItemsInfo.isEmpty() || layoutInfo.totalItemsCount <= 0) return
-    val density = LocalDensity.current
-    val itemSpacing = with(density) { 0.dp.roundToPx() }
-    val contentPaddingBefore = with(density) { 24.dp.roundToPx() }
-    val contentPaddingAfter = with(density) { 36.dp.roundToPx() }
-    val knownItemSizes = remember(listState) { mutableMapOf<Int, Int>() }
-    layoutInfo.visibleItemsInfo.forEach { item -> knownItemSizes[item.index] = item.size }
-    val estimatedItemSize = knownItemSizes.values.average().roundToInt().coerceAtLeast(1)
-    val estimatedItemSizes = (0 until layoutInfo.totalItemsCount).map { index ->
-        knownItemSizes[index] ?: estimatedItemSize
-    }
-    val estimatedContentSize = contentPaddingBefore + contentPaddingAfter +
-        estimatedItemSizes.sum() +
-        itemSpacing * (layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-    val estimatedScrollOffset = (0 until listState.firstVisibleItemIndex).sumOf { index ->
-        (knownItemSizes[index] ?: estimatedItemSize) + itemSpacing
-    } + listState.firstVisibleItemScrollOffset
-    val viewportSize = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-    val scrollOffset = when {
-        !listState.canScrollBackward -> 0
-        !listState.canScrollForward -> estimatedContentSize - viewportSize
-        else -> estimatedScrollOffset
-    }
-    val metrics = photoPickerScrollBarMetrics(
-        scrollOffset = scrollOffset,
-        viewportSize = viewportSize,
-        contentSize = estimatedContentSize,
-    ) ?: return
-    val trackColor = TripRecordPalette.current.line.copy(alpha = 0.65f)
-    val thumbColor = TripRecordPalette.current.accent.copy(alpha = 0.9f)
-    var scrollRequestVersion by remember { mutableStateOf(0) }
-    var requestedScroll by remember { mutableStateOf<Pair<Int, Float>?>(null) }
-    LaunchedEffect(requestedScroll) {
-        val fraction = requestedScroll?.second ?: return@LaunchedEffect
-        val target = photoPickerScrollTarget(
-            scrollFraction = fraction,
-            viewportSize = viewportSize,
-            itemSizes = estimatedItemSizes,
-            itemSpacing = itemSpacing,
-            contentPaddingBefore = contentPaddingBefore,
-            contentPaddingAfter = contentPaddingAfter,
-        ) ?: return@LaunchedEffect
-        listState.scrollToItem(target.itemIndex, target.itemScrollOffset)
-    }
-    Canvas(
-        modifier = modifier
-            .width(24.dp)
-            .fillMaxHeight()
-            .testTag("photo-picker-scrollbar")
-            .semantics { contentDescription = "사진 목록 스크롤바" }
-            .pointerInput(estimatedContentSize, viewportSize) {
-                fun updateScrollPosition(pointerY: Float) {
-                    scrollRequestVersion += 1
-                    requestedScroll = scrollRequestVersion to
-                        (pointerY / size.height.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
-                }
-                detectDragGestures(
-                    onDragStart = { offset -> updateScrollPosition(offset.y) },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        updateScrollPosition(change.position.y)
-                    },
-                )
-            },
-    ) {
-        val thumbHeight = (size.height * metrics.thumbFraction)
-            .coerceAtLeast(44.dp.toPx())
-            .coerceAtMost(size.height)
-        val thumbOffset = (size.height - thumbHeight) * metrics.scrollFraction
-        val barWidth = 4.dp.toPx()
-        val barOffsetX = (size.width - barWidth) / 2f
-        val cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
-        drawRoundRect(
-            color = trackColor,
-            topLeft = Offset(barOffsetX, 0f),
-            size = androidx.compose.ui.geometry.Size(barWidth, size.height),
-            cornerRadius = cornerRadius,
-        )
-        drawRoundRect(
-            color = thumbColor,
-            topLeft = Offset(barOffsetX, thumbOffset),
-            size = androidx.compose.ui.geometry.Size(barWidth, thumbHeight),
-            cornerRadius = cornerRadius,
-        )
-    }
-}
 
 @Composable
 private fun PhotoPickerHeader(
@@ -2645,6 +2508,7 @@ private fun PhotoSelectionCard(
     DisposableEffect(photo.id, dragSelectionController) {
         onDispose { dragSelectionController.remove(photo.id) }
     }
+    var imageReady by remember(photo.id, photo.previewUri, photo.previewBytes) { mutableStateOf(false) }
     val cardShape = RoundedCornerShape(16.dp)
     Box(
         modifier = modifier
@@ -2682,6 +2546,7 @@ private fun PhotoSelectionCard(
             imageUri = photo.previewUri ?: photo.fullResolutionUri.takeIf { photo.previewBytes == null },
             sharedImageKey = "picker:${photo.id}",
             sharedCornerRadius = 16.dp,
+            onReadyChanged = { imageReady = it },
             cacheKey = "picker-preview:${photo.id}",
             contentDescription = photo.displayName,
             modifier = Modifier.fillMaxSize(),
@@ -2696,7 +2561,7 @@ private fun PhotoSelectionCard(
                     .padding(6.dp),
             )
         }
-        if (showPreviewButton) {
+        if (showPreviewButton && imageReady) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
