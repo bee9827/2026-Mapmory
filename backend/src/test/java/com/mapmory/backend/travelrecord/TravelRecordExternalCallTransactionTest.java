@@ -2,7 +2,8 @@ package com.mapmory.backend.travelrecord;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willAnswer;
+import static org.mockito.BDDMockito.willReturn;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,10 +13,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.member.MemberRepository;
 import com.mapmory.backend.place.application.model.PlaceDetails;
-import com.mapmory.backend.place.infrastructure.google.GooglePlacesClient;
 import com.mapmory.backend.recordmedia.ExpiringUrl;
-import com.mapmory.backend.recordmedia.RecordMediaUrlService;
-import com.mapmory.backend.upload.storage.UploadedObjectChecker;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +21,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -49,30 +46,21 @@ class TravelRecordExternalCallTransactionTest extends IntegrationTest {
     @Autowired
     private MemberRepository memberRepository;
 
-    @MockitoBean
-    private GooglePlacesClient googlePlacesClient;
-
-    @MockitoBean
-    private UploadedObjectChecker uploadedObjectChecker;
-
-    @MockitoBean
-    private RecordMediaUrlService recordMediaUrlService;
-
     private final List<Boolean> transactionActiveAtExternalCall = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
-        given(googlePlacesClient.findById(GOOGLE_PLACE_ID)).willAnswer(invocation -> {
+        willAnswer(invocation -> {
             recordTransactionState();
             return new PlaceDetails(GOOGLE_PLACE_ID, null, "JP", null, null, List.of());
-        });
-        given(googlePlacesClient.providerCode()).willReturn("GOOGLE");
-        given(uploadedObjectChecker.exists(anyString())).willAnswer(invocation -> {
+        }).given(googlePlacesClient).findById(GOOGLE_PLACE_ID);
+        willReturn("GOOGLE").given(googlePlacesClient).providerCode();
+        willAnswer(invocation -> {
             recordTransactionState();
             return true;
-        });
-        given(recordMediaUrlService.createViewUrl(anyString()))
-                .willReturn(new ExpiringUrl("https://download.example/image.jpg", 300L));
+        }).given(uploadedObjectChecker).exists(anyString());
+        willReturn(new ExpiringUrl("https://download.example/image.jpg", 300L))
+                .given(recordMediaUrlService).createViewUrl(anyString());
     }
 
     @Test
@@ -108,11 +96,11 @@ class TravelRecordExternalCallTransactionTest extends IntegrationTest {
     void 사진을_확인하는_사이_기록이_삭제되면_수정은_TRAVEL_RECORD_NOT_FOUND로_끝난다() throws Exception {
         String accessToken = guestAccessToken();
         long recordId = createRecord(accessToken, PHOTO_A);
-        given(uploadedObjectChecker.exists(PHOTO_B)).willAnswer(invocation -> {
+        willAnswer(invocation -> {
             // 다른 기기에서 같은 기록을 지운 상황
             travelRecordService.delete(memberRepository.findAll().getFirst(), recordId);
             return true;
-        });
+        }).given(uploadedObjectChecker).exists(PHOTO_B);
 
         mockMvc.perform(put("/api/v1/travel-records/" + recordId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)

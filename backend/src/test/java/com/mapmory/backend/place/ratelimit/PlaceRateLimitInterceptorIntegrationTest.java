@@ -2,7 +2,7 @@ package com.mapmory.backend.place.ratelimit;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -13,13 +13,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.place.application.model.PlaceDetails;
-import com.mapmory.backend.place.infrastructure.google.GooglePlacesClient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
@@ -33,12 +31,9 @@ class PlaceRateLimitInterceptorIntegrationTest extends IntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
-    private GooglePlacesClient googlePlacesClient;
-
     @Test
     void 회원별_검색_한도를_넘으면_Google을_부르지_않고_거절한다() throws Exception {
-        given(googlePlacesClient.search(anyString(), anyString())).willReturn(List.of());
+        willReturn(List.of()).given(googlePlacesClient).search(anyString(), anyString());
         String accessToken = guestAccessToken();
 
         search(accessToken).andExpect(status().isOk());
@@ -54,9 +49,9 @@ class PlaceRateLimitInterceptorIntegrationTest extends IntegrationTest {
 
     @Test
     void 선택_한도는_검색_한도와_따로_센다() throws Exception {
-        given(googlePlacesClient.search(anyString(), anyString())).willReturn(List.of());
-        given(googlePlacesClient.findForSelection(anyString(), any())).willReturn(
-                new PlaceDetails("ChIJ-tokyo", null, null, "Google Maps", "https://www.google.com/maps", List.of()));
+        willReturn(List.of()).given(googlePlacesClient).search(anyString(), anyString());
+        willReturn(new PlaceDetails("ChIJ-tokyo", null, null, "Google Maps", "https://www.google.com/maps", List.of()))
+                .given(googlePlacesClient).findForSelection(anyString(), any());
         String accessToken = guestAccessToken();
 
         select(accessToken).andExpect(status().isOk());

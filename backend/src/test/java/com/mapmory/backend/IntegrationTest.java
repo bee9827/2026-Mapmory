@@ -3,7 +3,10 @@ package com.mapmory.backend;
 import com.mapmory.backend.auth.infrastructure.apple.AppleIdentityAdapter;
 import com.mapmory.backend.auth.infrastructure.google.GoogleIdentityAdapter;
 import com.mapmory.backend.auth.infrastructure.kakao.KakaoIdentityAdapter;
+import com.mapmory.backend.place.infrastructure.google.GooglePlacesClient;
+import com.mapmory.backend.recordmedia.RecordMediaUrlService;
 import com.mapmory.backend.support.MySqlTestContainerSupport;
+import com.mapmory.backend.upload.storage.UploadedObjectChecker;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.TestPropertySource;
@@ -25,8 +28,9 @@ import org.springframework.test.context.jdbc.Sql;
  * MockMvc는 쓰지 않는 테스트에도 켠다. 테스트마다 켜고 끄면 컨텍스트 캐시 키가 달라져
  * 같은 설정의 컨텍스트를 새로 띄우게 된다.
  *
- * 소셜 로그인 adapter도 같은 이유로 여기서 spy로 둔다. stub하지 않으면 실제 메서드를 그대로 부르고,
- * stub은 테스트가 끝나면 초기화되므로 이 adapter를 쓰지 않는 테스트의 동작은 바뀌지 않는다.
+ * 외부 연동 빈(소셜 로그인 adapter, Google Places, S3 업로드 확인, 미디어 URL)도 같은 이유로 여기서 spy로 둔다.
+ * stub하지 않으면 실제 메서드를 그대로 부르고, stub은 테스트가 끝나면 초기화되므로 이 빈을 쓰지 않는 테스트의 동작은 바뀌지 않는다.
+ * spy는 {@code given(spy.method())}로 stub하면 그 순간 실제 메서드가 불린다. {@code willReturn(...).given(spy).method()}로 stub한다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -45,4 +49,13 @@ public abstract class IntegrationTest extends MySqlTestContainerSupport {
 
     @MockitoSpyBean
     protected GoogleIdentityAdapter googleIdentityAdapter;
+
+    @MockitoSpyBean
+    protected GooglePlacesClient googlePlacesClient;
+
+    @MockitoSpyBean
+    protected UploadedObjectChecker uploadedObjectChecker;
+
+    @MockitoSpyBean
+    protected RecordMediaUrlService recordMediaUrlService;
 }

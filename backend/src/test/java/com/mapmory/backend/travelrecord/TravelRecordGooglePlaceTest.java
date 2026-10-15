@@ -1,7 +1,7 @@
 package com.mapmory.backend.travelrecord;
 
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,8 +14,6 @@ import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
 import com.mapmory.backend.place.infrastructure.google.GoogleRequestLimiter;
 import com.mapmory.backend.recordmedia.ExpiringUrl;
-import com.mapmory.backend.recordmedia.RecordMediaUrlService;
-import com.mapmory.backend.upload.storage.UploadedObjectChecker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,17 +45,11 @@ class TravelRecordGooglePlaceTest extends IntegrationTest {
     @MockitoBean
     private GoogleRequestLimiter googleRequestLimiter;
 
-    @MockitoBean
-    private UploadedObjectChecker uploadedObjectChecker;
-
-    @MockitoBean
-    private RecordMediaUrlService recordMediaUrlService;
-
     @BeforeEach
     void setUp() {
-        given(uploadedObjectChecker.exists(anyString())).willReturn(true);
-        given(recordMediaUrlService.createViewUrl(anyString()))
-                .willReturn(new ExpiringUrl("https://download.example/image.jpg", 300L));
+        willReturn(true).given(uploadedObjectChecker).exists(anyString());
+        willReturn(new ExpiringUrl("https://download.example/image.jpg", 300L))
+                .given(recordMediaUrlService).createViewUrl(anyString());
     }
 
     @Test
