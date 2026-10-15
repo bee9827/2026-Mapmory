@@ -13,7 +13,7 @@ internal object TripRecordListCacheCodec {
         CachedPage(
             records = page.records.map { record ->
                 CachedRecord(record.id, record.title, record.regionName, record.startDate, record.endDate,
-                    record.locationId, record.content, record.tags.map { CachedTag(it.id, it.name) })
+                    record.locationId, record.content, record.tags.map { CachedTag(it.id, it.name) }, record.photoCount)
             },
             page = page.page,
             size = page.size,
@@ -31,6 +31,7 @@ internal object TripRecordListCacheCodec {
                     startDate = record.startDate, endDate = record.endDate,
                     locationId = record.locationId, content = record.content,
                     tags = record.tags.map { Tag(it.id, it.name) },
+                    photoCount = record.photoCount,
                 )
             },
             page = cached.page, size = cached.size,
@@ -49,6 +50,7 @@ private data class CachedPage(
 private data class CachedRecord(
     val id: Long, val title: String, val regionName: String?, val startDate: String,
     val endDate: String?, val locationId: Long?, val content: String, val tags: List<CachedTag>,
+    val photoCount: Int? = null,
 )
 
 @Serializable

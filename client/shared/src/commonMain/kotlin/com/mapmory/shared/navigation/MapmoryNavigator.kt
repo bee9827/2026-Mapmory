@@ -77,12 +77,17 @@ internal class MapmoryNavigator(
         navController.navigate(EditorRoute(recordId, selectedLocationId))
     }
 
-    fun navigateToDetail(recordId: Long, locationName: String? = null, latestDate: String? = null) {
+    fun navigateToDetail(
+        recordId: Long,
+        locationName: String? = null,
+        latestDate: String? = null,
+        photoCount: Int? = null,
+    ) {
         // Navigation updates the current entry synchronously, before the old list leaves composition.
         // Ignore any further card clicks delivered from that outgoing list, including other IDs.
         if (navController.currentDestination?.hasRoute<DetailRoute>() == true) return
         clearForwardHistory()
-        navController.navigate(DetailRoute(recordId, locationName, latestDate))
+        navController.navigate(DetailRoute(recordId, locationName, latestDate, photoCount))
     }
 
     fun navigateAfterEdit(recordId: Long) {

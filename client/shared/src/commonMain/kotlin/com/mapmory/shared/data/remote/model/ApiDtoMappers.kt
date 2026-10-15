@@ -25,6 +25,7 @@ import com.mapmory.shared.domain.region.RegionCatalog
 
 fun TripRecordListItemDto.toDomain(): TripRecordSummary = TripRecordSummary(
     id = id,
+    photoCount = photoCount,
     title = title.orEmpty(),
     regionName = regionName,
     startDate = startDate,
