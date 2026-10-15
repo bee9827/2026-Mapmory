@@ -27,6 +27,8 @@ fun MainViewController(
     analytics: MapmoryAnalytics,
     tokenStore: AuthTokenStore,
     navigation: MapmoryNavigation,
+    updateState: com.mapmory.shared.update.ForceUpdateState,
+    onRetryUpdateCheck: () -> Unit,
 ) = createGuestRemoteAppContainer(
     apiBaseUrl = apiBaseUrl,
     tokenStore = tokenStore,
@@ -60,6 +62,8 @@ fun MainViewController(
         MapmoryApp(
             container = container,
             navigation = navigation,
+            updateState = updateState,
+            onRetryUpdateCheck = onRetryUpdateCheck,
             contentWindowInsets = WindowInsets.safeDrawing,
             onThemeChanged = onThemeChanged,
             analytics = analytics,

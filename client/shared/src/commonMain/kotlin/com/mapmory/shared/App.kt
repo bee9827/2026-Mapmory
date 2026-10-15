@@ -29,6 +29,8 @@ import com.mapmory.shared.presentation.splash.MapmorySplashScreen
 import com.mapmory.shared.presentation.components.ProvideScrollToTop
 import com.mapmory.shared.presentation.triprecord.screen.ProvideTripRecordPalettes
 import com.mapmory.shared.presentation.theme.MapmoryTypography
+import com.mapmory.shared.update.ForceUpdateState
+import com.mapmory.shared.update.ForceUpdateGate
 import kotlinx.coroutines.delay
 
 @Composable
@@ -39,6 +41,8 @@ fun MapmoryApp(
     onThemeChanged: (Boolean) -> Unit = {},
     analytics: MapmoryAnalytics = NoOpMapmoryAnalytics,
     developerToolsInfo: MapmoryDeveloperToolsInfo? = null,
+    updateState: ForceUpdateState? = null,
+    onRetryUpdateCheck: () -> Unit = {},
 ) {
     val ownedContainer = remember(container) {
         if (container == null) createInMemoryAppContainer() else null
@@ -66,7 +70,8 @@ fun MapmoryApp(
     val navigator = remember(navController) { MapmoryNavigator(navController) }
     val backHandlerRegistry = remember { MapmoryBackHandlerRegistry() }
     val latestNavigateBack = rememberUpdatedState {
-        backHandlerRegistry.handleBack(navController.currentBackStackEntry?.id) ||
+        updateState?.isBlocking == true ||
+            backHandlerRegistry.handleBack(navController.currentBackStackEntry?.id) ||
             navigator.navigateBack()
     }
     var edgeGestureOwnerId by remember { mutableStateOf<String?>(null) }
@@ -93,6 +98,7 @@ fun MapmoryApp(
     ) {
         ProvideTripRecordPalettes(isDark = isDarkTheme) {
             MaterialTheme(typography = MapmoryTypography()) {
+                updateState?.let { ForceUpdateGate(it, onRetryUpdateCheck) }
                 if (showSplash) {
                     MapmorySplashScreen(contentWindowInsets = contentWindowInsets)
                 } else {
@@ -105,7 +111,7 @@ fun MapmoryApp(
                             contentWindowInsets = contentWindowInsets,
                             developerToolsInfo = developerToolsInfo,
                         )
-                        PlatformNavigationGestures(
+                        if (updateState?.isBlocking != true) PlatformNavigationGestures(
                             onBackStarted = {
                                 val ownerId = navController.currentBackStackEntry?.id
                                 edgeGestureOwnerId = ownerId
