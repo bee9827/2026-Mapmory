@@ -19,7 +19,6 @@ import com.mapmory.backend.upload.storage.UploadedObjectChecker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
@@ -34,7 +33,6 @@ import org.springframework.test.web.servlet.MvcResult;
  * Google 이름은 저장하지 않고 출처 표기는 상수라 Google 없이 끝낼 수 있다. Google 주소는 닿지 않는 곳으로 둬서,
  * 조회를 시도하면 PLACE_PROVIDER_UNAVAILABLE로 실패하게 했다.
  */
-@AutoConfigureMockMvc
 @TestPropertySource(properties = {
         "google.places.api-key=test-key",
         "google.places.base-url=http://127.0.0.1:9"

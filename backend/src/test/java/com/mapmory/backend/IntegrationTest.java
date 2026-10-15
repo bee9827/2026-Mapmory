@@ -2,6 +2,7 @@ package com.mapmory.backend;
 
 import com.mapmory.backend.support.MySqlTestContainerSupport;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.jdbc.Sql;
 
@@ -16,8 +17,12 @@ import org.springframework.test.context.jdbc.Sql;
  * S3 권한 자가진단(ADR 0018)은 끈다. 실제 AWS를 호출하는 진단이라 테스트에서 돌 이유가 없고,
  * 인스턴스 역할이 붙은 러너에서는 운영 버킷을 조회하게 된다.
  * 진단 자체는 S3PermissionSelfCheckTest가 대역으로 검증한다.
+ *
+ * MockMvc는 쓰지 않는 테스트에도 켠다. 테스트마다 켜고 끄면 컨텍스트 캐시 키가 달라져
+ * 같은 설정의 컨텍스트를 새로 띄우게 된다.
  */
 @SpringBootTest
+@AutoConfigureMockMvc
 @TestPropertySource(properties = "upload.storage.s3.permission-self-check=false")
 @Sql(
         scripts = "/db/cleanup-test-data.sql",

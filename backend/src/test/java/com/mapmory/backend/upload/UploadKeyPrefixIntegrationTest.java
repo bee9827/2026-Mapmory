@@ -14,7 +14,6 @@ import com.mapmory.backend.upload.storage.PresignedUrlProvider;
 import java.net.URI;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
@@ -28,7 +27,6 @@ import org.springframework.test.web.servlet.MvcResult;
  * 운영 버킷은 여러 팀이 함께 쓰는 공용 버킷이라, 우리 객체는 서비스 prefix 아래에만 놓여야 한다.
  * S3 호출은 외부 시스템이므로 대역으로 대체하고, 서버가 발급하는 objectKey만 검증한다.
  */
-@AutoConfigureMockMvc
 @TestPropertySource(properties = "upload.storage.s3.key-prefix=mapmory")
 class UploadKeyPrefixIntegrationTest extends IntegrationTest {
 

@@ -17,7 +17,6 @@ import com.mapmory.backend.place.infrastructure.google.GooglePlacesClient;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -25,7 +24,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
-@AutoConfigureMockMvc
 @TestPropertySource(properties = {
         "place.rate-limit.searches-per-member-per-minute=2",
         "place.rate-limit.selections-per-member-per-day=1"

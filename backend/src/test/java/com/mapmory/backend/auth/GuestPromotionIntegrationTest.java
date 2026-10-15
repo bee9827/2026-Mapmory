@@ -17,7 +17,6 @@ import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -30,7 +29,6 @@ import org.springframework.test.web.servlet.MvcResult;
  * "게스트로 남긴 기록이 계정을 연결한 뒤에도 그대로 보인다"를 사용자 관점에서 검증한다.
  * 승격은 회원 행의 provider만 교체하므로 기록을 옮기지 않는다. (ADR 0015)
  */
-@AutoConfigureMockMvc
 class GuestPromotionIntegrationTest extends IntegrationTest {
 
     private static final String KAKAO_LOGIN_BODY = "{\"kakaoAccessToken\":\"kakao-token\"}";

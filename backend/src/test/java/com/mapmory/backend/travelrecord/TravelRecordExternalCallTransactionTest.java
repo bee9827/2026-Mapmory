@@ -21,7 +21,6 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -35,7 +34,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>트랜잭션 안에서 외부를 부르면 응답을 기다리는 동안 커넥션을 쥐고 있다. 부하 테스트에서 Google이 멈추자
  * 커넥션 풀이 고갈돼 기록과 무관한 API까지 실패했다.
  */
-@AutoConfigureMockMvc
 class TravelRecordExternalCallTransactionTest extends IntegrationTest {
 
     private static final String GOOGLE_PLACE_ID = "ChIJTokyoTower";

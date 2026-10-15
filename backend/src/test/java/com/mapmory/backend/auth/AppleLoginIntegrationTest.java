@@ -20,13 +20,11 @@ import com.mapmory.backend.member.Member;
 import com.mapmory.backend.member.MemberRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@AutoConfigureMockMvc
 class AppleLoginIntegrationTest extends IntegrationTest {
 
     private static final String REQUEST_BODY = "{\"identityToken\":\"apple-identity-token\"}";

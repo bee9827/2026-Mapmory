@@ -11,7 +11,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -25,7 +24,6 @@ import org.springframework.test.web.servlet.MvcResult;
  *
  * <p>빌린 횟수는 Hikari가 커넥션을 내줄 때마다 기록하는 {@code hikaricp.connections.acquire} 타이머로 센다.
  */
-@AutoConfigureMockMvc
 class LoginMemberConnectionUsageTest extends IntegrationTest {
 
     @Autowired

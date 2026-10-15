@@ -13,7 +13,6 @@ import com.mapmory.backend.auth.infrastructure.kakao.KakaoIdentityAdapter;
 import com.mapmory.backend.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
@@ -26,7 +25,6 @@ import org.springframework.test.web.servlet.ResultActions;
  * 게스트 로그인은 인증 없이 호출되므로 계정을 무제한으로 찍어낼 수 있다.
  * 같은 출처에서 짧은 시간에 반복 호출하면 거절한다. (ADR 0015)
  */
-@AutoConfigureMockMvc
 @TestPropertySource(properties = {
         "guest-login.rate-limit.capacity=2",
         "guest-login.rate-limit.window=1h"
