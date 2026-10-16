@@ -15,6 +15,92 @@ SPEC.loader.exec_module(MODULE)
 
 
 class GenerateKoreaMapTest(unittest.TestCase):
+    def test_같은_시의_일반구_접합부를_채움에서만_제거한다(self):
+        source = MODULE.Boundary("KR-41", "41130", "성남시", [
+            [[0, 0], [1, 0], [0.8, 1], [1.2, 2], [1, 3], [0, 3], [0, 0]],
+            [[1, 0], [2, 0], [2, 3], [1, 3], [1.2, 2], [0.8, 1], [1, 0]],
+        ])
+        overview = MODULE.Boundary("KR-41", "41130", "성남시", [
+            [[0, 0], [1, 0], [0.8, 1], [1, 3], [0, 3], [0, 0]],
+            [[1, 0], [2, 0], [2, 3], [1, 3], [1.2, 2], [1, 0]],
+        ])
+        self.assertFalse(any(MODULE._point_in_ring((1, 1.5), ring) for ring in overview.rings))
+
+        fill = MODULE.dissolve_overview_fill_rings(source, overview)
+
+        self.assertEqual(1, len(fill.rings))
+        self.assertTrue(MODULE._point_in_ring((1, 1.5), fill.rings[0]))
+        self.assertFalse(MODULE._point_in_ring((2.1, 1.5), fill.rings[0]))
+        self.assertEqual({(0, 0), (1, 0), (2, 0), (2, 3), (1, 3), (0, 3)},
+                         set(map(tuple, fill.rings[0])))
+        self.assertEqual(2, len(overview.rings))
+
+    def test_분리된_섬은_접합부가_없으면_그대로_유지한다(self):
+        boundary = MODULE.Boundary("KR-47", "47940", "울릉군", [
+            [[0, 0], [1, 0], [0, 1], [0, 0]],
+            [[2, 2], [3, 2], [2, 3], [2, 2]],
+        ])
+        self.assertIs(boundary, MODULE.dissolve_overview_fill_rings(boundary, boundary))
+
+    def test_전국_채움은_기존_내부_경계선을_빠짐없이_공유한다(self):
+        resource_dir = MODULE_PATH.parents[2] / "shared/src/commonMain/composeResources/files"
+        outlines = json.loads((resource_dir / "korea-district-overview.json").read_text())
+        districts = json.loads((resource_dir / "korea-district-overview-polygons.json").read_text())["districts"]
+        owners = {}
+        for district in districts:
+            for ring in district["rings"]:
+                for start, end in zip(ring, ring[1:]):
+                    owners.setdefault(MODULE.normalized_edge(tuple(start), tuple(end)), set()).add(district["code"])
+        for line in outlines["lines"]:
+            for start, end in zip(line, line[1:]):
+                edge = MODULE.normalized_edge(tuple(start), tuple(end))
+                self.assertIn(edge, owners)
+                self.assertTrue(len(owners[edge]) >= 2 or "27720" in owners[edge], edge)
+        seongnam = next(d for d in districts if d["code"] == "41130")
+        self.assertEqual(1, len(seongnam["rings"]))
+        self.assertTrue(MODULE._point_in_ring((127.121, 37.413), seongnam["rings"][0]))
+
+    def test_빈_단순화_링을_포함한_번들에서_전국_채움을_재생성한다(self):
+        resource_dir = MODULE_PATH.parents[2] / "shared/src/commonMain/composeResources/files"
+        boundaries = []
+        for resource in sorted(resource_dir.glob("korea-districts-*.json")):
+            payload = json.loads(resource.read_text())
+            boundaries.extend(
+                MODULE.Boundary(payload["provinceCode"], district["code"], district["name"], district["rings"])
+                for district in payload["districts"]
+            )
+        overview = MODULE.simplify_overview_boundaries(boundaries)
+        self.assertTrue(any(len(ring) < 4 for district in overview for ring in district.rings))
+        fills = [MODULE.dissolve_overview_fill_rings(source, simplified)
+                 for source, simplified in zip(boundaries, overview)]
+        with tempfile.TemporaryDirectory() as directory:
+            MODULE.write_overview_district_polygons_resource(Path(directory), fills)
+            regenerated = json.loads((Path(directory) / "korea-district-overview-polygons.json").read_text())
+        bundled = json.loads((resource_dir / "korea-district-overview-polygons.json").read_text())
+        self.assertEqual(bundled, regenerated)
+
+    def test_시도_재생성에도_군위_편입_보정을_자동_적용한다(self):
+        # Even an old source must not overwrite the pinned transfer correction.
+        features = [
+            {"type": "Feature", "properties": {"shapeISO": code},
+             "geometry": {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]}}
+            for code in MODULE.PROVINCE_NAMES
+        ]
+        correction_path = MODULE_PATH.with_name("data") / "gunwi-province-overrides.geojson"
+        corrections = MODULE.read_province_features(correction_path)
+        gunwi = (128.72472, 36.16710)
+        for code, _, rings in corrections:
+            self.assertEqual(code == "KR-27", any(MODULE._point_in_ring(gunwi, ring) for ring in rings))
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            source = directory / "old-source.json"
+            source.write_text(json.dumps({"features": features}))
+            MODULE.write_provinces(directory, source)
+            generated = "\n".join(path.read_text() for path in directory.glob("GeneratedKoreaMapDataPart*.kt"))
+            for _, _, rings in corrections:
+                for ring in rings:
+                    self.assertIn(MODULE.ring_expression(ring), generated)
+
     def test_시도별_번들_리소스는_정규_코드를_사용한다(self):
         client_dir = MODULE_PATH.parents[2]
         resource_dir = client_dir / "shared/src/commonMain/composeResources/files"
@@ -43,6 +129,26 @@ class GenerateKoreaMapTest(unittest.TestCase):
             {item["code"] for item in incheon["districts"] if item["code"] in {"28125", "28155", "28177", "28275", "28290"}},
         )
         self.assertEqual(11, len(incheon["districts"]))
+
+    def test_전국_개요_채움_폴리곤은_정규_시군구_코드를_유지한다(self):
+        client_dir = MODULE_PATH.parents[2]
+        resource_dir = client_dir / "shared/src/commonMain/composeResources/files"
+        locations_file = client_dir / "shared/src/commonMain/kotlin/com/mapmory/shared/domain/model/KoreanDistrictCode.kt"
+        locations_by_code = {
+            location.code: location
+            for location in MODULE.selectable_locations(MODULE.read_locations(locations_file))
+        }
+
+        resource = json.loads((resource_dir / "korea-district-overview-polygons.json").read_text())
+        districts = resource["districts"]
+
+        self.assertEqual(230, len(districts))
+        self.assertEqual(230, len({district["code"] for district in districts}))
+        self.assertEqual(set(locations_by_code), {district["code"] for district in districts})
+        for district in districts:
+            self.assertEqual(locations_by_code[district["code"]].province_code, district["provinceCode"])
+            self.assertTrue(district["rings"])
+            self.assertTrue(all(len(ring) >= 4 and ring[0] == ring[-1] for ring in district["rings"]))
 
     def test_외곽_링은_폴리곤_구멍을_제외한다(self):
         geometry = {

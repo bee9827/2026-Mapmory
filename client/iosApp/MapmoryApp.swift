@@ -1,4 +1,5 @@
 import FirebaseCore
+import FirebaseRemoteConfig
 import Shared
 import SwiftUI
 import UIKit
@@ -29,6 +30,8 @@ private enum AppConfiguration {
 @main
 struct MapmoryApp: App {
     @State private var isDarkTheme = false
+    @Environment(\.scenePhase) private var scenePhase
+    private let forceUpdate: IosForceUpdateController
     private let analyticsLogger: FirebaseAnalyticsLogger
 
     init() {
@@ -38,6 +41,7 @@ struct MapmoryApp: App {
         FirebaseApp.configure()
         analyticsLogger = FirebaseAnalyticsLogger()
 #endif
+        forceUpdate = IosForceUpdateController()
     }
 
     var body: some Scene {
@@ -47,7 +51,12 @@ struct MapmoryApp: App {
                 ComposeView(
                     isDarkTheme: $isDarkTheme,
                     analyticsLogger: analyticsLogger,
+                    forceUpdate: forceUpdate,
                 )
+            }
+            .onAppear { forceUpdate.refresh() }
+            .onChange(of: scenePhase) { phase in
+                if phase == .active { forceUpdate.refresh() }
             }
             .ignoresSafeArea()
             .preferredColorScheme(isDarkTheme ? .dark : .light)
@@ -58,6 +67,7 @@ struct MapmoryApp: App {
 private struct ComposeView: UIViewControllerRepresentable {
     @Binding var isDarkTheme: Bool
     let analyticsLogger: FirebaseAnalyticsLogger
+    let forceUpdate: IosForceUpdateController
 
     func makeCoordinator() -> Coordinator {
         Coordinator(isDarkTheme: $isDarkTheme)
@@ -74,6 +84,8 @@ private struct ComposeView: UIViewControllerRepresentable {
             analytics: analyticsLogger,
             tokenStore: KeychainAuthTokenStore(apiBaseUrl: AppConfiguration.apiBaseUrl),
             navigation: navigation,
+            updateState: forceUpdate.state,
+            onRetryUpdateCheck: { forceUpdate.refresh() },
         )
         let viewController = composeViewController
         applyTheme(to: viewController)
@@ -105,6 +117,69 @@ private struct ComposeView: UIViewControllerRepresentable {
             DispatchQueue.main.async { [weak self] in
                 self?.isDarkTheme.wrappedValue = isDark
             }
+        }
+    }
+}
+
+
+private final class IosForceUpdateController {
+    let state = ForceUpdateState(
+        currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+        storeUrl: "https://apps.apple.com/app/id6807056166"
+    )
+#if DEBUG || INTERNAL
+    private let key = "ios_dev_min_supported_version"
+#else
+    private let key = "ios_min_supported_version"
+#endif
+    private var fetching = false
+    private var generation = 0
+
+    init() {
+        _ = state.applyMinimumVersion(value: UserDefaults.standard.string(forKey: key) ?? "")
+    }
+
+    func refresh() {
+        guard !fetching else { return }
+        guard FirebaseApp.app() != nil else { state.finishCheck(); return }
+        fetching = true
+        generation += 1
+        let request = generation
+        let remote = RemoteConfig.remoteConfig()
+        let settings = RemoteConfigSettings()
+#if DEBUG
+        settings.minimumFetchInterval = 0
+#else
+        settings.minimumFetchInterval = 3600
+#endif
+        settings.fetchTimeout = 10
+        remote.configSettings = settings
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12) { [weak self] in
+            guard let self, self.generation == request else { return }
+            self.generation += 1
+            self.fetching = false
+            self.state.finishCheck()
+        }
+        remote.ensureInitialized { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self, self.generation == request else { return }
+                self.accept(remote.configValue(forKey: self.key).stringValue)
+                remote.fetchAndActivate { [weak self] _, error in
+                    DispatchQueue.main.async {
+                        guard let self, self.generation == request else { return }
+                        if error == nil { self.accept(remote.configValue(forKey: self.key).stringValue) }
+                        self.generation += 1
+                        self.fetching = false
+                        self.state.finishCheck()
+                    }
+                }
+            }
+        }
+    }
+
+    private func accept(_ value: String) {
+        if state.applyMinimumVersion(value: value) {
+            UserDefaults.standard.set(value, forKey: key)
         }
     }
 }

@@ -190,6 +190,7 @@ internal fun MapmoryNavHost(
                 recordId = route.recordId,
                 initialLocationName = route.locationName,
                 initialLatestDate = route.latestDate,
+                initialPhotoCount = route.photoCount,
                 tripRecordRevision = tripRecordRevision,
                 viewModel = viewModel,
                 backHandlerRegistry = backHandlerRegistry,

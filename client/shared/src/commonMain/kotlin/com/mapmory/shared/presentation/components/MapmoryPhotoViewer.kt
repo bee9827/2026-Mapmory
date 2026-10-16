@@ -1,9 +1,10 @@
 package com.mapmory.shared.presentation.components
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -11,9 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -21,8 +21,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -34,6 +32,7 @@ internal fun <T> MapmoryPhotoExpansion(
     photo: T?,
     content: @Composable (T?) -> Unit,
 ) {
+    val gestureMotion = com.mapmory.shared.navigation.LocalNavigationGestureMotion.current
     SharedTransitionLayout(Modifier.fillMaxSize()) {
         val sharedScope = this
         val painters = remember { mutableMapOf<String, Painter>() }
@@ -41,12 +40,13 @@ internal fun <T> MapmoryPhotoExpansion(
             targetState = photo,
             contentKey = { it != null },
             transitionSpec = {
-                photoExpansionTransition(isOpening = targetState != null)
+                if (gestureMotion.isActive) EnterTransition.None togetherWith ExitTransition.None
+                else photoExpansionTransition(isOpening = targetState != null)
             },
             label = "photo-expansion",
         ) { targetPhoto ->
             CompositionLocalProvider(
-                LocalMapmoryImageTransitionScope provides MapmoryImageTransitionScope(sharedScope, this, painters),
+                LocalMapmoryImageTransitionScope provides if (gestureMotion.isActive) null else MapmoryImageTransitionScope(sharedScope, this, painters),
             ) { content(targetPhoto) }
         }
     }
@@ -65,16 +65,15 @@ internal fun MapmoryPhotoViewer(
         content()
         Row(
             Modifier.align(Alignment.TopCenter).fillMaxWidth().statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 14.dp),
+                .height(56.dp).padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier.size(42.dp).background(Color.White.copy(alpha = 0.12f), CircleShape)
-                    .clickable(onClick = onClose)
-                    .semantics { contentDescription = closeContentDescription },
-                contentAlignment = Alignment.Center,
-            ) { Text("←", color = Color.White, fontSize = 24.sp) }
+            MapmoryBackButton(
+                onClick = onClose,
+                color = Color.White,
+                label = closeContentDescription,
+            )
             Text(
                 title, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),

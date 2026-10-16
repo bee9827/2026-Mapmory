@@ -16,6 +16,21 @@ import kotlin.test.assertTrue
 
 class MapmoryNavigationHistoryTest {
     @Test
+    fun `rapid map taps keep only the first editor and allow a new location after back`() = onUiThread {
+        val fixture = Fixture()
+        val origin = fixture.controller.currentBackStackEntry!!.id
+        fixture.navigator.navigateToEditor(selectedLocationId = 100)
+        fixture.navigator.navigateToEditor(selectedLocationId = 200)
+        fixture.navigator.navigateToEditor(selectedLocationId = 100)
+        assertEquals(100L, fixture.controller.currentBackStackEntry!!.toRoute<EditorRoute>().selectedLocationId)
+        assertTrue(fixture.navigator.navigateBack())
+        assertEquals(origin, fixture.controller.currentBackStackEntry!!.id)
+        fixture.navigator.navigateToEditor(selectedLocationId = 200)
+        assertEquals(200L, fixture.controller.currentBackStackEntry!!.toRoute<EditorRoute>().selectedLocationId)
+        fixture.close()
+    }
+
+    @Test
     fun `rapid clicks on different records open only the first and allow another after back`() = onUiThread {
         val fixture = Fixture()
         val origin = fixture.controller.currentBackStackEntry!!.id

@@ -70,25 +70,19 @@ class MapViewModel(
                 return
             }
         }.orEmpty()
-        val dokdoProvince = provinces.firstOrNull { it.code == DokdoProvinceCode.removePrefix(KoreanProvincePrefix) }
-        val dokdoDistricts = if (openProvinceCode == DokdoProvinceCode) {
-            emptyList()
-        } else {
-            dokdoProvince?.let { province ->
-                mapSummaryRepository.getChildRegions(province.regionId, selectedTagId).getOrElse {
-                    mapSummaryRepository.getCachedChildRegions(province.regionId, selectedTagId).orEmpty()
-                }
-            }.orEmpty()
+        val districtsByProvince = mutableMapOf<String, List<MapRegionSummary>>()
+        provinces.filter { it.count > 0 }.forEach { province ->
+            val provinceCode = "$KoreanProvincePrefix${province.code}"
+            val districts = mapSummaryRepository.getChildRegions(province.regionId, selectedTagId).getOrElse {
+                mapSummaryRepository.getCachedChildRegions(province.regionId, selectedTagId) ?: return@forEach
+            }
+            districtsByProvince[provinceCode] = districts
         }
 
         uiState = uiState.copy(
             rootRegions = roots,
             koreaProvinces = provinces,
-            districtsByProvince = if (dokdoProvince == null || openProvinceCode == DokdoProvinceCode) {
-                emptyMap()
-            } else {
-                mapOf(DokdoProvinceCode to dokdoDistricts)
-            },
+            districtsByProvince = districtsByProvince,
             tags = tags,
             selectedTagId = selectedTagId,
             errorMessage = null,
@@ -117,7 +111,7 @@ class MapViewModel(
         }
         val serverProvinceCode = provinceCode.removePrefix(KoreanProvincePrefix)
         val province = uiState.koreaProvinces.firstOrNull { it.code == serverProvinceCode }
-        val summaries = province?.let { summary ->
+        val summaries = uiState.districtsByProvince[provinceCode] ?: province?.let { summary ->
             mapSummaryRepository.getChildRegions(summary.regionId, uiState.selectedTagId).getOrElse { error ->
                 uiState = uiState.copy(
                     koreaMap = KoreaMapUiState.Error(
@@ -190,8 +184,18 @@ class MapViewModel(
     fun visitedDistrictCodes(provinceCode: String): Set<String> =
         uiState.districtsByProvince[provinceCode]
             .orEmpty()
+            .filter { it.count > 0 }
             .map(MapRegionSummary::code)
             .toSet()
+
+    val visitedKoreaDistrictCodes: Set<String>
+        get() = uiState.districtsByProvince.values.flatten()
+            .filter { it.count > 0 }
+            .map(MapRegionSummary::code)
+            .toSet()
+
+    val koreaDistrictCount: Int
+        get() = regionCatalog.locations.count { it.type == LocationType.DISTRICT }
 
     fun visitedDistrictCount(provinceCode: String): Int = visitedDistrictCodes(provinceCode).size
 }
@@ -200,13 +204,18 @@ private fun MapSummaryRepository.cachedUiState(): MapUiState {
     val roots = getCachedRootRegions().orEmpty()
     val korea = roots.firstOrNull { region -> region.code == KoreaCountryCode }
     val provinces = korea?.let { region -> getCachedChildRegions(region.regionId) }.orEmpty()
+    val districtsByProvince = provinces.mapNotNull { province ->
+        getCachedChildRegions(province.regionId)?.let { districts ->
+            "$KoreanProvincePrefix${province.code}" to districts
+        }
+    }.toMap()
     return MapUiState(
         rootRegions = roots,
         koreaProvinces = provinces,
+        districtsByProvince = districtsByProvince,
     )
 }
 
 private const val KoreaCountryCode = "KR"
 private const val KoreanProvincePrefix = "KR-"
-private const val DokdoProvinceCode = "KR-47"
 private const val CountryCodeLength = 2

@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -96,6 +97,7 @@ fun KoreaMapArtwork(
         regions.any { it.code == DokdoProvinceCode || it.code == DokdoDistrictCode }
     }
     var overviewData by remember { mutableStateOf<OverviewDistrictData?>(null) }
+    var overviewDistricts by remember { mutableStateOf<List<ProvincePolygon>?>(null) }
     var gunwiRegion by remember { mutableStateOf<ProvincePolygon?>(null) }
     LaunchedEffect(isProvinceOverview) {
         if (isProvinceOverview && overviewData == null) {
@@ -104,6 +106,13 @@ fun KoreaMapArtwork(
                     .single { it.code == GunwiDistrictCode }
                 GeneratedKoreaDistrictMapData.overviewData()
             }.getOrDefault(OverviewDistrictData(emptyList(), emptyList()))
+        }
+    }
+    LaunchedEffect(isProvinceOverview, visitedRegionCodes.isNotEmpty()) {
+        if (isProvinceOverview && visitedRegionCodes.isNotEmpty() && overviewDistricts == null) {
+            overviewDistricts = runCatching {
+                GeneratedKoreaDistrictMapData.overviewDistricts()
+            }.getOrDefault(emptyList())
         }
     }
     val projection = remember(bounds, viewportSize) {
@@ -173,6 +182,35 @@ fun KoreaMapArtwork(
             }
         }
     }
+    val preparedVisitedDistricts = remember(
+        overviewDistricts, overviewData, preparedRegions, projection, isProvinceOverview, visitedRegionCodes,
+    ) {
+        if (!isProvinceOverview || !projection.isValid) {
+            emptyList()
+        } else {
+            val sharedEdges = overviewData?.lines.orEmpty()
+                .flatMap { line -> line.zipWithNext { start, end -> setOf(start, end) } }.toSet()
+            overviewDistricts.orEmpty()
+                .filter { it.code in visitedRegionCodes }
+                .mapNotNull { district ->
+                    val provinceCode = overviewData?.labels?.firstOrNull { it.code == district.code }?.provinceCode
+                    val province = preparedRegions.firstOrNull { it.region.code == provinceCode }
+                        ?: return@mapNotNull null
+                    val fillPath = Path().apply {
+                        val rings = if (district.code == GunwiDistrictCode) district.rings else {
+                            alignDistrictFillWithProvince(district.rings, province.region.rings, sharedEdges)
+                        }
+                        rings.forEach { ring -> addProjectedRing(ring, projection) }
+                    }
+                    PreparedKoreaDistrictFill(
+                        fillPath = fillPath,
+                        // Gunwi's visible perimeter overrides the older Daegu province silhouette.
+                        clipPath = if (district.code == GunwiDistrictCode) fillPath else province.fillPath,
+                        smallIslandClipPath = province.smallIslandPath.takeUnless { district.code == GunwiDistrictCode },
+                    )
+                }
+        }
+    }
     var zoom by rememberSaveable(regions, isProvinceOverview) {
         mutableStateOf(if (isProvinceOverview) 1.5f else 1f)
     }
@@ -210,7 +248,7 @@ fun KoreaMapArtwork(
                         layout = textMeasurer.measure(
                             label.name,
                             overviewDistrictLabelStyle.copy(
-                                color = if (label.provinceCode in visitedRegionCodes) {
+                                color = if (label.code in visitedRegionCodes) {
                                     visitedOverviewLabelColor
                                 } else {
                                     overviewDistrictLabelStyle.color
@@ -369,6 +407,20 @@ fun KoreaMapArtwork(
                 }
             }
 
+            preparedVisitedDistricts.forEach { district ->
+                // Keep district fill inside the same province silhouette used by the visible outline.
+                clipPath(district.clipPath) {
+                    drawPath(path = district.fillPath, color = visitedFillColor)
+                }
+                if (transform.zoom >= OverviewIslandRevealZoom) {
+                    district.smallIslandClipPath?.let { islands ->
+                        clipPath(islands) {
+                            drawPath(path = district.fillPath, color = visitedFillColor)
+                        }
+                    }
+                }
+            }
+
             overviewDistrictOutlinePath?.let { path ->
                 drawPath(
                     path = path,
@@ -464,6 +516,12 @@ private data class PreparedKoreaRegion(
     val dokdoPath: Path?,
 )
 
+private data class PreparedKoreaDistrictFill(
+    val fillPath: Path,
+    val clipPath: Path,
+    val smallIslandClipPath: Path?,
+)
+
 internal fun List<ProvincePolygon>.sortedForMapRendering(): List<ProvincePolygon> =
     sortedByDescending(ProvincePolygon::area)
 
@@ -474,7 +532,7 @@ private data class PreparedKoreaLabel(
 )
 
 private const val MinZoom = 1f
-private const val MaxZoom = 6f
+private const val MaxZoom = 12f
 private const val PanSlackFraction = 0.1f
 private const val BoundaryEpsilon = 0.000001f
 private const val OverviewIslandAreaThreshold = 20f
