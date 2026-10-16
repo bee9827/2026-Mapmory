@@ -7,10 +7,8 @@ import com.mapmory.shared.data.remote.model.UploadFileRequestDto
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
-import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.content.ByteArrayContent
 import io.ktor.http.contentType
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -32,6 +30,8 @@ internal data class UploadedPhoto(
 }
 
 internal fun interface PhotoUploader {
+    suspend fun completedObjectKey(localId: String): String? = null
+    suspend fun forget(localIds: List<String>) {}
     suspend fun upload(sources: List<PhotoUploadSource>): Result<List<UploadedPhoto>>
 }
 
@@ -40,6 +40,10 @@ internal class PhotoUploadRemoteRepository(
     apiBaseUrl: String,
     private val accessTokenProvider: AccessTokenProvider,
 ) : PhotoUploader {
+    private val transfer = createPhotoUploadTransfer(client, apiBaseUrl)
+    override suspend fun completedObjectKey(localId: String): String? = transfer.completedObjectKey(localId)
+    override suspend fun forget(localIds: List<String>) = transfer.forget(localIds)
+
     private val presignedUploadsUrl = "${apiBaseUrl.trimEnd('/')}/uploads/presigned-urls"
 
     override suspend fun upload(sources: List<PhotoUploadSource>): Result<List<UploadedPhoto>> =
@@ -95,10 +99,8 @@ internal class PhotoUploadRemoteRepository(
                     require(contentType.contentType == "image") {
                         PhotoUploadPreparationFailureMessage
                     }
-                    client.put(upload.presignedUrl) {
-                        setBody(ByteArrayContent(source.bytes, contentType))
-                    }.requireSuccess()
-                    UploadedPhoto(source = source, objectKey = upload.objectKey)
+                    val objectKey = transfer.put(source, upload.presignedUrl, upload.objectKey, contentType)
+                    UploadedPhoto(source = source, objectKey = objectKey)
                 }
             }.awaitAll()
         }
