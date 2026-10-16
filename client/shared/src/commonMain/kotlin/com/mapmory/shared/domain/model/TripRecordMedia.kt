@@ -17,10 +17,11 @@ data class TripRecordMedia(
     val capturedAt: String? = null,
 )
 
+@kotlinx.serialization.Serializable
 data class TripRecordMediaDraft(
     val objectKey: String,
     val sortOrder: Int,
-    val previewBytes: ByteArray?,
+    @kotlinx.serialization.Transient val previewBytes: ByteArray? = null,
     val localPreviewKey: String? = null,
     val originalBytes: ByteArray? = null,
     val fileName: String? = null,

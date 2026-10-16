@@ -1,6 +1,7 @@
 package com.mapmory.shared.data.media
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
 import androidx.exifinterface.media.ExifInterface
@@ -16,6 +17,16 @@ class AndroidLocalPhotoDataSource(
     context: Context,
 ) : LocalPhotoDataSource {
     private val applicationContext = context.applicationContext
+
+    override suspend fun release(localId: String) = withContext(Dispatchers.IO) {
+        runCatching {
+            applicationContext.contentResolver.releasePersistableUriPermission(
+                Uri.parse(localId),
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        }
+        Unit
+    }
 
     override suspend fun capturedAt(localId: String): String? = withContext(Dispatchers.IO) {
         try {

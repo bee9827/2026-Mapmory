@@ -168,11 +168,12 @@ private class DefaultAppContainer(
     private val photoPreviewCache: PhotoPreviewCache?,
     backgroundSaveExecution: BackgroundSaveExecution,
     private val onClose: () -> Unit,
+    localPhotoDataSource: LocalPhotoDataSource?,
 ) : AppContainer {
     private val recordedPhotoIndex = com.mapmory.shared.data.media.RecordedPhotoIndex(photoPreviewCache)
     override val tripRecordRepository: TripRecordRepository =
         com.mapmory.shared.data.repository.PhotoUsageTripRecordRepository(tripRecordRepository, recordedPhotoIndex)
-    private val backgroundSaveScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val backgroundSaveScope = CoroutineScope(SupervisorJob() + backgroundSaveDispatcher())
     private val mutableTripRecordRevision = MutableStateFlow(0L)
     override val tripRecordRevision: StateFlow<Long> = mutableTripRecordRevision.asStateFlow()
     private val notifyTripRecordsChanged = {
@@ -186,6 +187,7 @@ private class DefaultAppContainer(
         execution = backgroundSaveExecution,
         photoPreviewCache = photoPreviewCache,
         onSaved = notifyTripRecordsChanged,
+        localPhotoDataSource = localPhotoDataSource,
     )
 
     override val viewModelFactory: MapmoryViewModelFactory = DefaultMapmoryViewModelFactory(
@@ -229,6 +231,7 @@ fun createAppContainer(
     backgroundSaveExecution: BackgroundSaveExecution = DirectBackgroundSaveExecution,
     placeRepository: PlaceRepository? = null,
     onClose: () -> Unit = {},
+    localPhotoDataSource: LocalPhotoDataSource? = null,
 ): AppContainer {
     val cachedTripStatistics = CachedTripStatisticsRepository(
         delegate = tripStatisticsRepository,
@@ -251,6 +254,7 @@ fun createAppContainer(
         thumbnailLoader = thumbnailLoader,
         photoPreviewCache = photoPreviewCache,
         backgroundSaveExecution = backgroundSaveExecution,
+        localPhotoDataSource = localPhotoDataSource,
         onClose = onClose,
     )
 }
@@ -445,6 +449,7 @@ internal fun createGuestRemoteAppContainer(
         thumbnailLoader = CachedTripRecordThumbnailLoader(photoPreviewLoader),
         photoPreviewCache = photoPreviewCache,
         backgroundSaveExecution = backgroundSaveExecution,
+        localPhotoDataSource = localPhotoDataSource,
         onClose = onClose,
     )
 }
