@@ -10,7 +10,6 @@ import com.jayway.jsonpath.JsonPath;
 import com.mapmory.backend.IntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,7 +23,6 @@ import org.springframework.test.web.servlet.MvcResult;
  * 서비스가 미리 초기화해 두지 않으면 LazyInitializationException이 난다.
  * 기존 인수 테스트는 모두 국가 단위(JP) 기록만 다뤄 이 경로를 지나지 않았다.
  */
-@AutoConfigureMockMvc
 class TravelRecordDetailAcceptanceTest extends IntegrationTest {
 
     private static final String SEOUL_PROVINCE_CODE = "11";

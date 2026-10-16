@@ -53,6 +53,7 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    systemProperty 'logging.level.org.springframework.test.context.cache', 'DEBUG'
 }
 
 tasks.bootJar {
