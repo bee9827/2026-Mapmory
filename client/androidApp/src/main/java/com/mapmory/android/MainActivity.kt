@@ -40,6 +40,11 @@ class MainActivity : ComponentActivity() {
     private val analyticsLogger by lazy { FirebaseAnalyticsLogger(applicationContext) }
     private val developerToolsInfo by lazy { loadDeveloperToolsInfo() }
 
+    override fun onResume() {
+        super.onResume()
+        appViewModel.forceUpdate.refresh()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val notificationPermission = registerForActivityResult(
@@ -95,6 +100,8 @@ class MainActivity : ComponentActivity() {
                         contentWindowInsets = WindowInsets.safeDrawing,
                         onThemeChanged = { isDarkTheme = it },
                         developerToolsInfo = developerToolsInfo,
+                        updateState = appViewModel.forceUpdate.state,
+                        onRetryUpdateCheck = appViewModel.forceUpdate::refresh,
                     )
                     BackHandler {
                         if (navigation.popBackStack()) {
@@ -124,9 +131,15 @@ private fun MainActivity.loadDeveloperToolsInfo(): MapmoryDeveloperToolsInfo? {
     val isDebuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
     if (!isDebuggable) return null
 
-    val appVersion = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+    val packageInfo = packageManager.getPackageInfo(packageName, 0)
+    val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        packageInfo.longVersionCode
+    } else {
+        packageInfo.versionCode.toLong()
+    }
     return MapmoryDeveloperToolsInfo(
-        appVersion = appVersion,
+        versionName = packageInfo.versionName.orEmpty(),
+        versionCode = versionCode,
         applicationId = packageName,
         buildType = "debug",
         apiBaseUrl = getString(R.string.mapmory_api_base_url),

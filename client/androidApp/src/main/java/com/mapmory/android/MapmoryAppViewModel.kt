@@ -14,6 +14,9 @@ import com.mapmory.shared.data.settings.AndroidOnboardingPreference
 import com.mapmory.shared.data.settings.AndroidThemePreference
 
 class MapmoryAppViewModel(application: Application) : AndroidViewModel(application) {
+    val forceUpdate = com.mapmory.android.update.AndroidForceUpdateController(application)
+    override fun onCleared() { forceUpdate.close() }
+
     val container: AppContainer = UploadContainer.get(application)
 }
 

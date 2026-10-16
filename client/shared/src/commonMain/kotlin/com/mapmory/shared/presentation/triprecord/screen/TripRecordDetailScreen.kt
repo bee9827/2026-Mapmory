@@ -98,6 +98,7 @@ fun TripRecordDetailScreen(
     modifier: Modifier = Modifier,
     initialLocationName: String? = null,
     initialLatestDate: String? = null,
+    initialPhotoCount: Int? = null,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var expandedPhotoIndex by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -140,6 +141,8 @@ fun TripRecordDetailScreen(
                 modifier = Modifier.fillMaxSize(),
                 locationName = initialLocationName,
                 latestDate = initialLatestDate,
+                photoCount = initialPhotoCount,
+                columnCount = photoColumns,
                 onBackClick = onBackClick,
             )
 

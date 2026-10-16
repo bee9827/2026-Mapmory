@@ -62,6 +62,8 @@ fun MainViewController(
     analytics: MapmoryAnalytics,
     tokenStore: AuthTokenStore,
     navigation: MapmoryNavigation,
+    updateState: com.mapmory.shared.update.ForceUpdateState,
+    onRetryUpdateCheck: () -> Unit,
 ): platform.UIKit.UIViewController {
     iosAnalytics = analytics
     val container = getIosContainer(apiBaseUrl, tokenStore)
@@ -71,6 +73,8 @@ fun MainViewController(
         MapmoryApp(
             container = container,
             navigation = navigation,
+            updateState = updateState,
+            onRetryUpdateCheck = onRetryUpdateCheck,
             contentWindowInsets = WindowInsets.safeDrawing,
             onThemeChanged = onThemeChanged,
             analytics = analytics,
