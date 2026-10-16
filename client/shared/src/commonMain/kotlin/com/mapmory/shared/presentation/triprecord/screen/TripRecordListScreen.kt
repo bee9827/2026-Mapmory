@@ -25,7 +25,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -399,6 +398,19 @@ private fun PendingTripRecordCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 7.dp),
                 )
+                if (!failed) {
+                    Text(
+                        text = when {
+                            save.status == BackgroundSaveStatus.QUEUED -> "업로드 대기 중"
+                            save.progressPercent >= 95 -> "기록 저장 중"
+                            save.remainingSeconds != null -> "약 ${save.remainingSeconds}초 남음"
+                            else -> "남은 시간 계산 중"
+                        },
+                        color = TripRecordPalette.current.secondaryText,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 7.dp),
+                    )
+                }
                 if (failed) {
                     Row(
                         modifier = Modifier.padding(top = 8.dp),
@@ -420,24 +432,7 @@ private fun PendingTripRecordCard(
                     }
                 }
             }
-            if (!failed) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(
-                        progress = { save.progressPercent / 100f },
-                        modifier = Modifier.size(32.dp),
-                        color = TripRecordPalette.current.primary,
-                        trackColor = TripRecordPalette.current.primarySoft,
-                        strokeWidth = 3.dp,
-                    )
-                    Text(
-                        text = "${save.progressPercent}%",
-                        color = TripRecordPalette.current.primary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-            }
+
         }
     }
 }

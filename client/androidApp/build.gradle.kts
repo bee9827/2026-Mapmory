@@ -90,6 +90,12 @@ tasks.matching { it.name == "processInternalGoogleServices" }.configureEach {
 }
 
 dependencies {
+    constraints {
+        implementation("androidx.fragment:fragment:1.3.6") {
+            because("Activity Result permissions require Fragment 1.3+; Play Services pulls in 1.1.0")
+        }
+    }
+    implementation("androidx.work:work-runtime-ktx:2.10.5")
     implementation(project(":shared"))
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.activity:activity-ktx:1.11.0")
