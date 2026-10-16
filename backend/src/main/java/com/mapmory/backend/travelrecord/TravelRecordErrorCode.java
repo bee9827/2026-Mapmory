@@ -21,7 +21,7 @@ public enum TravelRecordErrorCode implements ErrorCode {
             ErrorKind.INVALID_INPUT,
             "INVALID_REGION_TYPE",
             "지역 선택 단위가 올바르지 않습니다.",
-            "대한민국은 시군구 단위, 해외는 국가 단위로 선택해야 합니다."
+            "대한민국은 시도 또는 시군구 단위, 해외는 국가 단위로 선택해야 합니다."
     ),
     INVALID_PAGINATION(
             ErrorKind.INVALID_INPUT,

@@ -324,7 +324,8 @@ public class TravelRecordService {
         }
 
         if (KOREA_COUNTRY_CODE.equals(countryCode)) {
-            if (provinceCode == null || districtCode == null) {
+            // 부산광역시처럼 시·도까지만 골라도 저장한다. 시·군·구는 고를 수 있을 때만 고른다.
+            if (provinceCode == null) {
                 throw new BusinessException(TravelRecordErrorCode.REGION_REQUIRED);
             }
             return;

@@ -258,10 +258,17 @@ class TravelRecordServiceTest {
     }
 
     @Test
-    void 대한민국_여행에_시군구가_없으면_여행_일지를_생성하지_않는다() {
-        TravelRecordCommand command = createCommand("KR", "49", null);
+    void 대한민국_여행은_시군구_없이_시도_단위로도_생성한다() {
+        Region busan = mock(Region.class);
+        TravelRecordCommand command = createCommand("KR", "26", null);
+        when(regionResolver.resolve("KR", "26", null)).thenReturn(busan);
+        when(travelRecordRepository.save(any(TravelRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertInvalidRegion(command, "REGION_REQUIRED");
+        TravelRecord result = travelRecordService.create(member, command);
+
+        assertThat(result.getRegion()).isEqualTo(busan);
+        verify(travelRecordRepository).save(result);
     }
 
     @Test
