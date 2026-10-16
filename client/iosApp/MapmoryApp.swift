@@ -4,6 +4,7 @@ import Foundation
 import Shared
 import SwiftUI
 import UIKit
+import UserNotifications
 
 private let lightSystemBarColor = UIColor(
     red: 250.0 / 255.0,
@@ -30,6 +31,7 @@ private enum AppConfiguration {
 
 @main
 struct MapmoryApp: App {
+    @UIApplicationDelegateAdaptor(UploadAppDelegate.self) private var appDelegate
     @State private var isDarkTheme = false
     @Environment(\.scenePhase) private var scenePhase
     private let forceUpdate: IosForceUpdateController
@@ -122,6 +124,28 @@ private struct ComposeView: UIViewControllerRepresentable {
     }
 }
 
+final class UploadAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
+    }
+
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String, completionHandler: @escaping () -> Void) {
+        guard identifier == "com.mapmory.record-uploads" else {
+            completionHandler()
+            return
+        }
+        MainViewControllerKt.resumeBackgroundUploads(
+            apiBaseUrl: AppConfiguration.apiBaseUrl,
+            tokenStore: KeychainAuthTokenStore(apiBaseUrl: AppConfiguration.apiBaseUrl)
+        )
+        PhotoUploadTransferKt.handleBackgroundUploadEvents(completion: completionHandler)
+    }
+}
 
 private final class IosForceUpdateController {
     let state = ForceUpdateState(
