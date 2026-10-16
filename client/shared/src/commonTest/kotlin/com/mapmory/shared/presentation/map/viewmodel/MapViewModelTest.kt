@@ -121,6 +121,35 @@ class MapViewModelTest {
         assertTrue(viewModel.hasRecords(seoul))
     }
 
+    @Test
+    fun `전국지도는_기록한_시군구만_방문으로_표시한다`() = runSuspend {
+        val catalog = StaticRegionCatalog()
+        val repository = FakeTripRecordRepository(catalog) { "2026-08-31T00:00:00" }
+        repository.createTripRecord(draft(catalog.requireByCode("41150").id, "의정부 여행"))
+        repository.createTripRecord(draft(catalog.requireByCode("11680").id, "강남 여행"))
+        val viewModel = MapViewModel(repository, catalog)
+
+        viewModel.refresh()
+
+        assertEquals(setOf("41150", "11680"), viewModel.visitedKoreaDistrictCodes)
+        assertEquals(230, viewModel.koreaDistrictCount)
+    }
+
+    @Test
+    fun `시도에_직접_저장한_기록은_방문하지_않은_시군구를_칠하지_않는다`() = runSuspend {
+        val catalog = StaticRegionCatalog()
+        val repository = FakeTripRecordRepository(catalog) { "2026-08-31T00:00:00" }
+        val seoul = catalog.requireByCode("KR-11")
+        repository.createTripRecord(draft(seoul.id, "서울 기록"))
+        repository.createTripRecord(draft(catalog.requireByCode("11680").id, "강남 기록"))
+        val viewModel = MapViewModel(repository, catalog)
+
+        viewModel.refresh()
+
+        assertEquals(setOf("11680"), viewModel.visitedKoreaDistrictCodes)
+        assertTrue(viewModel.hasRecords(seoul))
+    }
+
     private fun draft(locationId: Long, title: String) = TripRecordDraft(
         locationId = locationId,
         title = title,
