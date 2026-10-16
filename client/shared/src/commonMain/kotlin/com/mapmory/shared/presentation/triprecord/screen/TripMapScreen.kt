@@ -49,7 +49,7 @@ fun TripMapScreen(
     mapScope: MapScope = MapScope.WORLD,
     visitedCount: Int = 0,
     onMapScopeChange: (MapScope) -> Unit = {},
-    showRegionLabels: Boolean = true,
+    showRegionLabels: Boolean = false,
     onRegionLabelsToggle: () -> Unit = {},
     onBackClick: () -> Unit,
     mapDetailTitle: String? = null,
