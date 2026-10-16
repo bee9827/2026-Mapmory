@@ -1,11 +1,11 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
 import com.mapmory.shared.presentation.components.MapmoryPhotoExpansion
+import com.mapmory.shared.presentation.components.PhotoListScrollBar
 import com.mapmory.shared.presentation.components.ScrollToTopEffect
 import com.mapmory.shared.presentation.components.MapmoryPhotoViewer
 import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import com.mapmory.shared.presentation.components.LocalMapmoryImageTransitionScope
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -285,8 +284,10 @@ private fun TripRecordPhotoAlbum(
                     }
                 }
             }
-            AlbumScrollBar(
-                scrollState = scrollState,
+            PhotoListScrollBar(
+                listState = scrollState,
+                contentKey = groups to columnCount,
+                testTag = "album-scrollbar",
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 5.dp, top = 8.dp, bottom = 8.dp),
@@ -377,46 +378,6 @@ private fun AlbumPhotoRow(
                     .aspectRatio(1f),
             )
         }
-    }
-}
-
-@Composable
-private fun AlbumScrollBar(
-    scrollState: LazyListState,
-    modifier: Modifier = Modifier,
-) {
-    val trackColor = TripRecordPalette.current.line.copy(alpha = 0.65f)
-    val thumbColor = TripRecordPalette.current.accent.copy(alpha = 0.9f)
-
-    Canvas(
-        modifier = modifier
-            .width(4.dp)
-            .fillMaxHeight(),
-    ) {
-        if (!scrollState.canScrollForward && !scrollState.canScrollBackward) return@Canvas
-        val layout = scrollState.layoutInfo
-        val averageHeight = layout.visibleItemsInfo.map { it.size }.average().toFloat()
-        if (!averageHeight.isFinite() || averageHeight <= 0f) return@Canvas
-        val viewportHeight = size.height
-        val contentHeight = averageHeight * layout.totalItemsCount + layout.beforeContentPadding + layout.afterContentPadding
-        val maxScrollValue = (contentHeight - viewportHeight).coerceAtLeast(1f)
-        val scrollValue = scrollState.firstVisibleItemIndex * averageHeight + scrollState.firstVisibleItemScrollOffset
-        val thumbHeight = (viewportHeight * viewportHeight / contentHeight)
-            .coerceAtLeast(44.dp.toPx())
-            .coerceAtMost(viewportHeight)
-        val progress = if (!scrollState.canScrollForward) 1f else (scrollValue / maxScrollValue).coerceIn(0f, 1f)
-        val thumbOffset = (viewportHeight - thumbHeight) * progress
-
-        drawRoundRect(
-            color = trackColor,
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.width / 2f),
-        )
-        drawRoundRect(
-            color = thumbColor,
-            topLeft = androidx.compose.ui.geometry.Offset(0f, thumbOffset),
-            size = androidx.compose.ui.geometry.Size(size.width, thumbHeight),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.width / 2f),
-        )
     }
 }
 
