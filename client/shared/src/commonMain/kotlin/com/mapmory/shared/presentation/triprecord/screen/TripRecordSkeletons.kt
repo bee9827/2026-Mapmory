@@ -106,49 +106,73 @@ private fun SkeletonCardText(
     }
 }
 
-/** 목록에서 받은 제목과 날짜를 표시하고 사진 한 장만 로딩 영역으로 남긴다. */
+/** 목록의 사진 개수로 상세 응답이 오기 전 사진첩 자리를 확보한다. */
 @Composable
 internal fun TripRecordDetailSkeleton(
     modifier: Modifier = Modifier,
     locationName: String? = null,
     latestDate: String? = null,
+    photoCount: Int? = null,
+    columnCount: Int = 2,
     onBackClick: () -> Unit = {},
 ) {
     val visibleLocationName = locationName?.takeIf { it.isNotBlank() } ?: "여행"
+    val rows = albumSkeletonRowSizes(photoCount, columnCount)
     Column(modifier.fillMaxSize()) {
         TripRecordTopBar(
-            title = visibleLocationName,
+            title = "",
             onBackClick = onBackClick,
         )
-        Spacer(Modifier.fillMaxWidth().height(1.dp).background(TripRecordPalette.current.line))
-        Column(
-            Modifier.fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(start = 24.dp, top = 32.dp, end = 32.dp, bottom = 36.dp),
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth().weight(1f).navigationBarsPadding(),
+            contentPadding = PaddingValues(start = 24.dp, top = 32.dp, end = 32.dp, bottom = 36.dp),
         ) {
-            AlbumHeading(locationName = visibleLocationName)
-            Spacer(Modifier.height(32.dp))
-            latestDate.toAlbumDate()?.let { date ->
-                Text(
-                    text = date.toAlbumDisplayDate(),
-                    color = TripRecordPalette.current.headingText,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                )
-                Spacer(Modifier.height(14.dp))
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SkeletonBox(
-                    Modifier.weight(1f).aspectRatio(1f),
-                    RoundedCornerShape(14.dp),
-                )
-                Spacer(Modifier.weight(1f).aspectRatio(1f))
+            item(key = "heading") { AlbumHeading(locationName = visibleLocationName) }
+            if (rows.isNotEmpty()) {
+                item(key = "date") {
+                    Box(Modifier.padding(top = 32.dp, bottom = 14.dp)) {
+                        val date = latestDate.toAlbumDate()
+                        if (date != null) {
+                            Text(
+                                text = date.toAlbumDisplayDate(),
+                                color = TripRecordPalette.current.headingText,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                            )
+                        } else {
+                            SkeletonCardText(18.sp, Modifier.width(140.dp), FontWeight.Bold)
+                        }
+                    }
+                }
+                items(rows.size, key = { "row:$it" }) { rowIndex ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(top = if (rowIndex == 0) 0.dp else 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        repeat(rows[rowIndex]) {
+                            SkeletonBox(
+                                Modifier.weight(1f).aspectRatio(1f),
+                                RoundedCornerShape(14.dp),
+                            )
+                        }
+                        repeat(columnCount - rows[rowIndex]) {
+                            Spacer(Modifier.weight(1f).aspectRatio(1f))
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+internal fun albumSkeletonRowSizes(photoCount: Int?, columnCount: Int): List<Int> {
+    require(columnCount > 0)
+    // 이전 API나 캐시에는 개수가 없으므로 한 장을 기본값으로 사용한다.
+    val count = (photoCount ?: 1).coerceAtLeast(0)
+    return List(count / columnCount + if (count % columnCount == 0) 0 else 1) { row ->
+        minOf(columnCount, count - row * columnCount)
     }
 }
 

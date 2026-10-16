@@ -532,7 +532,7 @@ private data class PreparedKoreaLabel(
 )
 
 private const val MinZoom = 1f
-private const val MaxZoom = 6f
+private const val MaxZoom = 12f
 private const val PanSlackFraction = 0.1f
 private const val BoundaryEpsilon = 0.000001f
 private const val OverviewIslandAreaThreshold = 20f

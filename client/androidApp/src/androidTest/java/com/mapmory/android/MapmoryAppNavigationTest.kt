@@ -53,13 +53,28 @@ class MapmoryAppNavigationTest {
     }
 
     @Test
+    fun forcedUpdateCannotBeDismissedWithBack() {
+        val update = com.mapmory.shared.update.ForceUpdateState("0.1.8", "https://play.google.com")
+        update.applyMinimumVersion("0.1.9")
+        update.finishCheck()
+        composeRule.setContent { MapmoryApp(container = createInMemoryAppContainer(), updateState = update) }
+        composeRule.onNodeWithText("업데이트가 필요해요").assertIsDisplayed()
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        composeRule.onNodeWithText("업데이트가 필요해요").assertIsDisplayed()
+        composeRule.runOnIdle { update.applyMinimumVersion("0.0.0") }
+        composeRule.onNodeWithText("업데이트가 필요해요").assertDoesNotExist()
+    }
+
+    @Test
     fun `개발자_도구는_디버그_정보가_제공될_때만_설정에서_열린다`() {
         val container = createInMemoryAppContainer()
         composeRule.setContent {
             MapmoryApp(
                 container = container,
                 developerToolsInfo = MapmoryDeveloperToolsInfo(
-                    appVersion = "0.1.7",
+                    versionName = "0.1.7",
+                    versionCode = 10L,
                     applicationId = "com.mapmory.android",
                     buildType = "debug",
                     apiBaseUrl = "https://dev-api.map-mory.com/api/v1",
@@ -71,7 +86,10 @@ class MapmoryAppNavigationTest {
 
         openSettings()
         composeRule.onNodeWithText("개발자 도구").performClick()
+        composeRule.onNodeWithText("versionName").assertIsDisplayed()
         composeRule.onNodeWithText("0.1.7").assertIsDisplayed()
+        composeRule.onNodeWithText("versionCode").assertIsDisplayed()
+        composeRule.onNodeWithText("10").assertIsDisplayed()
         composeRule.onNodeWithText("com.mapmory.android").assertIsDisplayed()
         composeRule.onNodeWithText("개발 서버").assertIsDisplayed()
         composeRule.onNodeWithText("https://dev-api.map-mory.com/api/v1").assertIsDisplayed()

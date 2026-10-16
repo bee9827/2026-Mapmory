@@ -1,8 +1,18 @@
 package com.mapmory.shared.presentation.triprecord.screen
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.semantics.Role
+import com.mapmory.shared.presentation.components.MapmoryBackButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,10 +72,7 @@ fun TripMapScreen(
             MapHeaderOverlay(
                 mapScope = mapScope,
                 visitedCount = visitedCount,
-                onMapScopeChange = onMapScopeChange,
-                mapDetailTitle = mapDetailTitle,
                 mapDetailTotal = mapDetailTotal,
-                onMapDetailBackClick = onMapDetailBackClick,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 14.dp),
@@ -87,15 +94,33 @@ fun TripMapScreen(
                     modifier = Modifier.align(Alignment.BottomEnd),
                 )
 
-                if (mapScope == MapScope.KOREA) {
-                    TripTagChip(
-                        text = if (showRegionLabels) "지역명 숨기기" else "지역명 표시",
-                        selected = showRegionLabels,
-                        onClick = onRegionLabelsToggle,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(12.dp),
-                    )
+                Column(
+                    modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(12.dp),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(34.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (mapScope == MapScope.KOREA && mapDetailTitle != null) {
+                            MapmoryBackButton(
+                                onClick = onMapDetailBackClick,
+                                color = TripRecordPalette.current.headingText,
+                                label = "$mapDetailTitle 지도에서 뒤로가기",
+                                modifier = Modifier.size(34.dp),
+                            )
+                        }
+                        Spacer(Modifier.weight(1f))
+                        MapScopeToggle(selected = mapScope, onSelected = onMapScopeChange)
+                    }
+                    if (mapScope == MapScope.KOREA) {
+                        TripTagChip(
+                            text = if (showRegionLabels) "지역명 숨기기" else "지역명 표시",
+                            selected = showRegionLabels,
+                            onClick = onRegionLabelsToggle,
+                        )
+                    }
                 }
             }
 
@@ -119,10 +144,7 @@ fun TripMapScreen(
 private fun MapHeaderOverlay(
     mapScope: MapScope,
     visitedCount: Int,
-    onMapScopeChange: (MapScope) -> Unit,
-    mapDetailTitle: String?,
     mapDetailTotal: Int?,
-    onMapDetailBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier) {
@@ -147,18 +169,12 @@ private fun MapHeaderOverlay(
                     fontWeight = FontWeight.Bold,
                 )
             }
-            MapScopeToggle(
-                selected = mapScope,
-                onSelected = onMapScopeChange,
-            )
         }
         Spacer(Modifier.height(14.dp))
         MapSummaryCard(
             mapScope = mapScope,
             visitedCount = visitedCount,
-            mapDetailTitle = mapDetailTitle,
             mapDetailTotal = mapDetailTotal,
-            onMapDetailBackClick = onMapDetailBackClick,
             modifier = Modifier.padding(horizontal = 12.dp),
         )
         Spacer(Modifier.height(6.dp))
@@ -170,28 +186,38 @@ private fun MapScopeToggle(
     selected: MapScope,
     onSelected: (MapScope) -> Unit,
 ) {
-    Row(
+    val thumbOffset by animateDpAsState(
+        targetValue = if (selected == MapScope.KOREA) 0.dp else 59.dp,
+        animationSpec = tween(260, easing = FastOutSlowInEasing),
+        label = "map-scope-thumb",
+    )
+    Box(
         modifier = Modifier
-            .width(174.dp)
-            .background(
-                color = TripMapPalette.current.scopeBackground,
-                shape = RoundedCornerShape(12.dp),
-            )
-            .border(1.dp, TripMapPalette.current.scopeBorder, RoundedCornerShape(12.dp))
-            .padding(3.dp),
+            .width(122.dp)
+            .height(34.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(TripMapPalette.current.scopeBackground)
+            .border(1.dp, TripMapPalette.current.scopeBorder, RoundedCornerShape(9.dp))
+            .padding(2.dp),
     ) {
-        MapScopeChip(
-            label = "⌖ 대한민국",
-            selected = selected == MapScope.KOREA,
-            onClick = { onSelected(MapScope.KOREA) },
-            modifier = Modifier.weight(1f),
+        Box(
+            Modifier.offset(x = thumbOffset).width(59.dp).fillMaxHeight()
+                .background(TripMapPalette.current.scopeSelectedBackground, RoundedCornerShape(6.dp)),
         )
-        MapScopeChip(
-            label = "◎ 전세계",
-            selected = selected == MapScope.WORLD,
-            onClick = { onSelected(MapScope.WORLD) },
-            modifier = Modifier.weight(1f),
-        )
+        Row(Modifier.fillMaxSize().selectableGroup()) {
+            MapScopeChip(
+                label = "⌖ 대한민국",
+                selected = selected == MapScope.KOREA,
+                onClick = { if (selected != MapScope.KOREA) onSelected(MapScope.KOREA) },
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
+            MapScopeChip(
+                label = "◎ 전세계",
+                selected = selected == MapScope.WORLD,
+                onClick = { if (selected != MapScope.WORLD) onSelected(MapScope.WORLD) },
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+            )
+        }
     }
 }
 
@@ -202,29 +228,31 @@ private fun MapScopeChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        text = label,
-        color = if (selected) TripMapPalette.current.scopeSelectedText else TripMapPalette.current.scopeUnselectedText,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        textAlign = TextAlign.Center,
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(
-                if (selected) TripMapPalette.current.scopeSelectedBackground else TripMapPalette.current.scopeBackground,
-            )
-            .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
+    val textColor by animateColorAsState(
+        targetValue = if (selected) TripMapPalette.current.scopeSelectedText else TripMapPalette.current.scopeUnselectedText,
+        animationSpec = tween(260),
+        label = "map-scope-text",
     )
+    Box(
+        modifier = modifier.clip(RoundedCornerShape(6.dp))
+            .selectable(selected = selected, role = Role.Tab, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            color = textColor,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+    }
 }
 
 @Composable
 private fun MapSummaryCard(
     mapScope: MapScope,
     visitedCount: Int,
-    mapDetailTitle: String?,
     mapDetailTotal: Int?,
-    onMapDetailBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val title = when (mapScope) {
@@ -258,21 +286,6 @@ private fun MapSummaryCard(
                 bottom = 14.dp,
             ),
     ) {
-        mapDetailTitle?.let { title ->
-            Text(
-                text = "← $title 전체에서 나가기",
-                color = TripRecordPalette.current.accent,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(TripRecordPalette.current.accentSoft)
-                    .clickable(onClick = onMapDetailBackClick)
-                    .padding(horizontal = 10.dp, vertical = 7.dp),
-            )
-            Spacer(Modifier.height(10.dp))
-        }
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
@@ -375,9 +388,6 @@ private fun MapSummaryCardPreview() {
     MapSummaryCard(
         mapScope = MapScope.WORLD,
         visitedCount = 3,
-        mapDetailTitle = "끄룽텝 마하나콘 아몬 랏따나꼬신 마힌따라 아유타야 마하딜록 뽑놉빠랏 랏차타니 부리롬 우돔랏차니우엣 마하싸탄 아몬삐만 아와딴싸티 싸카타띠야 위쓰누깜쁘라씻",
-        // 방콕의 본 도시명에 세계에서 제일 긴 도시 명이랍니다...
         mapDetailTotal = 9,
-        onMapDetailBackClick = {},
     )
 }
