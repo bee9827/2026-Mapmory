@@ -55,6 +55,7 @@ class BackgroundTripRecordSaver internal constructor(
     private val photoPreviewCache: PhotoPreviewCache? = null,
     private val onSaved: () -> Unit = {},
     private val automaticRetryDelayMillis: Long = AutomaticRetryDelayMillis,
+    private val localPhotoDataSource: com.mapmory.shared.data.media.LocalPhotoDataSource? = null,
 ) {
     private val queueMutex = Mutex()
     private val serverSaveStarted = mutableSetOf<Long>()
@@ -142,12 +143,27 @@ class BackgroundTripRecordSaver internal constructor(
 
     fun dismissFailure(id: Long) {
         if (mutableSaves.value.none { it.id == id && it.status == BackgroundSaveStatus.FAILED }) return
-        drafts.remove(id)
+        val discarded = drafts.remove(id)
         serverSaveStarted.remove(id)
         attemptStarts.remove(id)
         updatePendingPhotoIds()
         mutableSaves.update { current -> current.filterNot { save -> save.id == id } }
         persist()
+        scope.launch {
+            queueMutex.withLock {
+                discarded?.mediaObjectKeys?.distinct()?.forEach { localId ->
+                    if (drafts.values.none { localId in it.mediaObjectKeys }) {
+                        try {
+                            localPhotoDataSource?.release(localId)
+                        } catch (error: kotlinx.coroutines.CancellationException) {
+                            throw error
+                        } catch (_: Exception) {
+                            // Continue releasing the remaining files if one cleanup fails.
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun launch(id: Long) {

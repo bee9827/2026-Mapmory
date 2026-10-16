@@ -18,6 +18,37 @@ import kotlin.test.assertTrue
 
 class BackgroundTripRecordSaverTest {
     @Test
+    fun `폐기한_실패_작업의_원본은_마지막_참조가_사라진_뒤_정리한다`() = runBlocking {
+        val released = mutableListOf<String>()
+        val saver = BackgroundTripRecordSaver(
+            repository = object : EmptyTripRecordRepository() {
+                override suspend fun createTripRecord(draft: TripRecordDraft): Result<TripRecordData> =
+                    Result.failure(IllegalStateException("offline"))
+            },
+            scope = CoroutineScope(coroutineContext),
+            automaticRetryDelayMillis = 0,
+            localPhotoDataSource = object : com.mapmory.shared.data.media.LocalPhotoDataSource {
+                override suspend fun read(localId: String): ByteArray? = null
+                override suspend fun release(localId: String) { released += localId }
+            },
+        )
+        val photo = "mapmory-cache://pending-photo"
+        val first = saver.enqueue(draft().copy(mediaObjectKeys = listOf(photo)), "서울")
+        val second = saver.enqueue(draft().copy(mediaObjectKeys = listOf(photo)), "서울")
+        saver.saves.first { saves -> saves.size == 2 && saves.all { it.status == BackgroundSaveStatus.FAILED } }
+        assertTrue(released.isEmpty())
+        saver.dismissFailure(first)
+        kotlinx.coroutines.yield()
+        assertTrue(released.isEmpty())
+        saver.dismissFailure(second)
+        kotlinx.coroutines.yield()
+        assertEquals(listOf(photo), released)
+        saver.dismissFailure(second)
+        kotlinx.coroutines.yield()
+        assertEquals(listOf(photo), released)
+    }
+
+    @Test
     fun `영속_대기열을_복구하고_완료하면_디스크에서도_삭제한다`() = runBlocking {
         val store = TestSaveStore(listOf(PendingTripRecordSave(7, "서울", draft())))
         val saver = BackgroundTripRecordSaver(

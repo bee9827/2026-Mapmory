@@ -27,6 +27,23 @@ import kotlin.coroutines.suspendCoroutine
 
 class IosLocalPhotoDataSource : LocalPhotoDataSource {
     override suspend fun release(localId: String) {
+        if (localId.startsWith(IosPendingPhotoPrefix)) {
+            val root = NSSearchPathForDirectoriesInDomains(
+                NSApplicationSupportDirectory, NSUserDomainMask, true,
+            ).firstOrNull() as? String ?: return
+            val directory = "$root/$IosPendingPhotoDirectory/"
+            val path = localId.removePrefix(IosPendingPhotoPrefix)
+            // Only remove a direct child created by cacheIosPickerPhoto.
+            val filename = path.removePrefix(directory)
+            if (path.startsWith(directory) && filename.isNotEmpty() &&
+                filename != "." && filename != ".." && '/' !in filename
+            ) {
+                withContext(Dispatchers.Default) {
+                    NSFileManager.defaultManager.removeItemAtPath(path, null)
+                }
+            }
+            return
+        }
         val root = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, true).first() as String
         val directory = "$root/mapmory-upload-originals"
         val prefix = "$localId:".encodeToByteArray().joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
