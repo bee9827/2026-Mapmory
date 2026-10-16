@@ -97,6 +97,34 @@ class TravelRecordDetailAcceptanceTest extends IntegrationTest {
                 .andExpect(jsonPath("$.data.items[0].id").value(recordId));
     }
 
+    @Test
+    void 목록_지역_필터_코드_형식이_틀리면_400으로_거부한다() throws Exception {
+        String accessToken = guestAccessToken();
+
+        mockMvc.perform(get("/api/v1/travel-records")
+                        .param("countryCode", "kr")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+        mockMvc.perform(get("/api/v1/travel-records")
+                        .param("countryCode", "KR")
+                        .param("provinceCode", " ")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void 목록_지역_필터에_상위_지역_없이_하위_지역만_오면_400으로_거부한다() throws Exception {
+        String accessToken = guestAccessToken();
+
+        mockMvc.perform(get("/api/v1/travel-records")
+                        .param("provinceCode", BUSAN_PROVINCE_CODE)
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REGION_HIERARCHY"));
+    }
+
     private long createDistrictRecord(String accessToken) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/v1/travel-records")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
