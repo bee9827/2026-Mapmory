@@ -1,8 +1,12 @@
 package com.mapmory.backend;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.willAnswer;
+
 import com.mapmory.backend.auth.infrastructure.apple.AppleIdentityAdapter;
 import com.mapmory.backend.auth.infrastructure.google.GoogleIdentityAdapter;
 import com.mapmory.backend.auth.infrastructure.kakao.KakaoIdentityAdapter;
+import com.mapmory.backend.auth.web.ratelimit.GuestLoginRateLimitProperties;
 import com.mapmory.backend.auth.web.ratelimit.GuestLoginRateLimiter;
 import com.mapmory.backend.place.infrastructure.google.GooglePlacesClient;
 import com.mapmory.backend.place.infrastructure.google.GoogleRequestLimiter;
@@ -11,6 +15,8 @@ import com.mapmory.backend.support.MySqlTestContainerSupport;
 import com.mapmory.backend.support.SecuredTestController;
 import com.mapmory.backend.upload.storage.PresignedUrlProvider;
 import com.mapmory.backend.upload.storage.UploadedObjectChecker;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
@@ -46,6 +52,9 @@ import org.springframework.test.context.jdbc.Sql;
  * spy는 {@code given(spy.method())}로 stub하면 그 순간 실제 메서드가 불린다. {@code willReturn(...).given(spy).method()}로 stub한다.
  *
  * 인증 테스트용 컨트롤러(SecuredTestController)도 같은 이유로 모든 통합 테스트에 등록한다.
+ *
+ * 게스트 로그인 한도는 limiter가 메모리에 출처별로 센다. 컨텍스트를 같이 쓰면 앞선 테스트의 카운트가 남아
+ * 관계없는 테스트가 429로 깨질 수 있으므로, 테스트마다 운영 설정값으로 만든 새 limiter에 위임한다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -89,4 +98,14 @@ public abstract class IntegrationTest extends MySqlTestContainerSupport {
 
     @MockitoSpyBean
     protected RecordMediaUrlService recordMediaUrlService;
+
+    @Autowired
+    private GuestLoginRateLimitProperties guestLoginRateLimitProperties;
+
+    @BeforeEach
+    void startGuestLoginRateLimitFresh() {
+        GuestLoginRateLimiter limiter = new GuestLoginRateLimiter(guestLoginRateLimitProperties);
+        willAnswer(invocation -> limiter.tryAcquire(invocation.getArgument(0)))
+                .given(guestLoginRateLimiter).tryAcquire(anyString());
+    }
 }
