@@ -35,6 +35,7 @@ data class TripRecordSummary(
     val tags: List<Tag> = emptyList(),
 )
 
+@kotlinx.serialization.Serializable
 data class TripRecordDraft(
     val locationId: Long,
     val startDate: String,

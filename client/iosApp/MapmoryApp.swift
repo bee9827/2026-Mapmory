@@ -1,8 +1,10 @@
 import FirebaseCore
 import FirebaseRemoteConfig
+import Foundation
 import Shared
 import SwiftUI
 import UIKit
+import UserNotifications
 
 private let lightSystemBarColor = UIColor(
     red: 250.0 / 255.0,
@@ -29,6 +31,7 @@ private enum AppConfiguration {
 
 @main
 struct MapmoryApp: App {
+    @UIApplicationDelegateAdaptor(UploadAppDelegate.self) private var appDelegate
     @State private var isDarkTheme = false
     @Environment(\.scenePhase) private var scenePhase
     private let forceUpdate: IosForceUpdateController
@@ -121,6 +124,28 @@ private struct ComposeView: UIViewControllerRepresentable {
     }
 }
 
+final class UploadAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        UNUserNotificationCenter.current().delegate = self
+        return true
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
+    }
+
+    func application(_ application: UIApplication, handleEventsForBackgroundURLSession identifier: String, completionHandler: @escaping () -> Void) {
+        guard identifier == "com.mapmory.record-uploads" else {
+            completionHandler()
+            return
+        }
+        MainViewControllerKt.resumeBackgroundUploads(
+            apiBaseUrl: AppConfiguration.apiBaseUrl,
+            tokenStore: KeychainAuthTokenStore(apiBaseUrl: AppConfiguration.apiBaseUrl)
+        )
+        PhotoUploadTransferKt.handleBackgroundUploadEvents(completion: completionHandler)
+    }
+}
 
 private final class IosForceUpdateController {
     let state = ForceUpdateState(
@@ -134,12 +159,14 @@ private final class IosForceUpdateController {
 #endif
     private var fetching = false
     private var generation = 0
+    private var didCheckForStoreUpdate = false
 
     init() {
         _ = state.applyMinimumVersion(value: UserDefaults.standard.string(forKey: key) ?? "")
     }
 
     func refresh() {
+        checkForStoreUpdate()
         guard !fetching else { return }
         guard FirebaseApp.app() != nil else { state.finishCheck(); return }
         fetching = true
@@ -182,4 +209,48 @@ private final class IosForceUpdateController {
             UserDefaults.standard.set(value, forKey: key)
         }
     }
+
+    private func checkForStoreUpdate() {
+#if DEBUG || INTERNAL
+        return
+#else
+        guard !didCheckForStoreUpdate,
+              Bundle.main.bundleIdentifier == "com.mapmory.ios",
+              let installedVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+              var components = URLComponents(string: "https://itunes.apple.com/lookup") else {
+            return
+        }
+        didCheckForStoreUpdate = true
+        components.queryItems = [
+            URLQueryItem(name: "id", value: "6807056166"),
+            URLQueryItem(name: "country", value: "kr"),
+        ]
+        guard let lookupURL = components.url else { return }
+
+        URLSession.shared.dataTask(with: lookupURL) { data, response, error in
+            guard error == nil,
+                  let response = response as? HTTPURLResponse,
+                  (200..<300).contains(response.statusCode),
+                  let data,
+                  let results = try? JSONDecoder().decode(AppStoreLookupResponse.self, from: data).results,
+                  let app = results.first,
+                  app.bundleId == "com.mapmory.ios" else {
+                return
+            }
+            let updateAvailable = app.version.compare(installedVersion, options: .numeric) == .orderedDescending
+            DispatchQueue.main.async {
+                self.state.reportStoreUpdateAvailability(isAvailable: updateAvailable)
+            }
+        }.resume()
+#endif
+    }
+}
+
+private struct AppStoreLookupResponse: Decodable {
+    let results: [AppStoreApplication]
+}
+
+private struct AppStoreApplication: Decodable {
+    let bundleId: String
+    let version: String
 }
