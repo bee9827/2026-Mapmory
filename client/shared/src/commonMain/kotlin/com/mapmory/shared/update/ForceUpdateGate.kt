@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -26,9 +27,31 @@ import androidx.compose.ui.window.DialogProperties
 /** A modal gate keeps the underlying navigation/input state intact on foreground checks. */
 @Composable
 internal fun ForceUpdateGate(state: ForceUpdateState, onRetry: () -> Unit) {
-    if (!state.isBlocking) return
     val uriHandler = LocalUriHandler.current
     var storeError by remember { mutableStateOf(false) }
+    if (!state.isBlocking) {
+        if (state.isStoreUpdateAvailable) {
+            AlertDialog(
+                onDismissRequest = state::dismissStoreUpdate,
+                title = { Text("새 버전이 있어요") },
+                text = {
+                    Column {
+                        Text("최신 버전으로 업데이트하고 새로운 기능을 만나보세요.")
+                        if (storeError) Text("스토어를 열지 못했어요. 다시 시도해 주세요.")
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        storeError = runCatching { uriHandler.openUri(state.storeUrl) }.isFailure
+                    }) { Text("업데이트") }
+                },
+                dismissButton = {
+                    TextButton(onClick = state::dismissStoreUpdate) { Text("나중에") }
+                },
+            )
+        }
+        return
+    }
     Dialog(
         onDismissRequest = {},
         properties = DialogProperties(
