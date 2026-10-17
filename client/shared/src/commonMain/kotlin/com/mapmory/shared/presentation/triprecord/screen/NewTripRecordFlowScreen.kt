@@ -2204,32 +2204,34 @@ private fun PhotoPickerStep(
                             },
                         )
                     },
-                contentPadding = PaddingValues(start = 20.dp, top = 24.dp, end = 24.dp, bottom = 36.dp),
+                contentPadding = PaddingValues(top = 24.dp, bottom = 36.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
                 item {
-                    PhotoPickerHeader(
-                        locationName = locationName,
-                        selectedCount = pagingState.selectedIds.size,
-                        hasPhotos = pagingState.photos.isNotEmpty(),
-                        allSelected = pagingState.isAllSelectionActive() && !isSelectingAll,
-                        onAllToggle = onAllToggle,
-                        onPickFromGallery = onPickFromGallery,
-                    )
-                    if (showRecordedFilter) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            androidx.compose.material3.Checkbox(
-                                checked = excludeRecordedPhotos,
-                                enabled = !isRefreshingFilter,
-                                onCheckedChange = onRecordedFilterChanged,
-                            )
-                            Text(
-                                text = "이미 기록에 포함된 사진 숨기기",
-                                color = TripRecordPalette.current.bodyText,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(start = 4.dp),
-                            )
+                    Column(Modifier.padding(start = 20.dp, end = 24.dp)) {
+                        PhotoPickerHeader(
+                            locationName = locationName,
+                            selectedCount = pagingState.selectedIds.size,
+                            hasPhotos = pagingState.photos.isNotEmpty(),
+                            allSelected = pagingState.isAllSelectionActive() && !isSelectingAll,
+                            onAllToggle = onAllToggle,
+                            onPickFromGallery = onPickFromGallery,
+                        )
+                        if (showRecordedFilter) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                androidx.compose.material3.Checkbox(
+                                    checked = excludeRecordedPhotos,
+                                    enabled = !isRefreshingFilter,
+                                    onCheckedChange = onRecordedFilterChanged,
+                                )
+                                Text(
+                                    text = "이미 기록에 포함된 사진 숨기기",
+                                    color = TripRecordPalette.current.bodyText,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(start = 4.dp),
+                                )
+                            }
                         }
                     }
                 }
@@ -2243,7 +2245,7 @@ private fun PhotoPickerStep(
                                 TripRecordPalette.current.danger
                             },
                             fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 24.dp),
+                            modifier = Modifier.padding(start = 20.dp, top = 24.dp, end = 24.dp),
                         )
                     }
                 }
@@ -2251,7 +2253,7 @@ private fun PhotoPickerStep(
                     item {
                         EmptyPhotoPicker(
                             onPickFromGallery = onPickFromGallery,
-                            modifier = Modifier.padding(top = 24.dp),
+                            modifier = Modifier.padding(start = 20.dp, top = 24.dp, end = 24.dp),
                         )
                     }
                 } else {
@@ -2264,7 +2266,7 @@ private fun PhotoPickerStep(
                                 onGroupToggle = {
                                     onGroupToggle(item.photos.map(SelectedPhoto::id))
                                 },
-                                modifier = Modifier.animateItem().padding(top = 24.dp),
+                                modifier = Modifier.animateItem().padding(start = 20.dp, top = 24.dp, end = 24.dp),
                             )
 
                             is PhotoPickerListItem.PhotoRow -> PhotoSelectionRow(
@@ -2279,7 +2281,7 @@ private fun PhotoPickerStep(
                                 dragSelectionController = dragSelectionController,
                                 recordedPhotoIds = recordedPhotoIds,
                                 modifier = Modifier.animateItem().padding(
-                                    top = if (item.isFirstRowInDate) 12.dp else 10.dp,
+                                    top = if (item.isFirstRowInDate) 12.dp else 1.dp,
                                 ),
                             )
                         }
@@ -2470,7 +2472,7 @@ private fun PhotoSelectionRow(
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(1.dp),
     ) {
         photos.forEach { photo ->
             PhotoSelectionCard(
@@ -2509,15 +2511,14 @@ private fun PhotoSelectionCard(
         onDispose { dragSelectionController.remove(photo.id) }
     }
     var imageReady by remember(photo.id, photo.previewUri, photo.previewBytes) { mutableStateOf(false) }
-    val cardShape = RoundedCornerShape(16.dp)
+    val cardShape = RectangleShape
     Box(
         modifier = modifier
             .aspectRatio(1f)
             .clip(cardShape)
-            .border(
-                width = if (selected) 3.dp else 1.dp,
-                color = if (selected) TripRecordPalette.current.accent else TripRecordPalette.current.photoGalleryBorder,
-                shape = cardShape,
+            .then(
+                if (selected) Modifier.border(3.dp, TripRecordPalette.current.accent, cardShape)
+                else Modifier,
             )
             .onGloballyPositioned { layoutCoordinates ->
                 dragSelectionController.updateBounds(
@@ -2545,7 +2546,8 @@ private fun PhotoSelectionCard(
             imageBytes = photo.previewBytes,
             imageUri = photo.previewUri ?: photo.fullResolutionUri.takeIf { photo.previewBytes == null },
             sharedImageKey = "picker:${photo.id}",
-            sharedCornerRadius = 16.dp,
+            sharedCornerRadius = 0.dp,
+            shape = RectangleShape,
             onReadyChanged = { imageReady = it },
             cacheKey = "picker-preview:${photo.id}",
             contentDescription = photo.displayName,
@@ -2625,7 +2627,7 @@ private fun PhotoPreviewViewer(
             fallbackBytes = photo.previewBytes,
             cacheKey = if (usePreview) "picker-preview:${photo.id}" else "picker-full:${photo.id}",
             sharedImageKey = "picker:${photo.id}",
-            sharedCornerRadius = 16.dp,
+            sharedCornerRadius = 0.dp,
             contentDescription = "${photo.displayName} 확대 사진",
             blackLoadingBackground = true,
             modifier = Modifier.fillMaxSize().padding(vertical = 104.dp),
