@@ -5,6 +5,7 @@ import com.mapmory.shared.presentation.components.ScrollToTopEffect
 import com.mapmory.shared.presentation.components.MapmoryPhotoViewer
 import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import androidx.compose.animation.core.animateDpAsState
+import com.mapmory.shared.presentation.components.PhotoListScrollBar
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -126,7 +127,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 internal enum class NewRecordFlowStep {
     LOCATION,
@@ -2311,7 +2311,8 @@ private fun PhotoPickerStep(
             }
             PhotoListScrollBar(
                 listState = listState,
-                layoutKey = photoGridColumns,
+                contentKey = photoPickerItems to photoGridColumns,
+                testTag = "photo-picker-scrollbar",
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 5.dp, top = 8.dp, bottom = 8.dp),
