@@ -2,7 +2,6 @@ package com.mapmory.shared
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.window.ComposeUIViewController
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.uikit.EndEdgePanGestureBehavior
@@ -20,7 +19,43 @@ import com.mapmory.shared.data.settings.IosThemePreference
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.Platform
 
-@OptIn(ExperimentalNativeApi::class, ExperimentalComposeUiApi::class)
+private var iosContainer: com.mapmory.shared.app.AppContainer? = null
+private var iosAnalytics: MapmoryAnalytics = com.mapmory.shared.analytics.NoOpMapmoryAnalytics
+
+/** Bootstrap the same queue for a system relaunch, even when SwiftUI has no visible window. */
+fun resumeBackgroundUploads(apiBaseUrl: String, tokenStore: AuthTokenStore) {
+    getIosContainer(apiBaseUrl, tokenStore)
+}
+
+@OptIn(ExperimentalNativeApi::class)
+private fun getIosContainer(apiBaseUrl: String, tokenStore: AuthTokenStore): com.mapmory.shared.app.AppContainer {
+    iosContainer?.let { return it }
+    return createGuestRemoteAppContainer(
+        apiBaseUrl = apiBaseUrl,
+        tokenStore = tokenStore,
+        photoPreviewCache = IosPhotoPreviewCache(),
+        localPhotoDataSource = IosLocalPhotoDataSource(),
+        backgroundSaveExecution = IosBackgroundSaveExecution(apiBaseUrl),
+        mapSummaryCache = IosMapSummaryCache(),
+        tripStatisticsCache = IosTripStatisticsCache(),
+        themePreference = IosThemePreference(),
+        onboardingPreference = IosOnboardingPreference(),
+        onAuthRefreshFailed = { stage, error ->
+            if (!Platform.isDebugBinary) {
+                iosAnalytics.logEvent(
+                    MapmoryAnalyticsEvent.AUTH_SESSION_REFRESH_FAILED,
+                    mapOf(
+                        "platform" to "ios",
+                        "stage" to stage,
+                        "error_type" to (error::class.simpleName ?: "unknown"),
+                    ),
+                )
+            }
+        },
+    ).also { iosContainer = it }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
 fun MainViewController(
     apiBaseUrl: String,
     onThemeChanged: (Boolean) -> Unit,
@@ -29,36 +64,12 @@ fun MainViewController(
     navigation: MapmoryNavigation,
     updateState: com.mapmory.shared.update.ForceUpdateState,
     onRetryUpdateCheck: () -> Unit,
-) = createGuestRemoteAppContainer(
-    apiBaseUrl = apiBaseUrl,
-    tokenStore = tokenStore,
-    photoPreviewCache = IosPhotoPreviewCache(),
-    localPhotoDataSource = IosLocalPhotoDataSource(),
-    backgroundSaveExecution = IosBackgroundSaveExecution(),
-    mapSummaryCache = IosMapSummaryCache(),
-    tripStatisticsCache = IosTripStatisticsCache(),
-    themePreference = IosThemePreference(),
-    onboardingPreference = IosOnboardingPreference(),
-    onAuthRefreshFailed = { stage, error ->
-        if (!Platform.isDebugBinary) {
-            analytics.logEvent(
-                MapmoryAnalyticsEvent.AUTH_SESSION_REFRESH_FAILED,
-                mapOf(
-                    "platform" to "ios",
-                    "stage" to stage,
-                    "error_type" to (error::class.simpleName ?: "unknown"),
-                ),
-            )
-        }
-    },
-).let { container ->
-    ComposeUIViewController(configure = {
+): platform.UIKit.UIViewController {
+    iosAnalytics = analytics
+    val container = getIosContainer(apiBaseUrl, tokenStore)
+    return ComposeUIViewController(configure = {
         endEdgePanGestureBehavior = EndEdgePanGestureBehavior.Forward
     }) {
-        DisposableEffect(container) {
-            onDispose(container::close)
-        }
-
         MapmoryApp(
             container = container,
             navigation = navigation,

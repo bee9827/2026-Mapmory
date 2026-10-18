@@ -22,6 +22,28 @@ import kotlin.test.assertNull
 
 class UploadingTripRecordRepositoryTest {
     @Test
+    fun completedBackgroundTransferSkipsOriginalReadAndUpload() = runBlocking {
+        var forgotten = emptyList<String>()
+        val delegate = CapturingTripRecordRepository()
+        val repository = UploadingTripRecordRepository(
+            uploader = object : PhotoUploader {
+                override suspend fun completedObjectKey(localId: String) = "uploaded/recovered.jpg"
+                override suspend fun upload(sources: List<PhotoUploadSource>): Result<List<UploadedPhoto>> =
+                    error("A completed transfer must not upload again")
+                override suspend fun forget(localIds: List<String>) { forgotten = localIds }
+            },
+            delegate = delegate,
+            localPhotoDataSource = LocalPhotoDataSource { error("A completed transfer must not read iCloud again") },
+        )
+        repository.updateTripRecord(1, TripRecordDraft(
+            locationId = 1, startDate = "2026-10-15", mediaObjectKeys = listOf("local-photo"),
+            localMedia = listOf(TripRecordMediaDraft("local-photo", 0, null)),
+        )).getOrThrow()
+        assertEquals(listOf("uploaded/recovered.jpg"), delegate.updatedDraft?.mediaObjectKeys)
+        assertEquals(listOf("local-photo"), forgotten)
+    }
+
+    @Test
     fun transientPhotoUploadFailureIsRetriedWithoutRestartingPreviousPhotos() = runBlocking {
         val attempts = mutableMapOf<String, Int>()
         val localIds = listOf("content://photo/1", "content://photo/2")

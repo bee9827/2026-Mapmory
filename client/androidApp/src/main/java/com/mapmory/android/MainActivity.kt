@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.activity.enableEdgeToEdge
@@ -27,10 +28,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.colorResource
+import androidx.lifecycle.lifecycleScope
 import com.mapmory.shared.MapmoryApp
 import com.mapmory.shared.MapmoryNavigation
 import com.mapmory.android.analytics.FirebaseAnalyticsLogger
 import com.mapmory.shared.developer.MapmoryDeveloperToolsInfo
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val appViewModel: MapmoryAppViewModel by viewModels()
@@ -44,6 +47,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val notificationPermission = registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) {}
+        lifecycleScope.launch {
+            appViewModel.container.backgroundTripRecordSaver.saves.collect { saves ->
+                val preferences = getSharedPreferences("upload-notifications", MODE_PRIVATE)
+                if (Build.VERSION.SDK_INT >= 33 && saves.isNotEmpty() &&
+                    checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) !=
+                    android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                    !preferences.getBoolean("requested", false)
+                ) {
+                    preferences.edit().putBoolean("requested", true).apply()
+                    notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        }
         setContent {
             val navigation = remember { MapmoryNavigation() }
             var lastBackPressedAt by remember { mutableLongStateOf(0L) }

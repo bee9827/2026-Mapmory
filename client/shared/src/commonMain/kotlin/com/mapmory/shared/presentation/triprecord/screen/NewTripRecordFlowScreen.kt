@@ -5,6 +5,7 @@ import com.mapmory.shared.presentation.components.ScrollToTopEffect
 import com.mapmory.shared.presentation.components.MapmoryPhotoViewer
 import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import androidx.compose.animation.core.animateDpAsState
+import com.mapmory.shared.presentation.components.PhotoListScrollBar
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,7 +14,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -128,7 +127,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 internal enum class NewRecordFlowStep {
     LOCATION,
@@ -194,56 +192,6 @@ internal fun photoGridPinchResultAfterZoom(current: Int, accumulatedZoom: Float)
 
 internal fun shouldShowPhotoPreviewButton(columnCount: Int): Boolean = columnCount < 5
 
-internal data class PhotoPickerScrollBarMetrics(
-    val thumbFraction: Float,
-    val scrollFraction: Float,
-)
-
-internal data class PhotoPickerScrollTarget(
-    val itemIndex: Int,
-    val itemScrollOffset: Int,
-)
-
-internal fun photoPickerScrollTarget(
-    scrollFraction: Float,
-    viewportSize: Int,
-    itemSizes: List<Int>,
-    itemSpacing: Int,
-    contentPaddingBefore: Int,
-    contentPaddingAfter: Int,
-): PhotoPickerScrollTarget? {
-    if (viewportSize <= 0 || itemSizes.isEmpty()) return null
-    val contentSize = contentPaddingBefore + contentPaddingAfter +
-        itemSizes.sum() + itemSpacing * (itemSizes.size - 1).coerceAtLeast(0)
-    val maximumScrollOffset = (contentSize - viewportSize).coerceAtLeast(0)
-    var remainingOffset =
-        (scrollFraction.coerceIn(0f, 1f) * maximumScrollOffset).roundToInt() - contentPaddingBefore
-    if (remainingOffset <= 0) return PhotoPickerScrollTarget(0, 0)
-
-    itemSizes.forEachIndexed { index, itemSize ->
-        if (remainingOffset < itemSize + itemSpacing || index == itemSizes.lastIndex) {
-            return PhotoPickerScrollTarget(
-                itemIndex = index,
-                itemScrollOffset = remainingOffset.coerceIn(0, itemSize),
-            )
-        }
-        remainingOffset -= itemSize + itemSpacing
-    }
-    return PhotoPickerScrollTarget(itemSizes.lastIndex, itemSizes.last())
-}
-
-internal fun photoPickerScrollBarMetrics(
-    scrollOffset: Int,
-    viewportSize: Int,
-    contentSize: Int,
-): PhotoPickerScrollBarMetrics? {
-    if (viewportSize <= 0 || contentSize <= viewportSize) return null
-    val maxScrollOffset = contentSize - viewportSize
-    return PhotoPickerScrollBarMetrics(
-        thumbFraction = (viewportSize.toFloat() / contentSize).coerceIn(0f, 1f),
-        scrollFraction = (scrollOffset.toFloat() / maxScrollOffset).coerceIn(0f, 1f),
-    )
-}
 
 internal fun photoDragAutoScrollVelocity(
     pointerY: Float,
@@ -2361,8 +2309,10 @@ private fun PhotoPickerStep(
                     }
                 }
             }
-            PhotoPickerScrollBar(
+            PhotoListScrollBar(
                 listState = listState,
+                contentKey = photoPickerItems to photoGridColumns,
+                testTag = "photo-picker-scrollbar",
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 5.dp, top = 8.dp, bottom = 8.dp),
@@ -2371,98 +2321,6 @@ private fun PhotoPickerStep(
     }
 }
 
-@Composable
-private fun PhotoPickerScrollBar(
-    listState: androidx.compose.foundation.lazy.LazyListState,
-    modifier: Modifier = Modifier,
-) {
-    val layoutInfo = listState.layoutInfo
-    if (layoutInfo.visibleItemsInfo.isEmpty() || layoutInfo.totalItemsCount <= 0) return
-    val density = LocalDensity.current
-    val itemSpacing = with(density) { 0.dp.roundToPx() }
-    val contentPaddingBefore = with(density) { 24.dp.roundToPx() }
-    val contentPaddingAfter = with(density) { 36.dp.roundToPx() }
-    val knownItemSizes = remember(listState) { mutableMapOf<Int, Int>() }
-    layoutInfo.visibleItemsInfo.forEach { item -> knownItemSizes[item.index] = item.size }
-    val estimatedItemSize = knownItemSizes.values.average().roundToInt().coerceAtLeast(1)
-    val estimatedItemSizes = (0 until layoutInfo.totalItemsCount).map { index ->
-        knownItemSizes[index] ?: estimatedItemSize
-    }
-    val estimatedContentSize = contentPaddingBefore + contentPaddingAfter +
-        estimatedItemSizes.sum() +
-        itemSpacing * (layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-    val estimatedScrollOffset = (0 until listState.firstVisibleItemIndex).sumOf { index ->
-        (knownItemSizes[index] ?: estimatedItemSize) + itemSpacing
-    } + listState.firstVisibleItemScrollOffset
-    val viewportSize = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-    val scrollOffset = when {
-        !listState.canScrollBackward -> 0
-        !listState.canScrollForward -> estimatedContentSize - viewportSize
-        else -> estimatedScrollOffset
-    }
-    val metrics = photoPickerScrollBarMetrics(
-        scrollOffset = scrollOffset,
-        viewportSize = viewportSize,
-        contentSize = estimatedContentSize,
-    ) ?: return
-    val trackColor = TripRecordPalette.current.line.copy(alpha = 0.65f)
-    val thumbColor = TripRecordPalette.current.accent.copy(alpha = 0.9f)
-    var scrollRequestVersion by remember { mutableStateOf(0) }
-    var requestedScroll by remember { mutableStateOf<Pair<Int, Float>?>(null) }
-    LaunchedEffect(requestedScroll) {
-        val fraction = requestedScroll?.second ?: return@LaunchedEffect
-        val target = photoPickerScrollTarget(
-            scrollFraction = fraction,
-            viewportSize = viewportSize,
-            itemSizes = estimatedItemSizes,
-            itemSpacing = itemSpacing,
-            contentPaddingBefore = contentPaddingBefore,
-            contentPaddingAfter = contentPaddingAfter,
-        ) ?: return@LaunchedEffect
-        listState.scrollToItem(target.itemIndex, target.itemScrollOffset)
-    }
-    Canvas(
-        modifier = modifier
-            .width(24.dp)
-            .fillMaxHeight()
-            .testTag("photo-picker-scrollbar")
-            .semantics { contentDescription = "사진 목록 스크롤바" }
-            .pointerInput(estimatedContentSize, viewportSize) {
-                fun updateScrollPosition(pointerY: Float) {
-                    scrollRequestVersion += 1
-                    requestedScroll = scrollRequestVersion to
-                        (pointerY / size.height.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
-                }
-                detectDragGestures(
-                    onDragStart = { offset -> updateScrollPosition(offset.y) },
-                    onDrag = { change, _ ->
-                        change.consume()
-                        updateScrollPosition(change.position.y)
-                    },
-                )
-            },
-    ) {
-        val thumbHeight = (size.height * metrics.thumbFraction)
-            .coerceAtLeast(44.dp.toPx())
-            .coerceAtMost(size.height)
-        val thumbOffset = (size.height - thumbHeight) * metrics.scrollFraction
-        val barWidth = 4.dp.toPx()
-        val barOffsetX = (size.width - barWidth) / 2f
-        val cornerRadius = androidx.compose.ui.geometry.CornerRadius(barWidth / 2f)
-        drawRoundRect(
-            color = trackColor,
-            topLeft = Offset(barOffsetX, 0f),
-            size = androidx.compose.ui.geometry.Size(barWidth, size.height),
-            cornerRadius = cornerRadius,
-        )
-        drawRoundRect(
-            color = thumbColor,
-            topLeft = Offset(barOffsetX, thumbOffset),
-            size = androidx.compose.ui.geometry.Size(barWidth, thumbHeight),
-            cornerRadius = cornerRadius,
-        )
-    }
-}
 
 @Composable
 private fun PhotoPickerHeader(
