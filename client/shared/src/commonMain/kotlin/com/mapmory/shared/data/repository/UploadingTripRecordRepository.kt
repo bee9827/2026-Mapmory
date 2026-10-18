@@ -85,13 +85,22 @@ internal class UploadingTripRecordRepository(
         onProgress(ServerSaveProgress)
         val firstResult = save(prepared)
         if (firstResult.isSuccess || !draft.canRetryWithFreshObjectKeys(firstResult.exceptionOrNull())) {
-            if (firstResult.isSuccess) onProgress(100)
+            if (firstResult.isSuccess) {
+                uploader.forget(draft.mediaObjectKeys)
+                draft.mediaObjectKeys.forEach { localPhotoDataSource?.release(it) }
+                onProgress(100)
+            }
             return firstResult.withCachedMedia(prepared.localMedia)
         }
 
+        uploader.forget(draft.mediaObjectKeys)
         val retried = prepareDraft(draft, onProgress).getOrElse { error -> return Result.failure(error) }
         val result = save(retried).withCachedMedia(retried.localMedia)
-        if (result.isSuccess) onProgress(100)
+        if (result.isSuccess) {
+            uploader.forget(draft.mediaObjectKeys)
+            draft.mediaObjectKeys.forEach { localPhotoDataSource?.release(it) }
+            onProgress(100)
+        }
         return result
     }
 
@@ -106,6 +115,11 @@ internal class UploadingTripRecordRepository(
         if (pendingKeys.isEmpty()) onProgress(ServerSaveProgress)
 
         pendingKeys.forEachIndexed { index, key ->
+            uploader.completedObjectKey(key)?.let { objectKey ->
+                objectKeyByLocalId[key] = objectKey
+                onProgress(((index + 1) * ServerSaveProgress / pendingKeys.size).coerceAtMost(ServerSaveProgress))
+                return@forEachIndexed
+            }
             val media = mediaByLocalId[key]
                 ?: return Result.failure(
                     IllegalStateException(

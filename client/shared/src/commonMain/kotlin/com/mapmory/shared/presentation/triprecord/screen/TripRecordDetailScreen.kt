@@ -6,6 +6,11 @@ import com.mapmory.shared.presentation.components.ScrollToTopEffect
 import com.mapmory.shared.presentation.components.MapmoryPhotoViewer
 import com.mapmory.shared.presentation.components.MapmoryAsyncImage
 import com.mapmory.shared.presentation.components.LocalMapmoryImageTransitionScope
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -56,12 +61,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mapmory.shared.presentation.triprecord.state.TripRecordDetailUiState
@@ -230,6 +238,9 @@ private fun TripRecordPhotoAlbum(
     onPhotoClick: (TripRecordPhotoUiState) -> Unit,
 ) {
     var isPinching by remember { mutableStateOf(false) }
+    val photoRows = remember(groups, columnCount) {
+        groups.map { group -> group.photos.chunked(columnCount) }
+    }
     Column(Modifier.fillMaxSize()) {
         TripRecordTopBar(
             title = "",
@@ -241,11 +252,17 @@ private fun TripRecordPhotoAlbum(
                 )
             },
         )
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
         ) {
+            val photoSize = animateDpAsState(
+                targetValue = ((maxWidth - 56.dp - 8.dp * (columnCount - 1)) / columnCount)
+                    .coerceAtLeast(1.dp),
+                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                label = "albumPhotoSize",
+            )
             LazyColumn(
                 state = scrollState,
                 userScrollEnabled = !isPinching,
@@ -268,17 +285,17 @@ private fun TripRecordPhotoAlbum(
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(top = if (index == 0) 32.dp else 34.dp, bottom = 14.dp),
+                                modifier = Modifier.animateItem().padding(top = if (index == 0) 32.dp else 34.dp, bottom = 14.dp),
                             )
                         }
                         itemsIndexed(
-                            group.photos.chunked(columnCount),
+                            photoRows[index],
                             key = { _, photos -> "row:${photos.first().id}" },
                             contentType = { _, _ -> "photos" },
                         ) { rowIndex, photos ->
                             AlbumPhotoRow(
-                                photos, group.displayDate, columnCount, onPhotoClick,
-                                Modifier.padding(top = if (rowIndex == 0) 0.dp else 8.dp),
+                                photos, group.displayDate, columnCount, { photoSize.value }, onPhotoClick,
+                                Modifier.animateItem().padding(top = if (rowIndex == 0) 0.dp else 8.dp),
                             )
                         }
                     }
@@ -343,11 +360,12 @@ private fun AlbumPhotoRow(
     photos: List<TripRecordPhotoUiState>,
     displayDate: String,
     columnCount: Int,
+    photoSize: () -> Dp,
     onPhotoClick: (TripRecordPhotoUiState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().clipToBounds(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         photos.forEach { photo ->
@@ -363,8 +381,11 @@ private fun AlbumPhotoRow(
                 sharedCornerRadius = 14.dp,
                 onClick = { onPhotoClick(photo) },
                 modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(1f)
+                    .layout { measurable, _ ->
+                        val side = photoSize().roundToPx().coerceAtLeast(1)
+                        val placeable = measurable.measure(Constraints.fixed(side, side))
+                        layout(side, side) { placeable.placeRelative(0, 0) }
+                    }
                     .semantics {
                         contentDescription = "$displayDate 여행 사진 확대"
                     },
@@ -374,12 +395,16 @@ private fun AlbumPhotoRow(
         repeat(columnCount - photos.size) {
             Spacer(
                 modifier = Modifier
-                    .weight(1f)
-                    .aspectRatio(1f),
+                    .layout { measurable, _ ->
+                        val side = photoSize().roundToPx().coerceAtLeast(1)
+                        val placeable = measurable.measure(Constraints.fixed(side, side))
+                        layout(side, side) { placeable.placeRelative(0, 0) }
+                    },
             )
         }
     }
 }
+
 
 @Composable
 private fun ExpandedTripPhotoViewer(

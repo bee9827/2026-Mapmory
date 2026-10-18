@@ -51,6 +51,8 @@ internal fun photoScrollTarget(
     if (viewportSize <= 0 || itemSizes.isEmpty()) return null
     val contentSize = contentPaddingBefore + contentPaddingAfter + itemSizes.sum() +
         itemSpacing * (itemSizes.size - 1).coerceAtLeast(0)
+    // scrollToItem uses the same origin as firstVisibleItemScrollOffset: item 0 at offset 0
+    // already leaves beforeContentPadding visible. Subtracting it here would under-scroll.
     var offset = (scrollFraction.coerceIn(0f, 1f) * (contentSize - viewportSize).coerceAtLeast(0)).roundToInt()
     itemSizes.forEachIndexed { index, itemSize ->
         if (offset < itemSize + itemSpacing || index == itemSizes.lastIndex) {

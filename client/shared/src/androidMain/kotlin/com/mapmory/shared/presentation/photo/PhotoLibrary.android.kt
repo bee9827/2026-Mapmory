@@ -287,6 +287,12 @@ actual fun rememberPhotoLibraryActions(
                 try {
                     val result = traceSection("photo.pick.read") {
                         uris.mapNotNull { uri ->
+                            runCatching {
+                                context.contentResolver.takePersistableUriPermission(
+                                    uri,
+                                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                )
+                            }
                             context.readPhoto(uri, includeOriginalBytes = false)
                         }
                     }

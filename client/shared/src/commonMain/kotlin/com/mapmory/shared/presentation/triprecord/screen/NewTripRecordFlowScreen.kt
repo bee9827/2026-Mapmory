@@ -192,6 +192,7 @@ internal fun photoGridPinchResultAfterZoom(current: Int, accumulatedZoom: Float)
 
 internal fun shouldShowPhotoPreviewButton(columnCount: Int): Boolean = columnCount < 5
 
+
 internal fun photoDragAutoScrollVelocity(
     pointerY: Float,
     viewportTop: Float,
@@ -2310,7 +2311,7 @@ private fun PhotoPickerStep(
             }
             PhotoListScrollBar(
                 listState = listState,
-                contentKey = photoPickerItems,
+                contentKey = photoPickerItems to photoGridColumns,
                 testTag = "photo-picker-scrollbar",
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
@@ -2319,6 +2320,7 @@ private fun PhotoPickerStep(
         }
     }
 }
+
 
 @Composable
 private fun PhotoPickerHeader(

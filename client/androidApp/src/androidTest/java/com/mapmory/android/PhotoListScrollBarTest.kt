@@ -1,5 +1,6 @@
 package com.mapmory.android
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +44,50 @@ class PhotoListScrollBarTest {
             }
         }
         composeRule.waitForIdle()
+    }
+
+    @Test
+    fun paddedListSeeksToActualHalfwayAndBothEnds() {
+        composeRule.setContent {
+            state = rememberLazyListState()
+            Box(Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = state,
+                    contentPadding = PaddingValues(top = 96.dp, bottom = 36.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    items(100) { index ->
+                        Text("사진 $index", Modifier.fillMaxWidth().height(64.dp))
+                    }
+                }
+                PhotoListScrollBar(state, Modifier.align(Alignment.CenterEnd))
+            }
+        }
+        composeRule.waitForIdle()
+        val bar = composeRule.onNodeWithTag("photo-list-scrollbar")
+        bar.performTouchInput {
+            down(center)
+            up()
+        }
+        composeRule.runOnIdle {
+            val layout = state.layoutInfo
+            val itemSize = layout.visibleItemsInfo.first().size
+            val stride = itemSize + layout.mainAxisItemSpacing
+            val viewport = layout.viewportEndOffset - layout.viewportStartOffset
+            val content = layout.beforeContentPadding + layout.afterContentPadding +
+                itemSize * 100 + layout.mainAxisItemSpacing * 99
+            val actual = state.firstVisibleItemIndex * stride + state.firstVisibleItemScrollOffset
+            assertEquals((content - viewport) / 2f, actual.toFloat(), 2f)
+        }
+        bar.performTouchInput { down(Offset(centerX, height - 1f)); up() }
+        composeRule.runOnIdle { assertTrue(!state.canScrollForward) }
+        bar.performTouchInput { down(Offset(centerX, 0f)); up() }
+        composeRule.runOnIdle {
+            assertTrue(!state.canScrollBackward)
+            assertEquals(0, state.firstVisibleItemIndex)
+            assertEquals(0, state.firstVisibleItemScrollOffset)
+        }
     }
 
     @Test
