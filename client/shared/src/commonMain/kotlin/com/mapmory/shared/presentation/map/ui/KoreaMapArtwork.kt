@@ -98,12 +98,9 @@ fun KoreaMapArtwork(
     }
     var overviewData by remember { mutableStateOf<OverviewDistrictData?>(null) }
     var overviewDistricts by remember { mutableStateOf<List<ProvincePolygon>?>(null) }
-    var gunwiRegion by remember { mutableStateOf<ProvincePolygon?>(null) }
     LaunchedEffect(isProvinceOverview) {
         if (isProvinceOverview && overviewData == null) {
             overviewData = runCatching {
-                gunwiRegion = GeneratedKoreaDistrictMapData.forProvince("KR-27")
-                    .single { it.code == GunwiDistrictCode }
                 GeneratedKoreaDistrictMapData.overviewData()
             }.getOrDefault(OverviewDistrictData(emptyList(), emptyList()))
         }
@@ -197,16 +194,13 @@ fun KoreaMapArtwork(
                     val province = preparedRegions.firstOrNull { it.region.code == provinceCode }
                         ?: return@mapNotNull null
                     val fillPath = Path().apply {
-                        val rings = if (district.code == GunwiDistrictCode) district.rings else {
-                            alignDistrictFillWithProvince(district.rings, province.region.rings, sharedEdges)
-                        }
+                        val rings = alignDistrictFillWithProvince(district.rings, province.region.rings, sharedEdges)
                         rings.forEach { ring -> addProjectedRing(ring, projection) }
                     }
                     PreparedKoreaDistrictFill(
                         fillPath = fillPath,
-                        // Gunwi's visible perimeter overrides the older Daegu province silhouette.
-                        clipPath = if (district.code == GunwiDistrictCode) fillPath else province.fillPath,
-                        smallIslandClipPath = province.smallIslandPath.takeUnless { district.code == GunwiDistrictCode },
+                        clipPath = province.fillPath,
+                        smallIslandClipPath = province.smallIslandPath,
                     )
                 }
         }
@@ -240,7 +234,7 @@ fun KoreaMapArtwork(
             emptyList()
         } else if (isProvinceOverview) {
             val districtLabels = overviewData?.labels.orEmpty()
-                .filterNot { it.provinceCode in MetropolitanCityLabels && it.code != GunwiDistrictCode }
+                .filterNot { it.provinceCode in MetropolitanCityLabels }
                 .map { label ->
                     PreparedKoreaLabel(
                         code = label.code,
@@ -314,7 +308,6 @@ fun KoreaMapArtwork(
                     isProvinceOverview,
                     showRegionLabels,
                     preparedLabels,
-                    gunwiRegion,
                     dokdoTapCenter,
                     dokdoTapRadius,
                 ) {
@@ -349,14 +342,8 @@ fun KoreaMapArtwork(
                     } else if (labelRegion != null) {
                         currentOnRegionClick(labelRegion)
                     } else {
-                        val region = if (isProvinceOverview) {
-                            regions.overviewRegionAt(mapPoint, gunwiRegion)
-                        } else {
-                            regions.regionAt(mapPoint)
-                        }
-                        if (region?.code == GunwiDistrictCode) {
-                            currentOnRegionClick(region.code)
-                        } else if (
+                        val region = regions.regionAt(mapPoint)
+                        if (
                             isProvinceOverview &&
                             region != null &&
                             region.code !in MetropolitanCityLabels
@@ -537,7 +524,6 @@ private const val PanSlackFraction = 0.1f
 private const val BoundaryEpsilon = 0.000001f
 private const val OverviewIslandAreaThreshold = 20f
 private const val OverviewIslandRevealZoom = 1.8f
-private const val GunwiDistrictCode = "27720"
 private const val DokdoProvinceCode = "KR-47"
 private const val DokdoDistrictCode = "47940"
 private const val DokdoRingRadius = 0.05f
@@ -550,6 +536,7 @@ private val MetropolitanCityLabels = mapOf(
     "KR-30" to "대전광역시",
     "KR-31" to "울산광역시",
     "KR-50" to "세종특별자치시",
+    "KR-49" to "제주특별자치도",
 )
 private val DokdoMapPoint = GeoPoint(longitude = 131.86941f, latitude = 37.24006f)
 
@@ -767,12 +754,6 @@ private fun clampMapAxis(
     if (trailing - leading <= viewportSize) return value.coerceIn(-slack, slack)
     return value.coerceIn(viewportSize - trailing - slack, -leading + slack)
 }
-
-// The older province geometry still assigns Gunwi to Gyeongbuk.
-internal fun List<ProvincePolygon>.overviewRegionAt(
-    point: GeoPoint,
-    gunwiRegion: ProvincePolygon?,
-): ProvincePolygon? = listOfNotNull(gunwiRegion).regionAt(point) ?: regionAt(point)
 
 internal fun List<ProvincePolygon>.regionAt(point: GeoPoint): ProvincePolygon? =
     filter { region -> region.rings.any { pointInRing(point, it) } }
