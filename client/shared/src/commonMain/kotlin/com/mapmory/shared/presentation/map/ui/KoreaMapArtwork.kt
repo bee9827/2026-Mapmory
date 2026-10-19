@@ -3,6 +3,11 @@ package com.mapmory.shared.presentation.map.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +34,7 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -49,6 +55,7 @@ import com.mapmory.shared.preview.PreviewSurface
 import com.mapmory.shared.preview.previewVisitedRegions
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -103,19 +110,11 @@ fun KoreaMapArtwork(
     var overviewDistricts by remember {
         mutableStateOf(GeneratedKoreaDistrictMapData.cachedOverviewDistricts)
     }
-    var gunwiRegion by remember { mutableStateOf<ProvincePolygon?>(null) }
     LaunchedEffect(isProvinceOverview) {
-        if (isProvinceOverview) {
-            // This geometry is independent of whether overview data was already cached.
-            gunwiRegion = runCatching {
-                GeneratedKoreaDistrictMapData.forProvince("KR-27")
-                    .single { it.code == GunwiDistrictCode }
-            }.getOrNull()
-            if (overviewData == null) {
-                overviewData = runCatching {
-                    GeneratedKoreaDistrictMapData.overviewData()
-                }.getOrDefault(OverviewDistrictData(emptyList(), emptyList()))
-            }
+        if (isProvinceOverview && overviewData == null) {
+            overviewData = runCatching {
+                GeneratedKoreaDistrictMapData.overviewData()
+            }.getOrDefault(OverviewDistrictData(emptyList(), emptyList()))
         }
     }
     LaunchedEffect(isProvinceOverview, visitedRegionCodes.isNotEmpty()) {
@@ -207,16 +206,13 @@ fun KoreaMapArtwork(
                     val province = preparedRegions.firstOrNull { it.region.code == provinceCode }
                         ?: return@mapNotNull null
                     val fillPath = Path().apply {
-                        val rings = if (district.code == GunwiDistrictCode) district.rings else {
-                            alignDistrictFillWithProvince(district.rings, province.region.rings, sharedEdges)
-                        }
+                        val rings = alignDistrictFillWithProvince(district.rings, province.region.rings, sharedEdges)
                         rings.forEach { ring -> addProjectedRing(ring, projection) }
                     }
                     PreparedKoreaDistrictFill(
                         fillPath = fillPath,
-                        // Gunwi's visible perimeter overrides the older Daegu province silhouette.
-                        clipPath = if (district.code == GunwiDistrictCode) fillPath else province.fillPath,
-                        smallIslandClipPath = province.smallIslandPath.takeUnless { district.code == GunwiDistrictCode },
+                        clipPath = province.fillPath,
+                        smallIslandClipPath = province.smallIslandPath,
                     )
                 }
         }
@@ -225,7 +221,7 @@ fun KoreaMapArtwork(
         mutableStateOf(if (isProvinceOverview) 1.5f else 1f)
     }
     var pan by rememberSaveable(regions, stateSaver = MapPanSaver) { mutableStateOf(Offset.Zero) }
-    val currentTransform = rememberUpdatedState(MapTransform(zoom, pan))
+    var settleJob by remember { mutableStateOf<Job?>(null) }
     val backgroundColor = if (isDark) Color(0xFF121518) else Color(0xFFFAFCFB)
     val visitedFillColor = if (isDark) Color(0xFF35C987) else Color(0xFF4D9272)
     val unvisitedFillColor = if (isDark) Color(0xFF1B2536) else Color(0xFFE7EFE9)
@@ -250,7 +246,7 @@ fun KoreaMapArtwork(
             emptyList()
         } else if (isProvinceOverview) {
             val districtLabels = overviewData?.labels.orEmpty()
-                .filterNot { it.provinceCode in MetropolitanCityLabels && it.code != GunwiDistrictCode }
+                .filterNot { it.provinceCode in MetropolitanCityLabels }
                 .map { label ->
                     PreparedKoreaLabel(
                         code = label.code,
@@ -306,15 +302,36 @@ fun KoreaMapArtwork(
             .pointerInput(viewportSize, projection) {
                 detectTransformGestures(
                     panZoomLock = true,
-                ) { _, panChange, zoomChange, _ ->
-                    val transform = currentTransform.value
-                    val nextZoom = (transform.zoom * zoomChange).coerceIn(MinZoom, MaxZoom)
-                    zoom = nextZoom
-                    pan = projection.clampPan(
-                        pan = transform.pan + panChange,
-                        zoom = nextZoom,
-                        viewportSize = viewportSize,
+                ) { centroid, panChange, zoomChange, _ ->
+                    // Read state directly: several pointer events may arrive before recomposition.
+                    val next = transformKoreaMapGesture(
+                        MapTransform(zoom, pan), centroid, panChange, zoomChange, viewportSize,
                     )
+                    zoom = next.zoom
+                    val boundedPan = projection.clampPan(next.pan, next.zoom, viewportSize)
+                    pan = resistKoreaMapOverscroll(next.pan, boundedPan)
+                }
+            }
+            // Observe release without consuming input so taps and the standard pinch detector still work.
+            .pointerInput(viewportSize, projection) {
+                try {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        settleJob?.cancel()
+                        do {
+                            val event = awaitPointerEvent(PointerEventPass.Final)
+                        } while (event.changes.any { it.pressed })
+                        val target = projection.clampPan(pan, zoom, viewportSize)
+                        if (target != pan) {
+                            settleJob = coroutineScope.launch {
+                                Animatable(pan, Offset.VectorConverter).animateTo(target, tween(180)) {
+                                    pan = value
+                                }
+                            }
+                        }
+                    }
+                } finally {
+                    settleJob?.cancel()
                 }
             }
                 .pointerInput(
@@ -324,12 +341,11 @@ fun KoreaMapArtwork(
                     isProvinceOverview,
                     showRegionLabels,
                     preparedLabels,
-                    gunwiRegion,
                     dokdoTapCenter,
                     dokdoTapRadius,
                 ) {
                 detectTapGestures { position ->
-                    val transform = currentTransform.value
+                    val transform = MapTransform(zoom, pan)
                     val mapPoint = projection.unproject(position, transform, viewportSize)
                     val dokdoScreenCenter = dokdoTapCenter?.let { tapCenter ->
                         transformMapPoint(tapCenter, transform, viewportSize)
@@ -359,14 +375,8 @@ fun KoreaMapArtwork(
                     } else if (labelRegion != null) {
                         currentOnRegionClick(labelRegion)
                     } else {
-                        val region = if (isProvinceOverview) {
-                            regions.overviewRegionAt(mapPoint, gunwiRegion)
-                        } else {
-                            regions.regionAt(mapPoint)
-                        }
-                        if (region?.code == GunwiDistrictCode) {
-                            currentOnRegionClick(region.code)
-                        } else if (
+                        val region = regions.regionAt(mapPoint)
+                        if (
                             isProvinceOverview &&
                             region != null &&
                             region.code !in MetropolitanCityLabels
@@ -513,10 +523,30 @@ fun KoreaMapArtwork(
     }
 }
 
-private data class MapTransform(
+internal data class MapTransform(
     val zoom: Float,
     val pan: Offset,
 )
+
+internal fun transformKoreaMapGesture(
+    current: MapTransform,
+    centroid: Offset,
+    panChange: Offset,
+    zoomChange: Float,
+    viewportSize: IntSize,
+): MapTransform {
+    val nextZoom = (current.zoom * zoomChange).coerceIn(MinZoom, MaxZoom)
+    val effectiveScale = nextZoom / current.zoom
+    val center = Offset(viewportSize.width / 2f, viewportSize.height / 2f)
+    val anchor = centroid - center
+    return MapTransform(
+        zoom = nextZoom,
+        pan = anchor - (anchor - current.pan) * effectiveScale + panChange,
+    )
+}
+
+internal fun resistKoreaMapOverscroll(requested: Offset, bounded: Offset): Offset =
+    bounded + (requested - bounded) * 0.2f
 
 private data class PreparedKoreaRegion(
     val region: ProvincePolygon,
@@ -547,7 +577,6 @@ private const val PanSlackFraction = 0.1f
 private const val BoundaryEpsilon = 0.000001f
 private const val OverviewIslandAreaThreshold = 20f
 private const val OverviewIslandRevealZoom = 1.8f
-private const val GunwiDistrictCode = "27720"
 private const val DokdoProvinceCode = "KR-47"
 private const val DokdoDistrictCode = "47940"
 private const val DokdoRingRadius = 0.05f
@@ -560,6 +589,7 @@ private val MetropolitanCityLabels = mapOf(
     "KR-30" to "대전광역시",
     "KR-31" to "울산광역시",
     "KR-50" to "세종특별자치시",
+    "KR-49" to "제주특별자치도",
 )
 private val DokdoMapPoint = GeoPoint(longitude = 131.86941f, latitude = 37.24006f)
 
@@ -774,15 +804,13 @@ private fun clampMapAxis(
     viewportSize: Float,
     slack: Float,
 ): Float {
-    if (trailing - leading <= viewportSize) return value.coerceIn(-slack, slack)
+    if (trailing - leading <= viewportSize) {
+        // Match the large-map bounds continuously when its size crosses the viewport size.
+        val centeredPan = viewportSize / 2f - (leading + trailing) / 2f
+        return value.coerceIn(centeredPan - slack, centeredPan + slack)
+    }
     return value.coerceIn(viewportSize - trailing - slack, -leading + slack)
 }
-
-// The older province geometry still assigns Gunwi to Gyeongbuk.
-internal fun List<ProvincePolygon>.overviewRegionAt(
-    point: GeoPoint,
-    gunwiRegion: ProvincePolygon?,
-): ProvincePolygon? = listOfNotNull(gunwiRegion).regionAt(point) ?: regionAt(point)
 
 internal fun List<ProvincePolygon>.regionAt(point: GeoPoint): ProvincePolygon? =
     filter { region -> region.rings.any { pointInRing(point, it) } }
