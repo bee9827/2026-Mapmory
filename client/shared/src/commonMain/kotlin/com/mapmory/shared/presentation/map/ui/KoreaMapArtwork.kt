@@ -103,8 +103,13 @@ fun KoreaMapArtwork(
     val hasDokdoRegion = remember(regions) {
         regions.any { it.code == DokdoProvinceCode || it.code == DokdoDistrictCode }
     }
-    var overviewData by remember { mutableStateOf<OverviewDistrictData?>(null) }
-    var overviewDistricts by remember { mutableStateOf<List<ProvincePolygon>?>(null) }
+    // Re-entering from the editor must not first draw a map without cached details.
+    var overviewData by remember {
+        mutableStateOf(GeneratedKoreaDistrictMapData.cachedOverviewData)
+    }
+    var overviewDistricts by remember {
+        mutableStateOf(GeneratedKoreaDistrictMapData.cachedOverviewDistricts)
+    }
     LaunchedEffect(isProvinceOverview) {
         if (isProvinceOverview && overviewData == null) {
             overviewData = runCatching {
